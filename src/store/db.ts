@@ -607,7 +607,7 @@ export function openDatabaseReadonly(dbFile: string): Database.Database | undefi
 export function openDatabase(dbFile: string): Database.Database {
   let db: Database.Database;
   try {
-    db = new Database(dbFile);
+    db = new Database(dbFile, { timeout: 10000 });
   } catch (err) {
     throw new DodoError('INTERNAL_ERROR', `cannot open state database: ${(err as Error).message}`, {
       recovery: `check permissions on ${dbFile}`,
@@ -618,7 +618,7 @@ export function openDatabase(dbFile: string): Database.Database {
     // Concurrent owner CLI processes can otherwise fail at journal_mode=WAL
     // before migration's own retry loop has a chance to run.
     db.pragma('busy_timeout = 10000');
-    db.pragma('journal_mode = WAL');
+    withBusyRetry(() => db.pragma('journal_mode = WAL'));
     db.pragma('synchronous = FULL');
     db.pragma('foreign_keys = ON');
     migrateWithRetry(db);
@@ -646,33 +646,38 @@ export function openDatabase(dbFile: string): Database.Database {
  * failing the command. Migrations are idempotent (guarded by
  * schema_migrations), so a retry after another process finished is a no-op.
  */
-function migrateWithRetry(db: Database.Database, attempts = 5): void {
-  for (let i = 0; ; i += 1) {
+function migrateWithRetry(db: Database.Database): void {
+  withBusyRetry(() => migrate(db));
+}
+
+function withBusyRetry<T>(operation: () => T, timeoutMs = 15000): T {
+  const deadline = Date.now() + timeoutMs;
+  const waitCell = new Int32Array(new SharedArrayBuffer(4));
+  let attempt = 0;
+  for (;;) {
     try {
-      migrate(db);
-      return;
+      return operation();
     } catch (err) {
       const code = (err as { code?: string }).code ?? '';
-      if ((code === 'SQLITE_BUSY' || code === 'SQLITE_BUSY_SNAPSHOT' || /database is locked/.test((err as Error).message)) && i < attempts) {
-        // brief spin; better-sqlite3 is synchronous so we busy-wait shortly
-        const until = Date.now() + 200 * (i + 1);
-        while (Date.now() < until) {
-          /* wait */
-        }
-        continue;
-      }
-      throw err;
+      const busy = code === 'SQLITE_BUSY' || code === 'SQLITE_BUSY_SNAPSHOT' || /database is locked/.test((err as Error).message);
+      if (!busy || Date.now() >= deadline) throw err;
+      // Processes launched together otherwise wake in lockstep and repeatedly
+      // collide. A PID-derived offset keeps the wait deterministic per process
+      // while the capped backoff leaves enough time for the migration owner.
+      const delayMs = Math.min(50 * (2 ** attempt), 1000) + (process.pid % 47);
+      Atomics.wait(waitCell, 0, 0, Math.min(delayMs, Math.max(1, deadline - Date.now())));
+      attempt += 1;
     }
   }
 }
 
 function migrate(db: Database.Database): void {
-  db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)');
   // Run the whole migration under BEGIN IMMEDIATE so a second process that
-  // opens the store concurrently takes the write lock only after the first
-  // has committed, then re-reads applied versions and does nothing — instead
-  // of both racing the same CREATE TABLE (which would throw "already exists").
+  // opens the store concurrently takes the write lock before even creating
+  // schema_migrations. The loser waits, then re-reads applied versions after
+  // the winner commits instead of racing schema initialization.
   const apply = db.transaction(() => {
+    db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at INTEGER NOT NULL)');
     const appliedRows = db.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{ version: number }>;
     const applied = new Set(appliedRows.map((r) => r.version));
     if (appliedRows.some((r) => r.version > MIGRATIONS.length)) {
