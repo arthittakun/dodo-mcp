@@ -50,9 +50,14 @@ export async function killServers(configDir: string, timeoutMs = 30_000): Promis
 
   // Probe all candidates before stopping anything, so root aliases cannot race
   // their per-instance endpoints. Never trust stored PIDs as signal targets.
+  // Windows identity/credential validation runs synchronous ACL probes. A
+  // second worker would block the event loop while the first awaits its IPC
+  // handshake, spending that request's deadline on unrelated PowerShell work.
+  // Serialize there; retain every live identity and credential recheck.
+  const concurrency = process.platform === 'win32' ? 1 : 8;
   const live = new Map<number, { candidate: Candidate; status: Status; identity: string }>();
   let index = 0;
-  await Promise.all(Array.from({ length: Math.min(8, candidates.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(concurrency, candidates.length) }, async () => {
     while (index < candidates.length) {
       const w = candidates[index++]!, { socket } = w;
       try {
@@ -71,7 +76,7 @@ export async function killServers(configDir: string, timeoutMs = 30_000): Promis
   }));
   const targets = [...live.values()];
   index = 0;
-  await Promise.all(Array.from({ length: Math.min(8, targets.length) }, async () => {
+  await Promise.all(Array.from({ length: Math.min(concurrency, targets.length) }, async () => {
     while (index < targets.length) {
       const { candidate: w, status, identity } = targets[index++]!;
       try {

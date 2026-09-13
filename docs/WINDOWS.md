@@ -37,6 +37,9 @@ Desktop, speech, browser และ command sandbox ต้องผ่าน prob
 - LSP เทียบ URI ที่ normalize drive letter และ percent encoding แล้ว โดยไม่เปลี่ยน case ของชื่อไฟล์
 - private fixture ตรวจ Windows ACL; fault injection แบบ filesystem error ตรวจ rollback
   ได้ทุก platform เพิ่มจาก POSIX chmod test และจำกัด Windows file workers ที่สองตัว
+- `dodo kill` ตรวจและหยุด authenticated IPC endpoints ทีละรายการบน Windows
+  เพื่อไม่ให้ synchronous PowerShell ACL probes ขวางการรับ IPC response ของอีก
+  endpoint โดยยังตรวจ identity/epoch และรอ shutdown จริง ไม่ใช้ PID จาก state เพื่อส่ง signal
 
 ระบบจะประกาศ native support ได้เมื่อผ่าน named-pipe identity, NTFS
 reparse/ADS/8.3 guards, ACL enforcement, PATHEXT resolution, shell strategy,

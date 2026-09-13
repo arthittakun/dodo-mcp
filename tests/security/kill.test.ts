@@ -7,6 +7,7 @@ import { ensureConfigDir, statePaths, ipcSocketPath } from '../../src/config/pat
 import { openDatabase } from '../../src/store/db.js';
 import { Store } from '../../src/store/store.js';
 import { mintWorkspaceId } from '../../src/workspace/identity.js';
+import { encodeFileIdentity } from '../../src/platform/fileIdentity.js';
 import { killServers } from '../../src/cli/kill.js';
 import { startIpcServer } from '../../src/ipc/server.js';
 import { ipcCall } from '../../src/ipc/client.js';
@@ -19,8 +20,8 @@ function fixture() {
   ensureConfigDir(config);
   const store = new Store(openDatabase(statePaths(config).dbFile));
   const root = fs.realpathSync(base), id = mintWorkspaceId(store.installSecret(), root);
-  const st = fs.statSync(root);
-  store.upsertWorkspace({ id, root, dev: st.dev, ino: st.ino, epoch: 'test-epoch' });
+  const st = fs.statSync(root, { bigint: true });
+  store.upsertWorkspace({ id, root, dev: encodeFileIdentity(st.dev), ino: encodeFileIdentity(st.ino), epoch: 'test-epoch' });
   const socket = ipcSocketPath(config, id);
   const status = { pid: process.pid, root, workspaceId: id, workspaceEpoch: 'test-epoch', version: '1.0.0', transport: 'http' };
   return { config, socket, status, cleanup: () => { store.db.close(); fs.rmSync(base, { recursive: true, force: true }); } };

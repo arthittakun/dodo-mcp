@@ -11,9 +11,28 @@ import type { KillReport } from '../../src/cli/kill.js';
 
 const CLI = path.resolve('dist/cli/main.js');
 const exec = promisify(execFile);
-const cli = (args: string[], configDir: string, cwd = os.homedir()) => exec(process.execPath, [CLI, ...args], {
-  cwd, env: { ...process.env, DODO_CONFIG_DIR: configDir }, timeout: 35000, maxBuffer: 1024 * 1024,
-});
+const cli = async (args: string[], configDir: string, cwd = os.homedir()) => {
+  try {
+    return await exec(process.execPath, [CLI, ...args], {
+      cwd, env: { ...process.env, DODO_CONFIG_DIR: configDir },
+      // Windows validates each endpoint's DACL using PowerShell, sequentially.
+      timeout: process.platform === 'win32' && args[0] === 'kill' ? 120000 : 35000,
+      maxBuffer: 1024 * 1024,
+    });
+  } catch (error) {
+    if (args[0] === 'kill') {
+      // A nonzero kill command still returns its bounded, non-secret report.
+      // Surface just failure reasons, never raw stdout/stderr or credentials.
+      let reasons: string[] = [];
+      try {
+        const report = JSON.parse((error as { stdout: string }).stdout) as KillReport;
+        reasons = report.failed.slice(0, 8).map(item => item.reason.slice(0, 256));
+      } catch { /* missing/invalid report: retain the original command error */ }
+      if (reasons.length) throw new Error(`dodo kill failed: ${reasons.join('; ')}`);
+    }
+    throw error;
+  }
+};
 async function until(check: () => boolean | Promise<boolean>, ms = 15000) {
   const end = Date.now() + ms;
   while (!await check()) {
@@ -84,7 +103,10 @@ describe('dodo kill: CWD-independent shutdown with durable login', () => {
       for (const child of children) await closeChild(child);
       fs.rmSync(base, { recursive: true, force: true });
     }
-  }, 60000);
+  // Five real servers, multiple private ACL checks per endpoint and an owned
+  // job shutdown need a larger overall budget on native Windows. Individual
+  // IPC/drain deadlines and every isolation/authentication assertion remain.
+  }, process.platform === 'win32' ? 180000 : 60000);
 
   it('keeps existing access/refresh credentials and revocations across kill and restart', async () => {
     const ctx = await launch({ trust: 'trusted', configPort: 0 });
