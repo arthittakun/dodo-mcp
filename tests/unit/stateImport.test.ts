@@ -9,6 +9,7 @@ import { ensurePrivateDirectory } from '../../src/platform/privateFs.js';
 const owned: string[] = [];
 function fixture() {
   const base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-state-import-')));
+  ensurePrivateDirectory(base);
   owned.push(base);
   return { base, source: path.join(base, 'dodo-existing'), target: path.join(base, 'dodo') };
 }

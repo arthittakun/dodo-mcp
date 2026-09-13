@@ -28,6 +28,16 @@ Desktop, speech, browser และ command sandbox ต้องผ่าน prob
 
 ## งานที่ต้องผ่านก่อนประกาศรองรับ
 
+การแก้ candidate สำหรับ native CI:
+
+- directory identity ใช้ bigint เมื่ออ่าน NTFS; ค่าที่เกิน JavaScript safe integer
+  เก็บเป็น `u64:<decimal>` ใน JSON/SQLite เพื่อไม่ให้ file ID คนละค่าถูกปัดรวมกัน
+  ค่า integer เดิมยังอ่านได้ และการตรวจ replaced root/ACL/trust ยังคงมีผล
+- resource buffer เปิด staging file ด้วย writable handle ก่อน fsync ตามข้อกำหนด Windows
+- LSP เทียบ URI ที่ normalize drive letter และ percent encoding แล้ว โดยไม่เปลี่ยน case ของชื่อไฟล์
+- private fixture ตรวจ Windows ACL; fault injection แบบ filesystem error ตรวจ rollback
+  ได้ทุก platform เพิ่มจาก POSIX chmod test และจำกัด Windows file workers ที่สองตัว
+
 ระบบจะประกาศ native support ได้เมื่อผ่าน named-pipe identity, NTFS
 reparse/ADS/8.3 guards, ACL enforcement, PATHEXT resolution, shell strategy,
 process cancellation, read-only/antivirus file behavior, Windows argv limits,
@@ -40,3 +50,18 @@ conflict, rollback, jobs, setup และ package installation ผลปัจ�
 `MANUAL_NOT_RUN` Dedicated `windows-ci 02` self-hosted runner ใช้เก็บ automated native
 candidate evidence บน Node 22/24 แต่ไม่เปลี่ยน manual status เอง Workflow เลือก
 label `windows-ci 02` โดยเฉพาะ และเลิกใช้ runner 01 แล้ว
+
+## เริ่ม self-hosted runner บนเครื่องที่พบปัญหา locale
+
+หาก runner ล้มก่อน step แรกด้วย `PowerShellPreAmpersandEscape` ให้หยุด runner แล้ว
+รันใน PowerShell ที่โฟลเดอร์ runner เดิม:
+
+```powershell
+$env:DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = "1"
+$env:DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY = "false"
+.\run.cmd
+```
+
+ค่ามีผลเฉพาะหน้าต่างนี้; เมื่อเปิดใหม่ต้องตั้งอีกครั้ง Workflow คืน globalization
+ตามปกติให้ขั้นทดสอบ เพื่อไม่ใช้ workaround ของ runner มาบังปัญหา locale ใน DODO
+อาการและ workaround อ้างอิง [actions/runner#4686](https://github.com/actions/runner/issues/4686)

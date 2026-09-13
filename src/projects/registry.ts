@@ -6,6 +6,7 @@ import type { Store } from '../store/store.js';
 import { newId } from '../util/hash.js';
 import { mintWorkspaceId } from '../workspace/identity.js';
 import { resolveWorkspaceRoot, type RootInfo } from '../workspace/root.js';
+import { fileIdentityBigInt, parseFileIdentity, type FileIdentity } from '../platform/fileIdentity.js';
 
 export const PROJECT_METADATA_VERSION = 2;
 const MAX_PROJECTS = 1000;
@@ -40,7 +41,7 @@ export interface RegisteredProject {
   availability: ProjectAvailability;
   available: boolean;
   statusText: string;
-  identity: { dev: number; ino: number; birthtimeNs: string };
+  identity: { dev: FileIdentity; ino: FileIdentity; birthtimeNs: string };
 }
 
 export interface AddProjectResult {
@@ -85,7 +86,7 @@ function rawRows(db: Database.Database, includeRemoved: boolean): RegistryRow[] 
   ).all(MAX_PROJECTS + 1) as RegistryRow[];
 }
 
-function inspectAvailability(root: string, dev: number, ino: number, birthtimeNs: string): { availability: ProjectAvailability; statusText: string } {
+function inspectAvailability(root: string, dev: FileIdentity, ino: FileIdentity, birthtimeNs: string): { availability: ProjectAvailability; statusText: string } {
   let link: fs.Stats;
   try {
     link = fs.lstatSync(root);
@@ -105,8 +106,8 @@ function inspectAvailability(root: string, dev: number, ino: number, birthtimeNs
   if (
     !samePath(real, root) ||
     !stat.isDirectory() ||
-    stat.dev !== BigInt(dev) ||
-    stat.ino !== BigInt(ino) ||
+    stat.dev !== fileIdentityBigInt(dev) ||
+    stat.ino !== fileIdentityBigInt(ino) ||
     stat.birthtimeNs.toString() !== birthtimeNs
   ) {
     return { availability: 'replaced', statusText: 'path ชี้ไปยัง directory identity อื่น' };
@@ -129,8 +130,8 @@ function invalidProject(row: RegistryRow): RegisteredProject {
     available: false,
     statusText: 'registry metadata ไม่ถูกต้อง; ตรวจสอบและนำรายการนี้ออกก่อนใช้งาน',
     identity: {
-      dev: asFiniteInteger(row.root_dev) ?? 0,
-      ino: asFiniteInteger(row.root_ino) ?? 0,
+      dev: parseFileIdentity(row.root_dev) ?? 0,
+      ino: parseFileIdentity(row.root_ino) ?? 0,
       birthtimeNs: asBirthtimeNs(row.root_birthtime_ns) ?? '0',
     },
   };
@@ -141,8 +142,8 @@ function materialize(row: RegistryRow): RegisteredProject {
   const workspaceId = typeof row.workspace_id === 'string' && WORKSPACE_ID.test(row.workspace_id) ? row.workspace_id : undefined;
   const root = typeof row.canonical_root === 'string' && path.isAbsolute(row.canonical_root) ? row.canonical_root : undefined;
   const displayName = typeof row.display_name === 'string' && row.display_name.length >= 1 && row.display_name.length <= 120 && !/[\u0000-\u001f\u007f]/.test(row.display_name) ? row.display_name : undefined;
-  const dev = asFiniteInteger(row.root_dev);
-  const ino = asFiniteInteger(row.root_ino);
+  const dev = parseFileIdentity(row.root_dev);
+  const ino = parseFileIdentity(row.root_ino);
   const birthtimeNs = asBirthtimeNs(row.root_birthtime_ns);
   const createdAt = asFiniteInteger(row.created_at);
   const updatedAt = asFiniteInteger(row.updated_at);

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { launch, obtainToken, callToolLegacy, wsArgs, type TestContext, type TokenSet } from '../helpers/testServer.js';
@@ -18,6 +18,7 @@ describe('CHG-08/09: fault injection & boot reconciliation', () => {
     tokens = await obtainToken(ctx);
   }, 120_000);
   afterEach(async () => {
+    vi.restoreAllMocks();
     try {
       fs.chmodSync(path.join(ctx.fixtureDir, 'locked'), 0o755);
     } catch {
@@ -30,7 +31,7 @@ describe('CHG-08/09: fault injection & boot reconciliation', () => {
   const errCode = (env: Record<string, unknown>) => (env['error'] as Record<string, unknown> | null)?.['code'];
   const readFile = (rel: string) => fs.readFileSync(path.join(ctx.fixtureDir, rel), 'utf8');
 
-  it.skipIf(process.getuid?.() === 0)('CHG-08: a failing second write reverts the first (no half-applied changeset)', async () => {
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('CHG-08: a failing second write reverts the first (no half-applied changeset)', async () => {
     const preview = await callToolLegacy(ctx, tokens.accessToken, 'preview_changes', {
       ...wsArgs(ctx),
       operations: [
@@ -56,6 +57,35 @@ describe('CHG-08/09: fault injection & boot reconciliation', () => {
       expect(cs?.status).toBe('failed');
     }
     expect(readFile('locked/b.txt')).toBe('B\n');
+  });
+
+  it('CHG-08b: an injected filesystem failure on the second write rolls back the first on every platform', async () => {
+    const preview = await callToolLegacy(ctx, tokens.accessToken, 'preview_changes', {
+      ...wsArgs(ctx), operations: [
+        { op: 'replace_file', path: 'a.txt', content: 'A2\n' },
+        { op: 'replace_file', path: 'locked/b.txt', content: 'B2\n' },
+      ],
+    });
+    expect(preview.isError).toBe(false);
+    const plan = data(preview.envelope);
+    const open = fs.openSync;
+    let injected = false;
+    vi.spyOn(fs, 'openSync').mockImplementation((file, flags, mode) => {
+      if (!injected && typeof file === 'string' && path.dirname(file) === ctx.server.services.wfs.absOf('locked') && flags === 'wx') {
+        expect(readFile('a.txt')).toBe('A2\n');
+        injected = true;
+        throw Object.assign(new Error('fixture second-write failure'), { code: 'EACCES' });
+      }
+      return open(file, flags, mode);
+    });
+    const result = await callToolLegacy(ctx, tokens.accessToken, 'apply_changes', {
+      ...wsArgs(ctx), planId: plan['planId'], planHash: plan['planHash'], idempotencyKey: 'k-fault-portable',
+    });
+    expect(injected).toBe(true);
+    expect(result.isError).toBe(true);
+    expect(readFile('a.txt')).toBe('A\n');
+    expect(readFile('locked/b.txt')).toBe('B\n');
+    expect(ctx.server.services.store.listChangesets(ctx.server.workspaceId, 1)[0]?.status).toBe('failed');
   });
 
   it('CHG-09: a changeset left "committing" by a crash is reconciled on boot and blocks mutations until resolved', async () => {

@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import fs from 'node:fs';
+import { encodeFileIdentity, type FileIdentity } from '../../platform/fileIdentity.js';
 import { sandboxAvailability } from '../jobs/sandbox.js';
 import { CronExpressionParser } from 'cron-parser';
 import type { AppServices, Principal } from '../../tools/context.js';
@@ -19,7 +21,7 @@ export const ScheduleInput = z.object({
 }).strict();
 interface Payload {
   spec: z.infer<typeof ScheduleInput>;
-  root: string; dev: number; ino: number; policy: string;
+  root: string; dev: FileIdentity; ino: FileIdentity; policy: string;
   clientId: string | null; grantId: string | null;
 }
 interface Row {id:string; workspace_id:string; payload:string; digest:string; status:string; created_at:number; expires_at:number; next_at:number|null; approved_at:number|null}
@@ -70,8 +72,8 @@ export class ScheduleService {
     const p = JSON.parse(r.payload) as Payload;
     if (digestOf(p) !== r.digest) throw new DodoError('CONFLICT', 'schedule content changed since review');
     const root = this.s.store.getWorkspace(this.s.workspaceId)!;
-    const liveRoot = this.s.wfs.resolve('.').stat;
-    if (!liveRoot || liveRoot.dev !== p.dev || liveRoot.ino !== p.ino) throw new DodoError('FORBIDDEN', 'workspace directory identity changed');
+    const liveRoot = fs.statSync(this.s.wfs.resolve('.').abs, { bigint: true });
+    if (!liveRoot.isDirectory() || encodeFileIdentity(liveRoot.dev) !== p.dev || encodeFileIdentity(liveRoot.ino) !== p.ino) throw new DodoError('FORBIDDEN', 'workspace directory identity changed');
     if (root.root !== p.root || root.dev !== p.dev || root.ino !== p.ino || p.policy !== this.policy() || this.s.store.trustMode(this.s.workspaceId) !== 'trusted') throw new DodoError('FORBIDDEN', 'root or policy changed, or saved trust is not trusted; propose and approve again');
     if (p.clientId !== null && p.clientId !== 'stdio') {
       const g = p.grantId ? this.s.store.getGrant(p.grantId) : undefined;

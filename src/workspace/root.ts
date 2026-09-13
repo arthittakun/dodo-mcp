@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { DodoError } from '../errors.js';
 import { assertLocalWindowsRoot } from '../platform/pathPolicy.js';
+import { encodeFileIdentity, type FileIdentity } from '../platform/fileIdentity.js';
 
 /**
  * Workspace root rules (spec §4.2):
@@ -15,8 +16,8 @@ import { assertLocalWindowsRoot } from '../platform/pathPolicy.js';
  */
 export interface RootInfo {
   root: string; // realpath, absolute
-  dev: number;
-  ino: number;
+  dev: FileIdentity;
+  ino: FileIdentity;
   /** Stable directory-generation marker where the filesystem exposes birth time. */
   birthtimeNs: string | null;
 }
@@ -54,15 +55,10 @@ export function resolveWorkspaceRoot(candidate: string, opts: { allowUnsafe?: bo
       throw new DodoError('PATH_DENIED', `refusing unusually broad workspace root ${real} (--allow-unsafe-root overrides)`);
     }
   }
-  const dev = Number(st.dev);
-  const ino = Number(st.ino);
-  if (!Number.isSafeInteger(dev) || !Number.isSafeInteger(ino)) {
-    throw new DodoError('NOT_SUPPORTED', 'workspace directory identity exceeds JavaScript safe-integer limits');
-  }
   return {
     root: real,
-    dev,
-    ino,
+    dev: encodeFileIdentity(st.dev),
+    ino: encodeFileIdentity(st.ino),
     birthtimeNs: st.birthtimeNs > 0n ? st.birthtimeNs.toString() : null,
   };
 }

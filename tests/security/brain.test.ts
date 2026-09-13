@@ -66,12 +66,19 @@ describe('Phase 05 Project Brain security boundaries', () => {
       expect(denied.envelope.error).toMatchObject({ code: 'WORKSPACE_ACCESS_REQUIRED' });
     } finally { ctx.server.services.store.setClientAccess(ctx.server.workspaceId, reader.clientId, before); }
 
-    fs.writeFileSync(path.join(ctx.fixtureDir, 'safe.ts'), 'export const visibleBrainSymbol = 2;\n');
-    const freshOnly = BrainQueryResult.parse(assertOk(await gateway(owner.accessToken, 'dodo_assist_read', 'brain_query', { query: 'visibleBrainSymbol' })));
-    expect(freshOnly.nodes).toEqual([]);
-    expect(freshOnly.staleOmitted).toBeGreaterThan(0);
-    const stale = BrainQueryResult.parse(assertOk(await gateway(owner.accessToken, 'dodo_assist_read', 'brain_query', { query: 'visibleBrainSymbol', includeStale: true })));
-    expect(stale.nodes[0]?.freshness).toBe('stale');
+    // Keep the indexed snapshot fixed while testing live source validation.
+    // A background rebuild between the two HTTP requests would legitimately
+    // make the second result current, hiding the stale-snapshot scenario.
+    const brain = ctx.server.services.brain!;
+    await brain.pause(true);
+    try {
+      fs.writeFileSync(path.join(ctx.fixtureDir, 'safe.ts'), 'export const visibleBrainSymbol = 2;\n');
+      const freshOnly = BrainQueryResult.parse(assertOk(await gateway(owner.accessToken, 'dodo_assist_read', 'brain_query', { query: 'visibleBrainSymbol' })));
+      expect(freshOnly.nodes).toEqual([]);
+      expect(freshOnly.staleOmitted).toBeGreaterThan(0);
+      const stale = BrainQueryResult.parse(assertOk(await gateway(owner.accessToken, 'dodo_assist_read', 'brain_query', { query: 'visibleBrainSymbol', includeStale: true })));
+      expect(stale.nodes[0]?.freshness).toBe('stale');
+    } finally { await brain.pause(false); }
   });
 
   it('binds cursors to query, workspace and principal and rejects tampering', async () => {

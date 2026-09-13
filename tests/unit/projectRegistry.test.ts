@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectRegistry } from '../../src/projects/registry.js';
 import { openDatabase } from '../../src/store/db.js';
 import { Store } from '../../src/store/store.js';
+import { encodeFileIdentity } from '../../src/platform/fileIdentity.js';
 
 const owned: string[] = [];
 
@@ -100,11 +101,11 @@ describe('installation project registry', () => {
       // Make the old row match the replacement's dev/inode, exactly modeling
       // numeric identity reuse without depending on allocator or birth-time
       // clock resolution on the host filesystem.
-      const replacementStat = fs.statSync(root);
+      const replacementStat = fs.statSync(root, { bigint: true });
       const replacementBirthtime = fs.statSync(root, { bigint: true }).birthtimeNs;
       const differentBirthtime = replacementBirthtime + 1n;
       f.db.prepare('UPDATE project_registry SET root_dev = ?, root_ino = ?, root_birthtime_ns = ? WHERE id = ?')
-        .run(replacementStat.dev, replacementStat.ino, differentBirthtime.toString(), project.projectId);
+        .run(encodeFileIdentity(replacementStat.dev), encodeFileIdentity(replacementStat.ino), differentBirthtime.toString(), project.projectId);
       expect(f.registry.get(project.projectId).availability).toBe('replaced');
       expect(() => f.registry.add(root)).toThrow(/another directory identity/);
     } finally { f.db.close(); }

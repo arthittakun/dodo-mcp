@@ -8,6 +8,7 @@ import type { DiagnosticInfo, Position, ReferenceInfo, RenameResultData, SymbolI
 import { JsonRpcStdioClient, RpcResponseError } from './jsonrpc.js';
 import { resolveTrustedExecutable } from '../../platform/execResolve.js';
 import { isWithinPath } from '../../platform/pathPolicy.js';
+import { documentUri } from './documentUri.js';
 
 /**
  * Generic Language Server Protocol adapter: talks to OWNER-INSTALLED language
@@ -843,7 +844,9 @@ export class LspService {
 
   private readDoc(rel: string): OpenDoc {
     const { rel: normalized, text } = this.wfs.readTextFile(rel, this.limits.readFileBytes);
-    return { rel: normalized, uri: pathToFileURL(this.wfs.absOf(normalized)).href, doc: new TextDoc(text) };
+    const uri = documentUri(pathToFileURL(this.wfs.absOf(normalized)).href);
+    if (!uri) throw new DodoError('PATH_DENIED', 'cannot create a file URI for the document');
+    return { rel: normalized, uri, doc: new TextDoc(text) };
   }
 
   /**
@@ -876,7 +879,8 @@ export class LspService {
 
   private onPublishDiagnostics(entry: ServerEntry, params: unknown): void {
     if (!isRecord(params) || typeof params['uri'] !== 'string' || !Array.isArray(params['diagnostics'])) return;
-    const uri = params['uri'];
+    const uri = documentUri(params['uri']);
+    if (!uri || !entry.open.has(uri)) return;
     entry.diagnostics.delete(uri);
     entry.diagnostics.set(uri, params['diagnostics']);
     while (entry.diagnostics.size > MAX_STORED_DIAGNOSTIC_URIS) {

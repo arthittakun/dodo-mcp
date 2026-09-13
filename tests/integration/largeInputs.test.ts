@@ -9,6 +9,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { launch, obtainToken, callToolLegacy, wsArgs, type TestContext, type TokenSet } from '../helpers/testServer.js';
 import { sha256Bytes } from '../../src/util/hash.js';
 import { sandboxAvailability } from '../../src/services/jobs/sandbox.js';
+import { assertPrivatePath } from '../../src/platform/privateFs.js';
 
 const CLI = fileURLToPath(new URL('../../dist/cli/main.js', import.meta.url));
 const data = (env: Record<string, unknown>) => env['data'] as Record<string, unknown>;
@@ -62,8 +63,12 @@ describe('large coding inputs', () => {
     const launched = await call('run_command', { command: padding + "read -r value; printf 'got:%s' \"$value\"; sleep 60", background: true });
     const jobId = data(launched.envelope)['jobId'] as string;
     const script = scriptFor(jobId);
-    expect(fs.statSync(script).mode & 0o777).toBe(0o600);
-    expect(fs.statSync(path.dirname(script)).mode & 0o777).toBe(0o700);
+    assertPrivatePath(script);
+    assertPrivatePath(path.dirname(script), true);
+    if (process.platform !== 'win32') {
+      expect(fs.statSync(script).mode & 0o777).toBe(0o600);
+      expect(fs.statSync(path.dirname(script)).mode & 0o777).toBe(0o700);
+    }
     const input = await call('job_input', { jobId, data: 'hello\n' });
     expect(input.envelope['ok']).toBe(true);
     let output = '';

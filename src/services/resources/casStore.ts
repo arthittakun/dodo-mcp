@@ -104,7 +104,8 @@ export class CasStore {
     const stage = this.stagePath();
     try {
       fs.writeFileSync(stage, bytes, { flag: 'wx', mode: 0o600 });
-      const handle = fs.openSync(stage, 'r');
+      // FlushFileBuffers on Windows requires a writable handle.
+      const handle = fs.openSync(stage, 'r+');
       try { fs.fsyncSync(handle); } finally { fs.closeSync(handle); }
       return await this.commitStage(stage, digest, bytes.length);
     } finally {

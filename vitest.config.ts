@@ -12,5 +12,8 @@ export default defineConfig({
     // Suites share no global state (each test creates its own DODO_CONFIG_DIR),
     // but job/exec tests are sensitive to CPU contention on CI runners.
     maxConcurrency: 4,
+    // maxConcurrency bounds test.concurrent, not file workers. Native ACL
+    // probes start PowerShell; bound file workers to avoid starving IPC/CLI.
+    maxWorkers: process.platform === 'win32' ? 2 : undefined,
   },
 });

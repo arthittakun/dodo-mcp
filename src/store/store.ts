@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { decodeAccessScopes } from './scopeEncoding.js';
 import { randomBytes } from 'node:crypto';
 import { newId } from '../util/hash.js';
+import { requireFileIdentity, type FileIdentity } from '../platform/fileIdentity.js';
 
 /** Typed repository facade over the SQLite state database. */
 
@@ -10,8 +11,8 @@ export type TrustMode = 'inspect' | 'edit' | 'trusted';
 export interface WorkspaceRow {
   id: string;
   root: string;
-  dev: number;
-  ino: number;
+  dev: FileIdentity;
+  ino: FileIdentity;
   trustMode: TrustMode;
   createdAt: number;
   lastEpoch: string | null;
@@ -158,7 +159,9 @@ export class Store {
   }
 
   // ---- workspaces -------------------------------------------------------
-  upsertWorkspace(w: { id: string; root: string; dev: number; ino: number; epoch: string }): WorkspaceRow {
+  upsertWorkspace(w: { id: string; root: string; dev: FileIdentity; ino: FileIdentity; epoch: string }): WorkspaceRow {
+    requireFileIdentity(w.dev);
+    requireFileIdentity(w.ino);
     const existing = this.getWorkspace(w.id);
     if (!existing) {
       this.db
@@ -178,8 +181,8 @@ export class Store {
     return {
       id: r['id'] as string,
       root: r['root'] as string,
-      dev: r['dev'] as number,
-      ino: r['ino'] as number,
+      dev: requireFileIdentity(r['dev']),
+      ino: requireFileIdentity(r['ino']),
       trustMode: r['trust_mode'] as TrustMode,
       createdAt: r['created_at'] as number,
       lastEpoch: (r['last_epoch'] as string) ?? null,
