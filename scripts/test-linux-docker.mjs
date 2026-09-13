@@ -45,6 +45,7 @@ outputDir ||= path.join(root, 'release-evidence', pkg.version, `linux-docker-nod
 fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
 
 const image = `dodo-mcp-linux-gate:node${nodeVersion}`;
+const container = `dodo-mcp-linux-gate-node${nodeVersion}-${process.pid}-${Date.now()}`;
 console.log(`[linux-docker] building ${image} from revision ${revision.slice(0, 12)} (dirty=${dirty})`);
 run('docker', [
   'build', ...networkArgs, '--file', 'docker/linux-test.Dockerfile',
@@ -54,15 +55,33 @@ run('docker', [
 ]);
 
 console.log('[linux-docker] running Linux release gate with Playwright Chromium');
-run('docker', [
-  'run', '--rm', '--init', '--ipc=host', ...networkArgs,
-  '--security-opt', `seccomp=${path.join(root, 'docker', 'chromium-seccomp.json')}`,
-  '--mount', `type=bind,source=${outputDir},target=/evidence`,
-  '--env', `DODO_RELEASE_GATE_SOURCE_REVISION=${revision}`,
-  '--env', `DODO_RELEASE_GATE_SOURCE_DIRTY=${dirty}`,
-  '--env', `DODO_RELEASE_GATE_GITHUB_ACTIONS=${githubActionsUsed}`,
-  image,
-]);
+let gateError;
+try {
+  run('docker', [
+    'run', '--name', container, '--init', '--ipc=host', ...networkArgs,
+    '--security-opt', `seccomp=${path.join(root, 'docker', 'chromium-seccomp.json')}`,
+    '--env', `DODO_RELEASE_GATE_SOURCE_REVISION=${revision}`,
+    '--env', `DODO_RELEASE_GATE_SOURCE_DIRTY=${dirty}`,
+    '--env', `DODO_RELEASE_GATE_GITHUB_ACTIONS=${githubActionsUsed}`,
+    image,
+  ]);
+} catch (error) {
+  gateError = error;
+} finally {
+  let copyError;
+  try {
+    run('docker', ['cp', `${container}:/evidence/.`, outputDir], { timeout: 60_000 });
+  } catch (error) {
+    copyError = error;
+  }
+  try {
+    run('docker', ['rm', '--force', container], { capture: true, timeout: 30_000 });
+  } catch (error) {
+    if (!gateError && !copyError) throw error;
+  }
+  if (!gateError && copyError) throw copyError;
+}
+if (gateError) throw gateError;
 
 const reportFile = path.join(outputDir, 'gate-report.json');
 const report = JSON.parse(fs.readFileSync(reportFile, 'utf8'));

@@ -15,9 +15,11 @@ Run from the repository root:
 npm run test:linux:docker
 ```
 
-The container receives only a writeable evidence directory. Source is copied
-into the image, not mounted from the host. The same command runs locally and on
-the dedicated `linux-ci` self-hosted GitHub Actions runner; reports record the
+Source is copied into the image, not mounted from the host. Evidence is written
+inside the container and retrieved with `docker cp` after the gate exits. This
+avoids host/container UID and SELinux bind-mount mismatches without making the
+evidence directory world-writable. The same command runs locally and on the
+dedicated `linux-ci` self-hosted GitHub Actions runner; reports record the
 runner origin explicitly. That runner uses Docker host networking because its
 bridge resolver cannot reach public package registries; filesystem and process
 isolation remain containerized, and the workflow accepts trusted `main` pushes
