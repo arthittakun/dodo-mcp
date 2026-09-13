@@ -221,6 +221,7 @@ manual external-client acceptance
 
 Automated fixtures: รัน `npm run bench`, `npm run release:gate` บน macOS และ
 `npm run test:linux:docker` สำหรับ Linux แล้วตรวจ `gate-report.json` ใต้ ignored
-`release-evidence/` โครงการไม่ใช้ GitHub Actions เป็น test runner Manual external AI,
-owner repository และ Windows ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน
-`MANUAL_NOT_RUN` จากผล benchmark บน macOS หรือ Linux Docker
+`release-evidence/` Self-hosted GitHub Actions รัน Linux Docker และ Windows native
+candidate บน trusted main/manual เท่านั้น Manual external AI, owner repository และ
+Windows 11 ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน `MANUAL_NOT_RUN` จากผล
+automated บน macOS, Linux Docker หรือ Windows runner

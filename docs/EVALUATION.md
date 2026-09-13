@@ -45,9 +45,10 @@ write → read → edit → read-back ผ่าน Compact gateway
 หลักฐาน non-secret ถูกเขียนใต้ `release-evidence/<version>/` ซึ่งถูก ignore ทั้ง Git
 และ npm package สคริปต์ไม่ publish npm, ไม่แก้ tunnel/DNS และไม่แตะ owner state จริง
 
-## Platform gate ที่ใช้ในช่วงนี้
+## Platform gates
 
-โครงการไม่ใช้ GitHub Actions เป็น test runner หลักฐาน platform มาจากสองทางเท่านั้น:
+macOS รันจาก owner checkout ส่วน Linux gate เดียวกันรันได้ทั้ง local Docker และ
+dedicated self-hosted GitHub Actions runner:
 
 ```bash
 # macOS บน checkout ปัจจุบัน
@@ -62,13 +63,20 @@ private เข้า build context ตัว runner ส่งเฉพาะ rev
 เข้า release gate และ DodoBench ผ่าน environment attestation ที่รับได้เฉพาะใน Linux
 container จากนั้นตรวจ report กลับว่าตรงกับ revision และ lock digest เดิม
 
+`.github/workflows/platform-gates.yml` ใช้ self-hosted labels `linux-ci` และ
+`windows-ci` ทดสอบ Node 22/24 เฉพาะ push ที่ `main` กับ manual dispatch ไม่มี
+`pull_request` trigger เพราะ repository เป็น public และ untrusted PR ต้องไม่ execute
+บนเครื่อง runner ของเจ้าของ Actions dependencies ถูก pin ด้วย commit SHA และ token
+มีเพียง `contents: read`
+
 `npm run release:gate:strict` ต้องใช้ source ที่ clean และมี macOS/Linux evidence จาก
 revision กับ `package-lock.json` เดียวกัน Windows ถูกระบุเป็น
 `DEFERRED_MANUAL_NOT_RUN` และไม่ถูกนับเป็น supported release platform ในช่วงนี้
 Manual external-AI, owner workspace และ Windows 11 อยู่แยกเป็น `MANUAL_NOT_RUN`
 Strict gate รับ Linux evidence เฉพาะ `docker-host-git` จาก clean checkout พร้อม
 fresh-install PASS จึงไม่รับ candidate ที่มี uncommitted source หรือ report จาก runner
-ชนิดอื่น ไม่มีคำสั่งเหล่านี้ publish npm
+ชนิดอื่น Report บันทึก origin ว่ามาจาก local หรือ GitHub Actions ตามจริง ไม่มีคำสั่ง
+เหล่านี้ publish npm
 
 ## Security invariants
 

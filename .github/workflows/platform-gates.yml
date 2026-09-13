@@ -1,0 +1,107 @@
+name: platform-gates
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Self-hosted runners execute repository code. Do not add pull_request or
+# pull_request_target without a separate, disposable runner trust boundary.
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-gates-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux-docker:
+    name: Linux Docker / Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: [self-hosted, Linux, X64, linux-ci]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout trusted main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          clean: true
+          persist-credentials: false
+      - name: Use Node ${{ matrix.node }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Verify Linux Docker runner
+        run: |
+          test "$RUNNER_OS" = Linux
+          docker version
+          docker info
+      - name: Run isolated Linux release gate
+        run: >-
+          node scripts/test-linux-docker.mjs
+          --node "${{ matrix.node }}"
+          --output-dir "$GITHUB_WORKSPACE/release-evidence/ci/linux-node-${{ matrix.node }}"
+      - name: Upload non-secret Linux evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-docker-node-${{ matrix.node }}
+          path: release-evidence/ci/linux-node-${{ matrix.node }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+  windows-native:
+    name: Windows native / Node ${{ matrix.node }}
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: [self-hosted, Windows, X64, windows-ci]
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout trusted main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          clean: true
+          persist-credentials: false
+      - name: Use Node ${{ matrix.node }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Verify native Windows runner and enabled Administrator token
+        run: |
+          $evidence = Join-Path $env:GITHUB_WORKSPACE "release-evidence/ci/windows-node-${{ matrix.node }}"
+          New-Item -ItemType Directory -Force $evidence | Out-Null
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          $administrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+          @{ platform = [Environment]::OSVersion.Platform.ToString(); arch = $env:PROCESSOR_ARCHITECTURE; administrator = $administrator } |
+            ConvertTo-Json -Compress | Set-Content -Encoding utf8 (Join-Path $evidence "runner.json")
+          if ($env:RUNNER_OS -ne "Windows") { throw "windows-ci label is not a Windows runner" }
+          if (-not $administrator) { throw "windows-ci must run with an enabled Administrator token for native ACL tests" }
+      - name: Install dependencies and Playwright Chromium
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install chromium
+      - name: Run native Windows release candidate gate
+        run: >-
+          node scripts/release-gate.mjs
+          --output-dir "$env:GITHUB_WORKSPACE/release-evidence/ci/windows-node-${{ matrix.node }}"
+      - name: Upload non-secret Windows evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-native-node-${{ matrix.node }}
+          path: release-evidence/ci/windows-node-${{ matrix.node }}/
+          if-no-files-found: warn
+          retention-days: 14

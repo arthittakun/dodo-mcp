@@ -67,7 +67,8 @@ Directory guard ไม่ใช่ OS sandbox, repository instructions ไม่
 ## Evaluation evidence
 
 DodoBench local fixture ใช้ยืนยัน contract บน platform/revision ที่ report ระบุเท่านั้น
-ผลของ macOS ไม่แทน Linux และ Linux Docker ไม่แทน Windows native ช่วงนี้ release gate
-ต้องมีหลักฐาน macOS local และ Linux Docker ที่ revision/lock digest ตรงกัน Docker image
-ติดตั้ง Playwright Chromium เพื่อรัน browser case จริง โครงการไม่ใช้ GitHub Actions
-เป็น test runner ส่วน Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
+ผลของ macOS ไม่แทน Linux และ Linux Docker ไม่แทน Windows native Release gate ต้องมี
+หลักฐาน macOS local และ Linux Docker ที่ revision/lock digest ตรงกัน Docker image
+ติดตั้ง Playwright Chromium เพื่อรัน browser case จริง Dedicated self-hosted GitHub
+Actions รัน Linux Docker และ Windows native candidate เฉพาะ trusted main/manual
+Windows manual acceptance ยังคง `MANUAL_NOT_RUN` จนกว่าจะทดสอบบน Windows 11 จริง

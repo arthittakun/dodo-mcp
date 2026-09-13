@@ -1,6 +1,6 @@
 # ADR-041: Local macOS and Docker Linux release gates
 
-Status: Accepted
+Status: Superseded by ADR-043
 
 ## Context
 

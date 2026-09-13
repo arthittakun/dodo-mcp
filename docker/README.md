@@ -13,7 +13,8 @@ npm run test:linux:docker
 ```
 
 The container receives only a writeable evidence directory. Source is copied
-into the image, not mounted from the host. GitHub Actions is not part of this
-gate.
+into the image, not mounted from the host. The same command runs locally and on
+the dedicated `linux-ci` self-hosted GitHub Actions runner; reports record the
+runner origin explicitly.
 
 Source: https://github.com/microsoft/playwright/blob/v1.63.0/utils/docker/seccomp_profile.json

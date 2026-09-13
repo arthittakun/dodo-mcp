@@ -35,3 +35,9 @@ browser case ขึ้นกับ Chromium และ external AI/Windows hardwa
 platforms ไม่ใช้ GitHub Actions Docker image ติดตั้ง Chromium และสร้าง package/fresh
 install evidence จาก source copy แยก report ต้องตรงกับ host Git revision และ lock digest
 Windows แสดงเป็น `DEFERRED_MANUAL_NOT_RUN`; Linux Docker ไม่ใช่ Windows evidence
+
+## Addendum — trusted self-hosted runners
+
+ADR-043 เปิด GitHub Actions กลับมาหลัง dedicated Linux/Windows runners พร้อมใช้งาน
+Linux ยังคงรัน Docker gate เดิมและ Windows รัน native candidate gate ส่วน macOS เป็น
+local release gate Report ระบุ runner origin และ automated Windows ไม่แทน manual gate

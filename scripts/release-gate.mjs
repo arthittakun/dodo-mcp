@@ -45,12 +45,17 @@ function sourceState() {
   const assertedRevision = process.env['DODO_RELEASE_GATE_SOURCE_REVISION'];
   const assertedDirty = process.env['DODO_RELEASE_GATE_SOURCE_DIRTY'];
   if (assertedRevision === undefined && assertedDirty === undefined) {
-    return { revision: git(['rev-parse', 'HEAD']), dirty: git(['status', '--porcelain']).length > 0, provenance: 'local-git' };
+    const revision = git(['rev-parse', 'HEAD']);
+    const githubActionsUsed = process.env['GITHUB_ACTIONS'] === 'true';
+    if (githubActionsUsed && process.env['GITHUB_SHA'] !== revision) throw new Error('GitHub Actions checkout does not match GITHUB_SHA');
+    return { revision, dirty: git(['status', '--porcelain']).length > 0, provenance: 'local-git', githubActionsUsed };
   }
   if (process.platform !== 'linux' || !fs.existsSync('/.dockerenv')) throw new Error('source attestation variables are accepted only inside a Linux Docker container');
   if (!/^[0-9a-f]{40}$/i.test(assertedRevision ?? '')) throw new Error('invalid Docker source revision attestation');
   if (!['true', 'false'].includes(assertedDirty ?? '')) throw new Error('invalid Docker dirty-state attestation');
-  return { revision: assertedRevision, dirty: assertedDirty === 'true', provenance: 'docker-host-git' };
+  const assertedActions = process.env['DODO_RELEASE_GATE_GITHUB_ACTIONS'] ?? 'false';
+  if (!['true', 'false'].includes(assertedActions)) throw new Error('invalid Docker GitHub Actions attestation');
+  return { revision: assertedRevision, dirty: assertedDirty === 'true', provenance: 'docker-host-git', githubActionsUsed: assertedActions === 'true' };
 }
 
 const source = sourceState();
@@ -113,7 +118,13 @@ try {
 const requiredPlatforms = ['darwin', 'linux'];
 const deferredPlatforms = ['win32'];
 const platforms = { darwin: 'NOT_RUN', linux: 'NOT_RUN', win32: 'DEFERRED_MANUAL_NOT_RUN' };
-if (!failure && Object.hasOwn(platforms, process.platform)) platforms[process.platform] = 'AUTOMATED_PASS';
+const platformOrigins = { darwin: null, linux: null, win32: null };
+if (!failure && Object.hasOwn(platforms, process.platform)) {
+  platforms[process.platform] = 'AUTOMATED_PASS';
+  platformOrigins[process.platform] = source.githubActionsUsed
+    ? (source.provenance === 'docker-host-git' ? 'github-actions-docker' : 'github-actions-native')
+    : (source.provenance === 'docker-host-git' ? 'local-docker' : 'local');
+}
 for (const file of options.platformEvidence) {
   try {
     const evidence = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -130,9 +141,13 @@ for (const file of options.platformEvidence) {
       evidenceLock === `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` &&
       evidence.source?.dirty === false &&
       evidence.source?.provenance === expectedProvenance &&
-      evidence.platformPolicy?.githubActionsUsed === false &&
+      typeof evidence.platformPolicy?.githubActionsUsed === 'boolean' &&
       evidence.freshInstall?.status === 'PASS'
-    ) platforms[platform] = 'AUTOMATED_PASS';
+    ) {
+      platforms[platform] = 'AUTOMATED_PASS';
+      platformOrigins[platform] = evidence.platformOrigins?.[platform]
+        ?? (evidence.platformPolicy.githubActionsUsed ? 'github-actions' : 'local');
+    }
     else throw new Error('platform evidence does not match package/revision/lock/clean-source/provenance/status');
   } catch (error) { failure ??= `invalid platform evidence ${file}: ${error instanceof Error ? error.message : String(error)}`; }
 }
@@ -143,8 +158,8 @@ const report = {
   mode: options.release ? 'release' : 'candidate', status: failure ? 'AUTOMATED_FAIL' : 'AUTOMATED_PASS', failure: failure ?? null,
   steps, benchmark: bench ? { status: bench.status, dataset: bench.dataset, aggregate: bench.aggregate } : null,
   audit: auditSummary, packageArtifact: artifact, freshInstall: smoke,
-  platformPolicy: { required: requiredPlatforms, deferred: deferredPlatforms, githubActionsUsed: false },
-  platforms, manual: { status: 'MANUAL_NOT_RUN', externalAi: 'MANUAL_NOT_RUN', realOwnerWorkspace: 'MANUAL_NOT_RUN', windows11: 'MANUAL_NOT_RUN' },
+  platformPolicy: { required: requiredPlatforms, deferred: deferredPlatforms, githubActionsUsed: Object.values(platformOrigins).some(value => value?.startsWith('github-actions')) },
+  platforms, platformOrigins, manual: { status: 'MANUAL_NOT_RUN', externalAi: 'MANUAL_NOT_RUN', realOwnerWorkspace: 'MANUAL_NOT_RUN', windows11: 'MANUAL_NOT_RUN' },
   registry: { status: 'NOT_APPLICABLE_BEFORE_PUBLISH' },
   releaseReady: !failure && !dirty && platformComplete,
   releaseReadyReason: failure ? failure : dirty ? 'source tree is dirty' : !platformComplete ? 'supported-platform evidence is incomplete' : 'automated release evidence is complete; manual gates remain separately reported',

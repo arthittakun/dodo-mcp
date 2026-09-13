@@ -135,10 +135,11 @@ security violations โดย `modelTokens=null` เพราะไม่มี 
 
 Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix แล้วตรวจ CLI 1.0.0,
 STDIO Full 121, HTTP Streamable + OAuth Compact 19 และ write/edit read-backจริง
-Platform policy ปัจจุบันใช้ macOS local และ Linux Docker เท่านั้น ไม่ใช้ GitHub
-Actions Linux Docker image ติดตั้ง Playwright Chromium และต้องส่ง report ที่ revision /
-lock digest ตรงกับ macOS ก่อน strict gate จะผ่าน Windows ถูกเลื่อนไป phase สุดท้ายและ
-คง `MANUAL_NOT_RUN`
+Release policy ใช้ macOS local และ Linux Docker โดย report ต้องมี revision/lock digest
+ตรงกันก่อน strict gate จะผ่าน Linux Docker image ติดตั้ง Playwright Chromium
+Dedicated self-hosted GitHub Actions รัน Linux X64 Docker และ Windows X64 native
+candidate บน Node 22/24 โดยไม่รับ untrusted pull requests Windows manual acceptance
+ยังคง `MANUAL_NOT_RUN`
 
 ## Required security scenarios
 

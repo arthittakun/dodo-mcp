@@ -58,3 +58,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [040 — Revision-bound DodoBench and release evidence](040-dodobench-release-gate.md)
 - [041 — Local macOS and Docker Linux release gates](041-local-macos-docker-linux-gates.md)
 - [042 — Project directory generation identity](042-project-directory-generation-identity.md)
+- [043 — Trusted self-hosted platform gates](043-trusted-self-hosted-platform-gates.md)

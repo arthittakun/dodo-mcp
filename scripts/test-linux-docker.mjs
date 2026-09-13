@@ -33,6 +33,8 @@ function run(program, args, options = {}) {
 run('docker', ['info'], { capture: true, timeout: 30_000 });
 const revision = run('git', ['rev-parse', 'HEAD'], { capture: true, timeout: 30_000 });
 const dirty = run('git', ['status', '--porcelain'], { capture: true, timeout: 30_000 }).length > 0;
+const githubActionsUsed = process.env['GITHUB_ACTIONS'] === 'true';
+if (githubActionsUsed && process.env['GITHUB_SHA'] !== revision) throw new Error('GitHub Actions checkout does not match GITHUB_SHA');
 const lockDigest = `sha256:${createHash('sha256').update(fs.readFileSync(path.join(root, 'package-lock.json'))).digest('hex')}`;
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 outputDir ||= path.join(root, 'release-evidence', pkg.version, `linux-docker-node${nodeVersion}-${stamp}`);
@@ -54,6 +56,7 @@ run('docker', [
   '--mount', `type=bind,source=${outputDir},target=/evidence`,
   '--env', `DODO_RELEASE_GATE_SOURCE_REVISION=${revision}`,
   '--env', `DODO_RELEASE_GATE_SOURCE_DIRTY=${dirty}`,
+  '--env', `DODO_RELEASE_GATE_GITHUB_ACTIONS=${githubActionsUsed}`,
   image,
 ]);
 
@@ -67,6 +70,7 @@ if (report.source?.revision !== revision || report.source?.dependencyLockSha256 
 if (report.source?.dirty !== dirty || report.source?.provenance !== 'docker-host-git') {
   throw new Error('Linux evidence source attestation is invalid');
 }
+if (report.platformPolicy?.githubActionsUsed !== githubActionsUsed) throw new Error('Linux evidence runner origin is invalid');
 if (report.freshInstall?.status !== 'PASS') throw new Error('Linux fresh-tarball smoke did not pass');
 
 const verification = {
@@ -77,6 +81,7 @@ const verification = {
   source: report.source,
   host: report.host,
   releaseEligible: report.source?.dirty === false,
+  runnerOrigin: githubActionsUsed ? 'github-actions-self-hosted' : 'local',
   browserCase: report.benchmark?.aggregate?.eligibleCases === 7 ? 'AUTOMATED_PASS' : 'NOT_RUN',
   gateReport: path.basename(reportFile),
   generatedAt: new Date().toISOString(),

@@ -330,10 +330,10 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 
 ## Development
 
-โปรเจกต์ไม่ใช้ GitHub Actions เป็น test runner ในช่วงนี้ หลักฐาน automated รองรับ
-สอง environment เท่านั้น: macOS รันจากเครื่องพัฒนา และ Linux รันใน Docker แยก
-ที่ติดตั้ง Playwright Chromium ส่วน Windows ถูกเลื่อนไป phase สุดท้ายและต้องคงสถานะ
-`MANUAL_NOT_RUN` จนกว่าจะทดสอบบน Windows จริง
+Platform CI ใช้ dedicated self-hosted runners ที่เจ้าของควบคุม: Linux X64 รันผ่าน
+Docker พร้อม Playwright Chromium และ Windows X64 รัน native candidate gate ส่วน
+macOS ยังรัน release gate บนเครื่องพัฒนา Workflow รับเฉพาะ push ที่ `main` และ manual
+dispatch ไม่รัน pull request จากภายนอกบน self-hosted runner
 
 รัน regression benchmark, macOS candidate gate และ Linux Docker gate ได้ด้วย:
 
@@ -342,6 +342,10 @@ npm run bench
 npm run release:gate
 npm run test:linux:docker
 ```
+
+GitHub workflow รัน Node 22 และ 24 ทั้ง Linux/Windows โดยไม่ publish npm Windows จะ
+ยังไม่ถูกประกาศเป็น supported platform จนกว่า automated native gate และ manual
+Windows 11 acceptance จะผ่านตามเอกสาร
 
 Release gate สร้างหลักฐาน non-secret ใน ignored `release-evidence/` และตรวจ fresh
 exact-tarball ผ่าน STDIO Full กับ HTTP/OAuth Compact โดยไม่ publish npm ดูรายละเอียดที่
