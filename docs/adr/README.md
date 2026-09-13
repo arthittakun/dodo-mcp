@@ -53,3 +53,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [035 — Incremental Project Brain with source-verified graph evidence](035-project-brain-incremental-index.md)
 - [036 — Goal-driven Context Engine and source-verifying evidence](036-context-engine-evidence.md)
 - [037 — Evidence-backed owner-reviewed memory](037-owner-reviewed-memory.md)
+- [038 — Caller-scoped Runtime Intelligence](038-runtime-intelligence.md)

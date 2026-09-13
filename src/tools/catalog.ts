@@ -17,6 +17,7 @@ import { RESOURCE_TOOLS } from './resourceTools.js';
 import { BRAIN_TOOLS } from './brainTools.js';
 import { CONTEXT_TOOLS } from './contextTools.js';
 import { MEMORY_TOOLS } from './memoryTools.js';
+import { RUNTIME_TOOLS } from './runtimeTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -99,6 +100,8 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   ...CONTEXT_TOOLS,
   // Evidence-backed durable memory; all permanence and learning require owner review.
   ...MEMORY_TOOLS,
+  // Reconnectable process/browser observations and source-verifiable runtime evidence.
+  ...RUNTIME_TOOLS,
   // Incremental, source-verified project structure and relationship index.
   ...BRAIN_TOOLS,
   // Optional local media/browser/game/workflow capabilities under the existing scopes.

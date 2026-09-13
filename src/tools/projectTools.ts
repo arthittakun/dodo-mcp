@@ -57,6 +57,13 @@ export const projectOverviewTool = defineTool({
       memory = { available: false, status: 'recovery_required' };
       warnings.push('Memory diagnostics need recovery; inspect owner state before creating new proposals.');
     }
+    let runtime: Record<string, unknown>;
+    try {
+      runtime = s.runtime ? s.runtime.diagnostics(ctx) : { available: false, status: 'unavailable' };
+    } catch {
+      runtime = { available: false, status: 'recovery_required' };
+      warnings.push('Runtime Intelligence diagnostics need recovery; retry after checking this workspace and client access.');
+    }
     const desktop = s.desktop.policy();
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
     const federation = s.federation.listAuthorized(ctx.principal);
@@ -66,6 +73,7 @@ export const projectOverviewTool = defineTool({
         brain,
         contextEngine,
         memory,
+        runtime,
         capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
         federation: {
           mode: 'read-only',

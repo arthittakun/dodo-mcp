@@ -27,7 +27,7 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools
-- STDIO default: Full 94 tools
+- STDIO default: Full 104 tools
 - explicit Hybrid: 49 tools
 - explicit override: `--tools compact|full|hybrid`
 
@@ -39,9 +39,10 @@ TSX, JavaScript และ JSX พร้อมอ่าน dependency metadata �
 ไม่มี provider ที่ประกาศรองรับ
 
 Context Engine ใช้ lexical/Project Brain/Git สำหรับ active workspace, guarded lexical
-federation สำหรับ project อื่น และ owner-reviewed current Memory ตาม project visibility
-กับ live ACL Runtime provider ที่ยังไม่มีถูกแสดง unavailable ตามจริง Compact/Hybrid
-ยังคง 19/49 tools
+federation สำหรับ project อื่น, owner-reviewed current Memory และ caller-scoped current
+Runtime Intelligence evidence ตาม live ACL Runtime process ใช้ executable/sandbox
+support ของ JobManager ปัจจุบัน ส่วน browser evidence ต้องมี Playwright Chromium และ
+owned browser session เดิม Compact/Hybrid ยังคง 19/49 tools
 
 ## Optional capabilities
 

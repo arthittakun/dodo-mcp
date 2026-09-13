@@ -304,7 +304,7 @@ export async function mcpRaw(ctx: TestContext, body: unknown, token?: string, ex
     ...extraHeaders,
   };
   if (token) headers['authorization'] = `Bearer ${token}`;
-  return fetch(`${ctx.baseUrl}/mcp`, { method: 'POST', headers, body: JSON.stringify(body) });
+  return rfetch(`${ctx.baseUrl}/mcp`, { method: 'POST', headers, body: JSON.stringify(body) });
 }
 
 let rpcId = 100;

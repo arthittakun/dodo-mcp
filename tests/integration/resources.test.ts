@@ -47,7 +47,7 @@ describe('Phase 04 universal resources over real HTTP + OAuth', () => {
   const call = (name: string, args: Record<string, unknown>) => tool(ctx, token.accessToken, name, args);
 
   it('adds six exact resource tools to the full surface and keeps one compact gateway family', async () => {
-    expect(TOOL_CATALOG).toHaveLength(94);
+    expect(TOOL_CATALOG).toHaveLength(104);
     expect(TOOL_CATALOG.slice(-6).map((entry) => entry.name)).toEqual(['resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform']);
   });
 

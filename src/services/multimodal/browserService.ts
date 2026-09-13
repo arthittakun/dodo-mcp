@@ -153,6 +153,40 @@ export class BrowserService {
     s.current = { id: data.observationId, hash: this.fingerprint(state), url: state.url, expiresAt, data }; return data;
   }
   async observe(actor: Actor, id: string): Promise<BrowserObservationData> { return this.exclusive(actor, id, s => this.capture(actor, s)); }
+  /** Recheck an observation without exposing DOM text or performing an action. */
+  async verifyObservation(actor: Actor, id: string, observationId: string) {
+    return this.exclusive(actor, id, async s => {
+      const current = await this.fresh(s, observationId);
+      const timing = await this.bounded(s, s.page.evaluate(() => {
+        type NavigationEntry = {
+          responseEnd?: number;
+          domContentLoadedEventEnd?: number;
+          loadEventEnd?: number;
+        };
+        const performanceApi = globalThis.performance as unknown as {
+          getEntriesByType(type: string): NavigationEntry[];
+        };
+        const entries = performanceApi.getEntriesByType('navigation');
+        const navigation = entries[0];
+        const rounded = (value: number | undefined) => Number.isFinite(value) ? Math.max(0, Math.round(value as number)) : null;
+        return {
+          navigationCount: entries.length,
+          responseEndMs: rounded(navigation?.responseEnd),
+          domContentLoadedMs: rounded(navigation?.domContentLoadedEventEnd),
+          loadEventMs: rounded(navigation?.loadEventEnd),
+        };
+      }));
+      return {
+        sessionId: s.id,
+        observationId: current.observationId,
+        url: current.url,
+        expiresAt: current.expiresAt,
+        sourceHash: digestOf({ browser: s.id, observation: current.observationId, fingerprint: s.current?.hash, url: s.current?.url }),
+        screenshotHash: current.asset.sha256,
+        timing,
+      };
+    });
+  }
   private async fresh(s: Session, observationId: string, mediaControl = false) {
     if (!s.current || s.current.id !== observationId || s.current.expiresAt <= Date.now()) throw new DodoError('STALE_WORKSPACE', 'observe the browser again before acting');
     const current = await this.state(s);

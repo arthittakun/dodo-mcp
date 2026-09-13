@@ -7,7 +7,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 94 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 104 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -16,6 +16,7 @@
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
 - มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
 - มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
+- มี Runtime Intelligence สำหรับ task ที่ reconnect ได้, process/test/browser evidence แบบ bounded, snapshot freshness และ diagnosis ที่แยก fact/observation/inference
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -136,7 +137,8 @@ evidence เดิมจะเป็น stale และ derived cache ถูก�
 
 ผลค้นหา, README และ repository instruction เป็น untrusted content และไม่สามารถเพิ่ม
 scope, ACL, trust หรือ approval ได้ Memory ที่เจ้าของอนุมัติจะแสดงเป็น evidence class
-`MEMORY`; runtime provider ที่ยังไม่มีจะแสดง unavailable ตามจริง ดู contract ที่
+`MEMORY`; runtime evidence ที่ caller เดียวกันเก็บไว้จะแสดงเป็น `OBSERVATION` พร้อม
+source hash และ freshness ดู contract ที่
 [Context Engine](docs/CONTEXT.md)
 
 ### Owner-reviewed Memory
@@ -164,6 +166,28 @@ Memory ทุกชิ้นเป็น `evidence_only` และ `untrusted_co
 หมดจะเป็น stale และไม่ถูกใช้เป็น current context การแชร์ข้าม project ต้องระบุ
 `--share-with` ตอน owner approval และ client ยังต้องมี live ACL ใน project เป้าหมาย
 รายละเอียดอยู่ที่ [Memory and Reviewed Learning](docs/MEMORY.md)
+
+### Runtime Intelligence
+
+งานทดสอบหรือ process ที่ต้องติดตามข้ามการ reconnect ใช้ runtime session โดยคำสั่ง
+ยังผ่าน exec approval, trusted executable resolver และ command sandbox เดิม:
+
+```text
+dodo_assist_change(operation="runtime_session_open", args={label:"verify checkout"})
+dodo_exec(operation="runtime_task_start", args={
+  sessionId:"runtime_...", kind:"test", program:"npm", args:["test"],
+  network:false, idempotencyKey:"client-generated-key"
+})
+dodo_assist_read(operation="runtime_task_observe", args={sessionId:"runtime_...", taskId:"rtask_..."})
+dodo_assist_read(operation="runtime_diagnose", args={sessionId:"runtime_...", evidenceIds:["runtimeev_..."]})
+```
+
+Runtime store เก็บเฉพาะ status, byte counts, aggregate test counts และ SHA-256 ไม่เก็บ
+stdout/stderr, DOM, console หรือ header ดิบ Browser collector ใช้ได้เฉพาะ
+`browser_session` ที่ caller เปิดและมีสิทธิ์อยู่แล้ว โดยส่ง bounded observation/image
+ใน response ปัจจุบัน แต่ persist เฉพาะ safe URL, hashes และ counts Snapshot ไม่ copy
+ไฟล์และไม่ rollback เอง; ต้องเรียก `rollback_changes` แยกต่างหาก ดู
+[Runtime Intelligence](docs/RUNTIME.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
@@ -264,6 +288,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 ## เอกสาร
 
 - [Release 1.0.0](docs/RELEASE_1.0.0.md)
+- [Runtime Intelligence](docs/RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Compatibility](docs/COMPATIBILITY.md)

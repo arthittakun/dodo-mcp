@@ -405,6 +405,50 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     review_note TEXT
   );
   CREATE INDEX idx_memory_learning_workspace ON memory_learning_proposals(source_workspace_id,status,created_at);`,
+  `CREATE TABLE runtime_sessions (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    opened_epoch TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    label TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    closed_at INTEGER
+  );
+  CREATE INDEX idx_runtime_sessions_owner
+    ON runtime_sessions(workspace_id,owner,status,last_seen_at DESC);
+  CREATE INDEX idx_runtime_sessions_expiry ON runtime_sessions(expires_at);
+  CREATE TABLE runtime_tasks (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES runtime_sessions(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    job_id TEXT NOT NULL UNIQUE,
+    kind TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_runtime_tasks_session ON runtime_tasks(session_id,created_at DESC);
+  CREATE TABLE runtime_evidence (
+    id TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES runtime_sessions(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    source_ref TEXT NOT NULL,
+    source_hash TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    stale_reason TEXT,
+    created_at INTEGER NOT NULL,
+    last_verified_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    UNIQUE(session_id,owner,kind,source_ref,source_hash)
+  );
+  CREATE INDEX idx_runtime_evidence_session ON runtime_evidence(session_id,status,created_at DESC);
+  CREATE INDEX idx_runtime_evidence_expiry ON runtime_evidence(expires_at);`,
 ];
 
 /**
@@ -433,10 +477,13 @@ export function openDatabase(dbFile: string): Database.Database {
     });
   }
   try {
+    // Set the busy handler before any pragma that may need a database lock.
+    // Concurrent owner CLI processes can otherwise fail at journal_mode=WAL
+    // before migration's own retry loop has a chance to run.
+    db.pragma('busy_timeout = 10000');
     db.pragma('journal_mode = WAL');
     db.pragma('synchronous = FULL');
     db.pragma('foreign_keys = ON');
-    db.pragma('busy_timeout = 10000');
     migrateWithRetry(db);
   } catch (err) {
     db.close();

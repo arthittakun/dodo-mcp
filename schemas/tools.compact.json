@@ -2,19 +2,19 @@
   "$comment": "GENERATED from src/tools — do not edit by hand. Compact gateway surface (default for HTTP); every operation routes through the full tool contract in tools.json.",
   "version": 1,
   "toolCount": 19,
-  "fullToolCount": 94,
+  "fullToolCount": 104,
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 47961
+      "schemaBytes": 48393
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 115441
+      "schemaBytes": 115873
     },
     "full": {
-      "toolCount": 94,
-      "schemaBytes": 336195
+      "toolCount": 104,
+      "schemaBytes": 367506
     }
   },
   "tools": [
@@ -674,7 +674,7 @@
     {
       "name": "dodo_exec",
       "title": "Run commands and control jobs",
-      "description": "Gateway: shell/argv commands, task recipes, and stdin/cancel for owned background jobs. Set operation to one of: run_command, run_commands, run_task, exec_command, job_input, job_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: shell/argv commands, task recipes, and stdin/cancel for owned background jobs. Set operation to one of: run_command, run_commands, run_task, exec_command, job_input, job_cancel, runtime_task_start, runtime_task_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -689,7 +689,9 @@
         "run_task",
         "exec_command",
         "job_input",
-        "job_cancel"
+        "job_cancel",
+        "runtime_task_start",
+        "runtime_task_cancel"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -715,7 +717,9 @@
               "run_task",
               "exec_command",
               "job_input",
-              "job_cancel"
+              "job_cancel",
+              "runtime_task_start",
+              "runtime_task_cancel"
             ],
             "description": "Target operation to invoke"
           },
@@ -1459,7 +1463,7 @@
     {
       "name": "dodo_assist_read",
       "title": "Coding-task analysis",
-      "description": "Gateway: goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, runtime_session_status, runtime_task_observe, runtime_snapshot, runtime_evidence, runtime_diagnose, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1478,6 +1482,11 @@
         "memory_search",
         "memory_inspect",
         "memory_status",
+        "runtime_session_status",
+        "runtime_task_observe",
+        "runtime_snapshot",
+        "runtime_evidence",
+        "runtime_diagnose",
         "brain_status",
         "brain_query",
         "brain_symbol"
@@ -1510,6 +1519,11 @@
               "memory_search",
               "memory_inspect",
               "memory_status",
+              "runtime_session_status",
+              "runtime_task_observe",
+              "runtime_snapshot",
+              "runtime_evidence",
+              "runtime_diagnose",
               "brain_status",
               "brain_query",
               "brain_symbol"
@@ -1634,7 +1648,7 @@
     {
       "name": "dodo_assist_change",
       "title": "Refactor previews and verification",
-      "description": "Gateway: preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, memory_propose, memory_learning_propose, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -1648,6 +1662,8 @@
         "verify_changes",
         "memory_propose",
         "memory_learning_propose",
+        "runtime_session_open",
+        "runtime_session_close",
         "brain_rebuild",
         "brain_pause",
         "brain_cancel"
@@ -1675,6 +1691,8 @@
               "verify_changes",
               "memory_propose",
               "memory_learning_propose",
+              "runtime_session_open",
+              "runtime_session_close",
               "brain_rebuild",
               "brain_pause",
               "brain_cancel"
@@ -1986,8 +2004,8 @@
     {
       "name": "dodo_browser",
       "title": "Isolated browser",
-      "description": "Gateway: open/observe/act in the isolated local Chromium session. Set operation to one of: browser_session, browser_observe, browser_action. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
-      "requiredScope": "dodo:exec",
+      "description": "Gateway: open/observe/act in the isolated local Chromium session. Set operation to one of: browser_session, browser_observe, browser_action, runtime_browser_collect. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": false,
         "destructiveHint": true,
@@ -1998,7 +2016,8 @@
       "operations": [
         "browser_session",
         "browser_observe",
-        "browser_action"
+        "browser_action",
+        "runtime_browser_collect"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2021,7 +2040,8 @@
             "enum": [
               "browser_session",
               "browser_observe",
-              "browser_action"
+              "browser_action",
+              "runtime_browser_collect"
             ],
             "description": "Target operation to invoke"
           },

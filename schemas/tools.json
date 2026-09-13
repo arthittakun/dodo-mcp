@@ -1,7 +1,7 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Proposed DODO tool contract, not the MCP protocol spec.",
   "version": 1,
-  "toolCount": 94,
+  "toolCount": 104,
   "tools": [
     {
       "name": "project_overview",
@@ -13680,6 +13680,2463 @@
                   "expiresAt",
                   "ownerCommand",
                   "activated"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_session_open",
+      "title": "Open a durable runtime evidence session",
+      "description": "Open a caller/workspace-scoped runtime session that persists across MCP reconnects and server restarts. This opens no process, browser, network, desktop, microphone or system audio by itself. Handles expire and live OAuth/workspace ACL is rechecked on every use.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "ttlMinutes": {
+            "default": 60,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1440
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "label",
+          "ttlMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "CLOSED",
+                      "EXPIRED"
+                    ]
+                  },
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "openedEpoch": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastSeenAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "closedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "sessionId",
+                  "label",
+                  "status",
+                  "workspaceId",
+                  "openedEpoch",
+                  "createdAt",
+                  "lastSeenAt",
+                  "expiresAt",
+                  "closedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_session_status",
+      "title": "Inspect a runtime session",
+      "description": "Return caller-owned session, task and evidence status after rechecking live access. Process metadata is reconnectable; raw command output and browser secrets are never persisted in Runtime Intelligence.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "session": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "OPEN",
+                          "CLOSED",
+                          "EXPIRED"
+                        ]
+                      },
+                      "workspaceId": {
+                        "type": "string"
+                      },
+                      "openedEpoch": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "lastSeenAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "closedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "sessionId",
+                      "label",
+                      "status",
+                      "workspaceId",
+                      "openedEpoch",
+                      "createdAt",
+                      "lastSeenAt",
+                      "expiresAt",
+                      "closedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tasks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": {
+                          "type": "string",
+                          "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+                        },
+                        "sessionId": {
+                          "type": "string",
+                          "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                        },
+                        "jobId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "process",
+                            "test",
+                            "container"
+                          ]
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "exitCode": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "signal": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "startedAt": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "endedAt": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "timeoutMs": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "taskId",
+                        "sessionId",
+                        "jobId",
+                        "kind",
+                        "status",
+                        "exitCode",
+                        "signal",
+                        "createdAt",
+                        "startedAt",
+                        "endedAt",
+                        "timeoutMs"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "evidence": {
+                    "type": "object",
+                    "properties": {
+                      "current": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "stale": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expired": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "current",
+                      "stale",
+                      "expired"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "reconnectable": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "session",
+                  "tasks",
+                  "evidence",
+                  "reconnectable",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_session_close",
+      "title": "Close a runtime session",
+      "description": "Close one owned runtime session. Refuses while attached tasks are running and never kills work silently. Jobs remain governed by runtime_task_cancel and the existing owned-process rules.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "CLOSED",
+                      "EXPIRED"
+                    ]
+                  },
+                  "workspaceId": {
+                    "type": "string"
+                  },
+                  "openedEpoch": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastSeenAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "closedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "sessionId",
+                  "label",
+                  "status",
+                  "workspaceId",
+                  "openedEpoch",
+                  "createdAt",
+                  "lastSeenAt",
+                  "expiresAt",
+                  "closedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_task_start",
+      "title": "Start a reconnectable runtime task",
+      "description": "Start an explicit program+argv process as process/test/container runtime evidence. No shell string is accepted. Uses the existing trusted executable resolver, execution approval, owner command-sandbox policy, environment allowlist, timeout and durable idempotency. Returns immediately; observe or cancel by runtime task handle.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "process",
+              "test",
+              "container"
+            ]
+          },
+          "program": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "args": {
+            "default": [],
+            "maxItems": 128,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          },
+          "cwd": {
+            "default": ".",
+            "type": "string",
+            "maxLength": 1024
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "minimum": 1000,
+            "maximum": 1800000
+          },
+          "sandbox": {
+            "type": "boolean"
+          },
+          "network": {
+            "default": false,
+            "type": "boolean"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "kind",
+          "program",
+          "args",
+          "cwd",
+          "network",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "object",
+                    "properties": {
+                      "taskId": {
+                        "type": "string",
+                        "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "jobId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "process",
+                          "test",
+                          "container"
+                        ]
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "exitCode": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "signal": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "startedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "endedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeoutMs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "taskId",
+                      "sessionId",
+                      "jobId",
+                      "kind",
+                      "status",
+                      "exitCode",
+                      "signal",
+                      "createdAt",
+                      "startedAt",
+                      "endedAt",
+                      "timeoutMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "sandboxed": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "task",
+                  "sandboxed",
+                  "replayed"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_task_observe",
+      "title": "Record safe process or test evidence",
+      "description": "Observe an owned runtime task and persist only status, exit metadata, byte counts and SHA-256 samples. Raw stdout/stderr is not stored. Optional reportPath is read through WorkspaceFS and retains only aggregate JSON test counts plus its source hash.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "taskId": {
+            "type": "string",
+            "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "reportPath": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "task": {
+                    "type": "object",
+                    "properties": {
+                      "taskId": {
+                        "type": "string",
+                        "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "jobId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "process",
+                          "test",
+                          "container"
+                        ]
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "exitCode": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "signal": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "startedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "endedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "timeoutMs": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "taskId",
+                      "sessionId",
+                      "jobId",
+                      "kind",
+                      "status",
+                      "exitCode",
+                      "signal",
+                      "createdAt",
+                      "startedAt",
+                      "endedAt",
+                      "timeoutMs"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "evidence": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "evidenceId": {
+                        "type": "string",
+                        "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "process",
+                          "test",
+                          "container",
+                          "browser",
+                          "snapshot"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "CURRENT",
+                          "STALE",
+                          "EXPIRED"
+                        ]
+                      },
+                      "sourceRef": {
+                        "type": "string"
+                      },
+                      "sourceHash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "contentHash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "payload": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "staleReason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "lastVerifiedAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "trust": {
+                        "type": "string",
+                        "const": "untrusted_runtime_evidence"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "evidenceId",
+                      "sessionId",
+                      "kind",
+                      "status",
+                      "sourceRef",
+                      "sourceHash",
+                      "contentHash",
+                      "payload",
+                      "staleReason",
+                      "createdAt",
+                      "lastVerifiedAt",
+                      "expiresAt",
+                      "trust"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "task",
+                  "evidence"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_task_cancel",
+      "title": "Cancel an owned runtime task",
+      "description": "Cancel only the live owned process tree attached to this caller/workspace runtime task. Never signals a stored PID after restart and never broadens owner command policy.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "taskId": {
+            "type": "string",
+            "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "taskId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "taskId": {
+                    "type": "string",
+                    "pattern": "^rtask_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "jobId": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "taskId",
+                  "jobId",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_browser_collect",
+      "title": "Collect bounded evidence from an existing browser",
+      "description": "Observe an already owner-created browser_session and attach bounded screenshot/DOM/console/network evidence to a runtime session. It never opens a browser or enables public web. Persisted evidence contains hashes, counts and query-free safe URL only; no cookie, authorization header, input value or raw console/DOM text is stored.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "browserSessionId": {
+            "type": "string",
+            "pattern": "^browser_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "browserSessionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "evidence": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "evidenceId": {
+                        "type": "string",
+                        "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "sessionId": {
+                        "type": "string",
+                        "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "process",
+                          "test",
+                          "container",
+                          "browser",
+                          "snapshot"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "CURRENT",
+                          "STALE",
+                          "EXPIRED"
+                        ]
+                      },
+                      "sourceRef": {
+                        "type": "string"
+                      },
+                      "sourceHash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "contentHash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "payload": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      "staleReason": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "lastVerifiedAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "trust": {
+                        "type": "string",
+                        "const": "untrusted_runtime_evidence"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "evidenceId",
+                      "sessionId",
+                      "kind",
+                      "status",
+                      "sourceRef",
+                      "sourceHash",
+                      "contentHash",
+                      "payload",
+                      "staleReason",
+                      "createdAt",
+                      "lastVerifiedAt",
+                      "expiresAt",
+                      "trust"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "evidence"
+                ],
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_snapshot",
+      "title": "Record a guarded workspace snapshot",
+      "description": "Record a bounded hash of guarded file metadata plus caller-owned committed changesets eligible to be considered for rollback. It stores no file content and performs no rollback. Actual rollback remains rollback_changes with existing journal and conflict checks.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "evidenceId": {
+                    "type": "string",
+                    "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "process",
+                      "test",
+                      "container",
+                      "browser",
+                      "snapshot"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CURRENT",
+                      "STALE",
+                      "EXPIRED"
+                    ]
+                  },
+                  "sourceRef": {
+                    "type": "string"
+                  },
+                  "sourceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "contentHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "staleReason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastVerifiedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "trust": {
+                    "type": "string",
+                    "const": "untrusted_runtime_evidence"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "evidenceId",
+                  "sessionId",
+                  "kind",
+                  "status",
+                  "sourceRef",
+                  "sourceHash",
+                  "contentHash",
+                  "payload",
+                  "staleReason",
+                  "createdAt",
+                  "lastVerifiedAt",
+                  "expiresAt",
+                  "trust"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_evidence",
+      "title": "Inspect and revalidate runtime evidence",
+      "description": "Read one caller/workspace/session-scoped evidence record. By default rechecks the current guarded process, browser observation or workspace snapshot and marks changed/unavailable sources stale. An evidence ID never grants access.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "evidenceId": {
+            "type": "string",
+            "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "refresh": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "evidenceId",
+          "refresh"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "evidenceId": {
+                    "type": "string",
+                    "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "process",
+                      "test",
+                      "container",
+                      "browser",
+                      "snapshot"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "CURRENT",
+                      "STALE",
+                      "EXPIRED"
+                    ]
+                  },
+                  "sourceRef": {
+                    "type": "string"
+                  },
+                  "sourceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "contentHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "staleReason": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastVerifiedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "trust": {
+                    "type": "string",
+                    "const": "untrusted_runtime_evidence"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "evidenceId",
+                  "sessionId",
+                  "kind",
+                  "status",
+                  "sourceRef",
+                  "sourceHash",
+                  "contentHash",
+                  "payload",
+                  "staleReason",
+                  "createdAt",
+                  "lastVerifiedAt",
+                  "expiresAt",
+                  "trust"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "runtime_diagnose",
+      "title": "Diagnose bounded runtime evidence",
+      "description": "Produce deterministic facts, observations and clearly labeled inferences from current caller-owned runtime evidence. It never reads hidden output, executes a fix, changes code, grants permission or claims that process exit alone proves user-visible success.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "evidenceIds": {
+            "minItems": 1,
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+            }
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "evidenceIds"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "pattern": "^runtime_[0-9a-hjkmnp-tv-z]{8,64}$"
+                  },
+                  "facts": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "observations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "inferences": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "statement": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "string",
+                          "enum": [
+                            "low",
+                            "medium",
+                            "high"
+                          ]
+                        },
+                        "evidenceIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^runtimeev_[0-9a-hjkmnp-tv-z]{8,64}$"
+                          }
+                        }
+                      },
+                      "required": [
+                        "statement",
+                        "confidence",
+                        "evidenceIds"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "limitations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "trust": {
+                    "type": "string",
+                    "const": "untrusted_runtime_evidence"
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "facts",
+                  "observations",
+                  "inferences",
+                  "limitations",
+                  "trust"
                 ],
                 "additionalProperties": false
               },

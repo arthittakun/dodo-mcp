@@ -29,6 +29,8 @@ const FULL_NAMES = [
   'context_for_task', 'analyze_impact', 'read_symbol', 'preview_refactor', 'verify_changes',
   'context_query', 'context_evidence', 'context_status',
   'memory_search', 'memory_inspect', 'memory_status', 'memory_propose', 'memory_learning_propose',
+  'runtime_session_open', 'runtime_session_status', 'runtime_session_close', 'runtime_task_start', 'runtime_task_observe',
+  'runtime_task_cancel', 'runtime_browser_collect', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose',
   'brain_status', 'brain_query', 'brain_symbol', 'brain_rebuild', 'brain_pause', 'brain_cancel',
   'multimodal_status', 'screen_observe', 'image_view', 'media_open', 'media_extract', 'media_transcribe',
   'media_subtitles', 'media_search', 'media_read', 'media_job', 'media_close', 'speech_synthesize',
@@ -202,7 +204,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(94);
+    expect(TOOL_CATALOG).toHaveLength(104);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

@@ -31,9 +31,17 @@
   ranking, budget/cursor และ dependency-aware L0–L6 cache ทำให้ Full เป็น 89 tools
   โดย Compact/Hybrid คง 19/49 ผ่าน `dodo_assist_read`
 - เพิ่ม `memory_search`, `memory_inspect`, `memory_status`, `memory_propose` และ
-  `memory_learning_propose` ทำให้ Full เป็น 94 tools ส่วน Compact/Hybrid คง 19/49
+  `memory_learning_propose`; catalog ปัจจุบันเมื่อรวม Runtime Intelligence เป็น
+  Full 104 tools ส่วน Compact/Hybrid คง 19/49
   ผ่าน assistance gateways Permanent memory ต้องผ่าน private owner review + exact
   digest, ตรวจ source/retention/ACL ซ้ำ และ learning review ไม่ติดตั้งหรือ execute เอง
+- เพิ่ม Runtime Intelligence 10 operations สำหรับ durable session, reconnectable
+  process/test/container task, bounded task/browser evidence, guarded snapshot,
+  evidence revalidation และ deterministic diagnosis ทำให้ Full เป็น 104 tools
+  ขณะที่ Compact/Hybrid คง 19/49 ผ่าน gateways เดิม
+- Runtime task ใช้ JobManager, execution approval, idempotency, environment allowlist,
+  timeout และ command sandbox เดิม Runtime store ไม่เก็บ raw stdout/stderr, DOM,
+  console, cookie, authorization header หรือ environment secret
 
 ## วิธีอัปเดต
 

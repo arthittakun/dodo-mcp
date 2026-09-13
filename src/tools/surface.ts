@@ -112,7 +112,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Run commands and control jobs',
     domain: 'exec',
     summary: 'shell/argv commands, task recipes, and stdin/cancel for owned background jobs',
-    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel'],
+    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel', 'runtime_task_start', 'runtime_task_cancel'],
   },
   {
     name: 'dodo_git_read',
@@ -147,14 +147,14 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Coding-task analysis',
     domain: 'code',
     summary: 'goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries',
-    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'brain_status', 'brain_query', 'brain_symbol'],
+    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'runtime_session_status', 'runtime_task_observe', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose', 'brain_status', 'brain_query', 'brain_symbol'],
   },
   {
     name: 'dodo_assist_change',
     title: 'Refactor previews and verification',
     domain: 'code',
     summary: 'preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance',
-    operations: ['preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
+    operations: ['preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'runtime_session_open', 'runtime_session_close', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
   },
   {
     name: 'dodo_media',
@@ -187,7 +187,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Isolated browser',
     domain: 'browser',
     summary: 'open/observe/act in the isolated local Chromium session',
-    operations: ['browser_session', 'browser_observe', 'browser_action'],
+    operations: ['browser_session', 'browser_observe', 'browser_action', 'runtime_browser_collect'],
   },
   {
     name: 'dodo_game',

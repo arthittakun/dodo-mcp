@@ -16,6 +16,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ assistance/multimodal/workflow
                                       ├─ Context Engine ──► evidence + L0–L6 cache
                                       ├─ Memory ──► reviewed evidence + stale lifecycle
+                                      ├─ Runtime Intelligence ──► durable tasks + bounded evidence
                                       ├─ Project Brain ──► incremental AST graph
                                       └─ resource references ──► private SHA-256 CAS
 
@@ -138,6 +139,28 @@ memory stale และ derived cache ใช้ซ้ำไม่ได้
 Learning proposal ต้องอ้าง current owner-reviewed successful memory อย่างน้อยสองชิ้น
 Owner review บันทึก audit เท่านั้น ไม่มี handler สำหรับติดตั้ง/execute หรือเปลี่ยน policy
 
+## Runtime Intelligence
+
+`RuntimeService` อยู่ต่อ active workspace และเก็บ session, task reference และ immutable
+evidence ใน SQLite Session ผูก digest ของ `grantId + clientId`, workspace ID และ
+expiration งาน process/test/container ใช้ `JobManager` เดิมด้วย explicit program+argv,
+environment allowlist, timeout, execution approval, idempotency และ owner-selected
+command sandbox จึงไม่มี runtime shell หรือ process launcher อีกชุดหนึ่ง
+
+process evidence เก็บ status/exit/signal/timestamps, stream byte counts และ SHA-256 ของ
+bounded sample เท่านั้น Optional JSON test report อ่านผ่าน `WorkspaceFS` และลดเหลือ
+aggregate counts กับ source hash ส่วน Browser collector เรียก `BrowserService.observe`
+บน owned session เดิม แล้ว persist safe URL ที่ไม่มี query, content/screenshot hashes,
+event counts และ bounded navigation timing โดย WebSocket policy ยังคง blocked ตาม
+browser isolation ส่วน bounded DOM/image ส่งผ่าน MCP response แต่ไม่ถูกเก็บใน runtime tables
+
+Snapshot hash มาจาก guarded file metadata manifest และแสดง caller-owned committed
+changeset IDs เป็น rollback candidates เท่านั้น การ rollback จริงยังผ่าน
+`rollback_changes` และ conflict journal เดิม Evidence revalidation ไม่แก้ record เดิม:
+source เปลี่ยนหรือหายจะ mark record `STALE` Context Engine ใช้ current runtime row เป็น
+`OBSERVATION` และผูก content hash + caller-specific runtime manifest เป็น cache
+dependency ทุก access ตรวจ live OAuth grant/workspace ACL ใหม่
+
 ## Universal Resource Layer and CAS
 
 `ResourceService` ผูกกับ active `BootstrappedWorkspace` และสร้าง opaque resource
@@ -164,7 +187,7 @@ inflate และ SVG อยู่ใน text path ไม่ถูก render เ
 
 ## Tool surfaces
 
-- Full catalog 94 individual definitions
+- Full catalog 104 individual definitions
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

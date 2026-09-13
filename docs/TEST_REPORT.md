@@ -17,16 +17,16 @@ npm pack
 
 ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
-- build: PASS — full 94, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
+- build: PASS — full 104, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 75 files PASS, 2 files platform-skipped; 564 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 77 files PASS, 2 files platform-skipped; 572 tests PASS, 30 tests platform/prerequisite-skipped
 - packaging: 15 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
-- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 94,
-  Compact = 19 และ installed Compact `dodo_assist_read → memory_status` คืน
-  schemaVersion 1 จาก fresh state สำเร็จ
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 104,
+  Compact = 19 และ installed Compact `dodo_assist_read → memory_status` กับ
+  `dodo_assist_change → runtime_session_open` คืน schemaVersion 1 จาก fresh state สำเร็จ
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -46,7 +46,7 @@ identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
 `projectId` เข้า write operation Universal Resource, Project Brain และ Context Engine
-operations ทำให้ surface ปัจจุบันเป็น Full 94 / Compact 19 / Hybrid 49
+operations ทำให้ surface ปัจจุบันเป็น Full 104 / Compact 19 / Hybrid 49
 
 Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
 binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
@@ -71,7 +71,7 @@ L0–L6 cache hit/metrics, source-hash freshness transition, evidence recheck, a
 federated A/B retrieval by ID/name, unavailable target partial result, anonymous/live
 ACL/revocation, principal/workspace/cursor binding, secret/private-state/symlink guards,
 repository instruction เป็น untrusted content, canonical signed cursor, cache corruption
-recovery และ Memory dependency freshness โดย runtime unavailable ถูกแสดงตามจริง Fixture
+recovery, Memory dependency freshness และ Runtime dependency freshness Fixture
 baseline มี precision=1 และ recall=1 สำหรับ source/test/docs ที่กำหนด พร้อม term
 coverage=1 และ latency ต่ำกว่า 5 วินาทีใน isolated local fixture (ไม่ใช่ production SLA)
 
@@ -84,6 +84,16 @@ principal/workspace-bound canonical cursor, retention/prune ที่ไม่�
 project file, learning proposal จาก current reviewed memory, non-executable owner review
 และ scrubbed owner audit
 
+Runtime Intelligence tests ใช้ HTTP + OAuth และ Compact gateways จริง ครอบคลุม
+durable session, nonblocking task start, completed-task reconnect หลัง server restart,
+idempotent retry ที่ไม่สร้าง job ซ้ำ, cancel, wall timeout, close refusal ขณะ running,
+process/test aggregate evidence, raw-output non-retention, guarded test-report counts,
+snapshot staleness, Context `OBSERVATION`, deterministic diagnosis, anonymous/read-only/
+revoked ACL, principal isolation, stale epoch, secret/traversal report path และ quota
+Headless Chromium fixture พิสูจน์ existing-session-only collection, MCP image passthrough
+persisted hashes/counts/bounded navigation timing, WebSocket-blocked policy และการ mark
+หลักฐานเดิมเป็น stale หลังหน้าเปลี่ยน โดยไม่มี DOM/console/password/header text
+
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
 workspace เปลี่ยนเป็น canonical root B สำเร็จ ภาพอยู่ใน local ignored artifacts และ
@@ -91,10 +101,10 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 94 tools
+- Full surface: 104 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- generated schema metric: Full 336,195; Compact 47,961; Hybrid 115,441 bytes
+- generated schema metric: Full 367,506; Compact 48,393; Hybrid 115,873 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
@@ -117,6 +127,8 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - memory proposal ใช้ evidence ID ข้าม client ไม่ได้และ source-changed proposal fail closed
 - AI ไม่มี MCP operation สำหรับ memory approval/prune/learning review; owner action ใช้ private authenticated IPC + digest
 - current memory ไม่ถูก prune และ learning approval ไม่ติดตั้ง/execute หรือ grant authority
+- runtime handle ข้าม principal/workspace ไม่ได้, revoke มีผลทันที และ inspect exec ยังต้อง target-bound approval
+- runtime evidence ไม่เก็บ raw process/browser secret และ changed source ถูก mark stale
 
 ## Packaging
 
@@ -133,3 +145,5 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 สถานะ multi-project federation ผ่าน external AI และ owner project จริง: `MANUAL_NOT_RUN`
 
 สถานะ owner-reviewed Memory ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`
+
+สถานะ Runtime Intelligence ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`

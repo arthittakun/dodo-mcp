@@ -114,6 +114,25 @@ identity + target ACL และ explicit owner visibility ทุกครั้�
 หมดจะถูก mark stale Learning approval ไม่ติดตั้ง ไม่ execute และไม่ grant scope, ACL,
 trust, approval, sandbox exception หรือ executable policy
 
+## Runtime Intelligence
+
+Runtime session, task และ evidence ผูก digest ของ `grantId + clientId`, active
+workspace และ expiry Opaque IDs ไม่ใช่สิทธิ์ ทุก operation ตรวจ live grant/client/ACL
+และ target scope ใหม่ งาน process/test/container ใช้ `JobManager` เดิมด้วย explicit
+program+argv, execution approval, caller idempotency, environment allowlist, timeout
+และ command sandbox ที่เจ้าของตั้งไว้ Runtime ไม่มี generic shell หรือ owner control
+
+Runtime tables เก็บเฉพาะ status/exit/timestamps, byte counts, aggregate test counts และ
+SHA-256 ไม่เก็บ raw stdout/stderr, DOM/console text, cookies, authorization headers,
+input values หรือ environment secrets Browser evidence ใช้ owned browser session เดิม;
+collector เปิด browser/web/desktop/microphone/system audio ไม่ได้ Snapshot เก็บ metadata
+manifest และ rollback candidate IDs เท่านั้น การ rollback ยังต้องผ่าน
+`rollback_changes` พร้อม journal/hash conflict checks
+
+Source เปลี่ยนหรือ recheck ไม่ได้จะ mark evidence เดิม stale โดยไม่เขียนทับ hash
+Context Engine อ่านเฉพาะ current caller/workspace evidence และถือเป็น untrusted data
+Runtime diagnosis ไม่มี side effect และไม่สามารถ grant scope/trust/approval
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

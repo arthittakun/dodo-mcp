@@ -58,8 +58,9 @@ literal term match ระบบส่งเฉพาะ evidence ที่พอ
 ตัด excerpt แบบ UTF-8 safe และคืน signed cursor เมื่อยังมีผลต่อ Cursor ผูก query,
 index version, active workspace และ principal และหมดอายุภายใน 10 นาที
 
-ระบบไม่ dump repository ทั้งก้อน แหล่งที่ยังไม่มี เช่น runtime หรือ graph ของ
-federated project จะแสดง `unavailable`/`partial` และ limitation ตามจริง
+ระบบไม่ dump repository ทั้งก้อน Runtime provider อ่านเฉพาะ current bounded evidence
+ของ caller ใน active workspace ส่วน graph/runtime ของ federated project ที่ยังไม่เปิด
+จะแสดง `unavailable`/`partial` และ limitation ตามจริง
 
 ## Cache L0–L6
 
@@ -81,6 +82,6 @@ state ผล query แสดง term coverage และจำนวน source ki
   lexical federation และระบุ graph ว่า partial
 - Git history ใช้ active workspace เท่านั้น
 - memory retrieval รับเฉพาะ owner-reviewed CURRENT records และตรวจ source/retention;
-  runtime evidence ยังไม่เปิดและไม่ถูกสร้างขึ้นแทน
+  runtime evidence ไม่มี current row หรือ source recheck ไม่ผ่าน และไม่ถูกสร้างขึ้นแทน
 - context เป็นข้อมูลช่วยตัดสินใจ ไม่ใช่สิทธิ์เขียน/รันคำสั่ง การแก้ไขยังต้องผ่าน
   target tool, workspace ID/epoch, scope, trust, approval, hash และ path/secret guard

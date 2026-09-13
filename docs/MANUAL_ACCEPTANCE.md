@@ -150,6 +150,24 @@ Automated HTTP/OAuth fixtures ผ่าน contract หลักแล้ว แ
 Automated fixtures ผ่าน contract หลักแล้ว แต่ยังไม่เปลี่ยนสถานะ manual จนกว่าจะใช้
 external AI และ owner-selected fixture จริง
 
+## Runtime Intelligence
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI และ owner repository จริง
+
+1. เปิด runtime session แล้วเริ่ม test task แบบ `program + args` ผ่าน Compact gateway
+2. ตัด/reconnect MCP ระหว่างงาน ตรวจ session/task เดิมและไม่เกิด process ซ้ำเมื่อ retry key เดิม
+3. observe task แล้วตรวจ evidence มี status/count/hash แต่ไม่มี raw stdout/stderr หรือ secret fixture
+4. ทดสอบ cancel และ wall timeout จาก task แยกกัน
+5. สร้าง snapshot แก้ fixture ภายนอก แล้ว revalidate ต้องได้ `STALE`
+6. เปิด owned workspace browser session, collect evidence และตรวจ MCP image จริง
+7. ตรวจฐานข้อมูล runtime ไม่มี DOM, console, cookie, authorization header หรือ input value
+8. ถอน workspace ACL ระหว่าง session แล้ว handle เดิมต้องใช้ไม่ได้
+9. ใช้ `context_query` ค้น current runtime evidence และตรวจ source เป็น `dodo-runtime://...`
+10. ปิด session ขณะ task running ต้องถูกปฏิเสธ; cancel/wait แล้วจึงปิดได้
+
+Automated HTTP/OAuth/Chromium fixtures ผ่าน contract หลักแล้ว แต่ไม่ถือเป็น manual
+external-client acceptance
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth
@@ -165,7 +183,7 @@ external AI และ owner-selected fixture จริง
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 94 tools
+2. ตรวจ full catalog 104 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

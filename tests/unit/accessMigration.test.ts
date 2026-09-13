@@ -18,7 +18,7 @@ describe('workspace access migration', () => {
       store.putGrant({id:'revoked',workspaceId:'b',clientId:'client',accountId:'owner',scopes:['dodo:exec']});
       store.revokeGrant('revoked');
       // Restore the actual old schema, including tables added after v4.
-      db.exec('DROP TABLE memory_visibility; DROP TABLE memories; DROP TABLE memory_learning_proposals; DROP TABLE memory_proposals; DROP TABLE context_metrics; DROP TABLE context_evidence; DROP TABLE context_cache; DROP TABLE brain_edges; DROP TABLE brain_nodes; DROP TABLE brain_file_cache; DROP TABLE brain_runs; DROP TABLE brain_index_state; DROP TABLE resource_refs; DROP TABLE resource_objects; DROP TABLE project_registry; DROP TABLE chat_permissions; DROP TABLE usage_consents; DROP TABLE schedules; DROP TABLE schedule_runs');
+      db.exec('DROP TABLE runtime_evidence; DROP TABLE runtime_tasks; DROP TABLE runtime_sessions; DROP TABLE memory_visibility; DROP TABLE memories; DROP TABLE memory_learning_proposals; DROP TABLE memory_proposals; DROP TABLE context_metrics; DROP TABLE context_evidence; DROP TABLE context_cache; DROP TABLE brain_edges; DROP TABLE brain_nodes; DROP TABLE brain_file_cache; DROP TABLE brain_runs; DROP TABLE brain_index_state; DROP TABLE resource_refs; DROP TABLE resource_objects; DROP TABLE project_registry; DROP TABLE chat_permissions; DROP TABLE usage_consents; DROP TABLE schedules; DROP TABLE schedule_runs');
       if (version === 2) db.exec('DROP TABLE workspace_clients; DELETE FROM schema_migrations WHERE version >= 3');
       else {
         db.exec('DELETE FROM schema_migrations WHERE version >= 4');
