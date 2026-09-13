@@ -151,6 +151,28 @@ export class FederationService {
     }
   }
 
+  /** Bounded metadata fingerprint used only to invalidate derived read caches. */
+  manifest(projectId: string, principal: Principal): { workspaceId: string; hash: string; truncated: boolean } {
+    const runtime = this.runtime(projectId, principal);
+    const started = Date.now();
+    try {
+      const limit = Math.min(10_000, this.limits.semanticFilesMax * 4);
+      const files: Array<{ path: string; bytes: number; mtimeMs: number; ctimeMs: number }> = [];
+      for (const entry of runtime.wfs.walk({ maxEntries: limit + 1, maxDepth: 64 })) {
+        if (!entry.stat.isFile()) continue;
+        files.push({ path: entry.rel, bytes: entry.stat.size, mtimeMs: entry.stat.mtimeMs, ctimeMs: entry.stat.ctimeMs });
+        if (files.length > limit) break;
+      }
+      const truncated = files.length > limit;
+      const hash = digestOf(files.slice(0, limit));
+      this.audit(runtime.project, principal, 'federation.context_manifest', 'ok', started, hash);
+      return { workspaceId: runtime.project.workspaceId, hash, truncated };
+    } catch (error) {
+      this.auditFailure(runtime.project, principal, 'federation.context_manifest', error, started);
+      throw error;
+    }
+  }
+
   async searchMany(
     projectIds: string[],
     principal: Principal,

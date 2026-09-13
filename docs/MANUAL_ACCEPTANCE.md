@@ -114,6 +114,23 @@
 automated fixtures ผ่านรายการหลักแล้ว แต่ยังไม่ได้วัด performance ระยะยาวกับ repository
 ของผู้ใช้หรือ workflow ผ่าน external AI จึงยังเป็น `MANUAL_NOT_RUN`
 
+## Context Engine และ Evidence
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI และ owner repository จริง
+
+1. เรียก `context_query` ด้วย goal เดียวกันสองครั้งและตรวจ ranking/evidence ID คงเดิม พร้อม cache hit ครั้งที่สอง
+2. ใช้ budget เล็กและ cursor อ่านหน้าถัดไปโดยไม่มี evidence ซ้ำหรือข้าม
+3. ตรวจทุกผลมี project/source hash, confidence, generated/verified time, freshness และ `untrusted_content`
+4. แก้ source หลัง query แล้วตรวจว่า evidence เดิมเป็น stale และ query ใหม่ใช้ hash ใหม่
+5. ลงทะเบียน fixture A/B ให้ client อ่านได้ทั้งคู่ แล้ว query ด้วย project name/ID โดย active workspace ไม่เปลี่ยน
+6. ถอน ACL ของ B แล้วตรวจ query และ evidence เดิมถูกปฏิเสธโดยไม่เผย absolute path
+7. ค้น marker ใน `.env`, private state, symlink/hardlink และตรวจว่าไม่ปรากฏในผล/cache diagnostics
+8. ตรวจ `context_status` มี L0–L6 metrics แต่ไม่มี goal, path, source content หรือ credential
+9. ตรวจ memory/runtime และ federated graph แสดง unavailable/partial ตามจริง
+
+Automated HTTP/OAuth fixtures ผ่าน contract หลักแล้ว แต่ยังไม่เปลี่ยนสถานะ manual
+จนกว่าจะทดสอบกับ external AI และ repository ที่เจ้าของเลือกจริง
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth
@@ -129,7 +146,7 @@ automated fixtures ผ่านรายการหลักแล้ว แต
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 86 tools
+2. ตรวจ full catalog 89 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

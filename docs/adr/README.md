@@ -51,3 +51,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [033 — Read-only multi-project federation](033-read-only-project-federation.md)
 - [034 — Universal resource identity and private SHA-256 CAS](034-universal-resource-cas.md)
 - [035 — Incremental Project Brain with source-verified graph evidence](035-project-brain-incremental-index.md)
+- [036 — Goal-driven Context Engine and source-verifying evidence](036-context-engine-evidence.md)

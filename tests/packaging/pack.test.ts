@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'docs/BRAIN.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/tools/contextTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -215,6 +215,24 @@ describe('PACK: npm tarball', () => {
     try {
       const tools = (await client.listTools()).tools.map((t) => t.name);
       expect(tools).toEqual(COMPACT_CATALOG.map((t) => t.name));
+    } finally { await client.close(); }
+  }, 120_000);
+
+  it('PACK-15: fresh installed compact server retrieves source-verified context', async () => {
+    const root = fs.mkdtempSync(path.join(workDir, 'context-root-'));
+    const cfg = fs.mkdtempSync(path.join(workDir, 'context-cfg-'));
+    fs.writeFileSync(path.join(root, 'packed-context.ts'), 'export const packedContextNeedle = 42;\n');
+    const client = new Client({ name: 'packed-context-client', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [installedBin, 'stdio', '--tools', 'compact'], cwd: root, env: { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>, stderr: 'pipe' }));
+    try {
+      const overview = (await client.callTool({ name: 'project_overview', arguments: {} })).structuredContent as { workspaceId: string; workspaceEpoch: string };
+      const result = await client.callTool({ name: 'dodo_assist_read', arguments: {
+        workspaceId: overview.workspaceId, workspaceEpoch: overview.workspaceEpoch,
+        operation: 'context_query', args: { goal: 'packedContextNeedle', terms: ['packedContextNeedle'] },
+      } });
+      expect(result.isError).not.toBe(true);
+      expect(JSON.stringify(result.structuredContent)).toContain('packed-context.ts');
+      expect(JSON.stringify(result.structuredContent)).toContain('untrusted_content');
     } finally { await client.close(); }
   }, 120_000);
 

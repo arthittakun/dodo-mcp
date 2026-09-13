@@ -146,8 +146,8 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     name: 'dodo_assist_read',
     title: 'Coding-task analysis',
     domain: 'code',
-    summary: 'task context, static impact analysis, symbol reads and source-verified project graph queries',
-    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'brain_status', 'brain_query', 'brain_symbol'],
+    summary: 'goal-driven context, evidence, static analysis, symbol reads and source-verified project graph queries',
+    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'brain_status', 'brain_query', 'brain_symbol'],
   },
   {
     name: 'dodo_assist_change',

@@ -17,17 +17,17 @@ npm pack
 
 ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
-- build: PASS — full 86, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
+- build: PASS — full 89, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 69 files PASS, 2 files platform-skipped; 544 tests PASS, 30 tests platform/prerequisite-skipped
-- packaging: 14 tests PASS
+- core/integration/security/compatibility: 72 files PASS, 2 files platform-skipped; 555 tests PASS, 30 tests platform/prerequisite-skipped
+- packaging: 15 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
-- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 86,
-  Compact = 19 และ `dodo_assist_change → brain_rebuild` ตามด้วย
-  `dodo_assist_read → brain_query` พบ symbol `packedBrain` พร้อม
-  `sourceVerified:true` จาก installed artifact สำเร็จ
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 89,
+  Compact = 19 และทั้ง direct `context_query` กับ
+  `dodo_assist_read → context_query` พบ guarded fixture source พร้อม
+  `untrusted_content` จาก installed artifact สำเร็จ
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -46,8 +46,8 @@ Multi-project federation tests ใช้ HTTP + OAuth fixture จริงกั
 identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
-`projectId` เข้า write operation Universal Resource และ Project Brain operations ทำให้
-surface ปัจจุบันเป็น Full 86 / Compact 19 / Hybrid 49
+`projectId` เข้า write operation Universal Resource, Project Brain และ Context Engine
+operations ทำให้ surface ปัจจุบันเป็น Full 89 / Compact 19 / Hybrid 49
 
 Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
 binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
@@ -66,6 +66,16 @@ restart/corruption recovery, source-hash freshness, anonymous/read-only/revoked 
 workspace epoch, traversal/symlink/hardlink, principal-bound cursor และ target-specific
 inspect approval โดยไม่ execute source หรือ repository plugin
 
+Context Engine tests ใช้ HTTP + OAuth, direct Full และ Compact gateway จริง ครอบคลุม
+goal/Thai+identifier terms, deterministic ranking/evidence IDs, byte budget, cursor,
+L0–L6 cache hit/metrics, source-hash freshness transition, evidence recheck, active และ
+federated A/B retrieval by ID/name, unavailable target partial result, anonymous/live
+ACL/revocation, principal/workspace/cursor binding, secret/private-state/symlink guards,
+repository instruction เป็น untrusted content, cache corruption recovery และ fresh
+installed-tarball retrieval โดย memory/runtime unavailable ถูกแสดงตามจริง Fixture
+baseline มี precision=1 และ recall=1 สำหรับ source/test/docs ที่กำหนด พร้อม term
+coverage=1 และ latency ต่ำกว่า 5 วินาทีใน isolated local fixture (ไม่ใช่ production SLA)
+
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
 workspace เปลี่ยนเป็น canonical root B สำเร็จ ภาพอยู่ใน local ignored artifacts และ
@@ -73,10 +83,10 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 86 tools
+- Full surface: 89 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- generated schema metric: Full 290,795; Compact 47,583; Hybrid 115,063 bytes
+- generated schema metric: Full 315,892; Compact 47,742; Hybrid 115,222 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`

@@ -26,6 +26,10 @@
   symbols/references/imports/routes/tests/dependencies, stable `symbol://` identity,
   source freshness, rebuild/pause/cancel และ corruption/restart recovery; Full เป็น
   86 tools ส่วน Compact/Hybrid คง 19/49 และ route ผ่าน assistance gateways
+- เพิ่ม `context_query`, `context_evidence`, `context_status` สำหรับ goal-driven
+  retrieval, evidence 5 classes, provenance/confidence/freshness, deterministic
+  ranking, budget/cursor และ dependency-aware L0–L6 cache ทำให้ Full เป็น 89 tools
+  โดย Compact/Hybrid คง 19/49 ผ่าน `dodo_assist_read`
 
 ## วิธีอัปเดต
 

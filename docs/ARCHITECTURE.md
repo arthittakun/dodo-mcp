@@ -14,6 +14,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ changes and jobs
                                       ├─ Git/intelligence/LSP
                                       ├─ assistance/multimodal/workflow
+                                      ├─ Context Engine ──► evidence + L0–L6 cache
                                       ├─ Project Brain ──► incremental AST graph
                                       └─ resource references ──► private SHA-256 CAS
 
@@ -106,6 +107,19 @@ Federation audit เขียนอีกแถวด้วย target workspace 
 
 Gateway ไม่เรียก handler ตรง ๆ และไม่สามารถเรียก gateway อื่น, project overview หรือ owner controls
 
+## Context Engine และ evidence
+
+`ContextEngineService` ทำ goal-driven retrieval ต่อ active workspace โดยรวม guarded
+lexical search, Project Brain, Git และ read-only federation ผลลัพธ์แยก evidence class,
+project/source provenance, confidence, freshness และข้อจำกัด Ranking deterministic
+ภายใต้ query/ACL/index version เดียวกันและจำกัดด้วย byte budget/cursor
+
+SQLite เก็บ caller-scoped cache L0–L6, evidence และ aggregate metrics Derived cache
+ผูก dependency path/hash ก่อน reuse ระบบตรวจ live active/target ACL และ guarded source
+ซ้ำ หาก hash เปลี่ยนจะ mark evidence เดิม stale และ invalidate L1–L6 Cursor ใช้ HMAC
+ผูก principal/workspace/query/index version ค่า ID/hash/cache ไม่ใช่ authority และ
+retrieved content ทุกชนิดเป็น untrusted data
+
 ## Universal Resource Layer and CAS
 
 `ResourceService` ผูกกับ active `BootstrappedWorkspace` และสร้าง opaque resource
@@ -132,7 +146,7 @@ inflate และ SVG อยู่ใน text path ไม่ถูก render เ
 
 ## Tool surfaces
 
-- Full catalog 80 individual definitions
+- Full catalog 89 individual definitions
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

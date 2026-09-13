@@ -87,6 +87,20 @@ path policy และ current source SHA-256 ซ้ำ ผล stale/missing ถ�
 default maintenance operations (`brain_rebuild`, `brain_pause`, `brain_cancel`) ต้องมี
 `dodo:exec` และผ่าน trust/target-specific local approval เดิม
 
+## Context retrieval and evidence
+
+Context Engine ใช้ `dodo:read` และยังผ่าน invocation pipeline เดิม ก่อนค้นข้าม
+project ระบบ resolve เฉพาะรายการที่ caller มี live target ACL และ installation
+identity เท่านั้น Unauthorized selector ถูกปฏิเสธโดยไม่คืน absolute path หรือข้อมูล
+project Cache hit ไม่ข้ามการตรวจ ACL และ source hash ทุก dependency
+
+Evidence ID, source URI, hash และ signed cursor ไม่ใช่ capability และผูกกับ principal,
+request workspace, query/index version และ expiry ตามชนิด Source เปลี่ยนจะ mark stale
+และ invalidate derived cache ข้อมูลจาก source, docs, repository instruction, tool
+output หรือ index เป็น `untrusted_content` เสมอ ไม่สามารถ grant scope/ACL/trust,
+approve action, ปิด sandbox หรือข้าม path/secret guard ได้ Diagnostics ไม่คืน query,
+path, content, token หรือ private owner state
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

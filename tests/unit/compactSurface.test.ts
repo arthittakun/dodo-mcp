@@ -16,7 +16,7 @@ import {
 
 /** ADR-029: compact surface invariants — pure catalog logic, no server. */
 
-/** The frozen full-catalog contract: 86 tools, exact names, exact order. */
+/** The frozen full-catalog contract: exact names and stable order. */
 const FULL_NAMES = [
   'project_overview', 'list_files', 'read_files', 'read_image', 'read_instructions', 'search_code', 'glob_files',
   'write_file', 'edit_file', 'apply_patch', 'replace_in_files', 'delete_path', 'move_path', 'make_directory',
@@ -27,6 +27,7 @@ const FULL_NAMES = [
   'desktop_status', 'desktop_windows', 'desktop_capture', 'desktop_accessibility', 'desktop_action',
   'schedule_propose',
   'context_for_task', 'analyze_impact', 'read_symbol', 'preview_refactor', 'verify_changes',
+  'context_query', 'context_evidence', 'context_status',
   'brain_status', 'brain_query', 'brain_symbol', 'brain_rebuild', 'brain_pause', 'brain_cancel',
   'multimodal_status', 'screen_observe', 'image_view', 'media_open', 'media_extract', 'media_transcribe',
   'media_subtitles', 'media_search', 'media_read', 'media_job', 'media_close', 'speech_synthesize',
@@ -44,7 +45,7 @@ const discover = COMPACT_CATALOG.find((d) => d.name === 'dodo_discover') as AnyT
 const WS = { workspaceId: 'ws_test', workspaceEpoch: 'boot_test' };
 
 describe('compact surface catalog', () => {
-  it('full catalog includes the Phase 05 brain family: 86 exact names/order, no gateways mixed in', () => {
+  it('full catalog includes the Phase 06 context family in exact order, with no gateways mixed in', () => {
     expect(TOOL_CATALOG.map((d) => d.name)).toEqual(FULL_NAMES);
     expect(surfaceCatalog('full')).toBe(TOOL_CATALOG);
     expect(TOOL_CATALOG.some((d) => d.name.startsWith('dodo_'))).toBe(false);
@@ -200,7 +201,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(86);
+    expect(TOOL_CATALOG).toHaveLength(89);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

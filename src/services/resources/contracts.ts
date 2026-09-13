@@ -28,7 +28,7 @@ export const ResourceMetadata = z.object({
 
 export const ResourceInfo = z.object({
   resourceId: ResourceId,
-  uri: z.string().startsWith('dodo-resource://'),
+  uri: z.string().regex(/^dodo-resource:\/\//),
   mimeType: z.string().min(1).max(150),
   bytes: z.number().int().nonnegative(),
   sha256: Hash,

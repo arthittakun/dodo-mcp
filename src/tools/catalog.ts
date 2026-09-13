@@ -15,6 +15,7 @@ import { diagnosticsTool, approvalStatusTool, handoffWriteTool, handoffReadTool 
 import { todoWriteTool, todoReadTool, environmentInfoTool, fetchUrlTool } from './agentTools.js';
 import { RESOURCE_TOOLS } from './resourceTools.js';
 import { BRAIN_TOOLS } from './brainTools.js';
+import { CONTEXT_TOOLS } from './contextTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -93,6 +94,8 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   readSymbolTool,
   previewRefactorTool,
   verifyChangesTool,
+  // Goal-driven context, evidence revalidation and caller-scoped diagnostics.
+  ...CONTEXT_TOOLS,
   // Incremental, source-verified project structure and relationship index.
   ...BRAIN_TOOLS,
   // Optional local media/browser/game/workflow capabilities under the existing scopes.

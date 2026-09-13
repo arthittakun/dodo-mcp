@@ -2,7 +2,7 @@
   "name": "dodo-mcp",
   "version": "1.0.0",
   "author": "Arthittakun",
-  "description": "DODO — local-first MCP server with 86 coding, project-brain, resource, screen, media, browser and workflow tools; embedded OAuth and workspace permissions.",
+  "description": "DODO — local-first MCP server with 89 coding, context, project-brain, resource, screen, media, browser and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -24,6 +24,7 @@
     "docs/AUTH.md",
     "docs/BRAIN.md",
     "docs/COMPATIBILITY.md",
+    "docs/CONTEXT.md",
     "docs/CONFIRMATION.md",
     "docs/DESKTOP.md",
     "docs/LARGE_INPUTS.md",

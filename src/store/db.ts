@@ -272,6 +272,64 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     error TEXT
   );
   CREATE INDEX idx_brain_runs_workspace ON brain_runs(workspace_id, started_at DESC);`,
+  `CREATE TABLE context_cache (
+    cache_key TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    level INTEGER NOT NULL CHECK(level BETWEEN 0 AND 6),
+    query_hash TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    dependencies TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_hit_at INTEGER NOT NULL,
+    hits INTEGER NOT NULL DEFAULT 0,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_context_cache_scope ON context_cache(workspace_id, principal, query_hash, level);
+  CREATE INDEX idx_context_cache_expiry ON context_cache(expires_at);
+  CREATE TABLE context_evidence (
+    evidence_id TEXT PRIMARY KEY,
+    request_workspace_id TEXT NOT NULL,
+    source_workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    query_hash TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    claim TEXT NOT NULL,
+    project_id TEXT,
+    display_name TEXT NOT NULL,
+    active_source INTEGER NOT NULL,
+    source_kind TEXT NOT NULL,
+    source_resource TEXT NOT NULL,
+    source_path TEXT,
+    source_hash TEXT NOT NULL,
+    source_line INTEGER,
+    source_end_line INTEGER,
+    commit_sha TEXT,
+    confidence REAL NOT NULL,
+    ranking_score REAL NOT NULL,
+    ranking_reasons TEXT NOT NULL,
+    limitations TEXT NOT NULL,
+    freshness TEXT NOT NULL,
+    generated_at INTEGER NOT NULL,
+    last_verified_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_context_evidence_scope ON context_evidence(request_workspace_id, principal, query_hash, freshness);
+  CREATE INDEX idx_context_evidence_source ON context_evidence(source_workspace_id, source_path, source_hash);
+  CREATE INDEX idx_context_evidence_expiry ON context_evidence(expires_at);
+  CREATE TABLE context_metrics (
+    workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    queries INTEGER NOT NULL DEFAULT 0,
+    cache_hits INTEGER NOT NULL DEFAULT 0,
+    total_latency_ms INTEGER NOT NULL DEFAULT 0,
+    candidates INTEGER NOT NULL DEFAULT 0,
+    returned INTEGER NOT NULL DEFAULT 0,
+    stale_transitions INTEGER NOT NULL DEFAULT 0,
+    last_term_coverage REAL NOT NULL DEFAULT 0,
+    last_query_at INTEGER,
+    PRIMARY KEY(workspace_id, principal)
+  );`,
 ];
 
 /**

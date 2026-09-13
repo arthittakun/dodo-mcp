@@ -7,13 +7,14 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 86 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 89 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
+- มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -116,6 +117,25 @@ brain_rebuild(mode="incremental", waitMs=10000)
 เมื่อไฟล์ถูกย้ายแบบ exact-content แต่ URI/index row ไม่ใช่สิทธิ์ ทุก query จะตรวจ
 OAuth, live grant, workspace ACL, workspace ID/epoch, path/secret policy และ SHA-256
 ของ source ปัจจุบันใหม่ก่อนคืนผล ดู [Project Brain](docs/BRAIN.md)
+
+### Context Engine และ Evidence
+
+ให้ AI ขอ context ตาม goal ได้โดยไม่ต้องเลือก search/brain/git ทีละตัว:
+
+```text
+context_query(goal="Fix login callback", terms=["loginCallback", "OAuth"],
+  projects=["Frontend", "Backend"], budget=24000)
+```
+
+Compact/Hybrid ใช้ `dodo_assist_read(operation="context_query", args={...})` ผลลัพธ์
+แยก `FACT`, `OBSERVATION`, `MEMORY`, `INFERENCE`, `HYPOTHESIS` และทุก evidence มี
+project identity, source hash, line/commit, confidence, generated/verified time และ
+freshness Cache L0–L6 ตรวจ ACL และ dependency hash ก่อนใช้ซ้ำ Source เปลี่ยนแล้ว
+evidence เดิมจะเป็น stale และ derived cache ถูกสร้างใหม่
+
+ผลค้นหา, README และ repository instruction เป็น untrusted content และไม่สามารถเพิ่ม
+scope, ACL, trust หรือ approval ได้ Phase 06 ยังรายงาน memory/runtime ว่า unavailable
+ตามจริง ดู contract ที่ [Context Engine](docs/CONTEXT.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 

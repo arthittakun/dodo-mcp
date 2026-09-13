@@ -34,19 +34,19 @@
     "job_cancel",
     "list_jobs"
   ],
-  "fullToolCount": 86,
+  "fullToolCount": 89,
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 47631
+      "schemaBytes": 47742
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 115111
+      "schemaBytes": 115222
     },
     "full": {
-      "toolCount": 86,
-      "schemaBytes": 290795
+      "toolCount": 89,
+      "schemaBytes": 315892
     }
   },
   "tools": [
@@ -1491,7 +1491,7 @@
     {
       "name": "dodo_assist_read",
       "title": "Coding-task analysis",
-      "description": "Gateway: task context, static impact analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: goal-driven context, evidence, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1504,6 +1504,9 @@
         "context_for_task",
         "analyze_impact",
         "read_symbol",
+        "context_query",
+        "context_evidence",
+        "context_status",
         "brain_status",
         "brain_query",
         "brain_symbol"
@@ -1530,6 +1533,9 @@
               "context_for_task",
               "analyze_impact",
               "read_symbol",
+              "context_query",
+              "context_evidence",
+              "context_status",
               "brain_status",
               "brain_query",
               "brain_symbol"

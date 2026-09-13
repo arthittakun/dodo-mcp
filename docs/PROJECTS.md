@@ -62,7 +62,7 @@ MCP อ่านโปรเจกต์ที่ลงทะเบียนไ�
 - `search_code({projectIds: [...]})` สำหรับค้นพร้อมกันสูงสุด 8 โปรเจกต์
 
 ใน Compact/Hybrid surface ให้ใส่ fields เหล่านี้ใน `args` ของ `dodo_read`
-ตาม schema ที่ `dodo_discover` คืนมา จำนวน tools ปัจจุบันเป็น Full 86, Compact 19
+ตาม schema ที่ `dodo_discover` คืนมา จำนวน tools ปัจจุบันเป็น Full 89, Compact 19
 และ Hybrid 49
 
 `project_overview()` ของ active workspace แสดง `federation.projects` เฉพาะ

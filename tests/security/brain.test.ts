@@ -102,6 +102,12 @@ describe('Phase 05 Project Brain security boundaries', () => {
     expect(result.envelope.error).toMatchObject({ code: 'RECOVERY_REQUIRED' });
     const brain = ctx.server.services.brain!;
     let recovered = brain.status();
+    // Corruption recovery is queued on a zero-delay timer. Wait for that
+    // explicit lifecycle transition instead of racing the timer callback.
+    for (let attempt = 0; recovered.status === 'failed' && attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      recovered = brain.status();
+    }
     if (recovered.status === 'running' && recovered.activeRunId) recovered = await brain.wait(recovered.activeRunId, 10_000);
     expect(recovered).toMatchObject({ status: 'completed', lastError: null });
     expect((await gateway(owner.accessToken, 'dodo_assist_read', 'brain_query', { includeStale: true })).envelope.ok).toBe(true);

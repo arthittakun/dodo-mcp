@@ -41,6 +41,14 @@ export const projectOverviewTool = defineTool({
       brain = { available: false, status: 'recovery_required' };
       warnings.push('Project Brain status needs recovery; use brain_status or brain_rebuild after checking the active workspace.');
     }
+    let contextEngine: Record<string, unknown>;
+    try {
+      const status = s.contextEngine?.status(ctx);
+      contextEngine = status ? { available: true, ...status } : { available: false, status: 'unavailable' };
+    } catch {
+      contextEngine = { available: false, status: 'recovery_required' };
+      warnings.push('Context Engine diagnostics need recovery; retry context_status after checking the active workspace.');
+    }
     const desktop = s.desktop.policy();
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
     const federation = s.federation.listAuthorized(ctx.principal);
@@ -48,6 +56,7 @@ export const projectOverviewTool = defineTool({
       data: {
         ...data,
         brain,
+        contextEngine,
         capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
         federation: {
           mode: 'read-only',
