@@ -17,7 +17,7 @@ self-hosted runner มีความเสี่ยงต่อเครื่�
 ถูก pin ด้วย full commit SHA
 
 Linux runner label `linux-ci` รัน release gate ภายใน Docker image เดิมบน Node 22/24
-Windows runner label `windows-ci` รัน native candidate release gate บน Node 22/24
+Windows runner label `windows-ci 02` รัน native candidate release gate บน Node 22/24
 พร้อมตรวจ enabled Administrator token สำหรับ ACL tests ทั้งสอง job upload เฉพาะ
 non-secret ignored evidence และไม่มีขั้น publish npm
 

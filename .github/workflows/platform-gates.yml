@@ -66,7 +66,8 @@ jobs:
       fail-fast: false
       matrix:
         node: [22, 24]
-    runs-on: [self-hosted, Windows, X64, windows-ci]
+    # Select the replacement runner explicitly; runner 01 is retired.
+    runs-on: [self-hosted, Windows, X64, "windows-ci 02"]
     timeout-minutes: 90
     defaults:
       run:
@@ -96,10 +97,10 @@ jobs:
           $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
           $principal = [Security.Principal.WindowsPrincipal]::new($identity)
           $administrator = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-          @{ platform = [Environment]::OSVersion.Platform.ToString(); arch = $env:PROCESSOR_ARCHITECTURE; administrator = $administrator } |
+          @{ runner = $env:RUNNER_NAME; platform = [Environment]::OSVersion.Platform.ToString(); arch = $env:PROCESSOR_ARCHITECTURE; administrator = $administrator } |
             ConvertTo-Json -Compress | Set-Content -Encoding utf8 (Join-Path $evidence "runner.json")
-          if ($env:RUNNER_OS -ne "Windows") { throw "windows-ci label is not a Windows runner" }
-          if (-not $administrator) { throw "windows-ci must run with an enabled Administrator token for native ACL tests" }
+          if ($env:RUNNER_OS -ne "Windows") { throw "windows-ci 02 label is not a Windows runner" }
+          if (-not $administrator) { throw "windows-ci 02 must run with an enabled Administrator token for native ACL tests" }
       - name: Install dependencies and Playwright Chromium
         shell: cmd
         run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium

@@ -37,5 +37,6 @@ Chromium environment, LSP, full automated suite และ packaging บน Windo
 
 ต้องทดสอบบน Windows 11 จริง: OAuth/HTTP, STDIO, workspace isolation, ACL, file
 conflict, rollback, jobs, setup และ package installation ผลปัจจุบันคือ
-`MANUAL_NOT_RUN` Dedicated `windows-ci` self-hosted runner ใช้เก็บ automated native
-candidate evidence แต่ไม่เปลี่ยน manual status เอง
+`MANUAL_NOT_RUN` Dedicated `windows-ci 02` self-hosted runner ใช้เก็บ automated native
+candidate evidence บน Node 22/24 แต่ไม่เปลี่ยน manual status เอง Workflow เลือก
+label `windows-ci 02` โดยเฉพาะ และเลิกใช้ runner 01 แล้ว

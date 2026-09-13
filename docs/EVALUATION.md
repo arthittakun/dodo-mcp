@@ -64,7 +64,7 @@ private เข้า build context ตัว runner ส่งเฉพาะ rev
 container จากนั้นตรวจ report กลับว่าตรงกับ revision และ lock digest เดิม
 
 `.github/workflows/platform-gates.yml` ใช้ self-hosted labels `linux-ci` และ
-`windows-ci` ทดสอบ Node 22/24 เฉพาะ push ที่ `main` กับ manual dispatch ไม่มี
+`windows-ci 02` ทดสอบ Node 22/24 เฉพาะ push ที่ `main` กับ manual dispatch ไม่มี
 `pull_request` trigger เพราะ repository เป็น public และ untrusted PR ต้องไม่ execute
 บนเครื่อง runner ของเจ้าของ Actions dependencies ถูก pin ด้วย commit SHA และ token
 มีเพียง `contents: read`
