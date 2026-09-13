@@ -64,6 +64,13 @@ export const projectOverviewTool = defineTool({
       runtime = { available: false, status: 'recovery_required' };
       warnings.push('Runtime Intelligence diagnostics need recovery; retry after checking this workspace and client access.');
     }
+    let agentRuntime: Record<string, unknown>;
+    try {
+      agentRuntime = s.agentRuntime ? s.agentRuntime.diagnostics(ctx) : { available: false, status: 'unavailable' };
+    } catch {
+      agentRuntime = { available: false, status: 'recovery_required' };
+      warnings.push('Advanced Agent Runtime diagnostics need recovery; inspect this caller workspace state.');
+    }
     const desktop = s.desktop.policy();
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
     const federation = s.federation.listAuthorized(ctx.principal);
@@ -74,6 +81,7 @@ export const projectOverviewTool = defineTool({
         contextEngine,
         memory,
         runtime,
+        agentRuntime,
         capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
         federation: {
           mode: 'read-only',

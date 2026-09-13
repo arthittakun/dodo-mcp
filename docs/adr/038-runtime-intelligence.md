@@ -31,7 +31,7 @@ browser, sandbox และ gateway policy
 
 ## Consequences
 
-- Full surface เพิ่ม 10 operations เป็น 104; Compact/Hybrid คง 19/49
+- Full surface เพิ่ม 10 operations เป็น 104 ณ Phase 08; Phase 09 เพิ่มเป็น 121 โดย Compact/Hybrid คง 19/49
 - SQLite migration เพิ่ม runtime sessions/tasks/evidence พร้อม FK, quota และ expiry
 - server restart รักษา completed task/evidence metadata แต่ไม่ reattach หรือ signal PID
 - raw debugging output ยังใช้ bounded `job_output`; runtime evidence ไม่ทำสำเนา

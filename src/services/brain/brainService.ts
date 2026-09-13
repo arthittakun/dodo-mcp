@@ -704,10 +704,12 @@ export class ProjectBrainService {
   private verifyCursor(ctx: ToolCtx, token: string, signature: string): QueryCursor {
     const match = /^b1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(token);
     if (!match) throw new DodoError('INVALID_INPUT', 'invalid project brain cursor');
-    const actual = Buffer.from(match[2]!, 'base64url'), expected = createHmac('sha256', this.cursorKey).update(match[1]!).digest();
+    const body = Buffer.from(match[1]!, 'base64url'), actual = Buffer.from(match[2]!, 'base64url');
+    if (body.toString('base64url') !== match[1] || actual.toString('base64url') !== match[2]) throw new DodoError('INVALID_INPUT', 'invalid project brain cursor');
+    const expected = createHmac('sha256', this.cursorKey).update(match[1]!).digest();
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new DodoError('INVALID_INPUT', 'invalid project brain cursor');
     let payload: QueryCursor;
-    try { payload = JSON.parse(Buffer.from(match[1]!, 'base64url').toString('utf8')) as QueryCursor; }
+    try { payload = JSON.parse(body.toString('utf8')) as QueryCursor; }
     catch { throw new DodoError('INVALID_INPUT', 'invalid project brain cursor'); }
     if (payload.v !== 1 || payload.q !== signature || payload.w !== this.services.workspaceId || payload.a !== principalKey(ctx) || payload.exp <= Date.now() || !Number.isSafeInteger(payload.n) || payload.n < 0 || !Number.isSafeInteger(payload.e) || payload.e < 0) {
       throw new DodoError('STALE_WORKSPACE', 'project brain cursor expired or belongs to another query/client/workspace');

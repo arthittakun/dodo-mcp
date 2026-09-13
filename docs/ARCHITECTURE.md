@@ -17,6 +17,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ Context Engine ──► evidence + L0–L6 cache
                                       ├─ Memory ──► reviewed evidence + stale lifecycle
                                       ├─ Runtime Intelligence ──► durable tasks + bounded evidence
+                                      ├─ Advanced Agent Runtime ──► plans + hypotheses + intents + reviewed skills
                                       ├─ Project Brain ──► incremental AST graph
                                       └─ resource references ──► private SHA-256 CAS
 
@@ -161,6 +162,27 @@ source เปลี่ยนหรือหายจะ mark record `STALE` Cont
 `OBSERVATION` และผูก content hash + caller-specific runtime manifest เป็น cache
 dependency ทุก access ตรวจ live OAuth grant/workspace ACL ใหม่
 
+## Advanced Agent Runtime
+
+`AgentRuntimeService` ผูกกับ active `BootstrappedWorkspace` และเก็บ durable run ของ
+principal เดียวกัน: immutable plan revisions, bounded hypotheses, intent locks,
+metadata snapshots, target-action receipts, evidence judgements และ reviewed skill
+versions ทุก run มี `authority=coordination_only` และ capability envelope ที่ลด
+project/path/program/network/browser/desktop/media/workflow/quota จาก authority เดิม
+
+`agent_read`, `agent_write` และ `agent_exec` เลือกได้เฉพาะ allowlist ที่สร้างจาก
+`CORE_TOOL_CATALOG` แล้วเรียก target ผ่าน `invokeToolDefinition` จึงไม่มี security
+pipeline ชุดที่สอง Path write ต้องผ่าน run writable-path check + covering intent ก่อน
+ผ่าน target WorkspaceFS/secret/hash checks ส่วน exec ใช้ explicit argv หรือ owned
+runtime handles และตรวจ program/feature/job quota ก่อน target approval/sandbox
+
+Snapshot เก็บ metadata manifest และ changeset baseline; compare คืน caller-owned
+post-snapshot candidates; rollback ใช้ original `rollback_changes` pipeline Restart
+เปลี่ยน unfinished action เป็น `INTERRUPTED/SERVER_RESTARTED` และ run epoch เก่าเป็น
+`RECOVERY_REQUIRED` โดยไม่ replay หรือ signal stored PID Skill proposal อยู่ใน private
+review queue จน owner อนุมัติ exact digest; approved steps ยังเป็น non-executable
+`untrusted_guidance`
+
 ## Universal Resource Layer and CAS
 
 `ResourceService` ผูกกับ active `BootstrappedWorkspace` และสร้าง opaque resource
@@ -187,7 +209,7 @@ inflate และ SVG อยู่ใน text path ไม่ถูก render เ
 
 ## Tool surfaces
 
-- Full catalog 104 individual definitions
+- Full catalog 121 individual definitions (Core 104 + Advanced Agent Runtime 17)
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

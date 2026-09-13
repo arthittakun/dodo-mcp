@@ -27,7 +27,7 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools
-- STDIO default: Full 104 tools
+- STDIO default: Full 121 tools (Core 104 + Advanced Agent Runtime 17)
 - explicit Hybrid: 49 tools
 - explicit override: `--tools compact|full|hybrid`
 
@@ -43,6 +43,10 @@ federation สำหรับ project อื่น, owner-reviewed current Memor
 Runtime Intelligence evidence ตาม live ACL Runtime process ใช้ executable/sandbox
 support ของ JobManager ปัจจุบัน ส่วน browser evidence ต้องมี Playwright Chromium และ
 owned browser session เดิม Compact/Hybrid ยังคง 19/49 tools
+
+Advanced Agent Runtime ใช้ SQLite และ invocation pipeline เดิมทุก platform Managed
+exec ต้องใช้ explicit argv และ executable ที่ JobManager รองรับ ส่วน browser/desktop/
+media/workflow ขึ้นกับ optional capability ของ platform เช่นเดิม
 
 ## Optional capabilities
 

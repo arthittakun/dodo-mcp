@@ -98,7 +98,7 @@ the current byte measurements.
 ## Addendum (Phase 07): owner-reviewed memory operations
 
 ADR-037 adds five individual memory definitions to Full, so the current surfaces are
-Full 104, Compact 19 and Hybrid 49. Compact/Hybrid route read operations through
+Full 121, Compact 19 and Hybrid 49. Compact/Hybrid route read operations through
 `dodo_assist_read` and proposal operations through `dodo_assist_change`. Owner approval,
 rejection, prune and learning review remain private IPC commands and are never added
 to any MCP surface.

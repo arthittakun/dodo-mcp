@@ -29,7 +29,7 @@ content กลายเป็น policy
 
 ## Consequences
 
-- Full surface เพิ่มห้า memory operations; catalog ปัจจุบันรวม Phase 08 เป็น 104 tools;
+- Full surface เพิ่มห้า memory operations; catalog หลัง Phase 08 เป็น 104 tools; Phase 09 เพิ่มเป็น 121 tools;
   Compact/Hybrid คง 19/49 และ route
   ผ่าน assistance gateways
 - SQLite migration เพิ่ม proposal, memory, visibility และ learning-review tables

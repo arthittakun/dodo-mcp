@@ -7,7 +7,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 104 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 121 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -17,6 +17,7 @@
 - มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
 - มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
 - มี Runtime Intelligence สำหรับ task ที่ reconnect ได้, process/test/browser evidence แบบ bounded, snapshot freshness และ diagnosis ที่แยก fact/observation/inference
+- มี Advanced Agent Runtime สำหรับ immutable plan, parallel hypotheses, intent locks, guarded snapshots, evidence-backed completion, restart recovery และ owner-reviewed reusable guidance
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -189,6 +190,25 @@ stdout/stderr, DOM, console หรือ header ดิบ Browser collector ใ�
 ไฟล์และไม่ rollback เอง; ต้องเรียก `rollback_changes` แยกต่างหาก ดู
 [Runtime Intelligence](docs/RUNTIME.md)
 
+### Advanced Agent Runtime
+
+งานแก้ปัญหาหลายขั้นสามารถเปิด durable agent run ที่จำกัด project, writable paths,
+programs, optional capabilities, quotas และเวลาทำงานเพิ่มจากสิทธิ์เดิม:
+
+```text
+dodo_assist_change(operation="agent_run_open", args={goal, completionCriteria, capabilities})
+dodo_assist_change(operation="agent_hypothesis_open", args={runId, ...})
+dodo_assist_change(operation="agent_intent_acquire", args={runId, hypothesisId, kind:"path", resourceKey:"src"})
+dodo_write(operation="agent_write", args={runId, hypothesisId, operation:"edit_file", args:{...}})
+dodo_assist_read(operation="agent_snapshot_compare", args={...})
+```
+
+Run/plan/hypothesis/intent/snapshot/skill ไม่ให้ permission เพิ่ม ทุก target ยังผ่าน
+OAuth scope, live workspace ACL/epoch, trust approval, path/secret guards, expected hash,
+command sandbox, idempotency และ audit เดิม `agent_exec` ใช้ explicit argv/owned handles
+เท่านั้น และ cancel/pause coordinator ไม่ kill job ดู
+[Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
+
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
 DODO ไม่สร้าง Tunnel, DNS หรือ Cloudflare account ให้ ผู้ใช้สร้าง remotely-managed Tunnel และตั้ง public hostname ให้ route **ทุก path** มาที่ `http://127.0.0.1:21730` ก่อน จากนั้นเลือกได้สองโหมด:
@@ -289,6 +309,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 
 - [Release 1.0.0](docs/RELEASE_1.0.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
+- [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Compatibility](docs/COMPATIBILITY.md)

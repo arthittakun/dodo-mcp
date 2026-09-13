@@ -7,6 +7,7 @@ import { launch, obtainToken, type TestContext, type TokenSet } from '../helpers
 import { tool, assertOk, blocks } from '../helpers/multimodal.js';
 import { ResourceChunk, ResourceExtract, ResourceInfo, ResourcePreview } from '../../src/services/resources/contracts.js';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
+import { CORE_TOOL_CATALOG } from '../../src/tools/coreCatalog.js';
 
 function wavFixture(): Buffer {
   const samples = Buffer.alloc(1600 * 2);
@@ -47,8 +48,9 @@ describe('Phase 04 universal resources over real HTTP + OAuth', () => {
   const call = (name: string, args: Record<string, unknown>) => tool(ctx, token.accessToken, name, args);
 
   it('adds six exact resource tools to the full surface and keeps one compact gateway family', async () => {
-    expect(TOOL_CATALOG).toHaveLength(104);
-    expect(TOOL_CATALOG.slice(-6).map((entry) => entry.name)).toEqual(['resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform']);
+    expect(CORE_TOOL_CATALOG).toHaveLength(104);
+    expect(TOOL_CATALOG).toHaveLength(121);
+    expect(CORE_TOOL_CATALOG.slice(-6).map((entry) => entry.name)).toEqual(['resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform']);
   });
 
   it('ingests guarded UTF-8, deduplicates bytes and reads text with immutable identity', async () => {

@@ -31,17 +31,26 @@
   ranking, budget/cursor และ dependency-aware L0–L6 cache ทำให้ Full เป็น 89 tools
   โดย Compact/Hybrid คง 19/49 ผ่าน `dodo_assist_read`
 - เพิ่ม `memory_search`, `memory_inspect`, `memory_status`, `memory_propose` และ
-  `memory_learning_propose`; catalog ปัจจุบันเมื่อรวม Runtime Intelligence เป็น
+  `memory_learning_propose`; catalog หลัง Phase 08 เป็น
   Full 104 tools ส่วน Compact/Hybrid คง 19/49
   ผ่าน assistance gateways Permanent memory ต้องผ่าน private owner review + exact
   digest, ตรวจ source/retention/ACL ซ้ำ และ learning review ไม่ติดตั้งหรือ execute เอง
 - เพิ่ม Runtime Intelligence 10 operations สำหรับ durable session, reconnectable
   process/test/container task, bounded task/browser evidence, guarded snapshot,
-  evidence revalidation และ deterministic diagnosis ทำให้ Full เป็น 104 tools
+  evidence revalidation และ deterministic diagnosis ทำให้ Full ณ Phase 08 เป็น 104 tools
   ขณะที่ Compact/Hybrid คง 19/49 ผ่าน gateways เดิม
 - Runtime task ใช้ JobManager, execution approval, idempotency, environment allowlist,
   timeout และ command sandbox เดิม Runtime store ไม่เก็บ raw stdout/stderr, DOM,
   console, cookie, authorization header หรือ environment secret
+- เพิ่ม Advanced Agent Runtime 17 operations สำหรับ immutable plan, bounded parallel
+  hypotheses, intent locks, managed read/write/exec, metadata snapshot compare/rollback,
+  Runtime-evidence judgement, restart recovery และ reviewed skills ทำให้ Full เป็น 121
+  tools ขณะที่ Compact/Hybrid คง 19/49
+- Agent capabilities ลดสิทธิ์จาก caller เท่านั้น Managed target ยังผ่าน invocation
+  pipeline เดิม Skill proposal ต้องผ่าน private owner review exact digest และยังเป็น
+  non-executable untrusted guidance; coordinator cancel/pause ไม่ kill jobs
+- บังคับ canonical Base64URL ก่อนตรวจ HMAC ของ Resource และ Project Brain cursors
+  เพื่อไม่ให้ token string ที่ถูกแก้ไข alias เป็น byte sequence เดิมจาก decoder ที่ permissive
 
 ## วิธีอัปเดต
 

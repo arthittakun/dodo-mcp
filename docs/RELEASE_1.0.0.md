@@ -13,7 +13,7 @@ dodo --version
 
 - MCP HTTP + OAuth และ Local Config แบบ loopback
 - Compact HTTP surface 19 tools
-- Full STDIO surface 104 tools
+- Full STDIO surface 121 tools
 - Hybrid surface 49 tools
 - direct coding tools, gateway dispatch และ operation discovery
 - workspace switching จาก Local Config พร้อม readiness และ rollback
@@ -35,6 +35,9 @@ dodo --version
   explicit cross-project visibility และ non-executable workflow/skill proposals
 - Runtime Intelligence พร้อม durable/reconnectable tasks, bounded process/test/browser
   evidence, guarded snapshot, source revalidation และ fact/observation/inference diagnosis
+- Advanced Agent Runtime พร้อม immutable plans, bounded parallel hypotheses, path intents,
+  managed target dispatch, snapshot rollback, evidence-backed completion, restart recovery
+  และ owner-reviewed non-executable skills
 
 ## ลำดับการใช้ Compact
 
@@ -77,6 +80,10 @@ learning ไม่ถูกติดตั้งหรือ execute อัต�
 Runtime task ใช้ execution approval และ command sandbox เดิม Evidence IDs ไม่ใช่
 สิทธิ์ และ runtime store ไม่เก็บ raw stdout/stderr, browser DOM/console, cookies,
 authorization headers หรือ environment secrets
+
+Advanced Agent Runtime เป็น coordination-only และจำกัด authority เพิ่มจาก caller ทุก
+managed operation ยังผ่าน target scope/ACL/epoch/trust/approval/path/secret/hash/sandbox
+เดิม Skill ที่ owner review แล้วยังเป็น untrusted guidance และ cancel run ไม่ kill job
 
 ## ตรวจรับ
 

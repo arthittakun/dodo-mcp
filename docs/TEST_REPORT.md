@@ -17,16 +17,17 @@ npm pack
 
 ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
-- build: PASS — full 104, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
+- build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 77 files PASS, 2 files platform-skipped; 572 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 79 files PASS, 2 files platform-skipped; 581 tests PASS, 30 tests platform/prerequisite-skipped
 - packaging: 15 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
-- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 104,
-  Compact = 19 และ installed Compact `dodo_assist_read → memory_status` กับ
-  `dodo_assist_change → runtime_session_open` คืน schemaVersion 1 จาก fresh state สำเร็จ
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 121,
+  Compact = 19 และ installed Compact `dodo_assist_read → memory_status`,
+  `dodo_assist_change → runtime_session_open` และ `agent_run_open` คืน schemaVersion 1
+  จาก fresh state สำเร็จ โดย agent run มี `authority=coordination_only`
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -46,7 +47,7 @@ identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
 `projectId` เข้า write operation Universal Resource, Project Brain และ Context Engine
-operations ทำให้ surface ปัจจุบันเป็น Full 104 / Compact 19 / Hybrid 49
+operations และ Advanced Agent Runtime ทำให้ surface ปัจจุบันเป็น Full 121 / Compact 19 / Hybrid 49
 
 Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
 binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
@@ -94,6 +95,19 @@ Headless Chromium fixture พิสูจน์ existing-session-only collection
 persisted hashes/counts/bounded navigation timing, WebSocket-blocked policy และการ mark
 หลักฐานเดิมเป็น stale หลังหน้าเปลี่ยน โดยไม่มี DOM/console/password/header text
 
+Advanced Agent Runtime tests ใช้ HTTP + OAuth และ Compact gateways จริง ครอบคลุม
+immutable plan revision, bounded hypotheses, overlapping intent refusal, managed
+write/exec/read, metadata snapshot compare + original-journal rollback, current Runtime
+evidence judgement, exact completion criteria, durable restart recovery และ private
+owner skill review Security fixtures ครอบคลุม anonymous/read-only, principal isolation,
+live ACL revoke, stale epoch, path capability + intent, secret/traversal/nested context,
+program allowlist, target-bound inspect approval, hostile skill rejection และยืนยันว่า
+cancel coordinator ไม่ kill owned job
+
+Resource และ Project Brain cursor tests ตรวจ canonical Base64URL + HMAC ซ้ำ โดย token
+ที่เปลี่ยนอักขระท้ายต้องได้ `INVALID_INPUT` แม้ decoder จะถอด non-canonical text เป็น
+byte sequence เดียวกันได้
+
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
 workspace เปลี่ยนเป็น canonical root B สำเร็จ ภาพอยู่ใน local ignored artifacts และ
@@ -101,10 +115,10 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 104 tools
+- Full surface: 121 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- generated schema metric: Full 367,506; Compact 48,393; Hybrid 115,873 bytes
+- generated schema metric: Full 415,361; Compact 49,071; Hybrid 116,551 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
@@ -129,6 +143,9 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - current memory ไม่ถูก prune และ learning approval ไม่ติดตั้ง/execute หรือ grant authority
 - runtime handle ข้าม principal/workspace ไม่ได้, revoke มีผลทันที และ inspect exec ยังต้อง target-bound approval
 - runtime evidence ไม่เก็บ raw process/browser secret และ changed source ถูก mark stale
+- agent run ไม่เพิ่ม authority, managed target ตรวจ live ACL/epoch/scope/policy ซ้ำ และ path write ต้องมี capability + intent
+- agent skill ที่ยังไม่ผ่าน exact private owner review ถูกซ่อนและไม่ executable
+- agent coordinator cancel/pause ไม่ kill job และ restart ไม่ replay action
 
 ## Packaging
 
@@ -147,3 +164,5 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 สถานะ owner-reviewed Memory ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`
 
 สถานะ Runtime Intelligence ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`
+
+สถานะ Advanced Agent Runtime ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`

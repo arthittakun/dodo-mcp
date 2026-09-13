@@ -168,6 +168,24 @@ external AI และ owner-selected fixture จริง
 Automated HTTP/OAuth/Chromium fixtures ผ่าน contract หลักแล้ว แต่ไม่ถือเป็น manual
 external-client acceptance
 
+## Advanced Agent Runtime
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI และ owner repository จริง
+
+1. เปิด run พร้อม completion criteria, writable paths, explicit programs และ quota ที่แคบ
+2. สร้าง plan revision และ hypotheses สองตัว; ให้ path intents overlap แล้วต้องปฏิเสธตัวที่สอง
+3. snapshot → managed write/edit → verify → compare → rollback exact changeset
+4. ตัด/restart server ระหว่าง action แล้วตรวจ `RECOVERY_REQUIRED`; อ่าน status ก่อน recover
+5. ใช้ current Runtime evidence judge hypotheses และ complete เฉพาะเมื่อ criteria ครบ
+6. ถอน workspace ACL ระหว่าง run แล้ว handle เดิมต้องถูกปฏิเสธทันที
+7. เสนอ skill ที่มี hostile instruction ตรวจว่าหายจาก search จน owner review exact digest
+8. approve safe skill แล้วตรวจ progressive search/inspect และยืนยันว่าไม่มี code ถูกติดตั้ง/รัน
+9. เริ่ม long job แล้ว pause/cancel coordinator; job ต้องยังอยู่จน owner/caller หยุดโดย explicit handle
+10. ตรวจ audit แยก coordinator operation, target operation และ private owner review
+
+Automated HTTP/OAuth/restart/security fixtures ผ่าน contract หลักแล้ว แต่ไม่ถือเป็น
+manual external-client acceptance
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth
@@ -183,7 +201,7 @@ external-client acceptance
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 104 tools
+2. ตรวจ full catalog 121 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

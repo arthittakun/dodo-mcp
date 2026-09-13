@@ -105,6 +105,8 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'preview_rename',
       'todo_write',
       'handoff_write',
+      'agent_write',
+      'agent_snapshot_rollback',
     ],
   },
   {
@@ -112,7 +114,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Run commands and control jobs',
     domain: 'exec',
     summary: 'shell/argv commands, task recipes, and stdin/cancel for owned background jobs',
-    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel', 'runtime_task_start', 'runtime_task_cancel'],
+    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel', 'runtime_task_start', 'runtime_task_cancel', 'agent_exec'],
   },
   {
     name: 'dodo_git_read',
@@ -147,14 +149,14 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Coding-task analysis',
     domain: 'code',
     summary: 'goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries',
-    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'runtime_session_status', 'runtime_task_observe', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose', 'brain_status', 'brain_query', 'brain_symbol'],
+    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'runtime_session_status', 'runtime_task_observe', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose', 'agent_run_status', 'agent_read', 'agent_snapshot_create', 'agent_snapshot_compare', 'agent_skill_search', 'agent_skill_inspect', 'brain_status', 'brain_query', 'brain_symbol'],
   },
   {
     name: 'dodo_assist_change',
     title: 'Refactor previews and verification',
     domain: 'code',
     summary: 'preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance',
-    operations: ['preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'runtime_session_open', 'runtime_session_close', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
+    operations: ['preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'runtime_session_open', 'runtime_session_close', 'agent_run_open', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire', 'agent_intent_release', 'agent_hypothesis_judge', 'agent_skill_propose', 'agent_run_control', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
   },
   {
     name: 'dodo_media',

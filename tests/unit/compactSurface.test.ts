@@ -37,6 +37,10 @@ const FULL_NAMES = [
   'browser_session', 'browser_observe', 'browser_action', 'game_session', 'game_step',
   'workflow_save', 'workflow_search', 'workflow_run',
   'resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform',
+  'agent_run_open', 'agent_run_status', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire',
+  'agent_intent_release', 'agent_read', 'agent_write', 'agent_exec', 'agent_snapshot_create',
+  'agent_snapshot_compare', 'agent_snapshot_rollback', 'agent_hypothesis_judge', 'agent_skill_search',
+  'agent_skill_inspect', 'agent_skill_propose', 'agent_run_control',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -48,7 +52,7 @@ const discover = COMPACT_CATALOG.find((d) => d.name === 'dodo_discover') as AnyT
 const WS = { workspaceId: 'ws_test', workspaceEpoch: 'boot_test' };
 
 describe('compact surface catalog', () => {
-  it('full catalog includes the Phase 07 memory family in exact order, with no gateways mixed in', () => {
+  it('full catalog includes the Phase 09 agent family in exact order, with no gateways mixed in', () => {
     expect(TOOL_CATALOG.map((d) => d.name)).toEqual(FULL_NAMES);
     expect(surfaceCatalog('full')).toBe(TOOL_CATALOG);
     expect(TOOL_CATALOG.some((d) => d.name.startsWith('dodo_'))).toBe(false);
@@ -204,7 +208,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(104);
+    expect(TOOL_CATALOG).toHaveLength(121);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

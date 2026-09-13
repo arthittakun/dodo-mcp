@@ -265,11 +265,16 @@ export class ResourceService {
   private verifyCursor(ctx: ToolCtx, token: string): CursorPayload {
     const match = /^r1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(token);
     if (!match) throw new DodoError('INVALID_INPUT', 'invalid resource resume token');
+    const body = Buffer.from(match[1]!, 'base64url');
     const actual = Buffer.from(match[2]!, 'base64url');
+    // Node's decoder accepts non-canonical trailing Base64URL bits. Re-encode
+    // both segments before HMAC comparison so a textually modified token can
+    // never alias the original byte sequence.
+    if (body.toString('base64url') !== match[1] || actual.toString('base64url') !== match[2]) throw new DodoError('INVALID_INPUT', 'invalid resource resume token');
     const expected = createHmac('sha256', this.cursorKey).update(match[1]!).digest();
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new DodoError('INVALID_INPUT', 'invalid resource resume token');
     let payload: CursorPayload;
-    try { payload = JSON.parse(Buffer.from(match[1]!, 'base64url').toString('utf8')) as CursorPayload; }
+    try { payload = JSON.parse(body.toString('utf8')) as CursorPayload; }
     catch { throw new DodoError('INVALID_INPUT', 'invalid resource resume token'); }
     if (payload.v !== 1 || payload.w !== this.services.workspaceId || payload.a !== principalKey(ctx) || !Number.isSafeInteger(payload.o) || payload.o < 0 || payload.exp <= Date.now()) throw new DodoError('STALE_WORKSPACE', 'resource resume token expired or belongs to another client/workspace');
     return payload;

@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -227,6 +227,18 @@ describe('PACK: npm tarball', () => {
         operation: 'runtime_session_open', args: { label: 'packed runtime' },
       } });
       expect(runtime.structuredContent).toMatchObject({ ok: true, data: { schemaVersion: 1, status: 'OPEN' } });
+      const agent = await client.callTool({ name: 'dodo_assist_change', arguments: {
+        workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
+        operation: 'agent_run_open', args: {
+          goal: 'packed agent runtime', completionCriteria: ['explicit owner verification'],
+          capabilities: {
+            allowedProjectIds: [], writablePaths: [], allowedPrograms: [], allowNetwork: false,
+            allowBrowser: false, allowDesktop: false, allowMedia: false, allowWorkflow: false,
+            secretAccess: false, maxHypotheses: 1, maxActions: 5, maxRunningJobs: 1, maxWallMinutes: 5,
+          },
+        },
+      } });
+      expect(agent.structuredContent).toMatchObject({ ok: true, data: { schemaVersion: 1, status: 'ACTIVE', authority: 'coordination_only' } });
     } finally { await client.close(); }
   }, 120_000);
 

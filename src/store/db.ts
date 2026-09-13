@@ -449,6 +449,135 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
   );
   CREATE INDEX idx_runtime_evidence_session ON runtime_evidence(session_id,status,created_at DESC);
   CREATE INDEX idx_runtime_evidence_expiry ON runtime_evidence(expires_at);`,
+  `CREATE TABLE agent_runs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    opened_epoch TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    goal TEXT NOT NULL,
+    criteria TEXT NOT NULL,
+    capabilities TEXT NOT NULL,
+    status TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    action_count INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+  CREATE INDEX idx_agent_runs_owner ON agent_runs(workspace_id,owner,status,updated_at DESC);
+  CREATE INDEX idx_agent_runs_expiry ON agent_runs(expires_at);
+  CREATE TABLE agent_plans (
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    revision INTEGER NOT NULL,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    steps TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(run_id,revision)
+  );
+  CREATE TABLE agent_hypotheses (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    title TEXT NOT NULL,
+    probable_cause TEXT NOT NULL,
+    expected_evidence TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_agent_hypotheses_run ON agent_hypotheses(run_id,status,created_at);
+  CREATE TABLE agent_intents (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    hypothesis_id TEXT NOT NULL REFERENCES agent_hypotheses(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    resource_key TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    released_at INTEGER
+  );
+  CREATE INDEX idx_agent_intents_active ON agent_intents(workspace_id,status,kind,resource_key,expires_at);
+  CREATE INDEX idx_agent_intents_hypothesis ON agent_intents(hypothesis_id,status,created_at);
+  CREATE TABLE agent_actions (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    hypothesis_id TEXT NOT NULL REFERENCES agent_hypotheses(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    operation TEXT NOT NULL,
+    input_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_code TEXT,
+    result_hash TEXT,
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+  );
+  CREATE INDEX idx_agent_actions_run ON agent_actions(run_id,created_at DESC);
+  CREATE TABLE agent_snapshots (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    hypothesis_id TEXT NOT NULL REFERENCES agent_hypotheses(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    manifest_hash TEXT NOT NULL,
+    manifest TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_agent_snapshots_run ON agent_snapshots(run_id,created_at DESC);
+  CREATE TABLE agent_judgements (
+    id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_agent_judgements_run ON agent_judgements(run_id,created_at DESC);
+  CREATE TABLE agent_skill_proposals (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    steps TEXT NOT NULL,
+    capabilities TEXT NOT NULL,
+    base_skill_id TEXT,
+    base_version INTEGER,
+    digest TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    reviewed_at INTEGER,
+    review_note TEXT
+  );
+  CREATE INDEX idx_agent_skill_proposals_workspace ON agent_skill_proposals(workspace_id,status,created_at DESC);
+  CREATE TABLE agent_skills (
+    id TEXT NOT NULL,
+    workspace_id TEXT NOT NULL,
+    skill_key TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    steps TEXT NOT NULL,
+    capabilities TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    proposal_id TEXT NOT NULL UNIQUE REFERENCES agent_skill_proposals(id) ON DELETE RESTRICT,
+    digest TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    approved_at INTEGER NOT NULL,
+    PRIMARY KEY(id,version),
+    UNIQUE(workspace_id,skill_key,version)
+  );
+  CREATE UNIQUE INDEX idx_agent_skills_current ON agent_skills(workspace_id,skill_key) WHERE status='CURRENT';`,
 ];
 
 /**

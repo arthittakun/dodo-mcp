@@ -469,6 +469,26 @@ memoryLearning.command('reject <id>')
   .option('--note <text>', 'short non-secret owner review note', '')
   .action(async (id: string, opts: { digest: string; note: string }) => console.log(JSON.stringify(await ipcForCwd('memory.learning.review', { id, digest: opts.digest, note: opts.note, approved: false }), null, 2)));
 
+// ----------------------------------------------------- advanced agent --
+const agent = program.command('agent').description('owner review for reusable Advanced Agent Runtime skills');
+const agentSkill = agent.command('skill').description('review versioned skill guidance over private owner IPC');
+agentSkill.command('pending')
+  .description('list pending skill proposals for this active workspace')
+  .action(async () => console.log(JSON.stringify(await ipcForCwd('agent.skill.pending'), null, 2)));
+agentSkill.command('show <id>')
+  .description('inspect one exact proposal/skill and its digest')
+  .action(async (id: string) => console.log(JSON.stringify(await ipcForCwd('agent.skill.show', { id }), null, 2)));
+agentSkill.command('approve <id>')
+  .description('approve reviewed guidance as the next immutable skill version; never installs or executes it')
+  .requiredOption('--digest <sha256>', 'exact digest shown by dodo agent skill show')
+  .option('--note <text>', 'short non-secret owner review note', '')
+  .action(async (id: string, opts: { digest: string; note: string }) => console.log(JSON.stringify(await ipcForCwd('agent.skill.review', { id, digest: opts.digest, note: opts.note, approved: true }), null, 2)));
+agentSkill.command('reject <id>')
+  .description('reject a pending untrusted skill proposal')
+  .requiredOption('--digest <sha256>', 'exact digest shown by dodo agent skill show')
+  .option('--note <text>', 'short non-secret owner review note', '')
+  .action(async (id: string, opts: { digest: string; note: string }) => console.log(JSON.stringify(await ipcForCwd('agent.skill.review', { id, digest: opts.digest, note: opts.note, approved: false }), null, 2)));
+
 // ----------------------------------------------------------------- init ----
 program
   .command('init')

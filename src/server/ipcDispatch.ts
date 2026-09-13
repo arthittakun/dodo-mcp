@@ -90,6 +90,15 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         if (!services.memory) throw new Error('memory service is unavailable');
         return await services.memory.ownerLearningReview(String(args['id']), String(args['digest']), args['approved'] === true, typeof args['note'] === 'string' ? args['note'] : '');
       }
+      case 'agent.skill.pending': return services.agentRuntime?.ownerPendingSkills() ?? [];
+      case 'agent.skill.show': {
+        if (!services.agentRuntime) throw new Error('advanced agent runtime is unavailable');
+        return services.agentRuntime.ownerShowSkill(String(args['id']));
+      }
+      case 'agent.skill.review': {
+        if (!services.agentRuntime) throw new Error('advanced agent runtime is unavailable');
+        return services.agentRuntime.ownerReviewSkill(String(args['id']), String(args['digest']), args['approved'] === true, typeof args['note'] === 'string' ? args['note'] : '');
+      }
       case 'desktop.status': return services.desktop.status();
       case 'desktop.policy': return services.desktop.setPolicy(args);
       case 'trust.set': {

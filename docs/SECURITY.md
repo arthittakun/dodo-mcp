@@ -133,6 +133,25 @@ Source เปลี่ยนหรือ recheck ไม่ได้จะ mark e
 Context Engine อ่านเฉพาะ current caller/workspace evidence และถือเป็น untrusted data
 Runtime diagnosis ไม่มี side effect และไม่สามารถ grant scope/trust/approval
 
+## Advanced Agent Runtime
+
+Agent run, plan, hypothesis, intent, snapshot, judgement และ skill ID ไม่ใช่ capability
+ทุก request ตรวจ principal, live grant/client/workspace ACL, target scope และ active
+workspace epoch ใหม่ Run capabilities ลดสิทธิ์เท่านั้น: project ต้องอ่านได้อยู่แล้ว,
+writable path ผ่าน WorkspaceFS policy, executable ผ่าน allowlist/resolver และ optional
+network/browser/desktop/media/workflow ปิดเป็นค่าเริ่มต้น `secretAccess` เป็น false เสมอ
+
+Managed dispatcher เรียก target definition ผ่าน invocation pipeline เดิม Target-bound
+trust approval, strict schema, expected hash, path/secret/symlink/hardlink guards,
+command sandbox, idempotency และ audit จึงยังมีผล Coordinator ไม่มี owner control,
+ไม่มี unrestricted shell, ไม่ approve action และ pause/cancel run ไม่ kill jobs
+
+Intent เป็น coordination lock ไม่ใช่ filesystem permission Snapshot ไม่เก็บ contents
+และ rollback ได้เฉพาะ caller-owned changeset หลัง exact snapshot ผ่าน journal/conflict
+checks เดิม Judgement/completion ต้องอ้าง current Runtime evidence ของ caller Skill
+proposal ถูกซ่อนจน private owner review exact digest; approved skill เป็น versioned
+`untrusted_guidance`, ไม่ execute และไม่ grant authority
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

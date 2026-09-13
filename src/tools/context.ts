@@ -5,6 +5,7 @@ import type { ProjectBrainService } from '../services/brain/brainService.js';
 import type { ContextEngineService } from '../services/context/contextEngine.js';
 import type { MemoryService } from '../services/memory/memoryService.js';
 import type { RuntimeService } from '../services/runtime/runtimeService.js';
+import type { AgentRuntimeService } from '../services/agent/agentService.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
@@ -46,6 +47,8 @@ export interface AppServices {
   memory?: MemoryService;
   /** Durable, caller-scoped runtime sessions and source-verifiable evidence. */
   runtime?: RuntimeService;
+  /** Durable capability-narrowing plans, hypotheses, intents, snapshots and reviewed skills. */
+  agentRuntime?: AgentRuntimeService;
   multimodal?: MultimodalService;
   /** Installation CAS with workspace/principal-scoped references. */
   resources?: ResourceService;
