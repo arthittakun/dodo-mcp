@@ -83,7 +83,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
     "@types/express": "^5.0.0",
-    "@types/node": "^22.15.0",
+    "@types/node": "^26.5.1",
     "@types/oidc-provider": "^9.1.0",
     "@types/picomatch": "^4.0.3",
     "eslint": "^9.39.0",
