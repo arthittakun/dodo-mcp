@@ -126,10 +126,29 @@ automated fixtures ผ่านรายการหลักแล้ว แต
 6. ถอน ACL ของ B แล้วตรวจ query และ evidence เดิมถูกปฏิเสธโดยไม่เผย absolute path
 7. ค้น marker ใน `.env`, private state, symlink/hardlink และตรวจว่าไม่ปรากฏในผล/cache diagnostics
 8. ตรวจ `context_status` มี L0–L6 metrics แต่ไม่มี goal, path, source content หรือ credential
-9. ตรวจ memory/runtime และ federated graph แสดง unavailable/partial ตามจริง
+9. ตรวจ owner-reviewed CURRENT memory แสดงเป็น `MEMORY`; runtime และ federated graph
+   ที่ยังไม่มี provider แสดง unavailable/partial ตามจริง
 
 Automated HTTP/OAuth fixtures ผ่าน contract หลักแล้ว แต่ยังไม่เปลี่ยนสถานะ manual
 จนกว่าจะทดสอบกับ external AI และ repository ที่เจ้าของเลือกจริง
+
+## Memory และ reviewed learning
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI และ owner repository จริง
+
+1. ให้ AI เรียก `context_query` แล้วเสนอ `memory_propose` จาก current evidence ID
+2. ตรวจว่า `memory_search` ยังไม่คืน proposal ก่อน owner approval
+3. ใช้ `dodo memory show` ตรวจ claim, provenance, conflicts และ digest แล้ว approve
+4. เริ่ม conversation ใหม่และตรวจว่า `memory_search`/`context_query` พบ memory ที่
+   owner reviewed พร้อม `evidence_only` และ `untrusted_content`
+5. แก้ source แล้วตรวจว่า memory เป็น STALE และไม่ปรากฏใน current-only search
+6. ให้ client อื่นลองใช้ evidence ID เดิมและ memory ของ project ที่ไม่มี ACL ต้องถูกปฏิเสธ
+7. เสนอ learning จาก successful memory สองรายการ ตรวจ owner review และยืนยันว่าไม่มี
+   skill/workflow ถูกติดตั้งหรือ execute
+8. prune stale fixture แล้วตรวจว่า CURRENT memory และ project files ยังอยู่
+
+Automated fixtures ผ่าน contract หลักแล้ว แต่ยังไม่เปลี่ยนสถานะ manual จนกว่าจะใช้
+external AI และ owner-selected fixture จริง
 
 ## HTTP Compact
 
@@ -146,7 +165,7 @@ Automated HTTP/OAuth fixtures ผ่าน contract หลักแล้ว แ
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 89 tools
+2. ตรวจ full catalog 94 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

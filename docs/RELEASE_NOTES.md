@@ -30,6 +30,10 @@
   retrieval, evidence 5 classes, provenance/confidence/freshness, deterministic
   ranking, budget/cursor และ dependency-aware L0–L6 cache ทำให้ Full เป็น 89 tools
   โดย Compact/Hybrid คง 19/49 ผ่าน `dodo_assist_read`
+- เพิ่ม `memory_search`, `memory_inspect`, `memory_status`, `memory_propose` และ
+  `memory_learning_propose` ทำให้ Full เป็น 94 tools ส่วน Compact/Hybrid คง 19/49
+  ผ่าน assistance gateways Permanent memory ต้องผ่าน private owner review + exact
+  digest, ตรวจ source/retention/ACL ซ้ำ และ learning review ไม่ติดตั้งหรือ execute เอง
 
 ## วิธีอัปเดต
 

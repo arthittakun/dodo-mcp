@@ -101,6 +101,19 @@ output หรือ index เป็น `untrusted_content` เสมอ ไม�
 approve action, ปิด sandbox หรือข้าม path/secret guard ได้ Diagnostics ไม่คืน query,
 path, content, token หรือ private owner state
 
+## Memory and reviewed learning
+
+Memory proposal ต้องอ้าง current Context evidence ของ principal เดียวกันและเก็บเฉพาะ
+non-secret summary/provenance ไม่มี MCP tool สำหรับ approve, reject, prune หรือ learning
+review Owner control ใช้ private authenticated IPC และ exact digest; ก่อนอนุมัติจะตรวจ
+source hash, conflicts และ target project readiness ซ้ำ
+
+Approved memory มี `authority: evidence_only` และ `trust: untrusted_content` เสมอ
+Memory ID/digest/cursor ไม่ใช่ capability การค้นข้าม project ต้องผ่าน live installation
+identity + target ACL และ explicit owner visibility ทุกครั้ง Source เปลี่ยนหรือ retention
+หมดจะถูก mark stale Learning approval ไม่ติดตั้ง ไม่ execute และไม่ grant scope, ACL,
+trust, approval, sandbox exception หรือ executable policy
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

@@ -3,6 +3,7 @@ import type { ResourceService } from '../services/resources/resourceService.js';
 import type { FederationService } from '../projects/federation.js';
 import type { ProjectBrainService } from '../services/brain/brainService.js';
 import type { ContextEngineService } from '../services/context/contextEngine.js';
+import type { MemoryService } from '../services/memory/memoryService.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
@@ -40,6 +41,8 @@ export interface AppServices {
   brain?: ProjectBrainService;
   /** Goal-driven, source-verifying retrieval and evidence cache. */
   contextEngine?: ContextEngineService;
+  /** Owner-reviewed, evidence-backed durable memory and learning proposals. */
+  memory?: MemoryService;
   multimodal?: MultimodalService;
   /** Installation CAS with workspace/principal-scoped references. */
   resources?: ResourceService;

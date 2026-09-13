@@ -330,6 +330,81 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     last_query_at INTEGER,
     PRIMARY KEY(workspace_id, principal)
   );`,
+  `CREATE TABLE memory_proposals (
+    id TEXT PRIMARY KEY,
+    source_workspace_id TEXT NOT NULL,
+    source_project_id TEXT,
+    principal TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    claim TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    affected_entities TEXT NOT NULL,
+    evidence TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    fingerprint TEXT NOT NULL,
+    conflicts TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    retention_days INTEGER NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    reviewed_at INTEGER,
+    review_note TEXT,
+    approved_memory_id TEXT
+  );
+  CREATE INDEX idx_memory_proposals_workspace ON memory_proposals(source_workspace_id,status,created_at);
+  CREATE INDEX idx_memory_proposals_fingerprint ON memory_proposals(source_workspace_id,fingerprint,status);
+  CREATE TABLE memories (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    claim TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    affected_entities TEXT NOT NULL,
+    source_workspace_id TEXT NOT NULL,
+    source_project_id TEXT,
+    evidence TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    status TEXT NOT NULL,
+    stale_reason TEXT,
+    fingerprint TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    proposal_id TEXT NOT NULL UNIQUE REFERENCES memory_proposals(id) ON DELETE RESTRICT,
+    conflicts TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    approved_at INTEGER NOT NULL,
+    last_verified_at INTEGER NOT NULL,
+    expires_at INTEGER
+  );
+  CREATE INDEX idx_memories_status ON memories(status,approved_at DESC);
+  CREATE INDEX idx_memories_source ON memories(source_workspace_id,status);
+  CREATE UNIQUE INDEX idx_memories_current_fingerprint ON memories(source_workspace_id,fingerprint) WHERE status='CURRENT';
+  CREATE TABLE memory_visibility (
+    memory_id TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    workspace_id TEXT NOT NULL,
+    project_id TEXT,
+    display_name TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY(memory_id,workspace_id)
+  );
+  CREATE INDEX idx_memory_visibility_workspace ON memory_visibility(workspace_id,memory_id);
+  CREATE TABLE memory_learning_proposals (
+    id TEXT PRIMARY KEY,
+    source_workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    steps TEXT NOT NULL,
+    supporting_memory_ids TEXT NOT NULL,
+    digest TEXT NOT NULL,
+    status TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    reviewed_at INTEGER,
+    review_note TEXT
+  );
+  CREATE INDEX idx_memory_learning_workspace ON memory_learning_proposals(source_workspace_id,status,created_at);`,
 ];
 
 /**

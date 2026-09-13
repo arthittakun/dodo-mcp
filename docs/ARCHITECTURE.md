@@ -15,6 +15,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ Git/intelligence/LSP
                                       ├─ assistance/multimodal/workflow
                                       ├─ Context Engine ──► evidence + L0–L6 cache
+                                      ├─ Memory ──► reviewed evidence + stale lifecycle
                                       ├─ Project Brain ──► incremental AST graph
                                       └─ resource references ──► private SHA-256 CAS
 
@@ -120,6 +121,23 @@ SQLite เก็บ caller-scoped cache L0–L6, evidence และ aggregate me
 ผูก principal/workspace/query/index version ค่า ID/hash/cache ไม่ใช่ authority และ
 retrieved content ทุกชนิดเป็น untrusted data
 
+## Memory และ reviewed learning
+
+`MemoryService` แยก durable experience จาก Context cache และ Project Brain MCP
+caller สร้างได้เพียง proposal จาก current `context_evidence` ของ principal เดียวกัน
+เจ้าของอนุมัติ proposal ID + digest ผ่าน authenticated private IPC เท่านั้น ก่อน commit
+ระบบตรวจ source hash, conflict set, active workspace และ explicit cross-project
+visibility ซ้ำใน transaction
+
+Memory record มี source provenance, confidence, retention, CURRENT/STALE, content hash
+และ `authority: evidence_only` การค้นตรวจ live target ACL/readiness แล้วจำกัด scan,
+byte budget และ signed cursor Context Engine รับ memory ที่ current เป็น `MEMORY`
+evidence และใส่ memory content hash/manifest ใน dependency cache เมื่อ source เปลี่ยน
+memory stale และ derived cache ใช้ซ้ำไม่ได้
+
+Learning proposal ต้องอ้าง current owner-reviewed successful memory อย่างน้อยสองชิ้น
+Owner review บันทึก audit เท่านั้น ไม่มี handler สำหรับติดตั้ง/execute หรือเปลี่ยน policy
+
 ## Universal Resource Layer and CAS
 
 `ResourceService` ผูกกับ active `BootstrappedWorkspace` และสร้าง opaque resource
@@ -146,7 +164,7 @@ inflate และ SVG อยู่ใน text path ไม่ถูก render เ
 
 ## Tool surfaces
 
-- Full catalog 89 individual definitions
+- Full catalog 94 individual definitions
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

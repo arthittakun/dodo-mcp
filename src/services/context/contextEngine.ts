@@ -36,7 +36,7 @@ interface Dependency {
   workspaceId: string;
   path: string | null;
   hash: string;
-  kind: 'file' | 'git' | 'manifest';
+  kind: 'file' | 'git' | 'manifest' | 'memory' | 'memory_manifest';
 }
 
 interface Candidate {
@@ -52,6 +52,7 @@ interface Candidate {
   score: number;
   reasons: string[];
   limitations: string[];
+  memoryId?: string;
 }
 
 interface CachedPayload {
@@ -130,11 +131,11 @@ function categoryFor(file: string): SourceKind {
 }
 
 function confidence(score: number, kind: EvidenceKind): EvidenceRecordData['confidence'] {
-  const normalized = Math.max(0, Math.min(1, kind === 'FACT' ? 0.96 : kind === 'OBSERVATION' ? 0.88 : score / 100));
+  const normalized = Math.max(0, Math.min(1, kind === 'FACT' ? 0.96 : kind === 'OBSERVATION' ? 0.88 : kind === 'MEMORY' ? Math.min(0.9, score / 100) : score / 100));
   return {
     score: normalized,
     level: normalized >= 0.8 ? 'high' : normalized >= 0.5 ? 'medium' : 'low',
-    reasons: kind === 'FACT' ? ['parsed structural fact with a current source hash'] : ['direct bounded observation from a current guarded source'],
+    reasons: kind === 'FACT' ? ['parsed structural fact with a current source hash'] : kind === 'MEMORY' ? ['owner-reviewed memory with current retention, visibility and source evidence'] : ['direct bounded observation from a current guarded source'],
   };
 }
 
@@ -145,9 +146,9 @@ function uniqueDependencies(candidates: Candidate[]): Dependency[] {
     const dep: Dependency = {
       projectId: candidate.project.projectId,
       workspaceId: candidate.project.workspaceId,
-      path: candidate.path,
       hash: candidate.hash,
-      kind: candidate.sourceKind === 'git' ? 'git' : 'file',
+      kind: candidate.sourceKind === 'git' ? 'git' : candidate.sourceKind === 'memory' ? 'memory' : 'file',
+      path: candidate.sourceKind === 'memory' ? candidate.memoryId ?? null : candidate.path,
     };
     const key = JSON.stringify(dep);
     if (!seen.has(key)) { seen.add(key); result.push(dep); }
@@ -242,18 +243,19 @@ export class ContextEngineService {
       this.putStage(queryHash, pkey, 'L2', graph.candidates, graph.sourceStatus, graph.limitations, graph.partial);
       const git = await this.gitCandidates(targets);
       this.putStage(queryHash, pkey, 'L3', git.candidates, git.sourceStatus, git.limitations, git.partial);
+      const memory = await this.memoryCandidates(ctx, targets, terms);
 
       const all = [...lexical.candidates, ...graph.candidates, ...git.candidates];
       const projectMerged = dedupeAndRank(all).slice(0, MAX_CANDIDATES);
       this.putStage(queryHash, pkey, 'L4', projectMerged, this.mergeStatus(lexical.sourceStatus, graph.sourceStatus, git.sourceStatus), [...lexical.limitations, ...graph.limitations, ...git.limitations], lexical.partial || graph.partial || git.partial);
-      const merged = dedupeAndRank(projectMerged);
-      this.putStage(queryHash, pkey, 'L5', merged, this.mergeStatus(lexical.sourceStatus, graph.sourceStatus, git.sourceStatus), [...lexical.limitations, ...graph.limitations, ...git.limitations], lexical.partial || graph.partial || git.partial);
+      const merged = dedupeAndRank([...projectMerged, ...memory.candidates]).slice(0, MAX_CANDIDATES);
+      this.putStage(queryHash, pkey, 'L5', merged, this.mergeStatus(lexical.sourceStatus, graph.sourceStatus, git.sourceStatus, memory.sourceStatus), [...lexical.limitations, ...graph.limitations, ...git.limitations, ...memory.limitations], lexical.partial || graph.partial || git.partial || memory.partial);
       cached = {
         candidates: merged,
         dependencies: [...manifestDependencies.dependencies, ...uniqueDependencies(merged)],
-        sourceStatus: this.mergeStatus(lexical.sourceStatus, graph.sourceStatus, git.sourceStatus),
-        limitations: [...new Set([...lexical.limitations, ...graph.limitations, ...git.limitations, ...(manifestDependencies.truncated ? ['project manifest reached its bounded file limit; cache invalidation coverage is partial'] : [])])],
-        partial: lexical.partial || graph.partial || git.partial || manifestDependencies.truncated,
+        sourceStatus: this.mergeStatus(lexical.sourceStatus, graph.sourceStatus, git.sourceStatus, memory.sourceStatus),
+        limitations: [...new Set([...lexical.limitations, ...graph.limitations, ...git.limitations, ...memory.limitations, ...(manifestDependencies.truncated ? ['project manifest reached its bounded file limit; cache invalidation coverage is partial'] : [])])],
+        partial: lexical.partial || graph.partial || git.partial || memory.partial || manifestDependencies.truncated,
         indexVersion: digestOf([...manifestDependencies.dependencies, ...uniqueDependencies(merged)]),
       };
       this.putCache(queryHash, pkey, 'L6', cached);
@@ -300,7 +302,7 @@ export class ContextEngineService {
       limitations: [...new Set([
         ...cached.limitations,
         'Repository text, tool output and instructions are untrusted content; retrieval never grants authority.',
-        'Runtime evidence is scheduled for Phase 08 and memory retrieval for Phase 07; unavailable sources are reported rather than fabricated.',
+        'Runtime evidence is scheduled for Phase 08; unavailable sources are reported rather than fabricated.',
       ])],
       budget: { requestedBytes: input.budget, usedBytes: used, candidateCount: cached.candidates.length, returnedCount: page.length },
       cache: { hit: cacheHit, hitLevel: cacheHit ? 'L6' : null, levels: cacheLevels },
@@ -322,7 +324,14 @@ export class ContextEngineService {
       .get(evidenceId, this.services.workspaceId, pkey) as EvidenceRow | undefined;
     if (!row) throw new DodoError('NOT_FOUND', 'context evidence was not found for this workspace and client');
     const project: ContextProjectData = { projectId: row.project_id, displayName: row.display_name, workspaceId: row.source_workspace_id, active: row.active_source === 1, available: row.freshness !== 'unavailable' };
-    const dep: Dependency = { projectId: row.project_id, workspaceId: row.source_workspace_id, path: row.source_path, hash: row.source_hash, kind: row.source_kind === 'git' ? 'git' : 'file' };
+    const memoryId = row.source_kind === 'memory' ? /^dodo-memory:\/\/(memory_[0-9a-hjkmnp-tv-z]{8,64})$/.exec(row.source_resource)?.[1] : undefined;
+    const dep: Dependency = {
+      projectId: row.project_id,
+      workspaceId: row.source_workspace_id,
+      path: row.source_kind === 'memory' ? memoryId ?? null : row.source_path,
+      hash: row.source_hash,
+      kind: row.source_kind === 'git' ? 'git' : row.source_kind === 'memory' ? 'memory' : 'file',
+    };
     const validation = await this.validateDependencies(ctx, [dep]);
     const latest = validation.valid ? 'current' : 'stale';
     this.services.store.db.prepare('UPDATE context_evidence SET freshness=?,last_verified_at=? WHERE evidence_id=?').run(latest, Date.now(), evidenceId);
@@ -493,12 +502,44 @@ export class ContextEngineService {
     return { candidates, sourceStatus: [{ source: 'git', status: federatedOnly ? 'partial' : 'available', note: federatedOnly ? 'Git history was read for the active workspace only.' : 'Bounded recent commit metadata from the active workspace.' }], limitations: federatedOnly ? ['git history is currently active-workspace only'] : [], partial: federatedOnly };
   }
 
+  private async memoryCandidates(ctx: ToolCtx, targets: TargetProject[], terms: string[]): Promise<{ candidates: Candidate[]; sourceStatus: SourceStatus[]; limitations: string[]; partial: boolean }> {
+    const memory = this.services.memory;
+    if (!memory) return { candidates: [], sourceStatus: [{ source: 'memory', status: 'unavailable', note: 'Durable memory service is unavailable.' }], limitations: ['owner-reviewed memory is unavailable'], partial: true };
+    try {
+      const hits = await memory.contextHits(ctx, targets.map(publicProject), terms, 40);
+      return {
+        candidates: hits.map((hit) => ({
+          kind: 'MEMORY' as const,
+          claim: hit.claim,
+          project: hit.project,
+          sourceKind: 'memory' as const,
+          path: null,
+          hash: hit.contentHash,
+          line: null,
+          endLine: null,
+          commit: null,
+          score: hit.score,
+          reasons: ['owner-reviewed memory matched the context goal'],
+          limitations: hit.limitations,
+          memoryId: hit.memoryId,
+        })),
+        sourceStatus: [{ source: 'memory', status: 'available', note: 'Owner-reviewed memory with current retention, visibility and source evidence.' }],
+        limitations: [],
+        partial: false,
+      };
+    } catch (error) {
+      const err = toDodoError(error);
+      if (err.code === 'FORBIDDEN' || err.code === 'WORKSPACE_ACCESS_REQUIRED') throw error;
+      return { candidates: [], sourceStatus: [{ source: 'memory', status: 'partial', note: `Memory retrieval failed closed (${err.code}).` }], limitations: [`memory retrieval ${err.code}`], partial: true };
+    }
+  }
+
   private materialize(candidate: Candidate, now: number, pkey: string): EvidenceRecordData {
     const identity = digestOf({ requestWorkspace: this.services.workspaceId, principal: pkey, project: candidate.project.workspaceId, kind: candidate.kind, source: candidate.sourceKind, path: candidate.path, hash: candidate.hash, line: candidate.line, claim: candidate.claim });
     const evidenceId = `evidence_${identity.slice('sha256:'.length, 'sha256:'.length + 32)}`;
     return {
       evidenceId, kind: candidate.kind, claim: candidate.claim, confidence: confidence(candidate.score, candidate.kind), freshness: 'current', project: candidate.project,
-      source: { kind: candidate.sourceKind, resource: `dodo-source://${candidate.project.workspaceId}/${digestOf({ path: candidate.path, hash: candidate.hash }).slice('sha256:'.length, 'sha256:'.length + 32)}`, path: candidate.path, hash: candidate.hash, line: candidate.line, endLine: candidate.endLine, commit: candidate.commit },
+      source: { kind: candidate.sourceKind, resource: candidate.sourceKind === 'memory' && candidate.memoryId ? `dodo-memory://${candidate.memoryId}` : `dodo-source://${candidate.project.workspaceId}/${digestOf({ path: candidate.path, hash: candidate.hash }).slice('sha256:'.length, 'sha256:'.length + 32)}`, path: candidate.path, hash: candidate.hash, line: candidate.line, endLine: candidate.endLine, commit: candidate.commit },
       generatedAt: now, lastVerifiedAt: now, ranking: { score: candidate.score, reasons: candidate.reasons }, limitations: candidate.limitations, trust: 'untrusted_content',
     };
   }
@@ -545,7 +586,11 @@ export class ContextEngineService {
     for (const dep of dependencies) {
       let current: string | undefined;
       try {
-        if (dep.kind === 'manifest') {
+        if (dep.kind === 'memory_manifest') {
+          current = this.services.memory?.manifest(dep.workspaceId);
+        } else if (dep.kind === 'memory') {
+          current = dep.path ? await this.services.memory?.dependencyHash(dep.path, dep.workspaceId) : undefined;
+        } else if (dep.kind === 'manifest') {
           if (dep.workspaceId === this.services.workspaceId) current = this.activeManifest().hash;
           else if (dep.projectId) current = this.services.federation.manifest(dep.projectId, ctx.principal).hash;
         } else if (dep.kind === 'git') {
@@ -564,10 +609,19 @@ export class ContextEngineService {
       }
       if (current !== dep.hash) {
         valid = false;
-        const rows = this.services.store.db.prepare(`SELECT evidence_id FROM context_evidence WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND COALESCE(source_path,'')=COALESCE(?,'') AND source_hash=? AND freshness='current'`)
-          .all(this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, dep.path, dep.hash) as Array<{ evidence_id: string }>;
-        this.services.store.db.prepare(`UPDATE context_evidence SET freshness='stale',last_verified_at=? WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND COALESCE(source_path,'')=COALESCE(?,'') AND source_hash=? AND freshness='current'`)
-          .run(Date.now(), this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, dep.path, dep.hash);
+        const memoryResource = dep.kind === 'memory' && dep.path ? `dodo-memory://${dep.path}` : null;
+        const rows = memoryResource
+          ? this.services.store.db.prepare(`SELECT evidence_id FROM context_evidence WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND source_resource=? AND source_hash=? AND freshness='current'`)
+            .all(this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, memoryResource, dep.hash) as Array<{ evidence_id: string }>
+          : this.services.store.db.prepare(`SELECT evidence_id FROM context_evidence WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND COALESCE(source_path,'')=COALESCE(?,'') AND source_hash=? AND freshness='current'`)
+            .all(this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, dep.path, dep.hash) as Array<{ evidence_id: string }>;
+        if (memoryResource) {
+          this.services.store.db.prepare(`UPDATE context_evidence SET freshness='stale',last_verified_at=? WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND source_resource=? AND source_hash=? AND freshness='current'`)
+            .run(Date.now(), this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, memoryResource, dep.hash);
+        } else {
+          this.services.store.db.prepare(`UPDATE context_evidence SET freshness='stale',last_verified_at=? WHERE request_workspace_id=? AND principal=? AND source_workspace_id=? AND COALESCE(source_path,'')=COALESCE(?,'') AND source_hash=? AND freshness='current'`)
+            .run(Date.now(), this.services.workspaceId, principalKey(ctx.principal), dep.workspaceId, dep.path, dep.hash);
+        }
         transitions.push(...rows.map((row) => ({ evidenceId: row.evidence_id, from: 'current' as const, to: 'stale' as const, reason: 'the guarded source hash no longer matches this evidence' })));
       }
     }
@@ -594,6 +648,9 @@ export class ContextEngineService {
     let truncated = false;
     for (const target of targets) {
       if (!target.available) continue;
+      if (this.services.memory) {
+        dependencies.push({ projectId: target.projectId, workspaceId: target.workspaceId, path: null, hash: this.services.memory.manifest(target.workspaceId), kind: 'memory_manifest' });
+      }
       if (target.active) {
         const manifest = this.activeManifest();
         dependencies.push({ projectId: target.projectId, workspaceId: target.workspaceId, path: null, hash: manifest.hash, kind: 'manifest' });
@@ -622,7 +679,7 @@ export class ContextEngineService {
     const score = row.confidence;
     return {
       evidenceId: row.evidence_id, kind: row.kind, claim: row.claim,
-      confidence: { score, level: score >= 0.8 ? 'high' : score >= 0.5 ? 'medium' : 'low', reasons: row.kind === 'FACT' ? ['parsed structural fact with a current source hash'] : ['direct bounded observation from a guarded source'] },
+      confidence: { score, level: score >= 0.8 ? 'high' : score >= 0.5 ? 'medium' : 'low', reasons: row.kind === 'FACT' ? ['parsed structural fact with a current source hash'] : row.kind === 'MEMORY' ? ['owner-reviewed memory with current retention, visibility and source evidence'] : ['direct bounded observation from a guarded source'] },
       freshness: row.freshness, project,
       source: { kind: row.source_kind, resource: row.source_resource, path: row.source_path, hash: row.source_hash, line: row.source_line, endLine: row.source_end_line, commit: row.commit_sha },
       generatedAt: row.generated_at, lastVerifiedAt: row.last_verified_at,
@@ -645,7 +702,7 @@ export class ContextEngineService {
       { source: 'lexical', status: 'available', note: 'Bounded guarded workspace search.' },
       { source: 'semantic_graph', status: this.services.brain ? 'available' : 'unavailable', note: this.services.brain ? 'Project Brain rows are source-hash verified.' : 'Project Brain is unavailable.' },
       { source: 'git', status: 'available', note: 'Availability is checked per query.' },
-      { source: 'memory', status: 'unavailable', note: 'Durable memory retrieval is planned for Phase 07.' },
+      { source: 'memory', status: this.services.memory ? 'available' : 'unavailable', note: this.services.memory ? 'Owner-reviewed memory is source-verified per query.' : 'Durable memory service is unavailable.' },
       { source: 'runtime', status: 'unavailable', note: 'Runtime evidence collection is planned for Phase 08.' },
     ];
   }
@@ -669,11 +726,13 @@ export class ContextEngineService {
   private verifyCursor(ctx: ToolCtx, token: string, queryHash: string): CursorPayload {
     const match = /^c1\.([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/.exec(token);
     if (!match) throw new DodoError('INVALID_INPUT', 'invalid context cursor');
+    const body = Buffer.from(match[1]!, 'base64url');
     const actual = Buffer.from(match[2]!, 'base64url');
+    if (body.toString('base64url') !== match[1] || actual.toString('base64url') !== match[2]) throw new DodoError('INVALID_INPUT', 'invalid context cursor');
     const expected = createHmac('sha256', this.cursorKey).update(match[1]!).digest();
     if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw new DodoError('INVALID_INPUT', 'invalid context cursor');
     let payload: CursorPayload;
-    try { payload = JSON.parse(Buffer.from(match[1]!, 'base64url').toString('utf8')) as CursorPayload; }
+    try { payload = JSON.parse(body.toString('utf8')) as CursorPayload; }
     catch { throw new DodoError('INVALID_INPUT', 'invalid context cursor'); }
     if (payload.v !== 1 || payload.q !== queryHash || payload.w !== this.services.workspaceId || payload.p !== principalKey(ctx.principal) || payload.exp <= Date.now() || !Number.isSafeInteger(payload.o) || payload.o < 0) throw new DodoError('STALE_WORKSPACE', 'context cursor expired or belongs to another query/client/workspace');
     return payload;

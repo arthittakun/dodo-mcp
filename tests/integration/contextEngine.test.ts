@@ -36,7 +36,7 @@ describe('Phase 06 Context Engine over real HTTP + OAuth', () => {
       expect(first.evidence.MEMORY).toEqual([]);
       expect(first.evidence.HYPOTHESIS).toEqual([]);
       expect(first.sourceStatus).toEqual(expect.arrayContaining([
-        expect.objectContaining({ source: 'memory', status: 'unavailable' }),
+        expect.objectContaining({ source: 'memory', status: 'available' }),
         expect.objectContaining({ source: 'runtime', status: 'unavailable' }),
       ]));
       expect(JSON.stringify(first)).not.toContain('LOGIN_PRIVATE');

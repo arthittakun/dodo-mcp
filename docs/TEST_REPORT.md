@@ -17,17 +17,16 @@ npm pack
 
 ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
-- build: PASS — full 89, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
+- build: PASS — full 94, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 72 files PASS, 2 files platform-skipped; 555 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 75 files PASS, 2 files platform-skipped; 564 tests PASS, 30 tests platform/prerequisite-skipped
 - packaging: 15 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
-- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 89,
-  Compact = 19 และทั้ง direct `context_query` กับ
-  `dodo_assist_read → context_query` พบ guarded fixture source พร้อม
-  `untrusted_content` จาก installed artifact สำเร็จ
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 94,
+  Compact = 19 และ installed Compact `dodo_assist_read → memory_status` คืน
+  schemaVersion 1 จาก fresh state สำเร็จ
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -47,7 +46,7 @@ identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
 `projectId` เข้า write operation Universal Resource, Project Brain และ Context Engine
-operations ทำให้ surface ปัจจุบันเป็น Full 89 / Compact 19 / Hybrid 49
+operations ทำให้ surface ปัจจุบันเป็น Full 94 / Compact 19 / Hybrid 49
 
 Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
 binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
@@ -71,10 +70,19 @@ goal/Thai+identifier terms, deterministic ranking/evidence IDs, byte budget, cur
 L0–L6 cache hit/metrics, source-hash freshness transition, evidence recheck, active และ
 federated A/B retrieval by ID/name, unavailable target partial result, anonymous/live
 ACL/revocation, principal/workspace/cursor binding, secret/private-state/symlink guards,
-repository instruction เป็น untrusted content, cache corruption recovery และ fresh
-installed-tarball retrieval โดย memory/runtime unavailable ถูกแสดงตามจริง Fixture
+repository instruction เป็น untrusted content, canonical signed cursor, cache corruption
+recovery และ Memory dependency freshness โดย runtime unavailable ถูกแสดงตามจริง Fixture
 baseline มี precision=1 และ recall=1 สำหรับ source/test/docs ที่กำหนด พร้อม term
 coverage=1 และ latency ต่ำกว่า 5 วินาทีใน isolated local fixture (ไม่ใช่ production SLA)
+
+Memory tests ใช้ HTTP + OAuth, Full/Compact assistance gateways และ authenticated
+private owner IPC จริง ครอบคลุม evidence-bound proposal, exact digest approval,
+CURRENT/STALE retrieval, Context `MEMORY` evidence, source change ก่อน/หลัง approval,
+cross-client evidence isolation, live per-project ACL, explicit cross-project visibility,
+duplicate/conflict review, credential-shaped text, repository prompt injection,
+principal/workspace-bound canonical cursor, retention/prune ที่ไม่ลบ current record หรือ
+project file, learning proposal จาก current reviewed memory, non-executable owner review
+และ scrubbed owner audit
 
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
@@ -83,10 +91,10 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 89 tools
+- Full surface: 94 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- generated schema metric: Full 315,892; Compact 47,742; Hybrid 115,222 bytes
+- generated schema metric: Full 336,195; Compact 47,961; Hybrid 115,441 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
@@ -106,6 +114,9 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - gateway ไม่เรียก gateway อื่นหรือ owner controls
 - federated target ที่ไม่มี ACL/installation identity ถูกปฏิเสธโดยไม่เผย path
 - federated secret/traversal/replaced root fail closed และ write/exec federation ยังปิด
+- memory proposal ใช้ evidence ID ข้าม client ไม่ได้และ source-changed proposal fail closed
+- AI ไม่มี MCP operation สำหรับ memory approval/prune/learning review; owner action ใช้ private authenticated IPC + digest
+- current memory ไม่ถูก prune และ learning approval ไม่ติดตั้ง/execute หรือ grant authority
 
 ## Packaging
 
@@ -120,3 +131,5 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 สถานะ real Cloudflare Tunnel บน macOS/Windows/Linux: `MANUAL_NOT_RUN`
 
 สถานะ multi-project federation ผ่าน external AI และ owner project จริง: `MANUAL_NOT_RUN`
+
+สถานะ owner-reviewed Memory ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`

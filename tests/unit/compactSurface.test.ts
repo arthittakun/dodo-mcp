@@ -28,6 +28,7 @@ const FULL_NAMES = [
   'schedule_propose',
   'context_for_task', 'analyze_impact', 'read_symbol', 'preview_refactor', 'verify_changes',
   'context_query', 'context_evidence', 'context_status',
+  'memory_search', 'memory_inspect', 'memory_status', 'memory_propose', 'memory_learning_propose',
   'brain_status', 'brain_query', 'brain_symbol', 'brain_rebuild', 'brain_pause', 'brain_cancel',
   'multimodal_status', 'screen_observe', 'image_view', 'media_open', 'media_extract', 'media_transcribe',
   'media_subtitles', 'media_search', 'media_read', 'media_job', 'media_close', 'speech_synthesize',
@@ -45,7 +46,7 @@ const discover = COMPACT_CATALOG.find((d) => d.name === 'dodo_discover') as AnyT
 const WS = { workspaceId: 'ws_test', workspaceEpoch: 'boot_test' };
 
 describe('compact surface catalog', () => {
-  it('full catalog includes the Phase 06 context family in exact order, with no gateways mixed in', () => {
+  it('full catalog includes the Phase 07 memory family in exact order, with no gateways mixed in', () => {
     expect(TOOL_CATALOG.map((d) => d.name)).toEqual(FULL_NAMES);
     expect(surfaceCatalog('full')).toBe(TOOL_CATALOG);
     expect(TOOL_CATALOG.some((d) => d.name.startsWith('dodo_'))).toBe(false);
@@ -201,7 +202,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(89);
+    expect(TOOL_CATALOG).toHaveLength(94);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

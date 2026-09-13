@@ -53,6 +53,43 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
       case 'schedule.history': return services.schedules.history(String(args['id']));
       case 'schedule.approve': return services.schedules.approve(String(args['id']), String(args['digest']));
       case 'schedule.revoke': return services.schedules.revoke(String(args['id']));
+      case 'memory.pending': return services.memory?.ownerPending() ?? [];
+      case 'memory.show': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return services.memory.ownerShow(String(args['id']));
+      }
+      case 'memory.list': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return await services.memory.ownerList(args['includeStale'] === true);
+      }
+      case 'memory.approve': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        const shareWith = Array.isArray(args['shareWith']) && args['shareWith'].every((item) => typeof item === 'string') ? args['shareWith'] as string[] : [];
+        return await services.memory.ownerApprove(String(args['id']), String(args['digest']), shareWith, args['allowConflict'] === true);
+      }
+      case 'memory.reject': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return services.memory.ownerReject(String(args['id']), typeof args['note'] === 'string' ? args['note'] : '');
+      }
+      case 'memory.reverify': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return await services.memory.ownerReverify(String(args['id']), String(args['digest']));
+      }
+      case 'memory.prune': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        const days = Number(args['olderThanDays']);
+        if (!Number.isInteger(days) || days < 0 || days > 3650) throw new Error('olderThanDays must be an integer from 0 to 3650');
+        return services.memory.ownerPrune(days);
+      }
+      case 'memory.learning.pending': return services.memory?.ownerLearningPending() ?? [];
+      case 'memory.learning.show': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return services.memory.ownerLearningShow(String(args['id']));
+      }
+      case 'memory.learning.review': {
+        if (!services.memory) throw new Error('memory service is unavailable');
+        return await services.memory.ownerLearningReview(String(args['id']), String(args['digest']), args['approved'] === true, typeof args['note'] === 'string' ? args['note'] : '');
+      }
       case 'desktop.status': return services.desktop.status();
       case 'desktop.policy': return services.desktop.setPolicy(args);
       case 'trust.set': {

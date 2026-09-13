@@ -7,7 +7,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 89 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 94 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -15,6 +15,7 @@
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
 - มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
+- มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -134,8 +135,35 @@ freshness Cache L0–L6 ตรวจ ACL และ dependency hash ก่อน�
 evidence เดิมจะเป็น stale และ derived cache ถูกสร้างใหม่
 
 ผลค้นหา, README และ repository instruction เป็น untrusted content และไม่สามารถเพิ่ม
-scope, ACL, trust หรือ approval ได้ Phase 06 ยังรายงาน memory/runtime ว่า unavailable
-ตามจริง ดู contract ที่ [Context Engine](docs/CONTEXT.md)
+scope, ACL, trust หรือ approval ได้ Memory ที่เจ้าของอนุมัติจะแสดงเป็น evidence class
+`MEMORY`; runtime provider ที่ยังไม่มีจะแสดง unavailable ตามจริง ดู contract ที่
+[Context Engine](docs/CONTEXT.md)
+
+### Owner-reviewed Memory
+
+AI สร้าง memory ถาวรเองไม่ได้ ขั้นแรกต้องใช้ current `context_evidence` เพื่อเสนอ:
+
+```text
+dodo_assist_read(operation="context_query", args={goal:"Find session policy", ...})
+dodo_assist_change(operation="memory_propose", args={
+  kind:"decision",
+  claim:"Keep session state scoped to one workspace.",
+  evidenceIds:["evidence_..."]
+})
+```
+
+จากนั้นเจ้าของตรวจ proposal และ digest ผ่าน private local CLI เท่านั้น:
+
+```bash
+dodo memory pending
+dodo memory show memprop_xxxxxxxxxxxx
+dodo memory approve memprop_xxxxxxxxxxxx --digest sha256:...
+```
+
+Memory ทุกชิ้นเป็น `evidence_only` และ `untrusted_content` Source เปลี่ยนหรือ retention
+หมดจะเป็น stale และไม่ถูกใช้เป็น current context การแชร์ข้าม project ต้องระบุ
+`--share-with` ตอน owner approval และ client ยังต้องมี live ACL ใน project เป้าหมาย
+รายละเอียดอยู่ที่ [Memory and Reviewed Learning](docs/MEMORY.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 

@@ -203,7 +203,7 @@ it('new tools and actual image content work through a modern STDIO client', asyn
   const client = new Client({ name: 'multimodal-stdio-test', version: '1' });
   await client.connect(new StdioClientTransport({ command: process.execPath, args: [path.resolve('dist/cli/main.js'), 'stdio'], cwd: root, env: { ...process.env, DODO_CONFIG_DIR: config } as Record<string, string>, stderr: 'pipe' }));
   try {
-    expect((await client.listTools()).tools).toHaveLength(TOOL_CATALOG.length); expect(TOOL_CATALOG).toHaveLength(89);
+    expect((await client.listTools()).tools).toHaveLength(TOOL_CATALOG.length); expect(TOOL_CATALOG).toHaveLength(94);
     const overview = (await client.callTool({ name: 'project_overview', arguments: {} })).structuredContent as { workspaceId: string; workspaceEpoch: string };
     const response = await client.callTool({ name: 'image_view', arguments: { workspaceId: overview.workspaceId, workspaceEpoch: overview.workspaceEpoch, path: 'test.png' } });
     expect(response.isError).not.toBe(true); expect(z.array(z.object({ type: z.string() })).parse(response.content).some(c => c.type === 'image')).toBe(true);

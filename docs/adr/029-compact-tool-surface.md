@@ -88,9 +88,17 @@ invocation pipeline.
 
 ## Addendum (Phase 04): resource operations
 
-ADR-034 adds six individual resource definitions to Full, so the current surfaces
-are Full 89, Compact 19 and Hybrid 49. Compact/Hybrid route the new operations
+ADR-034 adds six individual resource definitions to Full, so the Phase 04 surfaces
+became Full 89, Compact 19 and Hybrid 49. Compact/Hybrid route the new operations
 through the existing `dodo_media` gateway; no new gateway or direct Hybrid duplicate
 was added. The historical 74-tool measurements above remain the evidence captured
 when this ADR was first accepted. Generated schemas and `docs/TEST_REPORT.md` carry
 the current byte measurements.
+
+## Addendum (Phase 07): owner-reviewed memory operations
+
+ADR-037 adds five individual memory definitions to Full, so the current surfaces are
+Full 94, Compact 19 and Hybrid 49. Compact/Hybrid route read operations through
+`dodo_assist_read` and proposal operations through `dodo_assist_change`. Owner approval,
+rejection, prune and learning review remain private IPC commands and are never added
+to any MCP surface.

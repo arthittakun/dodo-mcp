@@ -13,7 +13,7 @@ dodo --version
 
 - MCP HTTP + OAuth และ Local Config แบบ loopback
 - Compact HTTP surface 19 tools
-- Full STDIO surface 89 tools
+- Full STDIO surface 94 tools
 - Hybrid surface 49 tools
 - direct coding tools, gateway dispatch และ operation discovery
 - workspace switching จาก Local Config พร้อม readiness และ rollback
@@ -31,6 +31,8 @@ dodo --version
   routes/tests/dependencies, stable semantic URI และ current-source verification
 - Context Engine แบบ goal-driven พร้อม evidence provenance/confidence/freshness,
   deterministic budget/cursor และ caller-scoped L0–L6 dependency cache
+- owner-reviewed Memory พร้อม source evidence, confidence, retention, CURRENT/STALE,
+  explicit cross-project visibility และ non-executable workflow/skill proposals
 
 ## ลำดับการใช้ Compact
 
@@ -66,6 +68,9 @@ DODO ไม่สร้าง Tunnel/DNS และไม่ใช้ Cloudflare 
 ## Security
 
 Gateway ไม่ grant สิทธิ์, ไม่ bypass OAuth, ACL, workspace ID/epoch, trust, approval, path guard, secret guard หรือ command sandbox การเรียก operation ทุกครั้งถูกตรวจโดย target tool definition
+
+Memory เป็น untrusted evidence เท่านั้น AI approve/prune เองไม่ได้ และ reviewed
+learning ไม่ถูกติดตั้งหรือ execute อัตโนมัติ
 
 ## ตรวจรับ
 

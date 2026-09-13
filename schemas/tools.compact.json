@@ -2,19 +2,19 @@
   "$comment": "GENERATED from src/tools — do not edit by hand. Compact gateway surface (default for HTTP); every operation routes through the full tool contract in tools.json.",
   "version": 1,
   "toolCount": 19,
-  "fullToolCount": 89,
+  "fullToolCount": 94,
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 47742
+      "schemaBytes": 47961
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 115222
+      "schemaBytes": 115441
     },
     "full": {
-      "toolCount": 89,
-      "schemaBytes": 315892
+      "toolCount": 94,
+      "schemaBytes": 336195
     }
   },
   "tools": [
@@ -1459,7 +1459,7 @@
     {
       "name": "dodo_assist_read",
       "title": "Coding-task analysis",
-      "description": "Gateway: goal-driven context, evidence, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1475,6 +1475,9 @@
         "context_query",
         "context_evidence",
         "context_status",
+        "memory_search",
+        "memory_inspect",
+        "memory_status",
         "brain_status",
         "brain_query",
         "brain_symbol"
@@ -1504,6 +1507,9 @@
               "context_query",
               "context_evidence",
               "context_status",
+              "memory_search",
+              "memory_inspect",
+              "memory_status",
               "brain_status",
               "brain_query",
               "brain_symbol"
@@ -1628,7 +1634,7 @@
     {
       "name": "dodo_assist_change",
       "title": "Refactor previews and verification",
-      "description": "Gateway: preview-only refactors, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, memory_propose, memory_learning_propose, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -1640,6 +1646,8 @@
       "operations": [
         "preview_refactor",
         "verify_changes",
+        "memory_propose",
+        "memory_learning_propose",
         "brain_rebuild",
         "brain_pause",
         "brain_cancel"
@@ -1665,6 +1673,8 @@
             "enum": [
               "preview_refactor",
               "verify_changes",
+              "memory_propose",
+              "memory_learning_propose",
               "brain_rebuild",
               "brain_pause",
               "brain_cancel"

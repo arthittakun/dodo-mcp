@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/tools/contextTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -215,6 +215,13 @@ describe('PACK: npm tarball', () => {
     try {
       const tools = (await client.listTools()).tools.map((t) => t.name);
       expect(tools).toEqual(COMPACT_CATALOG.map((t) => t.name));
+      const overview = await client.callTool({ name: 'project_overview', arguments: {} });
+      const envelope = overview.structuredContent as { workspaceId: string; workspaceEpoch: string };
+      const memory = await client.callTool({ name: 'dodo_assist_read', arguments: {
+        workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
+        operation: 'memory_status', args: {},
+      } });
+      expect(memory.structuredContent).toMatchObject({ ok: true, data: { schemaVersion: 1, memories: { current: 0, stale: 0 } } });
     } finally { await client.close(); }
   }, 120_000);
 

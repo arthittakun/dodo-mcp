@@ -420,6 +420,55 @@ schedule.command('approve <id>').requiredOption('--digest <sha256>', 'exact dige
 schedule.command('revoke <id>').action(async (id:string) => console.log(JSON.stringify(await ipcForCwd('schedule.revoke',{id}),null,2)));
 schedule.command('history <id>').action(async (id:string) => console.log(JSON.stringify(await ipcForCwd('schedule.history',{id}),null,2)));
 
+// --------------------------------------------------------------- memory --
+const memory = program.command('memory').description('review evidence-backed project memory and reusable-learning proposals over private owner IPC');
+memory.command('pending')
+  .description('list pending memory proposals for this active workspace')
+  .action(async () => console.log(JSON.stringify(await ipcForCwd('memory.pending'), null, 2)));
+memory.command('show <id>')
+  .description('inspect one exact memory proposal or approved memory, including its review digest')
+  .action(async (id: string) => console.log(JSON.stringify(await ipcForCwd('memory.show', { id }), null, 2)));
+memory.command('list')
+  .description('list owner-approved memory visible to this active workspace')
+  .option('--include-stale', 'include stale/expired/source-changed records', false)
+  .action(async (opts: { includeStale: boolean }) => console.log(JSON.stringify(await ipcForCwd('memory.list', { includeStale: opts.includeStale }), null, 2)));
+memory.command('approve <id>')
+  .description('approve the exact reviewed proposal; never changes source files, permissions or executable policy')
+  .requiredOption('--digest <sha256>', 'exact digest shown by dodo memory show')
+  .option('--share-with <projectIds...>', 'owner-authorized registered project IDs that may read this memory', [])
+  .option('--allow-conflict', 'explicitly retain this proposal alongside listed conflicting current memories', false)
+  .action(async (id: string, opts: { digest: string; shareWith: string[]; allowConflict: boolean }) => {
+    console.log(JSON.stringify(await ipcForCwd('memory.approve', { id, digest: opts.digest, shareWith: opts.shareWith, allowConflict: opts.allowConflict }), null, 2));
+  });
+memory.command('reject <id>')
+  .description('reject a pending memory proposal')
+  .option('--note <text>', 'short non-secret owner review note', '')
+  .action(async (id: string, opts: { note: string }) => console.log(JSON.stringify(await ipcForCwd('memory.reject', { id, note: opts.note }), null, 2)));
+memory.command('reverify <id>')
+  .description('restore a stale memory only when every original evidence hash matches again')
+  .requiredOption('--digest <sha256>', 'exact memory contentHash from dodo memory show')
+  .action(async (id: string, opts: { digest: string }) => console.log(JSON.stringify(await ipcForCwd('memory.reverify', { id, digest: opts.digest }), null, 2)));
+memory.command('prune')
+  .description('delete old rejected/expired proposals and stale memories; CURRENT memory is never pruned')
+  .requiredOption('--older-than <days>', 'minimum age in days', (value) => Number.parseInt(value, 10))
+  .option('--yes', 'confirm reviewed deletion', false)
+  .action(async (opts: { olderThan: number; yes: boolean }) => {
+    if (!opts.yes) fail('memory prune requires --yes after reviewing dodo memory list --include-stale');
+    console.log(JSON.stringify(await ipcForCwd('memory.prune', { olderThanDays: opts.olderThan }), null, 2));
+  });
+
+const memoryLearning = memory.command('learning').description('review workflow/skill suggestions; approval never installs or executes them');
+memoryLearning.command('pending').action(async () => console.log(JSON.stringify(await ipcForCwd('memory.learning.pending'), null, 2)));
+memoryLearning.command('show <id>').action(async (id: string) => console.log(JSON.stringify(await ipcForCwd('memory.learning.show', { id }), null, 2)));
+memoryLearning.command('approve <id>')
+  .requiredOption('--digest <sha256>', 'exact digest shown by dodo memory learning show')
+  .option('--note <text>', 'short non-secret owner review note', '')
+  .action(async (id: string, opts: { digest: string; note: string }) => console.log(JSON.stringify(await ipcForCwd('memory.learning.review', { id, digest: opts.digest, note: opts.note, approved: true }), null, 2)));
+memoryLearning.command('reject <id>')
+  .requiredOption('--digest <sha256>', 'exact digest shown by dodo memory learning show')
+  .option('--note <text>', 'short non-secret owner review note', '')
+  .action(async (id: string, opts: { digest: string; note: string }) => console.log(JSON.stringify(await ipcForCwd('memory.learning.review', { id, digest: opts.digest, note: opts.note, approved: false }), null, 2)));
+
 // ----------------------------------------------------------------- init ----
 program
   .command('init')
