@@ -98,10 +98,13 @@ describe('installation project registry', () => {
       const project = f.registry.add(root).project;
       fs.rmdirSync(root); fs.mkdirSync(root);
       // Make the old row match the replacement's dev/inode, exactly modeling
-      // the Linux reuse case without depending on allocator timing.
+      // numeric identity reuse without depending on allocator or birth-time
+      // clock resolution on the host filesystem.
       const replacementStat = fs.statSync(root);
-      f.db.prepare('UPDATE project_registry SET root_dev = ?, root_ino = ? WHERE id = ?')
-        .run(replacementStat.dev, replacementStat.ino, project.projectId);
+      const replacementBirthtime = fs.statSync(root, { bigint: true }).birthtimeNs;
+      const differentBirthtime = replacementBirthtime + 1n;
+      f.db.prepare('UPDATE project_registry SET root_dev = ?, root_ino = ?, root_birthtime_ns = ? WHERE id = ?')
+        .run(replacementStat.dev, replacementStat.ino, differentBirthtime.toString(), project.projectId);
       expect(f.registry.get(project.projectId).availability).toBe('replaced');
       expect(() => f.registry.add(root)).toThrow(/another directory identity/);
     } finally { f.db.close(); }

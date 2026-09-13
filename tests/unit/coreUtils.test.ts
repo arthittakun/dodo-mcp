@@ -74,7 +74,7 @@ describe('child env whitelist (JOB-12, AUTH-17)', () => {
   });
 
   it('JOB-12: trustedPath drops entries inside the workspace root and relative entries', () => {
-    const p = trustedPath('/work/node_modules/.bin:/usr/bin:relative/bin:/usr/local/bin', '/work');
+    const p = trustedPath('/work/node_modules/.bin:/usr/bin:relative/bin:/usr/local/bin', '/work', 'linux');
     const parts = p.split(':');
     expect(parts).toContain('/usr/bin');
     expect(parts).toContain('/usr/local/bin');

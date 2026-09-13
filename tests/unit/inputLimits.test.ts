@@ -29,7 +29,9 @@ describe('local input limits', () => {
     const after = loadGlobalConfig(file);
     expect(after).toEqual({ ...before, limits: { ...before.limits, ...INPUT_LIMIT_PROFILES.large } });
     expect(fs.existsSync(path.join(dir, 'state.db'))).toBe(false);
-    expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    // Win32 chmod does not implement POSIX group/other mode bits. Native ACL
+    // privacy is covered by the dedicated Windows security suite.
+    if (process.platform !== 'win32') expect(fs.statSync(file).mode & 0o777).toBe(0o600);
     expect(cli(['--profile', 'standard']).status).toBe(0);
     expect(loadGlobalConfig(file).limits).toEqual({ ...before.limits, ...INPUT_LIMIT_PROFILES.standard });
   });

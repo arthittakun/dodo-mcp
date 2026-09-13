@@ -47,7 +47,7 @@ function run(w: WrappedSpawn, cwd: string): Promise<{ code: number | string | nu
   });
 }
 
-describe('seatbeltProfile', () => {
+describe.skipIf(process.platform === 'win32')('seatbeltProfile', () => {
   it('allows writes only under the workspace, temp dirs and /dev, after a global deny', () => {
     const root = mkRoot();
     const profile = seatbeltProfile(req(root));
@@ -147,7 +147,7 @@ describe('sandboxAvailability / wrapInSandbox', () => {
     expect(w.args.slice(2)).toEqual(['/bin/bash', '-c', 'echo hi']);
   });
 
-  it('on linux, finds bwrap on the trusted PATH (absolute entries only) and wraps with it', () => {
+  it.skipIf(process.platform === 'win32')('on linux, finds bwrap on the trusted PATH (absolute entries only) and wraps with it', () => {
     const bin = mkRoot();
     const fakeBwrap = path.join(bin, 'bwrap');
     fs.writeFileSync(fakeBwrap, '#!/bin/sh\nexit 0\n', { mode: 0o755 });

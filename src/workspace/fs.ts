@@ -53,7 +53,12 @@ export class WorkspaceFS {
   readonly ignores: IgnoreEngine;
 
   constructor(rootRealPath: string, ignores: IgnoreEngine) {
-    this.root = rootRealPath;
+    // Windows may expose the same directory through an 8.3 path (notably
+    // os.tmpdir() on service accounts) while realpathSync.native() returns
+    // its long spelling.  Keep one canonical spelling inside the policy so
+    // containment checks compare like with like.  Relative tool input is
+    // still checked component-by-component below and aliases remain denied.
+    this.root = process.platform === 'win32' ? fs.realpathSync.native(rootRealPath) : rootRealPath;
     this.ignores = ignores;
   }
 
