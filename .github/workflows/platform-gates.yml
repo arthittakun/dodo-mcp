@@ -78,11 +78,6 @@ jobs:
     env:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
       DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
-      # The Windows service account can publish %TEMP% through an 8.3 alias
-      # (for example ADMINI~1). DODO correctly rejects short-name workspace
-      # roots, so native fixtures use Actions' canonical long-path temp area.
-      TEMP: ${{ runner.temp }}
-      TMP: ${{ runner.temp }}
     steps:
       - name: Checkout trusted main revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -110,6 +105,12 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium
       - name: Run native Windows release candidate gate
         shell: cmd
+        # The Windows service account can publish %TEMP% through an 8.3 alias
+        # (for example ADMINI~1). DODO correctly rejects short-name workspace
+        # roots, so native fixtures use Actions' canonical long-path temp area.
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
         run: >-
           npm run release:gate:ci --
           --output-dir "%GITHUB_WORKSPACE%\release-evidence\ci\windows-node-${{ matrix.node }}"
