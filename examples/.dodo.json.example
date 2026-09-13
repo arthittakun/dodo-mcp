@@ -1,0 +1,20 @@
+{
+  "$comment": "Optional repo-local hints. This file has NO authority over security or permissions (spec §5): unknown keys are rejected, and it cannot widen file access, change auth, or disable logging. Copy to .dodo.json in your project root.",
+  "name": "my-app",
+  "description": "Example project hints for DODO.",
+  "exclude": ["fixtures/large-corpus/**"],
+  "tasks": [
+    {
+      "id": "unit",
+      "title": "Unit tests",
+      "program": "npm",
+      "args": ["run", "test:unit"]
+    },
+    {
+      "id": "typecheck",
+      "title": "Typecheck",
+      "program": "npm",
+      "args": ["run", "typecheck"]
+    }
+  ]
+}

@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "default": 1,
+      "type": "number",
+      "const": 1
+    },
+    "publicUrl": {
+      "type": "string",
+      "format": "uri"
+    },
+    "port": {
+      "default": 21730,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "configPort": {
+      "default": 21731,
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "allowedHosts": {
+      "default": [],
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255
+      }
+    },
+    "allowedOrigins": {
+      "default": [],
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 255
+      }
+    },
+    "limits": {
+      "default": {
+        "requestBodyBytes": 16777216,
+        "commandBytes": 1048576,
+        "toolContentBytes": 65536,
+        "readFileBytes": 8388608,
+        "readBatchMax": 10,
+        "treeDepthDefault": 2,
+        "treeEntriesMax": 200,
+        "searchResultsMax": 100,
+        "previewFilesMax": 50,
+        "previewAggregateBytes": 8388608,
+        "jobsConcurrentMax": 4,
+        "jobWallTimeoutDefaultMs": 600000,
+        "jobWallTimeoutMaxMs": 1800000,
+        "jobLogBytesPerJob": 20971520,
+        "jobLogBytesTotal": 209715200,
+        "planExpiryMs": 900000,
+        "approvalExpiryMs": 300000,
+        "idempotencyRetentionMs": 86400000,
+        "semanticFilesMax": 2000,
+        "semanticRequestTimeoutMs": 15000,
+        "searchTimeoutMs": 10000,
+        "auditRetentionDays": 7
+      },
+      "type": "object",
+      "properties": {
+        "requestBodyBytes": {
+          "default": 16777216,
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 33554432
+        },
+        "commandBytes": {
+          "default": 1048576,
+          "type": "integer",
+          "minimum": 8192,
+          "maximum": 8388608
+        },
+        "toolContentBytes": {
+          "default": 65536,
+          "type": "integer",
+          "minimum": 8192,
+          "maximum": 1048576
+        },
+        "readFileBytes": {
+          "default": 8388608,
+          "type": "integer",
+          "minimum": 16384,
+          "maximum": 16777216
+        },
+        "readBatchMax": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "treeDepthDefault": {
+          "default": 2,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        },
+        "treeEntriesMax": {
+          "default": 200,
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 5000
+        },
+        "searchResultsMax": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 1000
+        },
+        "previewFilesMax": {
+          "default": 50,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "previewAggregateBytes": {
+          "default": 8388608,
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 67108864
+        },
+        "jobsConcurrentMax": {
+          "default": 4,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "jobWallTimeoutDefaultMs": {
+          "default": 600000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "jobWallTimeoutMaxMs": {
+          "default": 1800000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "jobLogBytesPerJob": {
+          "default": 20971520,
+          "type": "integer",
+          "minimum": 65536,
+          "maximum": 9007199254740991
+        },
+        "jobLogBytesTotal": {
+          "default": 209715200,
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 9007199254740991
+        },
+        "planExpiryMs": {
+          "default": 900000,
+          "type": "integer",
+          "minimum": 60000,
+          "maximum": 9007199254740991
+        },
+        "approvalExpiryMs": {
+          "default": 300000,
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 9007199254740991
+        },
+        "idempotencyRetentionMs": {
+          "default": 86400000,
+          "type": "integer",
+          "minimum": 3600000,
+          "maximum": 9007199254740991
+        },
+        "semanticFilesMax": {
+          "default": 2000,
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 20000
+        },
+        "semanticRequestTimeoutMs": {
+          "default": 15000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 9007199254740991
+        },
+        "searchTimeoutMs": {
+          "default": 10000,
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 9007199254740991
+        },
+        "auditRetentionDays": {
+          "default": 7,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "requestBodyBytes",
+        "commandBytes",
+        "toolContentBytes",
+        "readFileBytes",
+        "readBatchMax",
+        "treeDepthDefault",
+        "treeEntriesMax",
+        "searchResultsMax",
+        "previewFilesMax",
+        "previewAggregateBytes",
+        "jobsConcurrentMax",
+        "jobWallTimeoutDefaultMs",
+        "jobWallTimeoutMaxMs",
+        "jobLogBytesPerJob",
+        "jobLogBytesTotal",
+        "planExpiryMs",
+        "approvalExpiryMs",
+        "idempotencyRetentionMs",
+        "semanticFilesMax",
+        "semanticRequestTimeoutMs",
+        "searchTimeoutMs",
+        "auditRetentionDays"
+      ],
+      "additionalProperties": false
+    },
+    "secretDeny": {
+      "default": [],
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "searchBackend": {
+      "default": "auto",
+      "type": "string",
+      "enum": [
+        "auto",
+        "js"
+      ]
+    },
+    "secretAllow": {
+      "default": [],
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 256
+      }
+    },
+    "commandSandbox": {
+      "default": "off",
+      "type": "string",
+      "enum": [
+        "off",
+        "prefer",
+        "require"
+      ]
+    },
+    "sandboxWritablePaths": {
+      "default": [],
+      "maxItems": 50,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 1024
+      }
+    },
+    "allowWebFetch": {
+      "default": false,
+      "type": "boolean"
+    },
+    "lsp": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_-]{0,31}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "args": {
+            "default": [],
+            "maxItems": 32,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          "extensions": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\.[a-z0-9]{1,10}$"
+            }
+          }
+        },
+        "required": [
+          "command",
+          "args",
+          "extensions"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "envAllowlist": {
+      "default": [],
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z0-9_]{1,64}$"
+      }
+    },
+    "logRetentionDays": {
+      "default": 7,
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365
+    },
+    "toolSurface": {
+      "type": "string",
+      "enum": [
+        "compact",
+        "full",
+        "hybrid"
+      ]
+    },
+    "dangerouslyAllowInsecurePublicUrl": {
+      "default": false,
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "version",
+    "port",
+    "configPort",
+    "allowedHosts",
+    "allowedOrigins",
+    "limits",
+    "secretDeny",
+    "searchBackend",
+    "secretAllow",
+    "commandSandbox",
+    "sandboxWritablePaths",
+    "allowWebFetch",
+    "lsp",
+    "envAllowlist",
+    "logRetentionDays",
+    "dangerouslyAllowInsecurePublicUrl"
+  ],
+  "additionalProperties": false
+}

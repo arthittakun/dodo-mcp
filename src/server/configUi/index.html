@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="th" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="referrer" content="no-referrer">
+<title>DODO Local Config</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+<a class="skip" href="#main">ข้ามไปยังเนื้อหา</a>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true">JJ</span>
+    <div>
+      <h1>DODO <span class="version" id="version" aria-label="เวอร์ชัน">…</span></h1>
+      <p class="sub">Local Config · หน้าตั้งค่าเฉพาะเจ้าของเครื่อง</p>
+    </div>
+  </div>
+  <ul class="chips" aria-label="สถานะระบบ">
+    <li class="chip" id="chip-mcp" data-state="idle"><span class="dot" aria-hidden="true"></span><span class="chip-icon" aria-hidden="true">…</span><span class="chip-text"><b>MCP</b> <span class="chip-value">กำลังตรวจ…</span></span></li>
+    <li class="chip" id="chip-oauth" data-state="idle"><span class="dot" aria-hidden="true"></span><span class="chip-icon" aria-hidden="true">…</span><span class="chip-text"><b>OAuth</b> <span class="chip-value">กำลังตรวจ…</span></span></li>
+    <li class="chip" id="chip-config" data-state="idle"><span class="dot" aria-hidden="true"></span><span class="chip-icon" aria-hidden="true">…</span><span class="chip-text"><b>Local Config</b> <span class="chip-value">กำลังตรวจ…</span></span></li>
+  </ul>
+  <button type="button" class="btn ghost" id="theme-toggle" aria-label="สลับธีม: มืด" title="สลับธีม">◐ มืด</button>
+</header>
+
+<div class="notice" id="notice" role="status" aria-live="polite" hidden>
+  <span class="notice-icon" aria-hidden="true"></span>
+  <span class="notice-text"></span>
+  <button type="button" class="btn ghost small notice-close" id="notice-close" aria-label="ปิดข้อความ">✕</button>
+</div>
+
+<main id="main" class="grid" aria-busy="true">
+
+  <section class="card" id="card-auth" hidden aria-labelledby="h-auth">
+    <h2 id="h-auth">ต้องเปิดจากลิงก์ส่วนตัว</h2>
+    <p>หน้านี้ใช้ token ส่วนตัวที่แสดงใน terminal ตอน <code>dodo start</code> ให้คัดลอกลิงก์ <b>Private config</b> ทั้งบรรทัด (มี <code>#…</code> ต่อท้าย) มาเปิดในเบราว์เซอร์อีกครั้ง ลิงก์หมดอายุใน 8 ชั่วโมง restart DODO เพื่อออกลิงก์ใหม่</p>
+    <p class="muted">อย่าส่งลิงก์นี้ให้ AI หรือผู้อื่น และห้ามชี้ tunnel มาที่พอร์ตนี้</p>
+  </section>
+
+  <!-- Workspace -->
+  <section class="card" id="card-workspace" aria-labelledby="h-ws">
+    <div class="card-head">
+      <h2 id="h-ws">Workspace</h2>
+      <span class="badge" id="ws-state-badge" hidden></span>
+    </div>
+    <div class="card-state" id="ws-loading">กำลังโหลด…</div>
+    <div class="card-body" id="ws-body" hidden>
+      <div class="kv">
+        <div class="k">โปรเจกต์</div>
+        <div class="v"><strong id="ws-name" class="ws-name">…</strong></div>
+        <div class="k">Path</div>
+        <div class="v path-row">
+          <code id="ws-root" class="path" title="">…</code>
+          <button type="button" class="btn small" id="ws-copy" aria-label="คัดลอก path ของ workspace">คัดลอก</button>
+        </div>
+        <div class="k">งานที่กำลังรัน</div>
+        <div class="v" id="ws-jobs">…</div>
+      </div>
+
+      <div class="callout warn" id="ws-hint" hidden>
+        <span aria-hidden="true">⚠</span>
+        <div><b>workspace เปลี่ยนแล้ว</b> — workspace ID และ epoch ใหม่มีผลทันที AI ทุกตัวต้องเรียก <code>project_overview</code> ใหม่ก่อนใช้งานต่อ คำขอที่ถือ context เดิมจะถูกปฏิเสธ (<code>WORKSPACE_MISMATCH</code>) และ client ที่ยังไม่ได้รับสิทธิ์ใน path นี้ต้องได้รับอนุญาตด้านล่างก่อน</div>
+      </div>
+
+      <form id="ws-form" class="form" novalidate>
+        <label for="ws-path">เปลี่ยนโปรเจกต์ (absolute path ของโฟลเดอร์ในเครื่องนี้)</label>
+        <div class="input-row">
+          <input id="ws-path" name="path" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/projects/app" aria-describedby="ws-path-help ws-path-error" required>
+          <button type="submit" class="btn primary" id="ws-switch">เปลี่ยนโปรเจกต์</button>
+        </div>
+        <p class="help" id="ws-path-help">ต้องเป็นโฟลเดอร์ที่มีอยู่จริง ไม่ใช่ home หรือ root ของดิสก์ DODO จะปฏิเสธถ้ามีงานกำลังรันหรือมี DODO อีกตัวเปิดโฟลเดอร์นั้นอยู่ เบราว์เซอร์เลือกโฟลเดอร์ในเครื่องให้โดยตรงไม่ได้ จึงต้องพิมพ์หรือวาง path เอง</p>
+        <p class="error" id="ws-path-error" role="alert" hidden></p>
+        <p class="progress" id="ws-progress" hidden><span class="spinner" aria-hidden="true"></span> กำลังสลับ workspace… (เตรียมโปรเจกต์ใหม่ ตรวจความพร้อม แล้วปิดของเดิม)</p>
+      </form>
+
+      <details class="details" id="ws-details">
+        <summary>รายละเอียด workspace</summary>
+        <dl class="dl">
+          <dt>Workspace ID</dt><dd><code id="ws-id">…</code></dd>
+          <dt>Epoch</dt><dd><code id="ws-epoch">…</code></dd>
+          <dt>Changeset ที่ต้องกู้คืนด้วยมือ</dt><dd id="ws-recovery">…</dd>
+        </dl>
+        <p class="muted">AI ได้สองค่านี้จาก <code>project_overview</code> และต้องส่งกลับมากับทุก tool call epoch เปลี่ยนทุกครั้งที่ restart หรือสลับ workspace</p>
+      </details>
+    </div>
+    <div class="card-state error-state" id="ws-error" hidden></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-desktop">
+    <div class="card-head"><h2 id="h-desktop">Desktop access</h2><span class="badge" id="desktop-mode">off</span></div>
+    <div class="card-body">
+      <p id="desktop-summary">การอ่านและควบคุมหน้าต่างปิดอยู่</p>
+      <div class="desktop-command">
+        <div class="actions">
+          <b>อนุญาต Chrome และจำสิทธิ์ไว้</b>
+          <button type="button" class="btn small" id="desktop-command-copy" aria-label="คัดลอกคำสั่งอนุญาต Chrome แบบจำสิทธิ์">คัดลอกคำสั่ง</button>
+        </div>
+        <pre><code id="desktop-command">dodo desktop allow --app com.google.Chrome --mode control --persist --yes</code></pre>
+        <p class="help">นำไปวางใน Terminal ที่อยู่ในโฟลเดอร์โปรเจกต์นี้ รันครั้งเดียวแล้วใช้ต่อเมื่อเปิด DODO ใหม่ได้ หากต้องการชั่วคราว ใช้ <code>--minutes 60</code> แทน <code>--persist</code></p>
+      </div>
+      <p class="help">รัน <code>dodo setup --components desktop</code> ใน local interactive session ก่อน: macOS ใช้ Screen Recording / Accessibility, Windows ใช้ interactive desktop + UI Automation และ Linux รองรับ X11/XWayland ที่มี XTEST/AT-SPI. จากนั้นเลือก app ID ด้วย <code>dodo desktop apps</code> (Windows/Linux) หรือ bundle ID บน macOS แล้วอนุญาตแยกจาก trusted / bypass</p>
+      <button type="button" class="btn danger" id="desktop-disable" disabled>ปิดและลืมสิทธิ์ Desktop</button>
+      <p class="help">ลบสิทธิ์ที่จำไว้ของโปรเจกต์นี้และหยุดคำสั่งถัดไป แต่ย้อน OS event ที่ส่งไปแล้วไม่ได้</p>
+    </div>
+  </section>
+
+  <!-- Permissions -->
+  <section class="card" id="card-perm" aria-labelledby="h-perm">
+    <div class="card-head">
+      <h2 id="h-perm">Permissions</h2>
+      <span class="badge" id="perm-effective-badge" hidden></span>
+    </div>
+    <div class="card-state" id="perm-loading">กำลังโหลด…</div>
+    <div class="card-body" id="perm-body" hidden>
+      <div class="two-col">
+        <div class="stat">
+          <div class="stat-label">ค่าที่บันทึกสำหรับโปรเจกต์นี้</div>
+          <div class="stat-value" id="perm-saved">…</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">สิทธิ์ที่มีผลในรอบนี้</div>
+          <div class="stat-value" id="perm-effective">…</div>
+        </div>
+      </div>
+      <div class="callout warn" id="perm-override" hidden>
+        <span aria-hidden="true">⚠</span>
+        <div id="perm-override-text"></div>
+      </div>
+      <form id="perm-form" class="form" novalidate>
+        <fieldset class="radios">
+          <legend>ระดับสิทธิ์ที่จะบันทึก</legend>
+          <label class="radio"><input type="radio" name="mode" value="inspect"><span><b>inspect</b><small>อ่านและค้นหาได้ แก้ไฟล์และรันคำสั่งต้องขออนุมัติทีละครั้งจาก terminal (<code>dodo approve</code>)</small></span></label>
+          <label class="radio"><input type="radio" name="mode" value="edit"><span><b>edit</b><small>อ่านและแก้ไฟล์ได้ทันที รันคำสั่ง commit และ fetch_url ยังต้องขออนุมัติ</small></span></label>
+          <label class="radio"><input type="radio" name="mode" value="trusted"><span><b>trusted</b><small>อนุญาตแก้ไฟล์และรันคำสั่ง <b>คำสั่งรันด้วยสิทธิ์ OS ของบัญชีคุณ</b> เว้นแต่เปิด command sandbox</small></span></label>
+        </fieldset>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="perm-save">บันทึกสิทธิ์</button>
+          <span class="help" id="perm-help">มีผลกับคำขอถัดไป ไม่ยกเลิกงานที่รันอยู่แล้ว</span>
+        </div>
+      </form>
+    </div>
+    <div class="card-state error-state" id="perm-error" hidden></div>
+  </section>
+
+  <!-- Connection -->
+  <section class="card" id="card-conn" aria-labelledby="h-conn">
+    <div class="card-head"><h2 id="h-conn">Connection</h2></div>
+    <div class="card-state" id="conn-loading">กำลังโหลด…</div>
+    <div class="card-body" id="conn-body" hidden>
+      <div class="kv">
+        <div class="k">Local MCP URL</div>
+        <div class="v path-row"><code id="conn-local" class="path">…</code><button type="button" class="btn small" id="conn-local-copy" aria-label="คัดลอก Local MCP URL">คัดลอก</button></div>
+        <div class="k">Public MCP URL</div>
+        <div class="v path-row"><code id="conn-public" class="path">…</code><button type="button" class="btn small" id="conn-public-copy" aria-label="คัดลอก Public MCP URL">คัดลอก</button></div>
+        <div class="k">Local Config</div>
+        <div class="v path-row"><code id="conn-config" class="path">…</code><span class="muted small-text">(ไม่รวม token)</span></div>
+        <div class="k">OAuth</div>
+        <div class="v" id="conn-oauth">…</div>
+      </div>
+      <p class="muted">หน้านี้แสดงเฉพาะสิ่งที่ process นี้รู้จริง ไม่ตรวจว่า tunnel ออนไลน์หรือ client ใดเชื่อมต่อสำเร็จแล้ว ทดสอบจากภายนอกด้วย <code>curl https://your-host/healthz</code></p>
+      <form id="conn-form" class="form" novalidate>
+        <label for="conn-origin">Public origin (HTTPS ของ tunnel ที่ชี้มาที่ MCP)</label>
+        <div class="input-row">
+          <input id="conn-origin" name="publicUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://dodo.example.com" aria-describedby="conn-origin-help conn-origin-error">
+          <button type="submit" class="btn primary" id="conn-save">บันทึก origin</button>
+        </div>
+        <p class="help" id="conn-origin-help">ต้องเป็น <code>https://</code> ไม่มี path การเปลี่ยนค่านี้มีผลหลัง restart DODO และ tunnel ต้องชี้มาที่พอร์ต MCP เท่านั้น ห้ามชี้มาที่หน้านี้</p>
+        <p class="error" id="conn-origin-error" role="alert" hidden></p>
+        <p class="callout info" id="conn-restart" hidden><span aria-hidden="true">ℹ</span><span>ค่าที่บันทึกต่างจากค่าที่รันอยู่ ต้อง restart DODO เพื่อให้มีผล</span></p>
+      </form>
+    </div>
+    <div class="card-state error-state" id="conn-error" hidden></div>
+  </section>
+
+  <section class="card" aria-labelledby="h-schedules">
+    <div class="card-head"><h2 id="h-schedules">Scheduled commands</h2></div>
+    <p class="muted">เจ้าของต้องอนุมัติคำสั่งและเวลาเฉพาะงาน ทำงานเฉพาะเมื่อ DODO แบบ HTTP เปิดโปรเจกต์นี้อยู่ ไม่รันรอบที่พลาดย้อนหลัง สร้างรายการด้วย dodo schedule create หรือให้ AI เสนอผ่าน schedule_propose</p>
+    <div id="schedules-list" class="clients"></div>
+  </section>
+
+  <!-- Client access -->
+  <section class="card" id="card-clients" aria-labelledby="h-clients">
+    <div class="card-head"><h2 id="h-clients">Client access</h2><span class="badge" id="clients-count" hidden></span></div>
+    <p class="muted">แสดงเฉพาะ client ที่อนุญาตในโฟลเดอร์นี้ การบันทึกมีผลกับโฟลเดอร์นี้เท่านั้น และไม่เพิ่ม scope ให้ token เดิม</p>
+    <div class="card-state" id="clients-loading">กำลังโหลด…</div>
+    <div class="card-body" id="clients-body" hidden>
+      <p class="help">โฟลเดอร์: <code id="clients-root" class="path"></code></p>
+      <div id="clients-list" class="clients"></div>
+      <div class="empty" id="clients-empty" hidden>
+        <p><b>ยังไม่มี client ที่อนุญาตในโฟลเดอร์นี้</b></p>
+        <p>เลือกเพิ่ม client ด้านล่างเพื่อใช้การเชื่อมต่อเดิมกับโฟลเดอร์นี้</p>
+      </div>
+      <details class="details client-add" id="clients-add">
+        <summary>เพิ่ม client ให้โฟลเดอร์นี้</summary>
+        <p class="help">เลือก client ที่ลงทะเบียนไว้แล้ว ตรวจ Client ID หากชื่อซ้ำกัน สิทธิ์ของโฟลเดอร์อื่นจะไม่ถูกเปลี่ยน</p>
+        <p id="client-add-status" class="help" role="status" aria-live="polite"></p>
+        <button class="btn small" type="button" id="client-add-reload">โหลดรายการใหม่</button>
+        <form id="client-add-form" hidden>
+          <label for="client-add-select">Client ที่จะเพิ่ม</label>
+          <select id="client-add-select" required disabled><option value="">เลือก client</option></select>
+          <fieldset class="checks">
+            <legend>สิทธิ์ในโฟลเดอร์นี้</legend>
+            <label class="check"><input type="checkbox" name="scope" value="dodo:read" checked><span>อ่านและค้นหา</span></label>
+            <label class="check"><input type="checkbox" name="scope" value="dodo:write"><span>แก้ไฟล์</span></label>
+            <label class="check"><input type="checkbox" name="scope" value="dodo:exec"><span>รันคำสั่งตาม trust mode</span></label>
+          </fieldset>
+          <button type="submit" class="btn primary" id="client-add-save">เพิ่มและบันทึกสิทธิ์</button>
+        </form>
+        <details class="help">
+          <summary>ยังไม่เคยลงทะเบียน client</summary>
+          <p>ใช้ callback จริงจากแอป แล้วโหลดรายการใหม่:</p>
+          <pre><code>dodo auth add-client --name "ChatGPT" --redirect-uri "&lt;callback URL จาก client&gt;"</code></pre>
+        </details>
+      </details>
+      <details class="details client-add" id="clients-manage">
+        <summary>ล้าง client ที่ไม่ใช้</summary>
+        <p class="help">ส่วนนี้แสดงทะเบียน client ของทั้งเครื่อง เลือกเฉพาะตัวที่ต้องการลบ การลบจะถอนล็อกอินและสิทธิ์ของตัวนั้นในทุกโฟลเดอร์ ต้องลงทะเบียนและเชื่อมใหม่หากต้องการใช้อีก</p>
+        <p id="client-manage-status" class="help" role="status" aria-live="polite"></p>
+        <button class="btn small" type="button" id="client-manage-reload">โหลดทะเบียนใหม่</button>
+        <label class="check"><input type="checkbox" id="client-manage-all" disabled><span>เลือกทั้งหมดในรายการนี้</span></label>
+        <div id="client-manage-list" class="clients"></div>
+        <button type="button" id="client-manage-delete" class="btn danger-outline" disabled>ล้าง client ที่เลือก</button>
+        <p class="help">ไม่ลบไฟล์โปรเจกต์หรือการเชื่อมต่ออื่น งานที่เริ่มไปแล้วอาจทำต่อได้ หากต้องการถอนเฉพาะโฟลเดอร์นี้ ให้ใช้ “ถอนสิทธิ์ทั้งหมด” บนการ์ดแทน</p>
+      </details>
+    </div>
+    <div class="card-state error-state" id="clients-error" hidden></div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <span>DODO Local Config · เฉพาะ loopback · token หมดอายุใน <span id="foot-expiry">…</span></span>
+  <button type="button" class="btn ghost small" id="refresh">⟳ โหลดใหม่</button>
+</footer>
+
+<dialog id="confirm" class="dialog" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h3 id="confirm-title">ยืนยัน</h3>
+    <p id="confirm-text"></p>
+    <div class="actions right">
+      <button type="submit" value="cancel" class="btn">ยกเลิก</button>
+      <button type="submit" value="ok" class="btn danger" id="confirm-ok">ยืนยัน</button>
+    </div>
+  </form>
+</dialog>
+
+<template id="client-template">
+  <article class="client">
+    <div class="client-head">
+      <div>
+        <div class="client-name"></div>
+        <code class="client-id"></code>
+      </div>
+      <span class="badge client-kind"></span>
+    </div>
+    <fieldset class="checks">
+      <legend class="sr-only">สิทธิ์</legend>
+      <label class="check"><input type="checkbox" value="dodo:read"><span><b>อ่าน</b><small>อ่านไฟล์ ค้นหา ดูโครงสร้างและ git status</small></span></label>
+      <label class="check"><input type="checkbox" value="dodo:write"><span><b>แก้ไฟล์</b><small>สร้าง แก้ ลบ ย้ายไฟล์ และ apply changes ภายใน workspace</small></span></label>
+      <label class="check"><input type="checkbox" value="dodo:exec"><span><b>รันคำสั่ง</b><small>run_command, exec_command, git_commit, fetch_url (ตามระดับ trust)</small></span></label>
+    </fieldset>
+    <div class="actions">
+      <button type="button" class="btn primary client-save">บันทึกสิทธิ์</button>
+      <button type="button" class="btn danger-outline client-revoke">ถอนสิทธิ์ทั้งหมด</button>
+      <span class="client-status help" role="status" aria-live="polite"></span>
+    </div>
+  </article>
+</template>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

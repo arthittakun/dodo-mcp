@@ -1,0 +1,23 @@
+# Example Cloudflare named-tunnel config (spec §17.1).
+#
+# DODO does NOT create tunnels, DNS, or credentials — you run cloudflared
+# yourself. This file assumes cloudflared runs on the SAME machine as DODO.
+#
+# CRITICAL: route ALL paths of the hostname to DODO, not just /mcp. OAuth
+# discovery (/.well-known/...), authorization, token, revocation and the
+# consent interaction pages must all reach the server, or sign-in breaks.
+#
+# Replace the tunnel id / hostname with your own. Create the tunnel and DNS
+# with the cloudflared CLI (see docs/TUNNEL.md).
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /home/you/.cloudflared/<YOUR_TUNNEL_ID>.json
+
+ingress:
+  - hostname: dodo.example.com
+    service: http://127.0.0.1:21730
+  # Final catch-all (required by cloudflared).
+  - service: http_status:404
+
+# Do NOT add ingress rules that expose any other local port (no MCP Inspector,
+# no debug endpoints). DODO binds only 127.0.0.1:21730.

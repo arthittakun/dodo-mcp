@@ -1,0 +1,346 @@
+import http from 'node:http';
+import { reviewClientDeletion, deleteReviewedClients, DeleteClientsInput } from '../auth/clientDeletion.js';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import express, { type Request, type Response, type NextFunction } from 'express';
+import { z } from 'zod';
+import type { BootstrappedWorkspace } from './bootstrap.js';
+import type { WorkspaceHost, SwitchResult } from './workspaceHost.js';
+import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSchema } from '../config/globalConfig.js';
+import { ALL_SCOPES } from '../security/policy.js';
+import { DodoError } from '../errors.js';
+
+/**
+ * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
+ * MCP listener:
+ * - loopback bind, per-process 256-bit bearer capability with an 8 h expiry,
+ *   passed once in the URL fragment (never a query string), then kept in
+ *   sessionStorage by the page;
+ * - Host/Origin/Sec-Fetch-Site checks and proxy-header rejection so a tunnel
+ *   or a foreign page can never reach it, even with the token;
+ * - static UI assets shipped with the package; strict CSP, no inline code,
+ *   no external assets;
+ * - the ACTIVE workspace is resolved per request through the host, so every
+ *   read and write targets whatever `dodo start` currently serves.
+ */
+export interface LocalConfigInfo {
+  version?: string;
+  /** What the MCP listener of this process looks like (absent for entries without one). */
+  transport?: { port: number; locked: boolean; publicUrl: string | null };
+  runMode?: 'allow-all' | 'bypass' | null;
+  log?: (line: string) => void;
+}
+
+export interface LocalConfigServer {
+  /** Private URL including the capability in the fragment — print it, never log it elsewhere. */
+  url: string;
+  /** Origin without the capability (safe to display). */
+  origin: string;
+  close(): Promise<void>;
+}
+
+const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
+const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'configUi');
+const CSP = "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
+
+type Target = WorkspaceHost | BootstrappedWorkspace;
+
+function isHost(t: Target): t is WorkspaceHost {
+  return typeof (t as WorkspaceHost).current === 'function' && typeof (t as WorkspaceHost).switchTo === 'function';
+}
+
+/** Entries without runtime switching (stdio, tests) get a fixed single-workspace host. */
+function staticHost(ws: BootstrappedWorkspace): WorkspaceHost {
+  return {
+    current: () => ws,
+    state: () => 'ready',
+    inflight: { enter: () => () => undefined, count: () => 0 },
+    switchTo: async () => {
+      throw new DodoError('NOT_SUPPORTED', 'workspace switching is only available for a server started with `dodo start`', {
+        recovery: 'for stdio entries the workspace is the directory the client launched; restart the client with another --root',
+      });
+    },
+    onSwitch: () => () => undefined,
+    close: async () => undefined,
+  };
+}
+
+function loadAsset(name: string): Buffer {
+  const file = path.join(UI_DIR, name);
+  try {
+    return fs.readFileSync(file);
+  } catch {
+    throw new DodoError('INTERNAL_ERROR', `Local Config UI asset missing: ${file}`, { recovery: 'reinstall the package (npm install -g dodo-mcp) — the UI ships inside dist/server/configUi' });
+  }
+}
+
+function localClients(ws: BootstrappedWorkspace) {
+  return ws.store.listOAuthClients().map((c) => ({
+    id: c.clientId,
+    name: typeof c.payload['client_name'] === 'string' ? c.payload['client_name'] : null,
+    public: c.payload['token_endpoint_auth_method'] === 'none',
+    scopes: ws.store.clientAccess(ws.workspaceId, c.clientId),
+  }));
+}
+
+export async function startLocalConfig(target: Target, port = 21731, info: LocalConfigInfo = {}): Promise<LocalConfigServer> {
+  const host: WorkspaceHost = isHost(target) ? target : staticHost(target);
+  const switchSupported = isHost(target);
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = Date.now() + TOKEN_TTL_MS;
+  const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
+
+  const app = express();
+  app.disable('x-powered-by');
+  let actualPort = port;
+
+  // ---- loopback + same-origin boundary (applies to EVERY route) ----
+  app.use((req, res, next) => {
+    const hostHeader = req.headers.host;
+    const origin = req.headers.origin;
+    const localHosts = [`127.0.0.1:${actualPort}`, `localhost:${actualPort}`];
+    const forwarded = Object.keys(req.headers).some((k) => k === 'forwarded' || k.startsWith('x-forwarded-') || k.startsWith('cf-'));
+    if (
+      !['127.0.0.1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '') ||
+      !localHosts.includes(hostHeader ?? '') ||
+      forwarded ||
+      (origin && origin !== `http://${hostHeader}`) ||
+      req.headers['sec-fetch-site'] === 'cross-site'
+    ) {
+      res.status(403).end();
+      return;
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Content-Security-Policy', CSP);
+    next();
+  });
+
+  // ---- static UI (no inline code; CSP 'self') ----
+  app.get('/', (_req, res) => res.type('html').send(assets.html));
+  app.get('/assets/app.css', (_req, res) => res.type('text/css').send(assets.css));
+  app.get('/assets/app.js', (_req, res) => res.type('text/javascript').send(assets.js));
+
+  // ---- capability check + flood bound for the API ----
+  let attempts = 0;
+  let windowStart = Date.now();
+  app.use('/api', (req, res, next) => {
+    if (Date.now() - windowStart > 60_000) {
+      windowStart = Date.now();
+      attempts = 0;
+    }
+    if (++attempts > 120) {
+      res.status(429).json({ error: 'Too many requests; wait a minute' });
+      return;
+    }
+    const supplied = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
+    const expected = Buffer.from(token);
+    if (Date.now() > expiresAt || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+      res.status(401).json({ error: 'Open the private Config URL printed in the DODO terminal. It expires after 8 hours; restart DODO to renew.' });
+      return;
+    }
+    next();
+  });
+  app.use('/api', express.json({ limit: 32 * 1024 }));
+
+  // Bind every mutation to the workspace the owner actually reviewed.
+  app.use('/api', (req, res, next) => {
+    if (req.method !== 'POST') { next(); return; }
+    const ws = host.current();
+    if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
+      res.status(409).json({error:'Workspace changed or is switching. Refresh this page before saving.',code:'STALE_WORKSPACE'}); return;
+    }
+    next();
+  });
+
+  // ---- state ----
+  app.get('/api/state', (_req, res) => {
+    const ws = host.current();
+    const cfg = loadGlobalConfig(ws.paths.configFile);
+    const transport = info.transport;
+    res.json({
+      version: info.version ?? ws.services.version,
+      state: host.state(),
+      generatedAt: Date.now(),
+      workspace: {
+        root: ws.rootInfo.root,
+        name: path.basename(ws.rootInfo.root),
+        workspaceId: ws.workspaceId,
+        epoch: ws.epoch,
+        runningJobs: ws.services.jobs.runningCount(),
+        recoveryRequired: ws.store.listChangesetsByStatus('recovery_required').filter((c) => c.workspaceId === ws.workspaceId).length,
+        switchSupported,
+      },
+      schedules: ws.services.schedules.list(),
+      desktop: { policy: ws.services.desktop.policy() },
+      permissions: {
+        savedMode: ws.store.trustMode(ws.workspaceId),
+        effectiveMode: ws.services.trustMode(),
+        override: info.runMode ?? null,
+        commandSandbox: ws.config.commandSandbox,
+        allowWebFetch: ws.config.allowWebFetch,
+      },
+      connection: {
+        mcpLocalUrl: transport ? `http://127.0.0.1:${transport.port}/mcp` : null,
+        publicUrl: cfg.publicUrl ?? '',
+        mcpPublicUrl: transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
+        oauthConfigured: transport ? !transport.locked : null,
+        activePublicUrl: transport?.publicUrl ?? null,
+        restartRequired: transport !== undefined && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null),
+        localConfigOrigin: `http://127.0.0.1:${actualPort}`,
+        expiresAt,
+      },
+      clients: localClients(ws).filter((c) => c.scopes.length > 0),
+    });
+  });
+
+  // Registration is installation-wide; only list unassigned clients when the
+  // owner explicitly opens the add-client picker for the reviewed workspace.
+  app.get('/api/access/available', (req, res) => {
+    const ws = host.current();
+    if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
+      res.status(409).json({ error: 'Workspace changed. Refresh before adding a client.', code: 'STALE_WORKSPACE' }); return;
+    }
+    res.json({
+      workspaceId: ws.workspaceId,
+      workspaceEpoch: ws.epoch,
+      clients: localClients(ws).filter((c) => c.scopes.length === 0).map(({ id, name, public: isPublic }) => ({ id, name, public: isPublic })),
+    });
+  });
+
+  app.get('/api/clients/manage', (req, res) => {
+    const ws = host.current();
+    if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
+      res.status(409).json({error:'Workspace changed. Refresh before reviewing clients.',code:'STALE_WORKSPACE'}); return;
+    }
+    const registered = ws.store.listOAuthClients();
+    res.json({workspaceId:ws.workspaceId,workspaceEpoch:ws.epoch,
+      clients:registered.slice(0,100).map(c => reviewClientDeletion(ws.store,c.clientId)),
+      truncated:registered.length > 100});
+  });
+  app.post('/api/clients/delete', (req, res) => {
+    const ws = host.current();
+    res.json(deleteReviewedClients(ws.store,DeleteClientsInput.parse(req.body),ws.workspaceId));
+  });
+
+  app.post('/api/schedule/approve', (req, res) => {
+    const p = z.object({id:z.string().max(100),digest:z.string().max(100)}).strict().parse(req.body);
+    res.json(host.current().services.schedules.approve(p.id,p.digest));
+  });
+  app.post('/api/schedule/revoke', (req, res) => {
+    const p = z.object({id:z.string().max(100)}).strict().parse(req.body);
+    res.json(host.current().services.schedules.revoke(p.id));
+  });
+
+  // ---- saved trust / public origin ----
+  app.post('/api/config', (req, res) => {
+    const ws = host.current();
+    const input = z.object({ mode: z.enum(['inspect', 'edit', 'trusted']).optional(), publicUrl: z.string().max(2048).optional() }).strict().safeParse(req.body);
+    if (!input.success) {
+      res.status(400).json({ error: 'Invalid configuration' });
+      return;
+    }
+    try {
+      let restartRequired = false;
+      if (input.data.publicUrl !== undefined) {
+        const config = loadGlobalConfig(ws.paths.configFile);
+        const url = validatePublicUrl(input.data.publicUrl, false);
+        saveGlobalConfig(ws.paths.configFile, GlobalConfigSchema.parse({ ...config, publicUrl: url.origin }));
+        restartRequired = (info.transport?.publicUrl ?? null) !== url.origin;
+      }
+      if (input.data.mode) ws.store.setTrustMode(ws.workspaceId, input.data.mode);
+      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.config', result: 'saved' });
+      res.json({ ok: true, restartRequired, savedMode: ws.store.trustMode(ws.workspaceId), effectiveMode: ws.services.trustMode() });
+    } catch {
+      res.status(400).json({ error: 'Invalid public HTTPS origin' });
+    }
+  });
+
+  // Owner-only emergency stop; enabling is explicit through local IPC/CLI.
+  app.post('/api/desktop/disable', (_req, res) => {
+    const policy = host.current().services.desktop.setPolicy({ mode: 'off' });
+    res.json({ ok: true, policy });
+  });
+
+  // ---- per-workspace client ACL ----
+  app.post('/api/access', (req, res) => {
+    const ws = host.current();
+    const input = z.object({ clientId: z.string().min(1).max(128), scopes: z.array(z.enum(ALL_SCOPES)).max(3), addOnly: z.boolean().optional() }).strict().safeParse(req.body);
+    if (!input.success || !ws.store.listOAuthClients().some((c) => c.clientId === input.data.clientId)) {
+      res.status(400).json({ error: 'Invalid client or scopes' });
+      return;
+    }
+    if (input.data.addOnly && ws.store.clientAccess(ws.workspaceId, input.data.clientId).length > 0) {
+      res.status(409).json({ error: 'This client already has access. Refresh to review its current permissions.', code: 'CLIENT_ALREADY_ALLOWED' }); return;
+    }
+    ws.store.setClientAccess(ws.workspaceId, input.data.clientId, input.data.scopes);
+    ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.access', refId: input.data.clientId, result: input.data.scopes.length ? 'allowed' : 'revoked' });
+    res.json({ ok: true, scopes: ws.store.clientAccess(ws.workspaceId, input.data.clientId) });
+  });
+
+  // ---- runtime workspace switch (owner only; never an MCP tool) ----
+  app.post('/api/workspace/switch', async (req, res) => {
+    const input = z.object({ path: z.string().min(1).max(4096) }).strict().safeParse(req.body);
+    if (!input.success) {
+      res.status(400).json({ error: 'path must be a non-empty absolute path', code: 'INVALID_INPUT' });
+      return;
+    }
+    const before = host.current();
+    try {
+      const result: SwitchResult = await host.switchTo({ path: input.data.path });
+      res.json({ ok: true, ...result, needsProjectOverview: result.changed });
+    } catch (err) {
+      const { status, body } = switchError(err);
+      try {
+        before.store.audit({ principal: 'local-config-owner', workspaceId: before.workspaceId, tool: 'local.workspace.switch', paths: [input.data.path], result: `refused:${body.code}` });
+      } catch {
+        /* old store may be closed if the failure happened late; audit is best effort */
+      }
+      res.status(status).json(body);
+    }
+  });
+
+  app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof z.ZodError) { res.status(400).json({error:'Invalid owner request',code:'INVALID_INPUT'}); return; }
+    if (err instanceof DodoError) { res.status(err.code === 'FORBIDDEN' ? 403 : 409).json({error:err.message,code:err.code}); return; }
+    res.status(500).json({error:'Owner request failed',code:'INTERNAL_ERROR'});
+  });
+  app.use((_req, res) => res.status(404).end());
+
+  const server = http.createServer(app);
+  server.requestTimeout = 60_000; // a switch can legitimately take a few seconds
+  server.headersTimeout = 5000;
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', () => resolve());
+  });
+  actualPort = (server.address() as { port: number }).port;
+  const origin = `http://127.0.0.1:${actualPort}`;
+  return {
+    url: `${origin}/#${token}`,
+    origin,
+    close: () =>
+      new Promise((resolve) => {
+        server.close(() => resolve());
+        server.closeAllConnections();
+      }),
+  };
+}
+
+function switchError(err: unknown): { status: number; body: { error: string; code: string; recovery?: string } } {
+  if (err instanceof DodoError) {
+    const status =
+      err.code === 'CONFLICT' ? 409 :
+      err.code === 'NOT_SUPPORTED' ? 501 :
+      err.code === 'INVALID_INPUT' || err.code === 'NOT_FOUND' || err.code === 'PATH_DENIED' ? 400 :
+      500;
+    return { status, body: { error: err.message, code: err.code, ...(err.recovery ? { recovery: err.recovery } : {}) } };
+  }
+  return { status: 500, body: { error: 'workspace switch failed; the previous workspace is still active', code: 'INTERNAL_ERROR' } };
+}
+
+export type { Request, Response };

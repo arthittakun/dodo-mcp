@@ -1,0 +1,61 @@
+name: windows-native-candidate
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows-native:
+    # Evidence gate. Remove allow-failure only after native results and Windows
+    # 11 manual acceptance are recorded (docs/WINDOWS.md).
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Create evidence directory
+        run: New-Item -ItemType Directory -Force windows-evidence
+      - run: npm ci
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Native Windows contracts (no OS emulation)
+        if: ${{ !cancelled() }}
+        run: |
+          node --version | Out-File windows-evidence/environment.txt
+          node -p "JSON.stringify({platform:process.platform,arch:process.arch})" | Out-File -Append windows-evidence/environment.txt
+          npm run test:windows -- --reporter=json --outputFile=windows-evidence/contracts.json
+          exit $LASTEXITCODE
+      - name: Install isolated Chromium for browser regression tests
+        if: ${{ !cancelled() }}
+        run: npm exec -- playwright install chromium
+      - name: Full existing core suites (failures are evidence, not skipped)
+        if: ${{ !cancelled() }}
+        run: |
+          npm exec -- vitest run tests/unit tests/integration tests/security tests/compatibility --reporter=json --outputFile=windows-evidence/core.json
+          exit $LASTEXITCODE
+      - name: Packaging and fresh-install tests
+        if: ${{ !cancelled() }}
+        run: |
+          npm exec -- vitest run tests/packaging --reporter=json --outputFile=windows-evidence/packaging.json
+          exit $LASTEXITCODE
+      - name: Preserve native test evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-node-${{ matrix.node }}
+          path: windows-evidence/
+          if-no-files-found: warn

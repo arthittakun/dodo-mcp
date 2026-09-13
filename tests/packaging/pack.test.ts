@@ -1,0 +1,220 @@
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { execFileSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { TOOL_CATALOG } from '../../src/tools/catalog.js';
+import { COMPACT_CATALOG, HYBRID_CATALOG } from '../../src/tools/surface.js';
+import { resolveTrustedExecutable } from '../../src/platform/execResolve.js';
+import { batchInvocation } from '../../src/platform/shell.js';
+
+/** G. Packaging (PACK-01..06). Runs the real `npm pack` and inspects the tarball. */
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** npm is a native executable or a guarded batch shim, never an assumed POSIX file. */
+function runNpm(args: string[], cwd: string): string {
+  const executable = resolveTrustedExecutable('npm', ROOT);
+  const invocation = process.platform === 'win32' && /\.(cmd|bat)$/i.test(executable)
+    ? batchInvocation(executable, args, ROOT)
+    : { program: executable, args, windowsVerbatimArguments: false };
+  const result = spawnSync(invocation.program, invocation.args, {
+    cwd, encoding: 'utf8', stdio: 'pipe', windowsHide: true,
+    windowsVerbatimArguments: invocation.windowsVerbatimArguments, timeout: 180000, maxBuffer: 16 * 1024 * 1024,
+  });
+  if (result.error || result.status !== 0) throw new Error(`npm ${args[0]} failed (${result.status}): ${result.error?.message ?? result.stderr}`);
+  return result.stdout;
+}
+
+describe('PACK: npm tarball', () => {
+  let tarball: string;
+  let fileList: string[];
+  let workDir: string;
+  let installedBin: string;
+
+  beforeAll(() => {
+    workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-pack-'));
+    // Ensure a fresh build + schemas.
+    execFileSync(process.execPath, [path.join(ROOT, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json'], { cwd: ROOT, stdio: 'pipe' });
+    execFileSync(process.execPath, ['scripts/emit-schemas.mjs'], { cwd: ROOT, stdio: 'pipe' });
+    execFileSync(process.execPath, ['scripts/copy-ui.mjs'], { cwd: ROOT, stdio: 'pipe' });
+    const out = runNpm(['pack', '--pack-destination', workDir, '--json'], ROOT);
+    const meta = JSON.parse(out) as Array<{ filename: string; files: Array<{ path: string }> }>;
+    tarball = path.join(workDir, meta[0]!.filename);
+    fileList = meta[0]!.files.map((f) => f.path);
+  }, 180_000);
+
+  it('PACK-01: contains dist, schemas, examples and docs — no source maps of state', () => {
+    expect(fileList.some((f) => f.startsWith('dist/cli/main.js'))).toBe(true);
+    expect(fileList).toContain('schemas/tools.json');
+    expect(fileList).toContain('package.json');
+    expect(fileList).toContain('README.md');
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    const privateDocs = [
+      /^docs\/development\//,
+      /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
+      /^(DODO_IMPLEMENTATION_SPEC|DODO_IMPLEMENTATION_PLAN_AND_ACCEPTANCE|RESEARCH_SOURCES)\.md$/,
+    ];
+    expect(fileList.some((file) => privateDocs.some((pattern) => pattern.test(file)))).toBe(false);
+    expect(fileList.some(f => f.startsWith('dist/services/consent/') || f.startsWith('dist/tools/consentTools.'))).toBe(false);
+  });
+
+  it('PACK-07: ships the Local Config UI assets next to the compiled server', () => {
+    for (const asset of ['dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js']) {
+      expect(fileList, asset).toContain(asset);
+    }
+  });
+
+  it('PACK-08: ships the desktop helper source without installing or enabling desktop access', () => {
+    expect(fileList).toContain('native/desktop.swift');
+    expect(fileList.some(f => /^native\/.*(?:arm64|x64)$/.test(f))).toBe(false);
+  });
+
+  it('PACK-10: ships assistance/media documentation and explicit setup, never models or recordings', () => {
+    for (const file of ['docs/ASSISTANCE.md', 'docs/MULTIMODAL.md', 'docs/RELEASE_NOTES.md', 'scripts/setup-multimodal.mjs', 'scripts/guard-publish.mjs', 'dist/services/multimodal/mediaWorker.js']) expect(fileList).toContain(file);
+    expect(fileList.some(f => /^(?:models|tmp|release-evidence)\//.test(f) || /\.(?:bin|mp4|aiff|wav|db)$/.test(f))).toBe(false);
+  });
+
+  it('PACK-01: contains NO secrets, keys, tokens, or state database', () => {
+    const forbidden = [
+      /\.env/, /state\.db/, /jwks\.json/, /cookies\.json/, /\.sock$/, /id_rsa/, /\.pem$/,
+      /\.dodo-dev-state/, /node_modules/, /\.git\//,
+    ];
+    for (const f of fileList) {
+      for (const pat of forbidden) {
+        expect(pat.test(f), `packaged file ${f} matches forbidden ${pat}`).toBe(false);
+      }
+    }
+  });
+
+  it('PACK-05: package.json declares NO install lifecycle hooks (no autostart/listener/tunnel)', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as { scripts?: Record<string, string> };
+    const scripts = pkg.scripts ?? {};
+    for (const hook of ['preinstall', 'install', 'postinstall', 'prepare']) {
+      expect(scripts[hook], hook).toBeUndefined();
+    }
+  });
+
+  it('PACK-13: manifest and lockfile agree and do not install an older DODO inside itself', () => {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'));
+    const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'package-lock.json'), 'utf8'));
+    expect(lock.version).toBe(pkg.version);
+    expect(lock.packages[''].version).toBe(pkg.version);
+    expect(pkg.dependencies[pkg.name]).toBeUndefined();
+    expect(lock.packages[''].dependencies[pkg.name]).toBeUndefined();
+    expect(lock.packages[`node_modules/${pkg.name}`]).toBeUndefined();
+  });
+
+  it('PACK-02: installs into a fresh prefix and the dodo binary is wired', () => {
+    const installDir = fs.mkdtempSync(path.join(workDir, 'install-'));
+    fs.writeFileSync(path.join(installDir, 'package.json'), JSON.stringify({ name: 'consumer', version: '1.0.0', private: true }));
+    runNpm(['install', tarball, '--no-audit', '--no-fund'], installDir);
+    const shim = path.join(installDir, 'node_modules', '.bin', process.platform === 'win32' ? 'dodo.cmd' : 'dodo');
+    expect(fs.existsSync(shim)).toBe(true);
+    // Windows .bin files are shell wrappers, not JavaScript for node.exe.
+    const binPath = path.join(installDir, 'node_modules', 'dodo-mcp', 'dist', 'cli', 'main.js');
+    expect(fs.existsSync(binPath)).toBe(true);
+    installedBin = binPath;
+    // The installed CLI runs (doctor exits 0 or 1 but prints checks) from a fresh prefix.
+    const cfg = fs.mkdtempSync(path.join(workDir, 'cfg-'));
+    let out = '';
+    try {
+      out = execFileSync(process.execPath, [binPath, 'doctor'], { cwd: installDir, env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8' });
+    } catch (e) {
+      out = (e as { stdout?: string }).stdout ?? '';
+    }
+    expect(out).toContain('sqlite-native');
+    expect(out).toContain('node');
+    const grantArgs = [binPath, 'desktop', 'allow', '--app', 'dev.dodo.fixture', '--mode', 'view', '--persist', '--yes'];
+    const grantOptions = { cwd: installDir, env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8' as const, stdio: 'pipe' as const };
+    if (process.platform === 'win32') {
+      let refusal = '';
+      try { execFileSync(process.execPath, grantArgs, grantOptions); }
+      catch (error) { refusal = String((error as { stderr?: string }).stderr ?? ''); }
+      expect(refusal).toContain('NOT_SUPPORTED');
+    } else {
+      expect(execFileSync(process.execPath, grantArgs, grantOptions)).toContain('Remembered until disabled');
+    }
+    const disabled = execFileSync(process.execPath, [binPath, 'desktop', 'disable'], {
+      cwd: installDir, env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8',
+    });
+    expect(disabled).toContain('disabled and forgotten');
+    const killed = execFileSync(process.execPath, [binPath, 'kill', '--json'], {
+      cwd: os.homedir(), env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8',
+    });
+    expect(JSON.parse(killed)).toMatchObject({ stopped: [], failed: [], authPreserved: true });
+  }, 120_000);
+
+  it('PACK-11: installed media setup is wired and check/help do not install or change configuration', () => {
+    const helper = path.resolve(path.dirname(installedBin), '../../scripts/setup-multimodal.mjs');
+    expect(fs.existsSync(helper)).toBe(true);
+    const cwd = fs.mkdtempSync(path.join(workDir, 'setup-check-'));
+    const config = path.join(cwd, 'not-created-config');
+    const options = { cwd, env: { ...process.env, DODO_CONFIG_DIR: config }, encoding: 'utf8' as const, timeout: 60000 };
+    expect(execFileSync(process.execPath, [helper, '--help'], options)).toContain('Usage: dodo-media-setup');
+    expect(execFileSync(process.execPath, [helper, '--check'], options)).toContain('No DODO permissions/configuration changed');
+    expect(() => execFileSync(process.execPath, [helper, '--check', '--download-model'], { ...options, stdio: 'pipe' })).toThrow();
+    expect(fs.existsSync(path.join(cwd, 'models'))).toBe(false);
+    expect(fs.existsSync(config)).toBe(false);
+  });
+
+  it('PACK-09: installed tarball dispatches directly from nested Thai/spaced CWD', async () => {
+    const root = path.join(workDir,'โปรเจกต์ ทดสอบ','nested'); fs.mkdirSync(root,{recursive:true});
+    const cfg = fs.mkdtempSync(path.join(workDir,'direct-cfg-'));
+    fs.writeFileSync(path.join(root,'proof.txt'),'packed fixture');
+    const client = new Client({name:'packed-direct-client',version:'1'});
+    await client.connect(new StdioClientTransport({command:process.execPath,args:[installedBin,'stdio'],cwd:root,env:{...process.env,DODO_CONFIG_DIR:cfg} as Record<string,string>,stderr:'pipe'}));
+    try {
+      const overview = await client.callTool({name:'project_overview',arguments:{}});
+      const e = overview.structuredContent as {ok:boolean;workspaceId:string;workspaceEpoch:string;data:{root:string}};
+      expect(e.ok).toBe(true); expect(e.data.root).toBe(fs.realpathSync(root));
+      const read = await client.callTool({name:'read_files',arguments:{workspaceId:e.workspaceId,workspaceEpoch:e.workspaceEpoch,files:[{path:'proof.txt'}]}});
+      expect(JSON.stringify(read.structuredContent)).toContain('packed fixture');
+      expect((await client.listTools()).tools).toHaveLength(TOOL_CATALOG.length);
+    } finally {await client.close();}
+  });
+
+  it('PACK-12: ships the compact surface schema and the installed CLI serves it on request', async () => {
+    expect(fileList).toContain('schemas/tools.compact.json');
+    expect(fileList).toContain('schemas/tools.hybrid.json');
+    const hybrid = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/tools.hybrid.json'), 'utf8')) as { toolCount: number; tools: Array<{ name: string }> };
+    expect(hybrid.toolCount).toBe(HYBRID_CATALOG.length);
+    expect(hybrid.toolCount).toBe(49);
+    expect(hybrid.tools.map((t) => t.name)).toEqual(HYBRID_CATALOG.map((t) => t.name));
+    const compact = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/tools.compact.json'), 'utf8')) as {
+      toolCount: number; fullToolCount: number; stats: { compact: { schemaBytes: number }; full: { schemaBytes: number } };
+      tools: Array<{ name: string; inputSchema: { additionalProperties: unknown }; operations?: string[] }>;
+    };
+    expect(compact.toolCount).toBe(COMPACT_CATALOG.length);
+    expect(compact.toolCount).toBeLessThanOrEqual(20);
+    expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
+    expect(compact.tools.map((t) => t.name)).toEqual(COMPACT_CATALOG.map((t) => t.name));
+    for (const t of compact.tools) expect(t.inputSchema.additionalProperties, t.name).toBe(false);
+    expect(compact.stats.compact.schemaBytes).toBeLessThan(compact.stats.full.schemaBytes * 0.5);
+    // the installed tarball can actually serve the compact surface over STDIO
+    const root = fs.mkdtempSync(path.join(workDir, 'compact-root-'));
+    const cfg = fs.mkdtempSync(path.join(workDir, 'compact-cfg-'));
+    const client = new Client({ name: 'packed-compact-client', version: '1' });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [installedBin, 'stdio', '--tools', 'compact'], cwd: root, env: { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>, stderr: 'pipe' }));
+    try {
+      const tools = (await client.listTools()).tools.map((t) => t.name);
+      expect(tools).toEqual(COMPACT_CATALOG.map((t) => t.name));
+    } finally { await client.close(); }
+  }, 120_000);
+
+  it('PACK-06: generated schemas match the current handlers (tool count, additionalProperties:false)', () => {
+    const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/tools.json'), 'utf8')) as { toolCount: number; tools: Array<{ name: string; inputSchema: { additionalProperties: unknown } }> };
+    expect(schema.toolCount).toBe(TOOL_CATALOG.length);
+    expect(schema.tools.map((t) => t.name)).toEqual(TOOL_CATALOG.map((t) => t.name));
+    for (const t of schema.tools) expect(t.inputSchema.additionalProperties).toBe(false);
+  });
+
+  it('PACK-01: the working tree has no stray secret files that would be packaged', () => {
+    // Guard against accidental commit of runtime state into the repo root.
+    for (const name of ['state.db', '.env', 'jwks.json']) {
+      expect(fs.existsSync(path.join(ROOT, name)), name).toBe(false);
+    }
+  });
+});

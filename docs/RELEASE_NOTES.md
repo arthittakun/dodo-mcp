@@ -1,0 +1,21 @@
+# DODO MCP — Release Notes
+
+## 1.0.0
+
+- เปิดตัว package `dodo-mcp` และ CLI `dodo`
+- เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ migration แบบ explicit
+- เพิ่ม Compact, Full และ Hybrid MCP tool surfaces
+- เพิ่ม operation discovery และ gateway dispatch ผ่าน policy pipeline เดียวกับ direct tools
+- คง workspace ID/epoch, ACL, trust, approval, expected hash และ secret/path guards
+- รองรับ Local Config workspace switching พร้อม drain, readiness และ rollback
+- รวม coding, jobs, Git, intelligence, assistance, multimodal, browser, game, workflow และ schedule capabilities
+- เพิ่ม Windows compatibility plan และ setup diagnostics
+
+## วิธีอัปเดต
+
+```bash
+npm install -g dodo-mcp@1.0.0
+dodo --version
+```
+
+หลังติดตั้งให้ restart DODO process และ rescan MCP connection ตามข้อกำหนดของ client

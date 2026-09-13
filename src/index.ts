@@ -1,0 +1,24 @@
+/** Library surface for tests and embedding. The CLI (`dodo`) is the product. */
+export { startServer, DODO_VERSION, type StartOptions, type RunningServer } from './server/appServer.js';
+export { startStdioServer, STDIO_PRINCIPAL, type StdioOptions, type RunningStdioServer } from './server/stdioServer.js';
+export { bootstrapWorkspace } from './server/bootstrap.js';
+export { DodoError, ERROR_CODES, type ErrorCode } from './errors.js';
+export { GlobalConfigSchema, loadGlobalConfig, saveGlobalConfig, validatePublicUrl } from './config/globalConfig.js';
+export { ProjectConfigSchema, loadProjectConfig } from './config/projectConfig.js';
+export { LimitsSchema, DEFAULT_LIMITS } from './config/limits.js';
+export { resolveConfigDir, legacyConfigDirs, statePaths, ipcSocketPath } from './config/paths.js';
+export { planLegacyMigration, importLegacyState, LEGACY_IMPORT_ENTRIES, type LegacyMigrationPlan, type LegacyMigrationResult } from './config/migration.js';
+export { WorkspaceFS } from './workspace/fs.js';
+export { IgnoreEngine } from './workspace/ignores.js';
+export { resolveWorkspaceRoot } from './workspace/root.js';
+export { mintWorkspaceId, mintEpoch } from './workspace/identity.js';
+export { openDatabase } from './store/db.js';
+export { Store } from './store/store.js';
+export { ipcCall, IpcError } from './ipc/client.js';
+export { TOOL_CATALOG } from './tools/catalog.js';
+export { envelopeSchema } from './tools/envelope.js';
+export { addStaticClient, listStaticClients } from './auth/clients.js';
+export { sha256Bytes, digestOf, canonicalJson, phraseFor } from './util/hash.js';
+export { buildChildEnv, trustedPath } from './security/env.js';
+export { redact } from './security/redact.js';
+export { decide, TRUST_MODE_DESCRIPTIONS, ALL_SCOPES } from './security/policy.js';
