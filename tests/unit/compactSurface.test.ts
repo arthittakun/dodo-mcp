@@ -190,6 +190,19 @@ describe('dodo_discover', () => {
     expect(full.properties['workspaceId']).toBeDefined();
   });
 
+  it('publishes federation fields through the existing read operations without changing catalog counts', async () => {
+    const read = await call(discover, { ...WS, operation: 'read_files' });
+    const search = await call(discover, { ...WS, operation: 'search_code' });
+    const readSchema = (read.data as { inputSchema: { properties: Record<string, unknown> } }).inputSchema;
+    const searchSchema = (search.data as { inputSchema: { properties: Record<string, unknown> } }).inputSchema;
+    expect(readSchema.properties['projectId']).toBeDefined();
+    expect(searchSchema.properties['projectId']).toBeDefined();
+    expect(searchSchema.properties['projectIds']).toBeDefined();
+    expect(TOOL_CATALOG).toHaveLength(74);
+    expect(COMPACT_CATALOG).toHaveLength(19);
+    expect(HYBRID_CATALOG).toHaveLength(49);
+  });
+
   it('idempotency-capable operations carry the retry note; unknown operations are NOT_FOUND', async () => {
     const res = await call(discover, { ...WS, operation: 'run_command' });
     expect((res.data as { notes: string[] }).notes.join(' ')).toContain('idempotencyKey');

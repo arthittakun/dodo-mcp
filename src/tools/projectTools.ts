@@ -4,20 +4,25 @@ import { DodoError } from '../errors.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
 
 const looseData = z.looseObject({});
+const projectIdInput = z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional()
+  .describe('Optional owner-registered project ID for read-only federation; omit to use the active workspace');
 
 export const projectOverviewTool = defineTool({
   name: 'project_overview',
   title: 'Project overview',
   description:
-    'Bootstrap tool: returns the workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. Read-only; never executes project code. Call this first.',
-  input: {},
+    'Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects for which this client has live read ACL. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first.',
+  input: { projectId: projectIdInput },
   output: looseData,
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   requiredScope: 'dodo:read',
   action: 'read',
   noWorkspaceContext: true,
-  handler: async (_args, ctx) => {
+  handler: async (args, ctx) => {
     const s = ctx.services;
+    if (args.projectId !== undefined) {
+      return await s.federation.overview(args.projectId, ctx.principal, { workspaceId: s.workspaceId, workspaceEpoch: s.epoch });
+    }
     const data = await s.overview.build({
       workspaceId: s.workspaceId,
       epoch: s.epoch,
@@ -31,7 +36,21 @@ export const projectOverviewTool = defineTool({
     if (data.projectConfigNote) warnings.push(data.projectConfigNote);
     const desktop = s.desktop.policy();
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
-    return { data: { ...data, capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } } }, warnings, truncated: data.treeTruncated };
+    const federation = s.federation.listAuthorized(ctx.principal);
+    return {
+      data: {
+        ...data,
+        capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
+        federation: {
+          mode: 'read-only',
+          projects: federation.projects,
+          maxProjectsPerSearch: 8,
+          note: 'Only owner-registered projects with live read ACL are listed. Pass projectId to project_overview/list_files/read_files, or projectId/projectIds to search_code. Writes and commands remain bound to the active workspace.',
+        },
+      },
+      warnings,
+      truncated: data.treeTruncated || federation.truncated,
+    };
   },
 });
 
@@ -39,8 +58,9 @@ export const listFilesTool = defineTool({
   name: 'list_files',
   title: 'List files',
   description:
-    'Bounded directory tree under a workspace-relative path ("." = root). Depth and entry counts are capped; symlinks are never followed; ignored/secret paths are excluded (includeIgnored only re-adds ordinary ignores, never secrets).',
+    'Bounded directory tree under a workspace-relative path ("." = root). Pass an owner-registered projectId for read-only federation without switching the active workspace. Depth and entry counts are capped; symlinks are never followed; ignored/secret paths are excluded (includeIgnored only re-adds ordinary ignores, never secrets).',
   input: {
+    projectId: projectIdInput,
     path: z.string().max(1024).default('.'),
     depth: z.number().int().min(1).max(10).optional(),
     includeIgnored: z.boolean().default(false),
@@ -54,6 +74,10 @@ export const listFilesTool = defineTool({
     const opts: { depth?: number; includeIgnored?: boolean; maxEntries?: number } = { includeIgnored: args.includeIgnored };
     if (args.depth !== undefined) opts.depth = args.depth;
     if (args.maxEntries !== undefined) opts.maxEntries = args.maxEntries;
+    if (args.projectId !== undefined) {
+      const res = ctx.services.federation.listFiles(args.projectId, ctx.principal, args.path, opts);
+      return { data: { tree: res.tree, entryCount: res.entryCount, project: res.project }, truncated: res.truncated };
+    }
     const res = ctx.services.listService.tree(args.path, opts);
     return { data: { tree: res.root, entryCount: res.entryCount }, truncated: res.truncated };
   },
@@ -63,8 +87,9 @@ export const readFilesTool = defineTool({
   name: 'read_files',
   title: 'Read files',
   description:
-    'Read up to 10 UTF-8 text files (workspace-relative paths), optionally by 1-based line range. Returns content, exact line span, total lines, and the SHA-256 of the WHOLE file\'s raw bytes — pass that hash to preview_changes as expectedHash. Binary or non-UTF-8 files return a typed error.',
+    'Read up to 10 UTF-8 text files (workspace-relative paths), optionally by 1-based line range. Pass an owner-registered projectId for read-only federation without switching the active workspace. Returns content, exact line span, total lines, and the SHA-256 of the WHOLE file\'s raw bytes. A federated hash is evidence only: switch that project into the active workspace and re-read before editing. Binary or non-UTF-8 files return a typed error.',
   input: {
+    projectId: projectIdInput,
     files: z
       .array(
         z
@@ -84,6 +109,10 @@ export const readFilesTool = defineTool({
   requiredScope: 'dodo:read',
   action: 'read',
   handler: async (args, ctx) => {
+    if (args.projectId !== undefined) {
+      const res = ctx.services.federation.readFiles(args.projectId, ctx.principal, args.files);
+      return { data: { files: res.files, errors: res.errors, project: res.project }, truncated: res.truncated };
+    }
     const res = ctx.services.readService.readBatch(args.files);
     return { data: { files: res.files, errors: res.errors }, truncated: res.truncated };
   },
@@ -93,8 +122,11 @@ export const searchCodeTool = defineTool({
   name: 'search_code',
   title: 'Search code',
   description:
-    'Search file contents (grep). mode "literal" (default) or "regex"; caseSensitive; fileGlob to restrict files (e.g. "*.ts", "src/**/*.py"); contextLines (or contextBefore/contextAfter) to include surrounding lines; outputMode "content" (matches with line/column), "files" (which files match + counts), or "count". Uses ripgrep when installed, otherwise a bounded JS scan (regex runs in a time-capped worker). Use nextCursor to continue a truncated content search.',
+    'Search file contents (grep). Pass projectId for one owner-registered project or projectIds for a bounded concurrent read across up to 8 authorized projects; this never switches the active workspace. mode "literal" (default) or "regex"; caseSensitive; fileGlob to restrict files; context lines; outputMode "content", "files", or "count". Uses ripgrep when installed, otherwise a bounded JS scan. A cursor is supported for one target only.',
   input: {
+    projectId: projectIdInput,
+    projectIds: z.array(z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/)).min(1).max(8).optional()
+      .describe('Search up to 8 owner-registered projects concurrently; unavailable authorized projects are reported as partial failures'),
     query: z.string().min(1).max(512),
     mode: z.enum(['literal', 'regex']).default('literal'),
     caseSensitive: z.boolean().default(true),
@@ -113,6 +145,9 @@ export const searchCodeTool = defineTool({
   requiredScope: 'dodo:read',
   action: 'read',
   handler: async (args, ctx) => {
+    if (args.projectId !== undefined && args.projectIds !== undefined) {
+      throw new DodoError('INVALID_INPUT', 'use either projectId or projectIds, not both');
+    }
     const q: Parameters<typeof ctx.services.search.search>[0] = {
       query: args.query,
       mode: args.mode,
@@ -125,6 +160,44 @@ export const searchCodeTool = defineTool({
     };
     if (args.paths !== undefined) q.paths = args.paths;
     if (args.fileGlob !== undefined) q.fileGlob = args.fileGlob;
+    const federatedIds = args.projectIds ?? (args.projectId !== undefined ? [args.projectId] : undefined);
+    if (federatedIds !== undefined) {
+      const federated = await ctx.services.federation.searchMany(federatedIds, ctx.principal, q, args.cursor);
+      if (args.projectIds === undefined && federated.results.length === 1) {
+        const item = federated.results[0] as (typeof federated.results)[number];
+        return {
+          data: {
+            matches: item.result.matches,
+            files: item.result.files,
+            totalMatches: item.result.totalMatches,
+            backend: item.result.backend,
+            filesScanned: item.result.filesScanned,
+            project: item.project,
+            sources: item.sources,
+            failures: federated.failures,
+          },
+          truncated: federated.truncated,
+          nextCursor: federated.nextCursor ?? null,
+        };
+      }
+      return {
+        data: {
+          projects: federated.results.map((item) => ({
+            project: item.project,
+            matches: item.result.matches,
+            files: item.result.files,
+            totalMatches: item.result.totalMatches,
+            backend: item.result.backend,
+            filesScanned: item.result.filesScanned,
+            sources: item.sources,
+          })),
+          failures: federated.failures,
+          projectCount: federated.results.length,
+          totalMatches: federated.results.reduce((sum, item) => sum + item.result.totalMatches, 0),
+        },
+        truncated: federated.truncated,
+      };
+    }
     const c: { principal: string; epoch: string; cursor?: string } = { principal: ctx.principal.grantId, epoch: ctx.services.epoch };
     if (args.cursor !== undefined) c.cursor = args.cursor;
     const res = await ctx.services.search.search(q, c);

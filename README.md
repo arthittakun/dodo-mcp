@@ -14,6 +14,7 @@
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
+- อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
 - ตรวจและเลือกใช้ Cloudflare Tunnel แบบ external หรือ DODO-managed โดย token อยู่ใน OS credential store/secure reference และการ start ต้องยืนยันทุกครั้ง
 - ไม่ส่ง token, secret หรือ state DB ไปที่ repository และไม่ให้ repository config เพิ่มสิทธิ์
 
@@ -44,6 +45,32 @@ dodo project remove prj_xxxxxxxxxxxx --yes
 
 Project Registry ใช้ project ID คงที่แยกจาก workspace authority และแสดง readiness
 ของ path ปัจจุบัน ดู contract ที่ [Project Registry](docs/PROJECTS.md)
+
+### อ่านหลายโปรเจกต์พร้อมกัน
+
+เจ้าของต้องลงทะเบียนแต่ละโปรเจกต์ และให้ `dodo:read` แก่ client ในแต่ละ workspace
+ก่อน การอยู่ใน registry เพียงอย่างเดียวไม่ให้สิทธิ์ AI:
+
+```text
+project_overview()
+  → federation.projects แสดงเฉพาะโปรเจกต์ที่ client อ่านได้
+
+dodo_read(operation="search_code", args={
+  projectIds: ["prj_2bcdefghjkmn", "prj_3cdefghjkmnp"],
+  query: "UserDto"
+})
+```
+
+`project_overview`, `list_files` และ `read_files` รับ `projectId` ได้ ส่วน
+`search_code` รับ `projectId` หรือ `projectIds` สูงสุด 8 รายการ ผลแต่ละโปรเจกต์มี
+project/workspace identity, federation epoch และ source hash เพื่อแยก evidence
+ออกจากกัน ค่า `workspaceId`/`workspaceEpoch` ระดับบนของ MCP call ยังคงเป็นของ
+active workspace เสมอ
+
+Federation รุ่นนี้เป็น read-only การเขียนไฟล์และรันคำสั่งยังทำได้เฉพาะ active
+workspace เจ้าของต้องเปิดโปรเจกต์นั้นผ่าน Local Config แล้วให้ AI เรียก
+`project_overview` และอ่านไฟล์ใหม่ก่อนแก้ จึงไม่สามารถนำ hash หรือ context จาก
+โปรเจกต์อื่นไปใช้เขียนโดยตรงได้
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 

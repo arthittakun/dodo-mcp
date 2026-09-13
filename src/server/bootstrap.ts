@@ -23,6 +23,7 @@ import { OverviewService } from '../services/overview.js';
 import { sandboxWrapperFromConfig } from '../services/jobs/sandboxWiring.js';
 import type { AppServices } from '../tools/context.js';
 import { DODO_VERSION } from './version.js';
+import { FederationService } from '../projects/federation.js';
 
 /**
  * Workspace bootstrap shared by every serving entry (`dodo start` over HTTP,
@@ -122,6 +123,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     limits,
   );
   const services: AppServices = {
+    federation: new FederationService(store, config, limits),
     schedules: new ScheduleService({store,workspaceId,epoch,wfs,jobs,config,limits}),
     version: DODO_VERSION,
     config,

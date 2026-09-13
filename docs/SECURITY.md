@@ -21,6 +21,11 @@ Project Registry เป็น owner metadata แยกจาก authority: proje
 ไม่ grant OAuth scope, workspace ACL หรือ trust และ AI ไม่มี MCP tool สำหรับเพิ่ม ลบ
 หรือเปลี่ยนรายการโปรเจกต์
 
+Read-only federation ตรวจ ACL แยกทุก target และรับเฉพาะ project ID จาก registry
+ที่ owner สร้าง Remote client ต้องใช้ installation identity grant; legacy token ที่
+ผูก workspace เดียวข้ามโปรเจกต์ไม่ได้ รายการโปรเจกต์ใน overview ถูกกรองก่อนส่ง และ
+request ที่อ้าง target ไม่มี ACL ถูกปฏิเสธโดยไม่เผย absolute path หรือ metadata
+
 ## HTTP and Local Config
 
 MCP และ public route ต้องผ่าน OAuth เสมอ ห้ามใช้ localhost เป็น authentication, ห้ามเปิด CORS เป็น `*`, ห้ามส่ง token ใน query string และห้าม trust proxy headers จากภายนอก
@@ -36,6 +41,11 @@ Project Registry API ใช้ boundary เดียวกันและผู�
 ทุก tool ตรวจ active workspace, workspace ID/epoch และ ACL target ปัจจุบัน Gateway ใช้ target tool definition เป็น authority และ route ผ่าน invocation pipeline เดียวกับ direct tool
 
 Gateway ไม่ bypass OAuth, scope, ACL, trust, approval, sandbox, expected hash, path guards หรือ secret guards ไม่สามารถเรียก gateway อื่น, owner IPC, trust management, OAuth approval หรือ server control ได้
+
+Federated read ยังคงตรวจ active workspace ID/epoch ก่อน แล้วตรวจ target readiness,
+grant revocation, target ACL และ shared path/secret guards ซ้ำ ผลลัพธ์มี target
+identity/source hash แต่ไม่ใช่ permission และใช้เป็น expected hash สำหรับ target
+mutation ไม่ได้ เพราะ write/exec federation ยังปิดอยู่
 
 ## Files and secrets
 

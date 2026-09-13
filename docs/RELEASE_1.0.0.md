@@ -24,6 +24,7 @@ dodo --version
 - setup แบบ plan-first: installer ที่ยังขาดต้องยืนยันด้วย `--yes`
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
 - Cloudflare Tunnel แบบ external หรือ managed foreground พร้อม OS credential references, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
+- owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม target ACL, readiness, source hash และ target-scoped audit
 
 ## ลำดับการใช้ Compact
 

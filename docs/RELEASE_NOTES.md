@@ -16,6 +16,7 @@
 - เพิ่ม Windows compatibility plan และ setup diagnostics
 - เพิ่ม owner-only Project Registry พร้อม stable project ID, path readiness, CLI CRUD และ Local Config UI
 - Project relocation รักษา project ID เฉพาะเมื่อ directory identity เดิมตรวจได้ และไม่คัดลอก trust/client ACL
+- เพิ่ม read-only multi-project federation ผ่าน overview/list/read/search สูงสุด 8 โปรเจกต์ โดยตรวจ installation identity, target ACL/readiness, source hash และ target-scoped audit
 
 ## วิธีอัปเดต
 

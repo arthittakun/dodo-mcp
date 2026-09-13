@@ -18,6 +18,12 @@
 Project Registry ใช้ได้ผ่าน `dodo project add/list/info/remove` และ private Local
 Config โดยไม่เปลี่ยนพฤติกรรม `dodo start --root PATH` หรือ single-workspace STDIO
 
+Read-only multi-project federation ใช้ tools เดิมโดยเพิ่ม optional `projectId` ใน
+overview/list/read/search และ `projectIds` สูงสุด 8 รายการใน search จึงไม่เปลี่ยน
+จำนวนหรือชื่อ tool ของ Full/Compact/Hybrid HTTP remote client ต้องมี installation
+identity และ `dodo:read` ACL ในทุก target; STDIO local owner ใช้ registry เดียวกัน
+Effectful tools และ jobs ยังทำงานใน active workspace เดียว
+
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools

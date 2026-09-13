@@ -2,9 +2,9 @@
 
 ผล manual ต้องบันทึกเป็น `MANUAL_PASS` หรือ `MANUAL_NOT_RUN` พร้อมวันเวลาและ environment ห้ามเดาผลจาก automated test
 
-สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-13) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
+สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-14) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
 
-สถานะ Cloudflare Tunnel จริง: `MANUAL_NOT_RUN` (2026-09-13) automated tests ใช้ fake executable และ loopback readiness fixture เท่านั้น ไม่มี Tunnel token, Cloudflare connection, DNS หรือ firewall ใดถูกใช้
+สถานะ Cloudflare Tunnel จริง: `MANUAL_NOT_RUN` (2026-09-14) automated tests ใช้ fake executable และ loopback readiness fixture เท่านั้น ไม่มี Tunnel token, Cloudflare connection, DNS หรือ firewall ใดถูกใช้
 
 ## Cloudflare Tunnel
 
@@ -67,6 +67,21 @@
 9. เปิด Local Config โดยไม่มี private fragment, จาก origin อื่น และผ่าน proxy headers; ทุกกรณีต้องถูกปฏิเสธ
 
 สถานะการตรวจ Project Registry บน browser/owner environment จริง: `MANUAL_NOT_RUN`
+
+## Multi-project federation
+
+1. สร้าง fixture A/B และลงทะเบียนทั้งคู่ด้วย owner CLI/Local Config
+2. ให้ client 1 มี `dodo:read` ใน A/B และ client 2 มีเฉพาะ A
+3. จาก active A เรียก `project_overview` แล้วตรวจว่าแต่ละ client เห็นเฉพาะรายการที่มี ACL
+4. ให้ client 1 เรียก `project_overview({projectId: B})`, `read_files` ของ A/B พร้อมกัน และ `search_code({projectIds:[A,B]})`
+5. ตรวจผลทุก project มี project/workspace identity, federation epoch และ source hash โดย active root/epoch ไม่เปลี่ยน
+6. ให้ client 2 query B ต้องได้ `FORBIDDEN` และ response ต้องไม่มี path/name/content ของ B
+7. อ่าน `.env`, traversal, symlink/hardlink และ replaced root ใน B ต้อง fail closed
+8. ทำ B unavailable แล้วค้น A/B ต้องได้ผล A พร้อม partial failure ของ B
+9. ส่ง stale active epoch ต้องถูกปฏิเสธก่อนอ่าน target
+10. ใส่ `projectId` ใน write/exec args ต้องถูก schema ปฏิเสธ และไฟล์/job ต้องไม่เกิด
+
+สถานะการตรวจ multi-project federation ผ่าน external AI/owner environment จริง: `MANUAL_NOT_RUN`
 
 ## HTTP Compact
 

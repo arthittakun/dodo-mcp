@@ -6,22 +6,22 @@
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 46834
+      "schemaBytes": 47185
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 113271
+      "schemaBytes": 114665
     },
     "full": {
       "toolCount": 74,
-      "schemaBytes": 237859
+      "schemaBytes": 239253
     }
   },
   "tools": [
     {
       "name": "project_overview",
       "title": "Project overview",
-      "description": "Bootstrap tool: returns the workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. Read-only; never executes project code. Call this first. This connection uses the COMPACT tool surface: capabilities are invoked through dodo_* gateway tools; call dodo_discover to find an operation and its exact schema.",
+      "description": "Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects for which this client has live read ACL. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first. This connection uses the COMPACT tool surface: capabilities are invoked through dodo_* gateway tools; call dodo_discover to find an operation and its exact schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -32,7 +32,13 @@
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
-        "properties": {},
+        "properties": {
+          "projectId": {
+            "description": "Optional owner-registered project ID for read-only federation; omit to use the active workspace",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          }
+        },
         "additionalProperties": false
       },
       "outputSchema": {

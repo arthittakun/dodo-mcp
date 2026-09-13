@@ -15,15 +15,16 @@ npm audit --omit=dev
 npm pack
 ```
 
-ผล local gate วันที่ 2026-09-13 (macOS, source checkout):
+ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
 - build: PASS — full 74, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 62 files PASS, 2 files platform-skipped; 505 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 64 files PASS, 2 files platform-skipped; 510 tests PASS, 30 tests platform/prerequisite-skipped
 - packaging: 14 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
-- `npm pack`: 326 files; required runtime/schemas/docs present and forbidden private state/development artifacts absent
+- `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, full schema = 74 tools และ installed read/search schemas มี federation fields
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -37,6 +38,14 @@ symlink/replaced readiness, corrupt metadata recovery, transactional audit, revi
 soft removal, Local Config authentication/XSS boundary, ACL/trust isolation, runtime
 workspace switch และ fresh tarball CLI
 
+Multi-project federation tests ใช้ HTTP + OAuth fixture จริงกับ Project A/B และ
+พิสูจน์ concurrent overview/read/search โดย active root/epoch ไม่เปลี่ยน, target
+identity/source hash, target-scoped audit, bounded partial failure, installation
+identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
+refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
+`projectId` เข้า write operation จำนวน surface ยังคง Full 74 / Compact 19 /
+Hybrid 49
+
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
 workspace เปลี่ยนเป็น canonical root B สำเร็จ ภาพอยู่ใน local ignored artifacts และ
@@ -47,6 +56,7 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - Full surface: 74 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
+- schema bytes: Full 239,253; Compact 47,185; Hybrid 114,665
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
@@ -64,6 +74,8 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - running jobs block workspace switch
 - switch failure ทำให้ workspace เดิมใช้งานต่อได้
 - gateway ไม่เรียก gateway อื่นหรือ owner controls
+- federated target ที่ไม่มี ACL/installation identity ถูกปฏิเสธโดยไม่เผย path
+- federated secret/traversal/replaced root fail closed และ write/exec federation ยังปิด
 
 ## Packaging
 
@@ -76,3 +88,5 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 สถานะ manual setup/import บน owner state จริง: `MANUAL_NOT_RUN` การตรวจรับใช้ isolated fixtures และ temporary package เท่านั้น ไม่มีการเปลี่ยน owner config, OAuth state, tunnel, DNS หรือ global installation
 
 สถานะ real Cloudflare Tunnel บน macOS/Windows/Linux: `MANUAL_NOT_RUN`
+
+สถานะ multi-project federation ผ่าน external AI และ owner project จริง: `MANUAL_NOT_RUN`

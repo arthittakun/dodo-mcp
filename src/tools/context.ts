@@ -1,4 +1,5 @@
 import type { MultimodalService } from '../services/multimodal/multimodalService.js';
+import type { FederationService } from '../projects/federation.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
@@ -31,6 +32,7 @@ export interface Principal {
 }
 
 export interface AppServices {
+  federation: FederationService;
   multimodal?: MultimodalService;
   schedules: ScheduleService;
   version: string;

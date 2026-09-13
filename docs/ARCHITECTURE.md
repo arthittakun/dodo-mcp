@@ -23,6 +23,8 @@ Local Config 127.0.0.1:21731 ──► WorkspaceHost ──► active workspace 
 Local owner CLI ──► authenticated tunnel IPC ──► bounded cloudflared supervisor
 
 Local owner CLI/Config ──► project registry ──► projectId + workspace reference
+
+Authorized MCP read ──► federation resolver ──► isolated read context A/B/…
 ```
 
 ## Bootstrap and workspace lifecycle
@@ -43,6 +45,28 @@ metadata และ readiness เท่านั้น ไม่ใช่ authori
 workspace ID จาก path ใหม่ ทำให้ trust และ client ACL ไม่ถูกคัดลอก Registry mutation
 และ audit commit ใน transaction เดียวกัน การ remove เป็น soft removal และไม่ลบไฟล์
 workspace history หรือ security state
+
+## Read-only federation
+
+Phase 03 เพิ่ม `FederationService` เป็น isolation layer สำหรับ owner-registered
+projects โดยไม่ bootstrap target เป็น active runtime และไม่เปลี่ยน `process.cwd()`
+แต่ละ target สร้าง `IgnoreEngine`, `WorkspaceFS`, read/list/search/overview และ Git
+read service ของตัวเอง พร้อม process-local federation epoch และ cache แบบ LRU
+ที่มีเพดาน 16 target contexts
+
+request ยังยึด active workspace ID/epoch ใน invocation pipeline แล้ว federation
+ตรวจ installation identity, grant revocation, token/grant read scope และ target
+workspace ACL ซ้ำ Project Registry ถูก resolve และตรวจ canonical directory identity
+ทุกครั้งก่อนใช้ cache cache key ผูก workspace ID, registry update และ dev/inode
+
+cross-project search รับสูงสุด 8 project IDs แบ่ง result quota รวมและทำ target ที่
+พร้อมแบบ concurrent ผลแต่ละ target มี project/workspace identity, epoch และ hashes
+ของ source files Target ที่ authorized แต่ unavailable แสดงเป็น partial failure;
+หาก target ใดไม่มี ACL request ทั้งก้อนถูกปฏิเสธก่อนคืนผล
+
+Federation audit เขียนอีกแถวด้วย target workspace ID นอกเหนือจาก outer tool audit
+ของ active workspace ทำให้ history กรองตาม project ได้ รุ่นนี้เปิดเฉพาะ read tools
+การ write/exec/jobs/plans ยังคงผูก active `BootstrappedWorkspace` เพียงตัวเดียว
 
 ## Tool invocation
 

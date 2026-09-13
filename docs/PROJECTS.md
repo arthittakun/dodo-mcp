@@ -51,6 +51,43 @@ DODO ไม่ถือว่า `missing`, `symlinked`, `replaced`, `inaccessib
 Host/Origin checks, rate limit และ workspace/epoch headers เดิม ไม่มี route นี้บน
 MCP/public listener
 
+## Read-only federation
+
+MCP อ่านโปรเจกต์ที่ลงทะเบียนไว้ได้โดยไม่เปลี่ยน active workspace ผ่าน tools เดิม:
+
+- `project_overview({projectId})`
+- `list_files({projectId, ...})`
+- `read_files({projectId, ...})`
+- `search_code({projectId, ...})`
+- `search_code({projectIds: [...]})` สำหรับค้นพร้อมกันสูงสุด 8 โปรเจกต์
+
+ใน Compact/Hybrid surface ให้ใส่ fields เหล่านี้ใน `args` ของ `dodo_read`
+ตาม schema ที่ `dodo_discover` คืนมา จำนวน tools จึงยังเป็น Full 74, Compact 19
+และ Hybrid 49
+
+`project_overview()` ของ active workspace แสดง `federation.projects` เฉพาะ
+รายการที่ client มี live `dodo:read` ACL เท่านั้น สำหรับ HTTP ต้องเป็น OAuth
+installation identity รุ่นปัจจุบันด้วย legacy workspace-bound grant ใช้ข้าม
+โปรเจกต์ไม่ได้ ส่วน local STDIO เป็น owner process และอ่านรายการที่ owner
+ลงทะเบียนได้
+
+ทุก target ถูกตรวจซ้ำก่อนอ่าน:
+
+1. project ID ต้องมาจาก owner registry
+2. canonical path และ directory identity ต้องมีสถานะ `ready`
+3. grant ต้องไม่ถูก revoke และ client ต้องมี `dodo:read` ใน target workspace
+4. shared ignore/path/secret policy ของ target ถูกสร้างใหม่จาก global policy
+5. request ยังต้องใช้ active workspace ID/epoch ที่ถูกต้อง
+
+ผล federated มี target project ID, workspace ID, federation epoch และ source hash
+แยกจาก envelope ของ active workspace การค้นหลายโปรเจกต์ใช้ quota รวมแบบ bounded;
+target ที่ owner อนุญาตแต่ unavailable ถูกระบุเป็น partial failure ส่วน target ที่
+ไม่มี ACL ทำให้ทั้ง request ถูกปฏิเสธและไม่เผย path/metadata
+
+Federation นี้ไม่เปลี่ยน `process.cwd()`, ไม่เปลี่ยน active workspace และไม่เปิด
+write/exec ข้ามโปรเจกต์ เจ้าของต้องเปิด target ผ่าน Local Config และให้ client
+อ่าน context ใหม่ก่อน mutation/command
+
 ## การนำรายการออก
 
 `dodo project remove` เป็น soft removal ของ registry metadata เท่านั้น ระบบไม่ลบ:
@@ -65,5 +102,8 @@ MCP/public listener
 
 ## ขอบเขต
 
-Registry รุ่นนี้ยังไม่ให้ AI query หลายโปรเจกต์พร้อมกัน และ process หนึ่งยัง serve
-active workspace เดียว Multi-project federation ต้องใช้ isolation layer แยกต่างหาก
+process หนึ่งยัง serve active workspace เดียวสำหรับ write, jobs, plans, approvals,
+Desktop และ resource ownership Read-only federation ไม่ใช่ multi-agent coordinator
+และไม่ค้น path ทั้งเครื่องอัตโนมัติ Effectful federation จะเปิดได้ต่อเมื่อมี
+per-project lock, stale-context, approval, journal/rollback และ job ownership ที่
+พิสูจน์ด้วย tests ครบ
