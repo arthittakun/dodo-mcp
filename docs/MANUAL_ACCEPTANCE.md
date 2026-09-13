@@ -17,7 +17,7 @@
 7. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
 8. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs` ไม่มี token
 9. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop ด้วย `dodo tunnel stop`
-10. ทำซ้ำบน macOS, Windows และ Linux โดยบันทึก `MANUAL_PASS`/`MANUAL_NOT_RUN` แยก OS
+10. บันทึก macOS และ Linux Docker แยก environment; Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
 
 ## Setup foundation
 
@@ -219,7 +219,8 @@ manual external-client acceptance
 
 ## DodoBench และ release gate
 
-Automated local fixture: รัน `npm run bench` และ `npm run release:gate` แล้วตรวจ
-`gate-report.json` ใต้ ignored `release-evidence/` Manual external AI, owner repository,
-Linux และ Windows ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน `MANUAL_NOT_RUN`
-จากผล benchmark บน macOS เพียงเครื่องเดียว
+Automated fixtures: รัน `npm run bench`, `npm run release:gate` บน macOS และ
+`npm run test:linux:docker` สำหรับ Linux แล้วตรวจ `gate-report.json` ใต้ ignored
+`release-evidence/` โครงการไม่ใช้ GitHub Actions เป็น test runner Manual external AI,
+owner repository และ Windows ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน
+`MANUAL_NOT_RUN` จากผล benchmark บน macOS หรือ Linux Docker

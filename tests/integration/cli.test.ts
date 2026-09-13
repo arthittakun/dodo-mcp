@@ -140,7 +140,7 @@ describe('CLI', () => {
     expect(res.stderr).toMatch(/no running DODO/);
   });
 
-  it('CLI desktop: save before start, survive restart, isolate nested roots and revoke while stopped', async () => {
+  it.skipIf(process.platform !== 'darwin')('CLI desktop on macOS: save before start, survive restart, isolate nested roots and revoke while stopped', async () => {
     const cfg = fs.mkdtempSync(path.join(base, 'desktop-cfg-'));
     const mono = fs.mkdtempSync(path.join(base, 'desktop-mono-'));
     const web = path.join(mono, 'โปรเจกต์ ITP006', 'apps', 'web');
@@ -199,6 +199,16 @@ describe('CLI', () => {
     const both = runCli([...args, '--yes', '--minutes', '60'], { cwd: proj, configDir: cfg });
     expect(both.code).not.toBe(0);
     expect(both.stderr).toContain('not both');
+    expect(fs.readdirSync(cfg)).toEqual([]);
+  });
+
+  it.skipIf(process.platform !== 'linux')('CLI desktop on Linux fails closed when no native helper is installed', () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'desktop-linux-cfg-'));
+    const proj = fs.mkdtempSync(path.join(base, 'desktop-linux-proj-'));
+    const app = `linux.${'a'.repeat(40)}`;
+    const result = runCli(['desktop', 'allow', '--app', app, '--mode', 'control', '--persist', '--yes'], { cwd: proj, configDir: cfg });
+    expect(result.code).not.toBe(0);
+    expect(result.stderr).toContain('NOT_SUPPORTED');
     expect(fs.readdirSync(cfg)).toEqual([]);
   });
 

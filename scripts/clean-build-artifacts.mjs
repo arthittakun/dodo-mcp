@@ -1,0 +1,16 @@
+#!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+fs.rmSync(path.join(root, 'dist'), { recursive: true, force: true });
+for (const name of [
+  'global-config.schema.json',
+  'project-config.schema.json',
+  'tools.json',
+  'tools.compact.json',
+  'tools.hybrid.json',
+]) {
+  fs.rmSync(path.join(root, 'schemas', name), { force: true });
+}

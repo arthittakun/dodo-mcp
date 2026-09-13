@@ -45,9 +45,30 @@ write → read → edit → read-back ผ่าน Compact gateway
 หลักฐาน non-secret ถูกเขียนใต้ `release-evidence/<version>/` ซึ่งถูก ignore ทั้ง Git
 และ npm package สคริปต์ไม่ publish npm, ไม่แก้ tunnel/DNS และไม่แตะ owner state จริง
 
-`npm run release:gate:strict` ต้องใช้ source ที่ clean และ platform evidence ครบตาม
-compatibility claim หากยังไม่มี Linux/Windows evidence จะ fail พร้อมรายงานตามจริง
-Manual external-AI และ owner-workspace acceptance อยู่แยกเป็น `MANUAL_NOT_RUN`
+## Platform gate ที่ใช้ในช่วงนี้
+
+โครงการไม่ใช้ GitHub Actions เป็น test runner หลักฐาน platform มาจากสองทางเท่านั้น:
+
+```bash
+# macOS บน checkout ปัจจุบัน
+npm run release:gate
+
+# Linux จริงใน Docker image แยก พร้อม Playwright Chromium
+npm run test:linux:docker
+```
+
+Docker build ไม่รับ `.git`, `.npmrc`, `.env`, model, release evidence หรือเอกสารพัฒนา
+private เข้า build context ตัว runner ส่งเฉพาะ revision/dirty state ที่อ่านจาก host Git
+เข้า release gate และ DodoBench ผ่าน environment attestation ที่รับได้เฉพาะใน Linux
+container จากนั้นตรวจ report กลับว่าตรงกับ revision และ lock digest เดิม
+
+`npm run release:gate:strict` ต้องใช้ source ที่ clean และมี macOS/Linux evidence จาก
+revision กับ `package-lock.json` เดียวกัน Windows ถูกระบุเป็น
+`DEFERRED_MANUAL_NOT_RUN` และไม่ถูกนับเป็น supported release platform ในช่วงนี้
+Manual external-AI, owner workspace และ Windows 11 อยู่แยกเป็น `MANUAL_NOT_RUN`
+Strict gate รับ Linux evidence เฉพาะ `docker-host-git` จาก clean checkout พร้อม
+fresh-install PASS จึงไม่รับ candidate ที่มี uncommitted source หรือ report จาก runner
+ชนิดอื่น ไม่มีคำสั่งเหล่านี้ publish npm
 
 ## Security invariants
 

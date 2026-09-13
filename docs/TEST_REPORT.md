@@ -20,7 +20,7 @@ npm pack
 - build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 80 files PASS, 2 files platform-skipped; 585 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 80 files PASS, 2 files platform-skipped; 587 tests PASS, 31 tests platform/prerequisite-skipped
 - packaging: 16 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
@@ -39,7 +39,8 @@ Project Registry tests ครอบคลุม schema migration, Unicode/spaced
 duplicate และ concurrent add, stable project ID, directory relocation, missing/
 symlink/replaced readiness, corrupt metadata recovery, transactional audit, reviewed
 soft removal, Local Config authentication/XSS boundary, ACL/trust isolation, runtime
-workspace switch และ fresh tarball CLI
+workspace switch, Linux inode reuse, fail-closed v1 birth-time migration และ fresh
+tarball CLI
 
 Multi-project federation tests ใช้ HTTP + OAuth fixture จริงกับ Project A/B และ
 พิสูจน์ concurrent overview/read/search โดย active root/epoch ไม่เปลี่ยน, target
@@ -133,9 +134,11 @@ tool calls, serialized bytes, p50/p95, precision/recall, wrong-file rate, cache 
 security violations โดย `modelTokens=null` เพราะไม่มี model call
 
 Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix แล้วตรวจ CLI 1.0.0,
-STDIO Full 121, HTTP Streamable + OAuth Compact 19 และ write/edit read-back จริง
-Linux/Windows strict platform evidence และ external-AI manual acceptance ยังคงแยกจาก
-local candidate gate
+STDIO Full 121, HTTP Streamable + OAuth Compact 19 และ write/edit read-backจริง
+Platform policy ปัจจุบันใช้ macOS local และ Linux Docker เท่านั้น ไม่ใช้ GitHub
+Actions Linux Docker image ติดตั้ง Playwright Chromium และต้องส่ง report ที่ revision /
+lock digest ตรงกับ macOS ก่อน strict gate จะผ่าน Windows ถูกเลื่อนไป phase สุดท้ายและ
+คง `MANUAL_NOT_RUN`
 
 ## Required security scenarios
 
@@ -166,7 +169,7 @@ local candidate gate
 
 ## Manual gates
 
-การทดสอบผ่าน ChatGPT, Claude หรือเครื่อง Windows จริงต้องทำใน environment ของผู้ใช้และรายงานแยกเป็น `MANUAL_PASS` หรือ `MANUAL_NOT_RUN` ห้ามสรุปจาก catalog เพียงอย่างเดียว
+การทดสอบผ่าน ChatGPT, Claude หรือเครื่อง Windows จริงต้องทำใน environment ของผู้ใช้และรายงานแยกเป็น `MANUAL_PASS` หรือ `MANUAL_NOT_RUN` ห้ามสรุปจาก catalog, macOS หรือ Linux Docker เพียงอย่างเดียว
 
 สถานะ manual setup/import บน owner state จริง: `MANUAL_NOT_RUN` การตรวจรับใช้ isolated fixtures และ temporary package เท่านั้น ไม่มีการเปลี่ยน owner config, OAuth state, tunnel, DNS หรือ global installation
 

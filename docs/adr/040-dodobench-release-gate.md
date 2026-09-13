@@ -28,3 +28,10 @@ publish package และไม่รับ authority จาก benchmark result
 Regression หลักตรวจซ้ำได้และชี้ revision ชัดเจน แต่ local fixture latency ไม่ใช่ SLA,
 browser case ขึ้นกับ Chromium และ external AI/Windows hardware ยังต้องมี separate gate
 การเปลี่ยน baseline ต้อง review dataset และ threshold พร้อมกัน
+
+## Addendum — local macOS and Docker Linux evidence
+
+ช่วงก่อนเริ่ม Windows phase ใช้ macOS local และ Linux Docker เป็น required automated
+platforms ไม่ใช้ GitHub Actions Docker image ติดตั้ง Chromium และสร้าง package/fresh
+install evidence จาก source copy แยก report ต้องตรงกับ host Git revision และ lock digest
+Windows แสดงเป็น `DEFERRED_MANUAL_NOT_RUN`; Linux Docker ไม่ใช่ Windows evidence

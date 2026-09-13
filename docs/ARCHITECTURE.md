@@ -64,8 +64,10 @@ running jobs, in-flight requests, stale Local Config headers และ duplicate
 ## Project registry
 
 Project Registry อยู่ใน installation SQLite และใช้ opaque random project ID แยกจาก
-path-derived workspace ID รายการเก็บ canonical root, directory identity, display
-metadata และ readiness เท่านั้น ไม่ใช่ authority store และไม่มี MCP/public route
+path-derived workspace ID รายการเก็บ canonical root, directory identity แบบ
+device/inode/birthtimeNs, display metadata และ readiness เท่านั้น ไม่ใช่ authority
+store และไม่มี MCP/public route การใช้ birth time แยก directory generation ใหม่ออก
+จาก inode เดิมที่ Linux อาจนำกลับมาใช้ซ้ำ
 
 การ relocate ที่พิสูจน์ directory identity เดิมได้รักษา project ID แต่คำนวณ
 workspace ID จาก path ใหม่ ทำให้ trust และ client ACL ไม่ถูกคัดลอก Registry mutation
@@ -83,7 +85,8 @@ read service ของตัวเอง พร้อม process-local federatio
 request ยังยึด active workspace ID/epoch ใน invocation pipeline แล้ว federation
 ตรวจ installation identity, grant revocation, token/grant read scope และ target
 workspace ACL ซ้ำ Project Registry ถูก resolve และตรวจ canonical directory identity
-ทุกครั้งก่อนใช้ cache cache key ผูก workspace ID, registry update และ dev/inode
+ทุกครั้งก่อนใช้ cache cache key ผูก workspace ID, registry update และ
+dev/inode/birthtimeNs
 
 cross-project search รับสูงสุด 8 project IDs แบ่ง result quota รวมและทำ target ที่
 พร้อมแบบ concurrent ผลแต่ละ target มี project/workspace identity, epoch และ hashes

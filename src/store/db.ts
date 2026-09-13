@@ -578,6 +578,14 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     UNIQUE(workspace_id,skill_key,version)
   );
   CREATE UNIQUE INDEX idx_agent_skills_current ON agent_skills(workspace_id,skill_key) WHERE status='CURRENT';`,
+  (db) => {
+    // Project registry v2 adds a stable directory-generation marker. Device
+    // and inode alone are insufficient because Linux can reuse an inode
+    // immediately after a directory is removed. A v1 row has no prior birth
+    // time to compare, so it cannot be upgraded safely by inspecting the live
+    // path. Leave every v1 row invalid for explicit owner review/re-add.
+    db.exec('ALTER TABLE project_registry ADD COLUMN root_birthtime_ns TEXT');
+  },
 ];
 
 /**

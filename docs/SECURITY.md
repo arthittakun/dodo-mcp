@@ -21,6 +21,11 @@ Project Registry เป็น owner metadata แยกจาก authority: proje
 ไม่ grant OAuth scope, workspace ACL หรือ trust และ AI ไม่มี MCP tool สำหรับเพิ่ม ลบ
 หรือเปลี่ยนรายการโปรเจกต์
 
+Registry ตรวจ canonical realpath กับ device, inode และ directory birth time ทุกครั้ง
+ก่อนถือว่า target พร้อมใช้งาน จึง fail closed เมื่อ path ถูกแทน แม้ Linux จะนำเลข
+inode เดิมกลับมาใช้ Migration ไม่ auto-upgrade row เก่าที่ไม่มี birth time เพราะไม่มี
+หลักฐานพอแยก inode reuse; row นั้นคงเป็น invalid จนเจ้าของ review, remove และ add ใหม่
+
 Read-only federation ตรวจ ACL แยกทุก target และรับเฉพาะ project ID จาก registry
 ที่ owner สร้าง Remote client ต้องใช้ installation identity grant; legacy token ที่
 ผูก workspace เดียวข้ามโปรเจกต์ไม่ได้ รายการโปรเจกต์ใน overview ถูกกรองก่อนส่ง และ

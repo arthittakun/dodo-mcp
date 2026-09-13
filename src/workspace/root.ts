@@ -17,6 +17,8 @@ export interface RootInfo {
   root: string; // realpath, absolute
   dev: number;
   ino: number;
+  /** Stable directory-generation marker where the filesystem exposes birth time. */
+  birthtimeNs: string | null;
 }
 
 export function resolveWorkspaceRoot(candidate: string, opts: { allowUnsafe?: boolean } = {}): RootInfo {
@@ -28,9 +30,9 @@ export function resolveWorkspaceRoot(candidate: string, opts: { allowUnsafe?: bo
     throw new DodoError('NOT_FOUND', `workspace root does not exist: ${candidate}`);
   }
   if (process.platform === 'win32') assertLocalWindowsRoot(real);
-  let st: fs.Stats;
+  let st: fs.BigIntStats;
   try {
-    st = fs.statSync(real);
+    st = fs.statSync(real, { bigint: true });
   } catch {
     throw new DodoError('NOT_FOUND', `workspace root is not accessible: ${candidate}`);
   }
@@ -52,7 +54,17 @@ export function resolveWorkspaceRoot(candidate: string, opts: { allowUnsafe?: bo
       throw new DodoError('PATH_DENIED', `refusing unusually broad workspace root ${real} (--allow-unsafe-root overrides)`);
     }
   }
-  return { root: real, dev: st.dev, ino: st.ino };
+  const dev = Number(st.dev);
+  const ino = Number(st.ino);
+  if (!Number.isSafeInteger(dev) || !Number.isSafeInteger(ino)) {
+    throw new DodoError('NOT_SUPPORTED', 'workspace directory identity exceeds JavaScript safe-integer limits');
+  }
+  return {
+    root: real,
+    dev,
+    ino,
+    birthtimeNs: st.birthtimeNs > 0n ? st.birthtimeNs.toString() : null,
+  };
 }
 
 function safeRealpath(p: string): string | undefined {

@@ -22,11 +22,17 @@ dodo project remove prj_xxxxxxxxxxxx --yes
 - `projectId` เป็น opaque random ID และไม่เผย path
 - `workspaceId` ยังคงสร้างจาก installation identity + canonical root ตาม contract
   เดิม และเป็น authority key สำหรับ trust/client ACL
-- Registry เก็บ canonical realpath, directory identity, display name, metadata
-  version และเวลา created/updated
+- Registry เก็บ canonical realpath, directory identity แบบ
+  `device + inode + birthtimeNs`, display name, metadata version และเวลา
+  created/updated การผูก birth time ป้องกัน Linux นำเลข inode เดิมกลับมาใช้กับ
+  directory ที่สร้างใหม่แล้วถูกเข้าใจผิดว่าเป็นโปรเจกต์เดิม
 - หาก directory ถูก rename ภายใน filesystem เดิม แล้วเจ้าของเรียก `project add`
-  ที่ path ใหม่ DODO จะรักษา projectId เมื่อพิสูจน์ dev/inode เดิมได้ แต่จะใช้
-  workspaceId ของ path ใหม่ จึงไม่คัดลอก trust หรือ client ACL ตามไป
+  ที่ path ใหม่ DODO จะรักษา projectId เมื่อพิสูจน์ directory generation เดิมได้
+  ครบ แต่จะใช้ workspaceId ของ path ใหม่ จึงไม่คัดลอก trust หรือ client ACL ตามไป
+
+Project Registry ปฏิเสธ filesystem ที่ไม่เปิดเผย birth time ที่เสถียร โดยไม่เดา
+identity จาก path หรือ inode เพียงอย่างเดียว Active workspace ปกติยังใช้ root policy
+เดิม; ข้อกำหนดนี้ใช้กับการเพิ่มโปรเจกต์ลง durable registry
 
 ## Readiness
 

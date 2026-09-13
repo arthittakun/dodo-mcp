@@ -40,6 +40,10 @@ dodo --version
   และ owner-reviewed non-executable skills
 - DodoBench แบบ revision-bound และ release gate ที่ตรวจ real HTTP/OAuth Compact,
   STDIO Full, security regressions, immutable package checksum และ fresh tarball install
+- platform evidence ใช้ macOS local และ Linux Docker พร้อม Chromium โดยไม่ใช้ GitHub
+  Actions; Windows native ถูกเลื่อนไป phase สุดท้ายและเป็น `MANUAL_NOT_RUN`
+- Project Registry ผูก directory generation ด้วย device/inode/birthtimeNs เพื่อกัน
+  inode reuse บน Linux โดย state v1 ที่พิสูจน์ generation ไม่ได้ต้องให้เจ้าของ review
 
 ## ลำดับการใช้ Compact
 
@@ -94,6 +98,7 @@ npm run build
 npm run typecheck
 npm run lint
 npm run test:all
+npm run test:linux:docker
 npm pack
 ```
 

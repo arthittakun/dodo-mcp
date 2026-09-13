@@ -34,6 +34,24 @@ function safeNote(error: unknown, roots: string[]): string {
   return note.replace(/Bearer\s+\S+/gi, 'Bearer <redacted>').slice(0, 500);
 }
 
+function sourceIdentity(): { revision: string; dirty: boolean } {
+  const assertedRevision = process.env['DODO_BENCH_SOURCE_REVISION'];
+  const assertedDirty = process.env['DODO_BENCH_SOURCE_DIRTY'];
+  if (assertedRevision === undefined && assertedDirty === undefined) {
+    return {
+      revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+      dirty: execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim().length > 0,
+    };
+  }
+  if (process.platform !== 'linux' || !fs.existsSync('/.dockerenv')) {
+    throw new Error('DodoBench source attestation is accepted only inside the Linux test container');
+  }
+  if (!/^[0-9a-f]{40}$/i.test(assertedRevision ?? '') || !['true', 'false'].includes(assertedDirty ?? '')) {
+    throw new Error('invalid DodoBench source attestation');
+  }
+  return { revision: assertedRevision!, dirty: assertedDirty === 'true' };
+}
+
 interface CaseStats { started: number; calls: number; requestBytes: number; responseBytes: number }
 function stats(): CaseStats { return { started: Date.now(), calls: 0, requestBytes: 0, responseBytes: 0 }; }
 class SecurityViolationError extends Error {
@@ -204,12 +222,10 @@ describe('DodoBench core dataset over real HTTP + OAuth', () => {
 
       const aggregate = evaluateDodoBench(cases, baseline);
       const datasetText = fs.readFileSync(path.join(ROOT, 'benchmarks/dodobench-core-v1.json'));
+      const source = sourceIdentity();
       const report = DodoBenchReport.parse({
         schemaVersion: 1, status: aggregate.regressions.length === 0 ? 'PASS' : 'FAIL', generatedAt: new Date().toISOString(),
-        source: {
-          revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
-          dirty: execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim().length > 0,
-        },
+        source,
         dataset: { ...baseline.dataset, digest: sha256(datasetText) },
         environment: { platform: process.platform, arch: process.arch, release: os.release(), node: process.version,
           dependencyLockSha256: sha256(fs.readFileSync(path.join(ROOT, 'package-lock.json'))),

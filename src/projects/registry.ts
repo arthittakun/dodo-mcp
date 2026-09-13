@@ -7,7 +7,7 @@ import { newId } from '../util/hash.js';
 import { mintWorkspaceId } from '../workspace/identity.js';
 import { resolveWorkspaceRoot, type RootInfo } from '../workspace/root.js';
 
-export const PROJECT_METADATA_VERSION = 1;
+export const PROJECT_METADATA_VERSION = 2;
 const MAX_PROJECTS = 1000;
 const PROJECT_ID = /^prj_[0-9a-hjkmnp-tv-z]{8,64}$/;
 const WORKSPACE_ID = /^ws_[a-f0-9]{20}$/;
@@ -21,6 +21,7 @@ interface RegistryRow {
   display_name: unknown;
   root_dev: unknown;
   root_ino: unknown;
+  root_birthtime_ns: unknown;
   metadata_version: unknown;
   created_at: unknown;
   updated_at: unknown;
@@ -39,7 +40,7 @@ export interface RegisteredProject {
   availability: ProjectAvailability;
   available: boolean;
   statusText: string;
-  identity: { dev: number; ino: number };
+  identity: { dev: number; ino: number; birthtimeNs: string };
 }
 
 export interface AddProjectResult {
@@ -56,6 +57,11 @@ function asFiniteInteger(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
 }
 
+function asBirthtimeNs(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !/^[1-9][0-9]{0,30}$/.test(value)) return undefined;
+  return value;
+}
+
 function safeDisplayName(input: string | undefined, root: string): string {
   const name = (input ?? path.basename(root)).trim();
   if (name.length < 1 || name.length > 120 || /[\u0000-\u001f\u007f]/.test(name)) {
@@ -70,7 +76,7 @@ function validateProjectId(projectId: string): void {
 
 function rawRows(db: Database.Database, includeRemoved: boolean): RegistryRow[] {
   return db.prepare(
-    `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino,
+    `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns,
             metadata_version, created_at, updated_at, removed_at
        FROM project_registry
       ${includeRemoved ? '' : 'WHERE removed_at IS NULL'}
@@ -79,7 +85,7 @@ function rawRows(db: Database.Database, includeRemoved: boolean): RegistryRow[] 
   ).all(MAX_PROJECTS + 1) as RegistryRow[];
 }
 
-function inspectAvailability(root: string, dev: number, ino: number): { availability: ProjectAvailability; statusText: string } {
+function inspectAvailability(root: string, dev: number, ino: number, birthtimeNs: string): { availability: ProjectAvailability; statusText: string } {
   let link: fs.Stats;
   try {
     link = fs.lstatSync(root);
@@ -89,14 +95,20 @@ function inspectAvailability(root: string, dev: number, ino: number): { availabi
   }
   if (link.isSymbolicLink()) return { availability: 'symlinked', statusText: 'path ที่บันทึกไว้ถูกแทนด้วย symbolic link' };
   let real: string;
-  let stat: fs.Stats;
+  let stat: fs.BigIntStats;
   try {
     real = fs.realpathSync.native(root);
-    stat = fs.statSync(real);
+    stat = fs.statSync(real, { bigint: true });
   } catch {
     return { availability: 'inaccessible', statusText: 'ไม่สามารถตรวจสอบ directory identity ได้' };
   }
-  if (!samePath(real, root) || !stat.isDirectory() || stat.dev !== dev || stat.ino !== ino) {
+  if (
+    !samePath(real, root) ||
+    !stat.isDirectory() ||
+    stat.dev !== BigInt(dev) ||
+    stat.ino !== BigInt(ino) ||
+    stat.birthtimeNs.toString() !== birthtimeNs
+  ) {
     return { availability: 'replaced', statusText: 'path ชี้ไปยัง directory identity อื่น' };
   }
   return { availability: 'ready', statusText: 'พร้อมใช้งาน' };
@@ -116,7 +128,11 @@ function invalidProject(row: RegistryRow): RegisteredProject {
     availability: 'invalid',
     available: false,
     statusText: 'registry metadata ไม่ถูกต้อง; ตรวจสอบและนำรายการนี้ออกก่อนใช้งาน',
-    identity: { dev: asFiniteInteger(row.root_dev) ?? 0, ino: asFiniteInteger(row.root_ino) ?? 0 },
+    identity: {
+      dev: asFiniteInteger(row.root_dev) ?? 0,
+      ino: asFiniteInteger(row.root_ino) ?? 0,
+      birthtimeNs: asBirthtimeNs(row.root_birthtime_ns) ?? '0',
+    },
   };
 }
 
@@ -127,14 +143,15 @@ function materialize(row: RegistryRow): RegisteredProject {
   const displayName = typeof row.display_name === 'string' && row.display_name.length >= 1 && row.display_name.length <= 120 && !/[\u0000-\u001f\u007f]/.test(row.display_name) ? row.display_name : undefined;
   const dev = asFiniteInteger(row.root_dev);
   const ino = asFiniteInteger(row.root_ino);
+  const birthtimeNs = asBirthtimeNs(row.root_birthtime_ns);
   const createdAt = asFiniteInteger(row.created_at);
   const updatedAt = asFiniteInteger(row.updated_at);
   const removedAt = row.removed_at === null ? null : asFiniteInteger(row.removed_at);
-  if (!id || !workspaceId || !root || !displayName || dev === undefined || ino === undefined || createdAt === undefined || updatedAt === undefined || removedAt === undefined || row.metadata_version !== PROJECT_METADATA_VERSION) {
+  if (!id || !workspaceId || !root || !displayName || dev === undefined || ino === undefined || !birthtimeNs || createdAt === undefined || updatedAt === undefined || removedAt === undefined || row.metadata_version !== PROJECT_METADATA_VERSION) {
     return invalidProject(row);
   }
   const status = removedAt === null
-    ? inspectAvailability(root, dev, ino)
+    ? inspectAvailability(root, dev, ino, birthtimeNs)
     : { availability: 'removed' as const, statusText: 'นำออกจาก registry แล้ว; ไฟล์และประวัติไม่ได้ถูกลบ' };
   return {
     schemaVersion: 1,
@@ -148,15 +165,21 @@ function materialize(row: RegistryRow): RegisteredProject {
     availability: status.availability,
     available: removedAt === null && status.availability === 'ready',
     statusText: status.statusText,
-    identity: { dev, ino },
+    identity: { dev, ino, birthtimeNs },
   };
 }
 
-function resolveInput(candidate: string): RootInfo {
+function resolveInput(candidate: string): RootInfo & { birthtimeNs: string } {
   if (typeof candidate !== 'string' || candidate.length < 1 || candidate.length > 4096 || candidate.includes('\0') || !path.isAbsolute(candidate)) {
     throw new DodoError('INVALID_INPUT', 'project path must be an absolute path');
   }
-  return resolveWorkspaceRoot(candidate, { allowUnsafe: false });
+  const root = resolveWorkspaceRoot(candidate, { allowUnsafe: false });
+  if (!root.birthtimeNs) {
+    throw new DodoError('NOT_SUPPORTED', 'project registry requires a filesystem with stable directory birth-time metadata', {
+      recovery: 'move the project to a local APFS, ext4, NTFS, or another filesystem that exposes directory birth time',
+    });
+  }
+  return { ...root, birthtimeNs: root.birthtimeNs };
 }
 
 /** Owner-only installation registry. It never changes workspace authority. */
@@ -179,7 +202,7 @@ export class ProjectRegistry {
     let row: RegistryRow | undefined;
     try {
       row = this.store.db.prepare(
-        `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino,
+        `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns,
                 metadata_version, created_at, updated_at, removed_at
            FROM project_registry WHERE id = ? ${options.includeRemoved ? '' : 'AND removed_at IS NULL'}`,
       ).get(projectId) as RegistryRow | undefined;
@@ -200,7 +223,7 @@ export class ProjectRegistry {
       if (byRoot) {
         const current = materialize(byRoot);
         if (current.availability === 'invalid') throw new DodoError('MIGRATION_REVIEW_REQUIRED', 'project registry row is invalid', { detail: { projectId: current.projectId } });
-        if (current.identity.dev !== root.dev || current.identity.ino !== root.ino) {
+        if (current.identity.dev !== root.dev || current.identity.ino !== root.ino || current.identity.birthtimeNs !== root.birthtimeNs) {
           throw new DodoError('CONFLICT', 'registered project path now points to another directory identity', {
             recovery: `review ${current.projectId}, remove it explicitly, then add the replacement as a new project`,
             detail: { projectId: current.projectId, availability: current.availability },
@@ -219,6 +242,12 @@ export class ProjectRegistry {
       if (byIdentity) {
         const current = materialize(byIdentity);
         if (current.availability === 'invalid') throw new DodoError('MIGRATION_REVIEW_REQUIRED', 'project registry row is invalid', { detail: { projectId: current.projectId } });
+        if (current.identity.birthtimeNs !== root.birthtimeNs) {
+          throw new DodoError('CONFLICT', 'a filesystem inode was reused by another directory generation', {
+            recovery: `review ${current.projectId}, remove it explicitly, then add the replacement as a new project`,
+            detail: { projectId: current.projectId, availability: current.availability },
+          });
+        }
         if (samePath(current.root, root.root)) {
           result = { changed: false, relocated: false, project: current };
           return;
@@ -227,8 +256,8 @@ export class ProjectRegistry {
           throw new DodoError('CONFLICT', 'the same directory identity is already registered at another active path', { detail: { projectId: current.projectId } });
         }
         const now = Date.now();
-        this.store.db.prepare('UPDATE project_registry SET workspace_id = ?, canonical_root = ?, display_name = ?, updated_at = ? WHERE id = ?')
-          .run(workspaceId, root.root, displayName === undefined ? current.displayName : name, now, current.projectId);
+        this.store.db.prepare('UPDATE project_registry SET workspace_id = ?, canonical_root = ?, display_name = ?, root_birthtime_ns = ?, updated_at = ? WHERE id = ?')
+          .run(workspaceId, root.root, displayName === undefined ? current.displayName : name, root.birthtimeNs, now, current.projectId);
         result = { changed: true, relocated: true, project: this.get(current.projectId) };
         this.audit(result, 'relocated');
         return;
@@ -240,9 +269,9 @@ export class ProjectRegistry {
       const projectId = newId('prj', 12);
       this.store.db.prepare(
         `INSERT INTO project_registry
-          (id, workspace_id, canonical_root, display_name, root_dev, root_ino, metadata_version, created_at, updated_at, removed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      ).run(projectId, workspaceId, root.root, name, root.dev, root.ino, PROJECT_METADATA_VERSION, now, now);
+          (id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns, metadata_version, created_at, updated_at, removed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      ).run(projectId, workspaceId, root.root, name, root.dev, root.ino, root.birthtimeNs, PROJECT_METADATA_VERSION, now, now);
       result = { changed: true, relocated: false, project: this.get(projectId) };
       this.audit(result, 'added');
     });

@@ -1120,6 +1120,9 @@ desktop.command('allow')
   .option('--persist', 'remember this workspace app grant until disabled; no running server required', false)
   .option('--yes', 'acknowledge that screen/UI access can expose data and affect apps outside the workspace', false)
   .action(async (opts: { app: string[]; mode: string; minutes?: number; persist: boolean; yes: boolean }) => {
+    if (!['view', 'control'].includes(opts.mode)) fail('desktop mode must be view or control');
+    if (!opts.yes) fail('Desktop access can expose private screen/UI data outside this workspace; control can change apps with your OS-user rights. Repeat with --yes to authorize the named apps.');
+    if (opts.persist && opts.minutes !== undefined) fail('use --persist or --minutes, not both');
     if (process.platform === 'win32' || process.platform === 'linux') {
       const { NativeDesktopBackend } = await import('../services/desktop/nativeBackend.js');
       const backend = new NativeDesktopBackend(resolveConfigDir(process.env).dir);
@@ -1127,9 +1130,6 @@ desktop.command('allow')
       const pattern = process.platform === 'win32' ? /^win\.[a-f0-9]{40}$/ : /^linux\.[a-f0-9]{40}$/;
       if (opts.app.some(app => !pattern.test(app))) fail('Use exact platform app IDs from dodo desktop apps, not executable basenames.');
     }
-    if (!['view', 'control'].includes(opts.mode)) fail('desktop mode must be view or control');
-    if (!opts.yes) fail('Desktop access can expose private screen/UI data outside this workspace; control can change apps with your OS-user rights. Repeat with --yes to authorize the named apps.');
-    if (opts.persist && opts.minutes !== undefined) fail('use --persist or --minutes, not both');
     const input = { mode: opts.mode, allowedApps: opts.app, persistent: opts.persist, ...(opts.minutes !== undefined ? { minutes: opts.minutes } : {}) };
     if (opts.persist) {
       const saved = saveDesktopPolicyForCwd(input);

@@ -10,17 +10,19 @@ import { fileURLToPath } from 'node:url';
  */
 export default function globalSetup(): void {
   const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  const marker = path.join(rootDir, 'dist', '.build-marker');
+  const marker = path.join(rootDir, 'node_modules', '.cache', 'dodo', 'build-marker');
+  const compiledCli = path.join(rootDir, 'dist', 'cli', 'main.js');
   const newestSrc = newestMtime(path.join(rootDir, 'src'));
   let markerTime = 0;
   try {
-    markerTime = fs.statSync(marker).mtimeMs;
+    markerTime = fs.existsSync(compiledCli) ? fs.statSync(marker).mtimeMs : 0;
   } catch {
     /* no marker yet */
   }
   if (newestSrc > markerTime) {
     execFileSync(process.execPath, [path.join(rootDir, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json'], { cwd: rootDir, stdio: 'inherit', windowsHide: true });
     execFileSync(process.execPath, ['scripts/copy-ui.mjs'], { cwd: rootDir, stdio: 'inherit', windowsHide: true });
+    fs.mkdirSync(path.dirname(marker), { recursive: true });
     fs.writeFileSync(marker, String(Date.now()));
   }
 }

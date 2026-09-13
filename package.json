@@ -53,7 +53,7 @@
     "scripts/guard-publish.mjs"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/emit-schemas.mjs && node scripts/copy-ui.mjs",
+    "build": "node scripts/clean-build-artifacts.mjs && tsc -p tsconfig.build.json && node scripts/emit-schemas.mjs && node scripts/copy-ui.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src tests scripts",
     "test:unit": "vitest run tests/unit",
@@ -62,6 +62,7 @@
     "test:compat": "vitest run tests/compatibility",
     "test:pack": "vitest run tests/packaging",
     "test:bench": "node scripts/dodo-bench.mjs",
+    "test:linux:docker": "node scripts/test-linux-docker.mjs",
     "bench": "npm run build && node scripts/dodo-bench.mjs",
     "test:windows": "vitest run tests/unit/windowsPlatform.test.ts tests/unit/windowsAclContract.test.ts tests/integration/windowsRuntime.test.ts tests/security/windowsNative.test.ts tests/security/windowsAclOwner.test.ts tests/security/ipcAuthentication.test.ts tests/security/rollbackPathPolicy.test.ts",
     "test:all": "npm run typecheck && npm run lint && vitest run tests/unit tests/integration tests/security tests/compatibility && npm run test:pack",

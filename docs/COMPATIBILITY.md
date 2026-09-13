@@ -7,7 +7,7 @@
 | Node.js | ใช้เวอร์ชันที่ package ระบุใน `engines` |
 | macOS | รองรับ coding, HTTP, STDIO, Local Config และ optional native integrations ตาม permission |
 | Linux | รองรับ coding, HTTP, STDIO, Local Config และ optional integrations ตาม desktop/runtime environment |
-| Windows | coding, setup probes, HTTP, STDIO และ Local Config ใช้ได้ตาม native backend ที่ติดตั้ง; sandbox, desktop และ speech รายงาน prerequisite ตามจริง |
+| Windows | Deferred — มี candidate code/tests แต่ยังไม่ประกาศ native support จนกว่าจะผ่าน Windows 11 จริง |
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control เท่านั้น |
@@ -67,6 +67,7 @@ Directory guard ไม่ใช่ OS sandbox, repository instructions ไม่
 ## Evaluation evidence
 
 DodoBench local fixture ใช้ยืนยัน contract บน platform/revision ที่ report ระบุเท่านั้น
-ผลของ macOS ไม่แทน Linux/Windows และ browser case จะเป็น optional skip เมื่อไม่มี
-Playwright Chromium Strict release gate ต้องมี evidence ที่ revision และ lock digest
-ตรงกันจากทุก platform ที่ประกาศรองรับ
+ผลของ macOS ไม่แทน Linux และ Linux Docker ไม่แทน Windows native ช่วงนี้ release gate
+ต้องมีหลักฐาน macOS local และ Linux Docker ที่ revision/lock digest ตรงกัน Docker image
+ติดตั้ง Playwright Chromium เพื่อรัน browser case จริง โครงการไม่ใช้ GitHub Actions
+เป็น test runner ส่วน Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย

@@ -41,8 +41,20 @@ function command(program, args, { allowFailure = false, timeout = 20 * 60 * 1000
 function sha(algorithm, file) { return createHash(algorithm).update(fs.readFileSync(file)).digest('hex'); }
 function git(args) { return command('git', args).stdout.trim(); }
 
-const revision = git(['rev-parse', 'HEAD']);
-const dirty = git(['status', '--porcelain']).length > 0;
+function sourceState() {
+  const assertedRevision = process.env['DODO_RELEASE_GATE_SOURCE_REVISION'];
+  const assertedDirty = process.env['DODO_RELEASE_GATE_SOURCE_DIRTY'];
+  if (assertedRevision === undefined && assertedDirty === undefined) {
+    return { revision: git(['rev-parse', 'HEAD']), dirty: git(['status', '--porcelain']).length > 0, provenance: 'local-git' };
+  }
+  if (process.platform !== 'linux' || !fs.existsSync('/.dockerenv')) throw new Error('source attestation variables are accepted only inside a Linux Docker container');
+  if (!/^[0-9a-f]{40}$/i.test(assertedRevision ?? '')) throw new Error('invalid Docker source revision attestation');
+  if (!['true', 'false'].includes(assertedDirty ?? '')) throw new Error('invalid Docker dirty-state attestation');
+  return { revision: assertedRevision, dirty: assertedDirty === 'true', provenance: 'docker-host-git' };
+}
+
+const source = sourceState();
+const { revision, dirty } = source;
 if (dirty && !options.allowDirty) failure = 'source changes are present; commit/review them or use --allow-dirty for a candidate gate';
 
 let auditSummary = null;
@@ -59,7 +71,12 @@ try {
   command(npm, ['run', 'test:all'], { timeout: 30 * 60 * 1000 });
 
   const benchFile = path.join(outputDir, 'dodobench.json');
-  command(process.execPath, ['scripts/dodo-bench.mjs', '--output', benchFile], { timeout: 10 * 60 * 1000 });
+  command(process.execPath, ['scripts/dodo-bench.mjs', '--output', benchFile], {
+    timeout: 10 * 60 * 1000,
+    env: source.provenance === 'docker-host-git'
+      ? { DODO_BENCH_SOURCE_REVISION: revision, DODO_BENCH_SOURCE_DIRTY: String(dirty) }
+      : {},
+  });
   bench = JSON.parse(fs.readFileSync(benchFile, 'utf8'));
   if (bench.status !== 'PASS') throw new Error('DodoBench regression gate failed');
 
@@ -93,7 +110,9 @@ try {
   append(`\n[GATE FAILURE] ${failure}\n`);
 }
 
-const platforms = { darwin: 'NOT_RUN', linux: 'NOT_RUN', win32: 'NOT_RUN' };
+const requiredPlatforms = ['darwin', 'linux'];
+const deferredPlatforms = ['win32'];
+const platforms = { darwin: 'NOT_RUN', linux: 'NOT_RUN', win32: 'DEFERRED_MANUAL_NOT_RUN' };
 if (!failure && Object.hasOwn(platforms, process.platform)) platforms[process.platform] = 'AUTOMATED_PASS';
 for (const file of options.platformEvidence) {
   try {
@@ -101,18 +120,31 @@ for (const file of options.platformEvidence) {
     const platform = evidence.platform ?? evidence.host?.platform;
     const evidenceRevision = evidence.revision ?? evidence.source?.revision;
     const evidenceLock = evidence.dependencyLockSha256 ?? evidence.source?.dependencyLockSha256;
-    if (Object.hasOwn(platforms, platform) && evidence.status === 'AUTOMATED_PASS' && evidenceRevision === revision && evidenceLock === `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}`) platforms[platform] = 'AUTOMATED_PASS';
-    else throw new Error('platform evidence does not match revision/lock/status');
+    const expectedProvenance = platform === 'linux' ? 'docker-host-git' : 'local-git';
+    if (
+      requiredPlatforms.includes(platform) &&
+      evidence.status === 'AUTOMATED_PASS' &&
+      evidence.package?.name === pkg.name &&
+      evidence.package?.version === pkg.version &&
+      evidenceRevision === revision &&
+      evidenceLock === `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` &&
+      evidence.source?.dirty === false &&
+      evidence.source?.provenance === expectedProvenance &&
+      evidence.platformPolicy?.githubActionsUsed === false &&
+      evidence.freshInstall?.status === 'PASS'
+    ) platforms[platform] = 'AUTOMATED_PASS';
+    else throw new Error('platform evidence does not match package/revision/lock/clean-source/provenance/status');
   } catch (error) { failure ??= `invalid platform evidence ${file}: ${error instanceof Error ? error.message : String(error)}`; }
 }
-const platformComplete = Object.values(platforms).every((status) => status === 'AUTOMATED_PASS');
+const platformComplete = requiredPlatforms.every((platform) => platforms[platform] === 'AUTOMATED_PASS');
 const report = {
   schemaVersion: 1, generatedAt: new Date().toISOString(), package: { name: pkg.name, version: pkg.version },
-  source: { revision, dirty, dependencyLockSha256: `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` },
+  source: { revision, dirty, provenance: source.provenance, dependencyLockSha256: `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` },
   mode: options.release ? 'release' : 'candidate', status: failure ? 'AUTOMATED_FAIL' : 'AUTOMATED_PASS', failure: failure ?? null,
   steps, benchmark: bench ? { status: bench.status, dataset: bench.dataset, aggregate: bench.aggregate } : null,
   audit: auditSummary, packageArtifact: artifact, freshInstall: smoke,
-  platforms, manual: { status: 'MANUAL_NOT_RUN', externalAi: 'MANUAL_NOT_RUN', realOwnerWorkspace: 'MANUAL_NOT_RUN' },
+  platformPolicy: { required: requiredPlatforms, deferred: deferredPlatforms, githubActionsUsed: false },
+  platforms, manual: { status: 'MANUAL_NOT_RUN', externalAi: 'MANUAL_NOT_RUN', realOwnerWorkspace: 'MANUAL_NOT_RUN', windows11: 'MANUAL_NOT_RUN' },
   registry: { status: 'NOT_APPLICABLE_BEFORE_PUBLISH' },
   releaseReady: !failure && !dirty && platformComplete,
   releaseReadyReason: failure ? failure : dirty ? 'source tree is dirty' : !platformComplete ? 'supported-platform evidence is incomplete' : 'automated release evidence is complete; manual gates remain separately reported',

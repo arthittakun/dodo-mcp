@@ -330,16 +330,26 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 
 ## Development
 
-รัน regression benchmark และ candidate release gate จาก source checkout ได้ด้วย:
+โปรเจกต์ไม่ใช้ GitHub Actions เป็น test runner ในช่วงนี้ หลักฐาน automated รองรับ
+สอง environment เท่านั้น: macOS รันจากเครื่องพัฒนา และ Linux รันใน Docker แยก
+ที่ติดตั้ง Playwright Chromium ส่วน Windows ถูกเลื่อนไป phase สุดท้ายและต้องคงสถานะ
+`MANUAL_NOT_RUN` จนกว่าจะทดสอบบน Windows จริง
+
+รัน regression benchmark, macOS candidate gate และ Linux Docker gate ได้ด้วย:
 
 ```bash
 npm run bench
 npm run release:gate
+npm run test:linux:docker
 ```
 
 Release gate สร้างหลักฐาน non-secret ใน ignored `release-evidence/` และตรวจ fresh
 exact-tarball ผ่าน STDIO Full กับ HTTP/OAuth Compact โดยไม่ publish npm ดูรายละเอียดที่
 [DodoBench และ Release Gate](docs/EVALUATION.md)
+
+เมื่อทั้งสอง report มาจาก Git revision และ `package-lock.json` เดียวกัน ให้รวมหลักฐาน
+บน macOS ด้วย `node scripts/release-gate.mjs --release --platform-evidence /absolute/path/to/linux/gate-report.json`
+คำสั่งนี้ไม่ publish package
 
 ```bash
 npm ci

@@ -37,6 +37,7 @@ describe('PACK: npm tarball', () => {
   beforeAll(() => {
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-pack-'));
     // Ensure a fresh build + schemas.
+    execFileSync(process.execPath, ['scripts/clean-build-artifacts.mjs'], { cwd: ROOT, stdio: 'pipe' });
     execFileSync(process.execPath, [path.join(ROOT, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.build.json'], { cwd: ROOT, stdio: 'pipe' });
     execFileSync(process.execPath, ['scripts/emit-schemas.mjs'], { cwd: ROOT, stdio: 'pipe' });
     execFileSync(process.execPath, ['scripts/copy-ui.mjs'], { cwd: ROOT, stdio: 'pipe' });
@@ -59,6 +60,9 @@ describe('PACK: npm tarball', () => {
     ];
     expect(fileList.some((file) => privateDocs.some((pattern) => pattern.test(file)))).toBe(false);
     expect(fileList.some(f => f.startsWith('dist/services/consent/') || f.startsWith('dist/tools/consentTools.'))).toBe(false);
+    expect(fileList).not.toContain('dist/config/migration.js');
+    expect(fileList).not.toContain('dist/config/migration.js.map');
+    expect(fileList).not.toContain('dist/.build-marker');
   });
 
   it('PACK-07: ships the Local Config UI assets next to the compiled server', () => {
@@ -136,7 +140,7 @@ describe('PACK: npm tarball', () => {
     expect(out).toContain('node');
     const grantArgs = [binPath, 'desktop', 'allow', '--app', 'dev.dodo.fixture', '--mode', 'view', '--persist', '--yes'];
     const grantOptions = { cwd: installDir, env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8' as const, stdio: 'pipe' as const };
-    if (process.platform === 'win32') {
+    if (process.platform !== 'darwin') {
       let refusal = '';
       try { execFileSync(process.execPath, grantArgs, grantOptions); }
       catch (error) { refusal = String((error as { stderr?: string }).stderr ?? ''); }

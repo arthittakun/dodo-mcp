@@ -260,7 +260,7 @@ export class FederationService {
   }
 
   private runtimeFor(project: RegisteredProject): ProjectRuntime {
-    const cacheKey = `${project.workspaceId}:${project.updatedAt}:${project.identity.dev}:${project.identity.ino}`;
+    const cacheKey = `${project.workspaceId}:${project.updatedAt}:${project.identity.dev}:${project.identity.ino}:${project.identity.birthtimeNs}`;
     const cached = this.runtimes.get(project.projectId);
     if (cached?.cacheKey === cacheKey) {
       // Refresh insertion order for the bounded LRU cache.

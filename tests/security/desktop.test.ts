@@ -121,7 +121,7 @@ describe('desktop MCP authorization and private owner controls (fake OS adapter 
             await ctx.cleanup();
         }
     });
-    it('persistent owner CLI grants take effect live, retain OAuth scopes and forget on offline-capable disable', async () => {
+    it.skipIf(process.platform !== 'darwin')('persistent owner CLI grants on macOS take effect live, retain OAuth scopes and forget on offline-capable disable', async () => {
         const { ctx, t, backend } = await fixture();
         try {
             const cli = (args: string[]) => execFileSync(process.execPath, [path.resolve('dist/cli/main.js'), 'desktop', ...args], {

@@ -91,6 +91,22 @@ describe('installation project registry', () => {
     } finally { f.db.close(); }
   });
 
+  it('rejects a replacement even when the filesystem reuses its numeric inode identity', () => {
+    const f = fixture();
+    const root = path.join(f.base, 'reused-inode'); fs.mkdirSync(root);
+    try {
+      const project = f.registry.add(root).project;
+      fs.rmdirSync(root); fs.mkdirSync(root);
+      // Make the old row match the replacement's dev/inode, exactly modeling
+      // the Linux reuse case without depending on allocator timing.
+      const replacementStat = fs.statSync(root);
+      f.db.prepare('UPDATE project_registry SET root_dev = ?, root_ino = ? WHERE id = ?')
+        .run(replacementStat.dev, replacementStat.ino, project.projectId);
+      expect(f.registry.get(project.projectId).availability).toBe('replaced');
+      expect(() => f.registry.add(root)).toThrow(/another directory identity/);
+    } finally { f.db.close(); }
+  });
+
   it('soft-removes only registry metadata and preserves files, trust, ACL and historical workspace rows', () => {
     const f = fixture();
     const root = path.join(f.base, 'keep-everything');
@@ -149,7 +165,7 @@ describe('installation project registry', () => {
     const f = fixture();
     const root = path.join(f.base, 'shared'); fs.mkdirSync(root);
     try {
-      f.db.exec('DROP TABLE project_registry; DELETE FROM schema_migrations WHERE version = 7');
+      f.db.exec('DROP TABLE project_registry; DELETE FROM schema_migrations WHERE version IN (7, 15)');
       f.db.close();
       const firstDb = openDatabase(path.join(f.base, 'config', 'state.db'));
       const secondDb = openDatabase(path.join(f.base, 'config', 'state.db'));
@@ -160,6 +176,30 @@ describe('installation project registry', () => {
         expect(second.changed).toBe(false);
         expect((firstDb.prepare('SELECT COUNT(*) AS count FROM project_registry WHERE removed_at IS NULL').get() as { count: number }).count).toBe(1);
       } finally { firstDb.close(); secondDb.close(); }
+    } finally { if (f.db.open) f.db.close(); }
+  });
+
+  it('leaves a v1 project invalid until the owner removes and re-adds it', () => {
+    const f = fixture();
+    const root = path.join(f.base, 'v1-project'); fs.mkdirSync(root);
+    try {
+      const project = f.registry.add(root).project;
+      f.db.prepare('UPDATE project_registry SET metadata_version = 1 WHERE id = ?').run(project.projectId);
+      f.db.exec('ALTER TABLE project_registry DROP COLUMN root_birthtime_ns; DELETE FROM schema_migrations WHERE version = 15');
+      f.db.close();
+      const upgraded = openDatabase(path.join(f.base, 'config', 'state.db'));
+      try {
+        const row = upgraded.prepare('SELECT metadata_version, root_birthtime_ns FROM project_registry WHERE id = ?').get(project.projectId) as { metadata_version: number; root_birthtime_ns: string | null };
+        expect(row).toEqual({ metadata_version: 1, root_birthtime_ns: null });
+        const registry = new ProjectRegistry(new Store(upgraded));
+        expect(registry.get(project.projectId).availability).toBe('invalid');
+        expect(() => registry.add(root)).toThrow(/registry row is invalid/);
+        registry.remove(project.projectId);
+        const replacement = registry.add(root).project;
+        expect(replacement.projectId).not.toBe(project.projectId);
+        expect(replacement.identity.birthtimeNs).toMatch(/^[1-9][0-9]+$/);
+        expect(replacement.availability).toBe('ready');
+      } finally { upgraded.close(); }
     } finally { if (f.db.open) f.db.close(); }
   });
 });

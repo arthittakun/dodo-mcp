@@ -338,7 +338,7 @@
       const details = document.createElement('details'); details.className = 'details';
       const summary = document.createElement('summary'); summary.textContent = 'รายละเอียด registry';
       const dl = document.createElement('dl'); dl.className = 'dl';
-      for (const [label, value] of [['Workspace ID', project.workspaceId], ['Directory identity', `${project.identity.dev}:${project.identity.ino}`], ['อัปเดต', new Date(project.updatedAt).toLocaleString()]]) {
+      for (const [label, value] of [['Workspace ID', project.workspaceId], ['Directory identity', `${project.identity.dev}:${project.identity.ino}:${project.identity.birthtimeNs}`], ['อัปเดต', new Date(project.updatedAt).toLocaleString()]]) {
         const dt = document.createElement('dt'); dt.textContent = label;
         const dd = document.createElement('dd'); dd.textContent = value;
         dl.append(dt, dd);

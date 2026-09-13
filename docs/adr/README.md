@@ -54,3 +54,7 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [036 — Goal-driven Context Engine and source-verifying evidence](036-context-engine-evidence.md)
 - [037 — Evidence-backed owner-reviewed memory](037-owner-reviewed-memory.md)
 - [038 — Caller-scoped Runtime Intelligence](038-runtime-intelligence.md)
+- [039 — Advanced Agent Runtime](039-advanced-agent-runtime.md)
+- [040 — Revision-bound DodoBench and release evidence](040-dodobench-release-gate.md)
+- [041 — Local macOS and Docker Linux release gates](041-local-macos-docker-linux-gates.md)
+- [042 — Project directory generation identity](042-project-directory-generation-identity.md)

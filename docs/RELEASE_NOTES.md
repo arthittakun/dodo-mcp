@@ -10,6 +10,11 @@
   exact-tarball smoke ของ CLI, STDIO Full และ HTTP/OAuth Compact
 - รายงานผูกกับ Git revision, dataset, dependency lock, configuration และ platform;
   model token เป็น `null` เมื่อไม่มี model call และ manual/platform status ไม่ถูกแต่งขึ้น
+- ใช้ macOS local + Linux Docker เป็น automated platform gate โดยไม่ใช้ GitHub
+  Actions; Windows native เป็นงาน phase สุดท้ายและคง `MANUAL_NOT_RUN`
+- Project Registry metadata v2 ผูก canonical path กับ device/inode/birthtimeNs เพื่อ
+  ปฏิเสธ directory replacement แม้ Linux reuse inode โดย row v1 ที่ไม่มี birth time
+  จะไม่ถูก auto-upgrade และต้องให้เจ้าของ review/remove/add ใหม่
 
 - เปิดตัว package `dodo-mcp` และ CLI `dodo`
 - เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ safe existing-state preference import แบบ explicit

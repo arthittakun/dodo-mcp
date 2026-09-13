@@ -17,10 +17,13 @@ display name, metadata version และ timestamps พร้อม soft removal
 CLI และ Local Config เท่านั้นที่เข้าถึง registry ไม่มี MCP tool หรือ public admin
 route การ add/remove ไม่เปลี่ยน trust, OAuth, ACL, jobs, plans หรือ history
 
-การ add path ใหม่ที่ path เดิมหายและ dev/inode ตรงกับรายการเดิมถือเป็น relocation:
-projectId คงเดิม แต่ workspaceId เปลี่ยนตาม canonical path ใหม่ จึงไม่มี authority
-ไหลตาม project identity หาก path เดิมถูกแทนด้วย identity อื่น ระบบ fail closed และ
-ต้องให้เจ้าของ remove/add หลัง review
+การ add path ใหม่ที่ path เดิมหายและ directory identity ตรงกับรายการเดิมถือเป็น
+relocation: projectId คงเดิม แต่ workspaceId เปลี่ยนตาม canonical path ใหม่ จึงไม่มี
+authority ไหลตาม project identity หาก path เดิมถูกแทนด้วย identity อื่น ระบบ fail
+closed และต้องให้เจ้าของ remove/add หลัง review
+
+รายละเอียดการเพิ่ม birth-time generation marker หลังพบ inode reuse บน Linux อยู่ใน
+[ADR-042](042-project-directory-generation-identity.md)
 
 Registry mutation และ scrubbed audit commit ใน SQLite transaction เดียวกัน
 metadata ที่ผิดรุ่นถูกแสดงเป็น `invalid` และไม่ถือว่า ready แต่ยังนำออกแบบ reviewed

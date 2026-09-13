@@ -1,6 +1,8 @@
-# DODO Windows Support
+# DODO Windows Candidate — Deferred
 
-DODO MCP 1.0.0 รองรับการเตรียม environment, coding tools, HTTP, STDIO, Local Config และ workspace policy บน Windows ตาม dependency และ backend ที่ติดตั้งจริง
+DODO MCP 1.0.0 ยังไม่ประกาศ native Windows support โค้ดและ tests สำหรับ Windows
+บางส่วนมีอยู่เป็น candidate สำหรับ phase สุดท้าย แต่ยังไม่มีหลักฐานจาก Windows 11 จริง
+และ Linux Docker ไม่สามารถใช้แทนหลักฐาน Windows ได้
 
 ## ตรวจเครื่อง
 
@@ -24,10 +26,15 @@ dodo doctor
 
 Desktop, speech, browser และ command sandbox ต้องผ่าน probe และ owner permission หาก backend ไม่พร้อมระบบตอบ `NOT_SUPPORTED` ตามจริง
 
-## Native support gate
+## งานที่ต้องผ่านก่อนประกาศรองรับ
 
-ระบบจะประกาศ native support ได้เมื่อผ่าน named-pipe identity, NTFS reparse/ADS/8.3 guards, ACL enforcement, PATHEXT resolution, shell strategy, process cancellation, read-only/antivirus file behavior, Windows argv limits, Chromium environment, LSP และ CI บน `windows-latest` ครบตามหลักฐานจริง
+ระบบจะประกาศ native support ได้เมื่อผ่าน named-pipe identity, NTFS
+reparse/ADS/8.3 guards, ACL enforcement, PATHEXT resolution, shell strategy,
+process cancellation, read-only/antivirus file behavior, Windows argv limits,
+Chromium environment, LSP, full automated suite และ packaging บน Windows จริง
 
 ## Manual acceptance
 
-ต้องทดสอบบน Windows 11 จริง แยกจาก CI: OAuth/HTTP, STDIO, workspace isolation, ACL, file conflict, rollback, jobs, setup และ package installation ผลที่ยังไม่ได้ทำให้บันทึกเป็น `MANUAL_NOT_RUN`
+ต้องทดสอบบน Windows 11 จริง: OAuth/HTTP, STDIO, workspace isolation, ACL, file
+conflict, rollback, jobs, setup และ package installation ผลปัจจุบันคือ
+`MANUAL_NOT_RUN` และไม่มี GitHub Actions workflow ใช้เป็นหลักฐาน
