@@ -1,6 +1,7 @@
 import type { MultimodalService } from '../services/multimodal/multimodalService.js';
 import type { ResourceService } from '../services/resources/resourceService.js';
 import type { FederationService } from '../projects/federation.js';
+import type { ProjectBrainService } from '../services/brain/brainService.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
@@ -34,6 +35,8 @@ export interface Principal {
 
 export interface AppServices {
   federation: FederationService;
+  /** Durable, incrementally refreshed project structure index. */
+  brain?: ProjectBrainService;
   multimodal?: MultimodalService;
   /** Installation CAS with workspace/principal-scoped references. */
   resources?: ResourceService;

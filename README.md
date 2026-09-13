@@ -7,12 +7,13 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 80 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 86 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
+- มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -95,6 +96,26 @@ HTTP Compact/Hybrid เรียก operation เดียวกันผ่า�
 workspace ACL, workspace ID/epoch และ principal ownership ซ้ำ ไม่ ingest `.env`,
 private DODO state, traversal, symlink หรือ hardlink และไม่ inflate/execute archive
 content ดูรายละเอียดที่ [Resources](docs/RESOURCES.md)
+
+### Project Brain
+
+Project Brain สร้าง graph แบบ bounded จาก TypeScript/JavaScript AST และ
+`package.json` โดยไม่รัน source, repository plugin หรือ command ใด ๆ ระบบ refresh
+อัตโนมัติและ parse ใหม่เฉพาะไฟล์ที่เปลี่ยน พร้อมขยายผลไปยัง relation ที่ได้รับ
+ผลกระทบ:
+
+```text
+brain_status()
+brain_query(query="UserService", nodeTypes=["symbol"])
+brain_symbol(uri="symbol://...")
+brain_rebuild(mode="incremental", waitMs=10000)
+```
+
+ใน Compact/Hybrid ให้เรียกผ่าน `dodo_assist_read` หรือ `dodo_assist_change`
+ตาม schema จาก `dodo_discover` ค่า `symbol://` เป็น semantic identity ที่คงเดิม
+เมื่อไฟล์ถูกย้ายแบบ exact-content แต่ URI/index row ไม่ใช่สิทธิ์ ทุก query จะตรวจ
+OAuth, live grant, workspace ACL, workspace ID/epoch, path/secret policy และ SHA-256
+ของ source ปัจจุบันใหม่ก่อนคืนผล ดู [Project Brain](docs/BRAIN.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
@@ -207,6 +228,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - [Multimodal](docs/MULTIMODAL.md)
 - [Project Registry](docs/PROJECTS.md)
 - [Universal resources and CAS](docs/RESOURCES.md)
+- [Project Brain and incremental index](docs/BRAIN.md)
 - [Manual acceptance](docs/MANUAL_ACCEPTANCE.md)
 - [Test report](docs/TEST_REPORT.md)
 

@@ -34,12 +34,20 @@ export const projectOverviewTool = defineTool({
     });
     const warnings: string[] = [];
     if (data.projectConfigNote) warnings.push(data.projectConfigNote);
+    let brain: Record<string, unknown>;
+    try {
+      brain = s.brain ? { available: true, ...s.brain.status() } : { available: false, status: 'unavailable' };
+    } catch {
+      brain = { available: false, status: 'recovery_required' };
+      warnings.push('Project Brain status needs recovery; use brain_status or brain_rebuild after checking the active workspace.');
+    }
     const desktop = s.desktop.policy();
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
     const federation = s.federation.listAuthorized(ctx.principal);
     return {
       data: {
         ...data,
+        brain,
         capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
         federation: {
           mode: 'read-only',

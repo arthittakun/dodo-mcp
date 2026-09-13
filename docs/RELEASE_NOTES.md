@@ -18,11 +18,14 @@
 - Project relocation รักษา project ID เฉพาะเมื่อ directory identity เดิมตรวจได้ และไม่คัดลอก trust/client ACL
 - เพิ่ม read-only multi-project federation ผ่าน overview/list/read/search สูงสุด 8 โปรเจกต์ โดยตรวจ installation identity, target ACL/readiness, source hash และ target-scoped audit
 - เพิ่ม `resource_inspect`, `resource_read`, `resource_read_range`,
-  `resource_preview`, `resource_extract` และ `resource_transform`; Full เป็น 80 tools
-  ส่วน Compact/Hybrid คง 19/49 และ route ผ่าน `dodo_media`
+  `resource_preview`, `resource_extract` และ `resource_transform`
 - เพิ่ม installation-private immutable SHA-256 CAS, workspace/principal-scoped
   references, bounded range/resume, expected hash/MIME, MCP image/audio preview,
   safe ZIP metadata และ transactional reference-aware GC
+- เพิ่ม Project Brain แบบ incremental สำหรับ TypeScript/JavaScript AST,
+  symbols/references/imports/routes/tests/dependencies, stable `symbol://` identity,
+  source freshness, rebuild/pause/cancel และ corruption/restart recovery; Full เป็น
+  86 tools ส่วน Compact/Hybrid คง 19/49 และ route ผ่าน assistance gateways
 
 ## วิธีอัปเดต
 

@@ -34,19 +34,19 @@
     "job_cancel",
     "list_jobs"
   ],
-  "fullToolCount": 80,
+  "fullToolCount": 86,
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 47411
+      "schemaBytes": 47631
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 114891
+      "schemaBytes": 115111
     },
     "full": {
-      "toolCount": 80,
-      "schemaBytes": 264467
+      "toolCount": 86,
+      "schemaBytes": 290795
     }
   },
   "tools": [
@@ -1491,7 +1491,7 @@
     {
       "name": "dodo_assist_read",
       "title": "Coding-task analysis",
-      "description": "Gateway: task context, static impact analysis and single-symbol reads. Set operation to one of: context_for_task, analyze_impact, read_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: task context, static impact analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1503,7 +1503,10 @@
       "operations": [
         "context_for_task",
         "analyze_impact",
-        "read_symbol"
+        "read_symbol",
+        "brain_status",
+        "brain_query",
+        "brain_symbol"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1526,7 +1529,10 @@
             "enum": [
               "context_for_task",
               "analyze_impact",
-              "read_symbol"
+              "read_symbol",
+              "brain_status",
+              "brain_query",
+              "brain_symbol"
             ],
             "description": "Target operation to invoke"
           },
@@ -1648,7 +1654,7 @@
     {
       "name": "dodo_assist_change",
       "title": "Refactor previews and verification",
-      "description": "Gateway: preview-only symbol-body refactors and explicit verification plan/run/report. Set operation to one of: preview_refactor, verify_changes. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: preview-only refactors, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -1659,7 +1665,10 @@
       "domain": "code",
       "operations": [
         "preview_refactor",
-        "verify_changes"
+        "verify_changes",
+        "brain_rebuild",
+        "brain_pause",
+        "brain_cancel"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1681,7 +1690,10 @@
             "type": "string",
             "enum": [
               "preview_refactor",
-              "verify_changes"
+              "verify_changes",
+              "brain_rebuild",
+              "brain_pause",
+              "brain_cancel"
             ],
             "description": "Target operation to invoke"
           },

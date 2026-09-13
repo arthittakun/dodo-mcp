@@ -14,6 +14,7 @@ import { runCommandTool, runCommandsTool, execCommandTool, runTaskTool, jobStatu
 import { diagnosticsTool, approvalStatusTool, handoffWriteTool, handoffReadTool } from './metaTools.js';
 import { todoWriteTool, todoReadTool, environmentInfoTool, fetchUrlTool } from './agentTools.js';
 import { RESOURCE_TOOLS } from './resourceTools.js';
+import { BRAIN_TOOLS } from './brainTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -92,6 +93,8 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   readSymbolTool,
   previewRefactorTool,
   verifyChangesTool,
+  // Incremental, source-verified project structure and relationship index.
+  ...BRAIN_TOOLS,
   // Optional local media/browser/game/workflow capabilities under the existing scopes.
   ...MULTIMODAL_TOOLS,
   // Universal immutable resources and content-addressed storage.

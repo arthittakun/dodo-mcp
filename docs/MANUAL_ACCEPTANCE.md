@@ -97,6 +97,23 @@
 
 ห้ามใช้ไฟล์จริงที่เป็นความลับและห้ามเปลี่ยน MANUAL_PASS จาก automated test เท่านั้น
 
+## Project Brain
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI และ owner project จริง
+
+1. เปิด fixture TypeScript project แล้วรอ `brain_status` เป็น `completed`
+2. ค้น symbol/import/route/test/dependency ด้วย `brain_query`
+3. แก้หนึ่งไฟล์และยืนยัน metrics ว่า `parsedFiles` ไม่เท่ากับทั้ง project
+4. ย้ายไฟล์แบบ exact-content และตรวจว่า `symbol://` URI เดิม resolve ไป path ใหม่
+5. แก้ source หลัง index แล้วตรวจว่า query default ตัด stale result และ
+   `includeStale:true` ระบุ freshness ตามจริง
+6. ลอง `.env`, traversal, symlink/hardlink, token read-only, revoked ACL และ stale epoch
+7. pause/cancel/rebuild ใน inspect mode และยืนยัน approval ผูก target operation
+8. restart ระหว่าง run แล้วตรวจ interrupted recovery และ committed graph เดิม
+
+automated fixtures ผ่านรายการหลักแล้ว แต่ยังไม่ได้วัด performance ระยะยาวกับ repository
+ของผู้ใช้หรือ workflow ผ่าน external AI จึงยังเป็น `MANUAL_NOT_RUN`
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth
@@ -112,7 +129,7 @@
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 80 tools
+2. ตรวจ full catalog 86 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

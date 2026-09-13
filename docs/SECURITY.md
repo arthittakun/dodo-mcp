@@ -74,6 +74,19 @@ mutation ไม่ได้ เพราะ write/exec federation ยังป�
   overwrite winner และ GC ลบ expired refs ก่อน ลบเฉพาะ object ที่ไม่มี reference
   และพ้น grace หนึ่งชั่วโมงแล้ว
 
+## Project Brain
+
+Project Brain ใช้ `WorkspaceFS.walk/readTextFile/assertRegularFileForDirectAccess`
+จึงไม่ index secret-denied/protected/ignored output, traversal, symlink หรือ hardlink
+parser อยู่ใน bounded worker และใช้ TypeScript ที่มากับ DODO ไม่โหลดหรือรัน source,
+repository compiler plugin, LSP command หรือ package script
+
+index row, graph edge และ `symbol://` URI เป็น evidence เท่านั้น ไม่ใช่ capability
+read ทุกครั้งตรวจ OAuth scope, live grant, client, workspace ACL, workspace ID/epoch,
+path policy และ current source SHA-256 ซ้ำ ผล stale/missing ถูกระบุและตัดออกโดย
+default maintenance operations (`brain_rebuild`, `brain_pause`, `brain_cancel`) ต้องมี
+`dodo:exec` และผ่าน trust/target-specific local approval เดิม
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

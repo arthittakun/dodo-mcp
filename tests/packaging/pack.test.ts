@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'docs/BRAIN.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,

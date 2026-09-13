@@ -1,7 +1,7 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Proposed DODO tool contract, not the MCP protocol spec.",
   "version": 1,
-  "toolCount": 80,
+  "toolCount": 86,
   "tools": [
     {
       "name": "project_overview",
@@ -9723,6 +9723,2251 @@
                   "notRun",
                   "notes",
                   "replayed"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_status",
+      "title": "Inspect Project Brain status",
+      "description": "Return bounded Project Brain freshness, parser/schema versions, latest run state and graph counts for the active workspace. Cached index rows are evidence only and never grant source access.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "parserVersion": {
+                    "type": "string"
+                  },
+                  "namespace": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "running",
+                      "paused",
+                      "completed",
+                      "canceled",
+                      "failed",
+                      "interrupted"
+                    ]
+                  },
+                  "paused": {
+                    "type": "boolean"
+                  },
+                  "activeRunId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lastRunId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lastStartedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastCompletedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "lastError": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "sourceHash": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "files": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "nodes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "edges": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "staleFiles": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "properties": {
+                      "scannedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "parsedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "reusedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "movedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "removedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "skippedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "affectedFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "edges": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "syntaxErrors": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "scannedFiles",
+                      "parsedFiles",
+                      "reusedFiles",
+                      "movedFiles",
+                      "removedFiles",
+                      "skippedFiles",
+                      "affectedFiles",
+                      "nodes",
+                      "edges",
+                      "syntaxErrors"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "automaticRefresh": {
+                    "type": "boolean"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schemaVersion",
+                  "parserVersion",
+                  "namespace",
+                  "status",
+                  "paused",
+                  "activeRunId",
+                  "lastRunId",
+                  "lastStartedAt",
+                  "lastCompletedAt",
+                  "lastError",
+                  "sourceHash",
+                  "files",
+                  "nodes",
+                  "edges",
+                  "staleFiles",
+                  "metrics",
+                  "automaticRefresh",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_query",
+      "title": "Query project structure",
+      "description": "Query bounded files, symbols, routes, tests, dependencies and relationship edges from the active Project Brain. Every returned row is re-authorized and checked against the current guarded source SHA-256; stale rows are omitted by default.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "nodeTypes": {
+            "minItems": 1,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "file",
+                "symbol",
+                "route",
+                "test",
+                "dependency"
+              ]
+            }
+          },
+          "edgeTypes": {
+            "minItems": 1,
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "contains",
+                "imports",
+                "exports",
+                "dynamic_import",
+                "references",
+                "depends_on"
+              ]
+            }
+          },
+          "includeStale": {
+            "default": false,
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "includeStale",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "parserVersion": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "running",
+                          "paused",
+                          "completed",
+                          "canceled",
+                          "failed",
+                          "interrupted"
+                        ]
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "activeRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastStartedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastCompletedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastError": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sourceHash": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "edges": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "staleFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "metrics": {
+                        "type": "object",
+                        "properties": {
+                          "scannedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "parsedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reusedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "movedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "removedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "skippedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "affectedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nodes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "edges": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "syntaxErrors": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "scannedFiles",
+                          "parsedFiles",
+                          "reusedFiles",
+                          "movedFiles",
+                          "removedFiles",
+                          "skippedFiles",
+                          "affectedFiles",
+                          "nodes",
+                          "edges",
+                          "syntaxErrors"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "automaticRefresh": {
+                        "type": "boolean"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "parserVersion",
+                      "namespace",
+                      "status",
+                      "paused",
+                      "activeRunId",
+                      "lastRunId",
+                      "lastStartedAt",
+                      "lastCompletedAt",
+                      "lastError",
+                      "sourceHash",
+                      "files",
+                      "nodes",
+                      "edges",
+                      "staleFiles",
+                      "metrics",
+                      "automaticRefresh",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "nodes": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "uri": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "file",
+                            "symbol",
+                            "route",
+                            "test",
+                            "dependency"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "qualifiedName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "path": {
+                          "type": "string"
+                        },
+                        "line": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "column": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "endLine": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "endColumn": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sourceHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[a-f0-9]{64}$"
+                        },
+                        "parserVersion": {
+                          "type": "string"
+                        },
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "freshness": {
+                          "type": "string",
+                          "enum": [
+                            "current",
+                            "stale",
+                            "missing"
+                          ]
+                        },
+                        "details": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "uri",
+                        "type",
+                        "name",
+                        "qualifiedName",
+                        "path",
+                        "line",
+                        "column",
+                        "endLine",
+                        "endColumn",
+                        "sourceHash",
+                        "parserVersion",
+                        "schemaVersion",
+                        "freshness",
+                        "details"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "edges": {
+                    "maxItems": 200,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "contains",
+                            "imports",
+                            "exports",
+                            "dynamic_import",
+                            "references",
+                            "depends_on"
+                          ]
+                        },
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "targetKey": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "sourcePath": {
+                          "type": "string"
+                        },
+                        "targetPath": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "line": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sourceHash": {
+                          "type": "string",
+                          "pattern": "^sha256:[a-f0-9]{64}$"
+                        },
+                        "parserVersion": {
+                          "type": "string"
+                        },
+                        "schemaVersion": {
+                          "type": "number",
+                          "const": 1
+                        },
+                        "freshness": {
+                          "type": "string",
+                          "enum": [
+                            "current",
+                            "stale",
+                            "missing"
+                          ]
+                        },
+                        "details": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "from",
+                        "to",
+                        "targetKey",
+                        "sourcePath",
+                        "targetPath",
+                        "line",
+                        "sourceHash",
+                        "parserVersion",
+                        "schemaVersion",
+                        "freshness",
+                        "details"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "staleOmitted": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "inaccessibleOmitted": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "nextCursor": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evidence": {
+                    "type": "object",
+                    "properties": {
+                      "sourceVerified": {
+                        "type": "boolean"
+                      },
+                      "checkedAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "sourceVerified",
+                      "checkedAt",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "status",
+                  "nodes",
+                  "edges",
+                  "staleOmitted",
+                  "inaccessibleOmitted",
+                  "truncated",
+                  "nextCursor",
+                  "evidence"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_symbol",
+      "title": "Resolve a stable Project Brain symbol",
+      "description": "Resolve one symbol:// project entity URI. The stable identity survives an exact-content file move, while the result reports the current path and source freshness.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "pattern": "^symbol:\\/\\/"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "uri"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "file",
+                      "symbol",
+                      "route",
+                      "test",
+                      "dependency"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "qualifiedName": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "line": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "column": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endLine": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endColumn": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "sourceHash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "parserVersion": {
+                    "type": "string"
+                  },
+                  "schemaVersion": {
+                    "type": "number",
+                    "const": 1
+                  },
+                  "freshness": {
+                    "type": "string",
+                    "enum": [
+                      "current",
+                      "stale",
+                      "missing"
+                    ]
+                  },
+                  "details": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "id",
+                  "uri",
+                  "type",
+                  "name",
+                  "qualifiedName",
+                  "path",
+                  "line",
+                  "column",
+                  "endLine",
+                  "endColumn",
+                  "sourceHash",
+                  "parserVersion",
+                  "schemaVersion",
+                  "freshness",
+                  "details"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_rebuild",
+      "title": "Rebuild Project Brain",
+      "description": "Start one bounded incremental or full Project Brain rebuild. Repository code, plugins and scripts are never executed. This owner-controlled maintenance action retains the active trust/approval policy.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "mode": {
+            "default": "incremental",
+            "type": "string",
+            "enum": [
+              "incremental",
+              "full"
+            ]
+          },
+          "waitMs": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "mode",
+          "waitMs"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "changed": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "parserVersion": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "running",
+                          "paused",
+                          "completed",
+                          "canceled",
+                          "failed",
+                          "interrupted"
+                        ]
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "activeRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastStartedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastCompletedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastError": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sourceHash": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "edges": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "staleFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "metrics": {
+                        "type": "object",
+                        "properties": {
+                          "scannedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "parsedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reusedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "movedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "removedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "skippedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "affectedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nodes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "edges": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "syntaxErrors": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "scannedFiles",
+                          "parsedFiles",
+                          "reusedFiles",
+                          "movedFiles",
+                          "removedFiles",
+                          "skippedFiles",
+                          "affectedFiles",
+                          "nodes",
+                          "edges",
+                          "syntaxErrors"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "automaticRefresh": {
+                        "type": "boolean"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "parserVersion",
+                      "namespace",
+                      "status",
+                      "paused",
+                      "activeRunId",
+                      "lastRunId",
+                      "lastStartedAt",
+                      "lastCompletedAt",
+                      "lastError",
+                      "sourceHash",
+                      "files",
+                      "nodes",
+                      "edges",
+                      "staleFiles",
+                      "metrics",
+                      "automaticRefresh",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "runId",
+                  "changed",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_pause",
+      "title": "Pause or resume Project Brain refresh",
+      "description": "Pause or resume automatic indexing for the active workspace. Pausing cancels an in-progress uncommitted index transaction; it never changes source files or permissions.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "paused": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "paused"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "changed": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "parserVersion": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "running",
+                          "paused",
+                          "completed",
+                          "canceled",
+                          "failed",
+                          "interrupted"
+                        ]
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "activeRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastStartedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastCompletedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastError": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sourceHash": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "edges": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "staleFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "metrics": {
+                        "type": "object",
+                        "properties": {
+                          "scannedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "parsedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reusedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "movedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "removedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "skippedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "affectedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nodes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "edges": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "syntaxErrors": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "scannedFiles",
+                          "parsedFiles",
+                          "reusedFiles",
+                          "movedFiles",
+                          "removedFiles",
+                          "skippedFiles",
+                          "affectedFiles",
+                          "nodes",
+                          "edges",
+                          "syntaxErrors"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "automaticRefresh": {
+                        "type": "boolean"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "parserVersion",
+                      "namespace",
+                      "status",
+                      "paused",
+                      "activeRunId",
+                      "lastRunId",
+                      "lastStartedAt",
+                      "lastCompletedAt",
+                      "lastError",
+                      "sourceHash",
+                      "files",
+                      "nodes",
+                      "edges",
+                      "staleFiles",
+                      "metrics",
+                      "automaticRefresh",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "runId",
+                  "changed",
+                  "status"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "brain_cancel",
+      "title": "Cancel a Project Brain rebuild",
+      "description": "Cancel the active Project Brain parser run before commit. Existing committed index data stays available and source files are never modified.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "runId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "runId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "changed": {
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "type": "object",
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "number",
+                        "const": 1
+                      },
+                      "parserVersion": {
+                        "type": "string"
+                      },
+                      "namespace": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "running",
+                          "paused",
+                          "completed",
+                          "canceled",
+                          "failed",
+                          "interrupted"
+                        ]
+                      },
+                      "paused": {
+                        "type": "boolean"
+                      },
+                      "activeRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastRunId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "lastStartedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastCompletedAt": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "lastError": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "sourceHash": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "files": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "nodes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "edges": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "staleFiles": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "metrics": {
+                        "type": "object",
+                        "properties": {
+                          "scannedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "parsedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reusedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "movedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "removedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "skippedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "affectedFiles": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "nodes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "edges": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "syntaxErrors": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "scannedFiles",
+                          "parsedFiles",
+                          "reusedFiles",
+                          "movedFiles",
+                          "removedFiles",
+                          "skippedFiles",
+                          "affectedFiles",
+                          "nodes",
+                          "edges",
+                          "syntaxErrors"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "automaticRefresh": {
+                        "type": "boolean"
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "parserVersion",
+                      "namespace",
+                      "status",
+                      "paused",
+                      "activeRunId",
+                      "lastRunId",
+                      "lastStartedAt",
+                      "lastCompletedAt",
+                      "lastError",
+                      "sourceHash",
+                      "files",
+                      "nodes",
+                      "edges",
+                      "staleFiles",
+                      "metrics",
+                      "automaticRefresh",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "runId",
+                  "changed",
+                  "status"
                 ],
                 "additionalProperties": false
               },

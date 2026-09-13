@@ -27,11 +27,16 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools
-- STDIO default: Full 80 tools
+- STDIO default: Full 86 tools
 - explicit Hybrid: 49 tools
 - explicit override: `--tools compact|full|hybrid`
 
 Surface เปลี่ยนจำนวน tools ที่ expose เท่านั้น ไม่เปลี่ยน permission หรือ security policy
+
+Project Brain รุ่นแรกใช้ bundled TypeScript 5.9 AST provider สำหรับ TypeScript,
+TSX, JavaScript และ JSX พร้อมอ่าน dependency metadata จาก `package.json` ภาษาอื่น
+ยังใช้ semantic/LSP tools เดิม และ Project Brain จะไม่อ้างว่ามี parser graph หากยัง
+ไม่มี provider ที่ประกาศรองรับ
 
 ## Optional capabilities
 

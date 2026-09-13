@@ -180,6 +180,98 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     BEGIN
       SELECT RAISE(ABORT, 'resource store quota exceeded');
     END;`,
+  `CREATE TABLE brain_index_state (
+    workspace_id TEXT PRIMARY KEY,
+    namespace TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    parser_version TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    paused INTEGER NOT NULL DEFAULT 0,
+    generation INTEGER NOT NULL DEFAULT 0,
+    active_run_id TEXT,
+    last_run_id TEXT,
+    last_started_at INTEGER,
+    last_completed_at INTEGER,
+    last_error TEXT,
+    source_hash TEXT,
+    metrics TEXT NOT NULL
+  );
+  CREATE TABLE brain_file_cache (
+    workspace_id TEXT NOT NULL,
+    path TEXT NOT NULL,
+    file_id TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    mtime_ms REAL NOT NULL,
+    ctime_ms REAL NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    config_hash TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    indexed_at INTEGER NOT NULL,
+    generation INTEGER NOT NULL,
+    PRIMARY KEY (workspace_id, path),
+    UNIQUE (workspace_id, file_id)
+  );
+  CREATE INDEX idx_brain_files_hash ON brain_file_cache(workspace_id, content_hash);
+  CREATE TABLE brain_nodes (
+    workspace_id TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    uri TEXT NOT NULL,
+    node_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    qualified_name TEXT,
+    path TEXT NOT NULL,
+    line INTEGER NOT NULL,
+    column_no INTEGER NOT NULL,
+    end_line INTEGER NOT NULL,
+    end_column INTEGER NOT NULL,
+    source_hash TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    freshness TEXT NOT NULL,
+    details TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    generation INTEGER NOT NULL,
+    PRIMARY KEY (workspace_id, node_id),
+    UNIQUE (workspace_id, uri)
+  );
+  CREATE INDEX idx_brain_nodes_query ON brain_nodes(workspace_id, node_type, name);
+  CREATE INDEX idx_brain_nodes_path ON brain_nodes(workspace_id, path);
+  CREATE TABLE brain_edges (
+    workspace_id TEXT NOT NULL,
+    edge_id TEXT NOT NULL,
+    edge_type TEXT NOT NULL,
+    from_node_id TEXT NOT NULL,
+    to_node_id TEXT,
+    target_key TEXT,
+    source_path TEXT NOT NULL,
+    target_path TEXT,
+    line INTEGER NOT NULL,
+    source_hash TEXT NOT NULL,
+    parser_version TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    freshness TEXT NOT NULL,
+    details TEXT NOT NULL,
+    updated_at INTEGER NOT NULL,
+    generation INTEGER NOT NULL,
+    PRIMARY KEY (workspace_id, edge_id)
+  );
+  CREATE INDEX idx_brain_edges_source ON brain_edges(workspace_id, source_path, edge_type);
+  CREATE INDEX idx_brain_edges_target ON brain_edges(workspace_id, target_path, edge_type);
+  CREATE TABLE brain_runs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    mode TEXT NOT NULL,
+    trigger_kind TEXT NOT NULL,
+    status TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER,
+    metrics TEXT NOT NULL,
+    error TEXT
+  );
+  CREATE INDEX idx_brain_runs_workspace ON brain_runs(workspace_id, started_at DESC);`,
 ];
 
 /**

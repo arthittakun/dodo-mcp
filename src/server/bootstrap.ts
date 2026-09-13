@@ -1,5 +1,6 @@
 import { MultimodalService } from '../services/multimodal/multimodalService.js';
 import { ResourceService } from '../services/resources/resourceService.js';
+import { ProjectBrainService } from '../services/brain/brainService.js';
 import { ScheduleService } from '../services/schedules/scheduleService.js';
 import { DesktopService } from '../services/desktop/desktopService.js';
 import { NativeDesktopBackend } from '../services/desktop/nativeBackend.js';
@@ -149,6 +150,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
 
   services.multimodal = new MultimodalService(services, configDir);
   services.resources = new ResourceService(services, configDir, paths.resourceStoreDir, paths.resourceStagingDir, installSecret);
+  services.brain = new ProjectBrainService(services, installSecret);
 
   let closed = false;
   return {
@@ -168,6 +170,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
       if (closed) return;
       closed = true;
       services.schedules.stop();
+      await services.brain?.close();
       await services.multimodal?.close();
       services.resources?.close();
       await services.desktop.close();

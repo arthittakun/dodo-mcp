@@ -14,6 +14,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ changes and jobs
                                       ├─ Git/intelligence/LSP
                                       ├─ assistance/multimodal/workflow
+                                      ├─ Project Brain ──► incremental AST graph
                                       └─ resource references ──► private SHA-256 CAS
 
 Owner browser/CLI
@@ -27,6 +28,26 @@ Local owner CLI/Config ──► project registry ──► projectId + workspac
 
 Authorized MCP read ──► federation resolver ──► isolated read context A/B/…
 ```
+
+## Project Brain และ incremental graph
+
+`ProjectBrainService` เป็น service ต่อ active workspace และใช้ SQLite tables แยก
+สำหรับ index state, parsed-file cache, nodes, edges และ bounded run history
+background scheduler ตรวจ metadata เป็นช่วง แล้ว snapshot เฉพาะไฟล์ที่เปลี่ยนผ่าน
+`WorkspaceFS` ก่อนส่ง UTF-8 text ไปยัง worker ที่โหลด bundled TypeScript เท่านั้น
+ไม่มีการโหลด compiler plugin, language plugin หรือ code จาก repository
+
+cache key ผูก content SHA-256, parser version, schema version และ config hash
+exact-content move รักษา opaque file identity ทำให้ `symbol://<project>/<entity>`
+คงเดิม จากนั้น affected calculator สร้าง graph ใหม่เฉพาะ source ที่เปลี่ยน ผู้ import
+source นั้น และ source ที่อ้างชื่อ symbol ที่เปลี่ยน transaction เดียว commit cache,
+nodes, edges, metrics และ run state จึงไม่เกิด graph ครึ่งรุ่น
+
+index เป็น evidence ที่สร้างใหม่ได้ ไม่ใช่ authority ทุก `brain_query` และ
+`brain_symbol` ตรวจ principal/live grant/workspace ACL, workspace context,
+`WorkspaceFS` policy และ SHA-256 ปัจจุบันซ้ำ stale row ถูกตัดออกโดย default และ
+cursor ใช้ HMAC ผูก query, workspace และ principal การเปลี่ยน workspace ปิด parser,
+scheduler และ run เดิมก่อนปิด database
 
 ## Bootstrap and workspace lifecycle
 
