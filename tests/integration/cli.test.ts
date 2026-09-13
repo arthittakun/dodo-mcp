@@ -73,6 +73,19 @@ describe('CLI', () => {
     expect(res.stderr).toMatch(/https/);
   });
 
+  it('CLI: setup plan is read-only and missing installers require --yes', () => {
+    const cfg = path.join(base, 'setup-plan-cfg');
+    const proj = fs.mkdtempSync(path.join(base, 'setup-plan-proj-'));
+    const plan = runCli(['setup', '--plan', '--components', 'model', '--json'], { cwd: proj, configDir: cfg, expectFail: true });
+    expect(plan.code).toBe(2);
+    expect(JSON.parse(plan.stdout)).toMatchObject({ mode: 'plan', components: [{ component: 'model', state: 'missing' }] });
+    expect(fs.existsSync(cfg)).toBe(false);
+    const install = runCli(['setup', '--components', 'model'], { cwd: proj, configDir: cfg, expectFail: true });
+    expect(install.code).not.toBe(0);
+    expect(install.stderr).toMatch(/no installer was started/);
+    expect(fs.existsSync(cfg)).toBe(false);
+  });
+
   it('CLI-10: refuses the home directory as a workspace root', () => {
     const cfg = fs.mkdtempSync(path.join(base, 'cfg-'));
     const res = runCli(['trust', '--mode', 'inspect'], { cwd: os.homedir(), configDir: cfg, expectFail: true });

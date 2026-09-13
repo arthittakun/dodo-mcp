@@ -57,7 +57,9 @@ Gateway ไม่เรียก handler ตรง ๆ และไม่สา�
 
 SQLite ใช้ durable migrations, WAL ตาม platform และ transaction ที่เหมาะสม Changesets มี immutable plan, journal, backups และ recovery marker
 
-Global config อยู่นอก workspace ใน platform config directory รองรับ `DODO_CONFIG_DIR` เป็น override หลัก และรักษา legacy override เพื่อ migration แบบ explicit
+Global config อยู่นอก workspace ใน platform config directory และรองรับ `DODO_CONFIG_DIR` เป็น explicit override
+
+`dodo setup --import-state` ใช้ state-import pipeline แยกจาก runtime bootstrap โดยอ่านได้เฉพาะ `config.json` ที่เป็น private regular file, validate ด้วย config schema, เลือกเฉพาะ non-authority allowlist, ตรวจ SHA-256 ซ้ำก่อนเขียน และ commit target ด้วย atomic rename การนำเข้าจะไม่เปิด SQLite เดิมหรืออ่าน/copy keys, tokens, ACL, trust, approvals, schedules, executable registrations หรือ runtime state
 
 Repo config เป็น hints-only และไม่สามารถ widen permissions, change OAuth, disable guards หรือ grant client access
 

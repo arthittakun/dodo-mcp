@@ -21,6 +21,8 @@ dodo --version
 - file changes แบบ hash-verified, journaled และ rollback ได้
 - jobs, Git, semantic tools, LSP และ task assistance
 - multimodal, browser, game, workflow และ schedule tools ตาม prerequisite
+- setup แบบ plan-first: installer ที่ยังขาดต้องยืนยันด้วย `--yes`
+- existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
 
 ## ลำดับการใช้ Compact
 
@@ -31,6 +33,16 @@ project_overview
 ```
 
 Compact ลด schema load ตอนเชื่อมต่อ แต่ยังใช้ target authorization และ policy เดิมทุกข้อ
+
+## Setup ที่ปลอดภัย
+
+```bash
+dodo setup --check
+dodo setup --plan --components git,ripgrep,ffmpeg
+dodo setup --yes --components git,ripgrep,ffmpeg
+```
+
+`--check` และ `--plan` ไม่เขียน config หรือเริ่ม installer การใช้ `--import-state` จะเก็บ source เดิมและไม่คัดลอก OAuth, token, database, ACL, trust หรือ permission-bearing configuration
 
 ## Security
 

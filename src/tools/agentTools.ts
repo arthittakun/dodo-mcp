@@ -11,6 +11,7 @@ import { resolveTrustedExecutable } from '../platform/execResolve.js';
 import { batchInvocation, shellSpec } from '../platform/shell.js';
 import { signalOwnedProcess } from '../platform/processTree.js';
 import { truncateUtf8 } from '../util/bytes.js';
+import { DODO_VERSION } from '../server/version.js';
 
 /**
  * Agent-workflow tools: a per-workspace todo list (Claude Code / OpenCode
@@ -250,7 +251,7 @@ export const fetchUrlTool = defineTool({
         res = await fetch(current, {
           redirect: 'manual',
           signal: controller.signal,
-          headers: { 'user-agent': 'dodo-mcp/1.1 (+fetch_url)', accept: 'text/html,application/json,text/plain;q=0.9,*/*;q=0.5' },
+          headers: { 'user-agent': `dodo-mcp/${DODO_VERSION} (+fetch_url)`, accept: 'text/html,application/json,text/plain;q=0.9,*/*;q=0.5' },
         });
         if (res.status >= 300 && res.status < 400) {
           const loc = res.headers.get('location');

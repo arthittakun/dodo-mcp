@@ -3,7 +3,9 @@
 ## 1.0.0
 
 - เปิดตัว package `dodo-mcp` และ CLI `dodo`
-- เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ migration แบบ explicit
+- เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ safe existing-state preference import แบบ explicit
+- `dodo setup --check/--plan` เป็น read-only และ dependency installer ต้องได้รับ `--yes` ก่อนเริ่ม
+- state import ไม่คัดลอก OAuth material, database, client/workspace authority หรือ permission-bearing config
 - เพิ่ม Compact, Full และ Hybrid MCP tool surfaces
 - เพิ่ม operation discovery และ gateway dispatch ผ่าน policy pipeline เดียวกับ direct tools
 - คง workspace ID/epoch, ACL, trust, approval, expected hash และ secret/path guards

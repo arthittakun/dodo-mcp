@@ -24,15 +24,15 @@ import { sandboxAvailability } from '../services/jobs/sandbox.js';
 import { NativeDesktopBackend, setupNativeDesktop } from '../services/desktop/nativeBackend.js';
 import { activateManagedTools, registerManagedPath } from './managedTools.js';
 import { downloadVerified, verifiedFile, MODEL_PIN, WINDOWS_PINS, extractWindowsZip } from './download.js';
-import { importLegacyState, planLegacyMigration, type LegacyMigrationPlan, type LegacyMigrationResult } from '../config/migration.js';
+import { importState, planStateImport, type StateImportPlan, type StateImportResult } from '../config/stateImport.js';
 
 export const COMPONENTS = ['git', 'ripgrep', 'ffmpeg', 'whisper', 'model', 'chromium', 'lsp', 'speech', 'desktop', 'sandbox', 'web'] as const;
 export type Component = typeof COMPONENTS[number];
 export type SetupState = 'ready' | 'missing' | 'needs-permission' | 'needs-backend' | 'failed';
 export interface SetupItem { component: Component; state: SetupState; detail: string; action?: string }
-export interface SetupOptions { cwd: string; configDir: string; check?: boolean; plan?: boolean; yes?: boolean; enableWeb?: boolean; components?: Component[]; detectLegacy?: boolean; importLegacy?: boolean }
-export interface SetupMigrationReport { plan: LegacyMigrationPlan; result?: LegacyMigrationResult }
-export interface SetupReport { platform: string; arch: string; mode: 'check' | 'plan' | 'install'; components: SetupItem[]; complete: boolean; exitCode: number; receipt?: string; migration?: SetupMigrationReport }
+export interface SetupOptions { cwd: string; configDir: string; check?: boolean; plan?: boolean; yes?: boolean; enableWeb?: boolean; components?: Component[]; detectExistingState?: boolean; importState?: boolean }
+export interface SetupStateImportReport { plan: StateImportPlan; result?: StateImportResult }
+export interface SetupReport { platform: string; arch: string; mode: 'check' | 'plan' | 'install'; components: SetupItem[]; complete: boolean; exitCode: number; receipt?: string; stateImport?: SetupStateImportReport }
 const WHISPER_COMMIT = '306c88f4d1286aec1bf96e544632897886af5501';
 const LSP_PACKAGES = ['pyright@1.1.414', 'vscode-langservers-extracted@4.10.0', 'yaml-language-server@1.24.0', 'bash-language-server@5.6.0'];
 const LSP_ENTRIES = {
@@ -141,30 +141,45 @@ export async function inspectSetup(options: SetupOptions): Promise<SetupReport> 
     }
   }
   const complete = results.every(item => item.state === 'ready');
-  const migration = options.detectLegacy ? { plan: planLegacyMigration(options.configDir) } : undefined;
-  return { platform: process.platform, arch: process.arch, mode: options.check ? 'check' : options.plan ? 'plan' : 'install', components: results, complete, exitCode: complete ? 0 : results.some(item => item.state === 'failed') ? 1 : 2, ...(migration ? { migration } : {}) };
+  const stateImport = options.detectExistingState ? { plan: planStateImport(options.configDir) } : undefined;
+  return { platform: process.platform, arch: process.arch, mode: options.check ? 'check' : options.plan ? 'plan' : 'install', components: results, complete, exitCode: complete ? 0 : results.some(item => item.state === 'failed') ? 1 : 2, ...(stateImport ? { stateImport } : {}) };
 }
 
 /** The local setup CLI alone chooses installers. No MCP tool or repository manifest selects commands. */
 export async function runSetup(options: SetupOptions, log: (text: string) => void = console.log): Promise<SetupReport> {
   if ((options.check || options.plan) && options.enableWeb) throw new DodoError('INVALID_INPUT', '--enable-web cannot be combined with --check/--plan');
   const root = setupContext(options.cwd), configDir = path.resolve(options.configDir);
-  if ((options.check || options.plan) && options.importLegacy) throw new DodoError('INVALID_INPUT', '--import-state cannot be combined with --check/--plan');
-  let migration: SetupMigrationReport | undefined;
-  const migrationPlan = options.detectLegacy ? planLegacyMigration(configDir) : undefined;
-  if (options.importLegacy) {
-    if (!options.detectLegacy) throw new DodoError('INVALID_INPUT', '--import-state is available only with the default Dodo config directory; use an explicit migration plan for custom state');
-    if (!migrationPlan || migrationPlan.state !== 'available') throw new DodoError('CONFLICT', migrationPlan?.reason ?? 'no importable legacy Dodo state was found');
-    const result = importLegacyState(migrationPlan);
-    migration = { plan: migrationPlan, result };
+  if ((options.check || options.plan) && options.importState) throw new DodoError('INVALID_INPUT', '--import-state cannot be combined with --check/--plan');
+  let stateImport: SetupStateImportReport | undefined;
+  const importPlan = options.detectExistingState ? planStateImport(configDir) : undefined;
+  if (options.importState) {
+    if (!options.detectExistingState) throw new DodoError('INVALID_INPUT', '--import-state is available only with the default Dodo config directory; use an explicit import plan for custom state');
+    if (importPlan?.state === 'blocked') {
+      throw new DodoError('MIGRATION_REVIEW_REQUIRED', importPlan.reason ?? 'state import needs local review', {
+        recovery: 'inspect the source locally; Dodo did not create or modify the target',
+      });
+    }
+    if (importPlan?.state === 'available') {
+      const result = importState(importPlan);
+      stateImport = { plan: importPlan, result };
+    } else if (importPlan) {
+      stateImport = { plan: importPlan };
+    }
   }
-  if (!migration && migrationPlan) migration = { plan: migrationPlan };
-  const initial = await inspectSetup({ ...options, ...(migration ? { detectLegacy: false } : {}) });
+  if (!stateImport && importPlan) stateImport = { plan: importPlan };
+  const initial = await inspectSetup({ ...options, ...(stateImport ? { detectExistingState: false } : {}) });
   if (options.check || options.plan) {
-    if (migration) initial.migration = migration;
+    if (stateImport) initial.stateImport = stateImport;
     return initial;
   }
   if (!['darwin', 'linux', 'win32'].includes(process.platform)) throw new DodoError('NOT_SUPPORTED', `no reviewed installer recipes for ${process.platform}`);
+  const installTargets = initial.components.filter(item => item.state === 'missing' || item.state === 'failed').map(item => item.component);
+  if (installTargets.length > 0 && !options.yes) {
+    throw new DodoError('APPROVAL_REQUIRED', 'setup found components that require installation; no installer was started', {
+      detail: { components: installTargets },
+      recovery: 'review dodo setup --plan for those components, then rerun with --yes',
+    });
+  }
   ensurePrivateDirectory(configDir);
   const tools = path.join(configDir, 'tools'); ensurePrivateDirectory(tools);
   const receipts = path.join(configDir, 'setup-receipts'); ensurePrivateDirectory(receipts);
@@ -305,7 +320,7 @@ export async function runSetup(options: SetupOptions, log: (text: string) => voi
       } catch (error) { outcomes.set(component, (error as Error).message); log(`[setup] ${component}: ${(error as Error).message}`); }
     }
     if (options.enableWeb) updateOwnerConfig(configDir, current => ({ ...current, allowWebFetch: true }));
-    const result = await inspectSetup({ ...options, detectLegacy: false });
+    const result = await inspectSetup({ ...options, detectExistingState: false });
     for (const item of result.components) if (outcomes.has(item.component)) { item.state = 'failed'; item.detail = outcomes.get(item.component)!; }
     // Installer success is not readiness. Exercise installed components with
     // private synthetic fixtures before reporting them as ready.
@@ -325,9 +340,9 @@ export async function runSetup(options: SetupOptions, log: (text: string) => voi
       catch (error) { sandbox.state = 'failed'; sandbox.detail = `sandbox confinement verification failed: ${(error as Error).message.slice(0, 1000)}`; }
     }
     result.complete = result.components.every(item => item.state === 'ready'); result.exitCode = result.complete ? 0 : result.components.some(item => item.state === 'failed') ? 1 : 2;
-    if (migration) result.migration = migration;
+    if (stateImport) result.stateImport = stateImport;
     const receipt = path.join(receipts, `${id}.json`); result.receipt = receipt;
-    fs.writeFileSync(receipt, JSON.stringify({ ...result, completedAt: new Date().toISOString(), steps, scope: 'explicit local owner setup; no DODO OAuth/workspace-access/trust/desktop-consent resets; native sandbox provisioning may create its own dedicated account and SID-scoped rules', webConsentRequested: options.enableWeb === true, restartRequiredForExistingServer: true }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    fs.writeFileSync(receipt, JSON.stringify({ schemaVersion: 1, kind: 'dodo-setup-receipt', ...result, completedAt: new Date().toISOString(), steps, scope: 'explicit local owner setup; no DODO OAuth/workspace-access/trust/desktop-consent resets; native sandbox provisioning may create its own dedicated account and SID-scoped rules', webConsentRequested: options.enableWeb === true, restartRequiredForExistingServer: true }, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     return result;
   } finally { try { if (fs.readFileSync(lock, 'utf8') === token) fs.unlinkSync(lock); } catch { /* Never remove a replaced lock. */ } }
 }

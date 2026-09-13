@@ -29,7 +29,7 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 
 - [016 — OpenID consent correction](016-oidc-openid-consent.md)
 - [017 — Installation identity and local config](017-installation-identity-local-config.md)
-- [018 — Repair legacy ACL scope encoding](018-access-scope-encoding.md)
+- [018 — ACL scope encoding contract](018-access-scope-encoding.md)
 - [019 — Runtime workspace switch from Local Config](019-runtime-workspace-switch.md)
 - [020 — Local macOS desktop access](020-desktop-access.md)
 

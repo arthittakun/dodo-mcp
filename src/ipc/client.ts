@@ -6,8 +6,8 @@ import { IPC_FRAME_BYTES, loadIpcCredential, ipcMac, validMac } from './authenti
 export class IpcError extends Error {}
 const NOT_RUNNING = 'no running DODO server for this workspace (start it with `dodo start`)';
 
-/** No unauthenticated fallback, including status/stop. Old servers must be
- * stopped with their matching CLI before upgrading to the 0.8 IPC protocol. */
+/** No unauthenticated fallback, including status/stop. A process using an
+ * incompatible IPC contract must be stopped with its matching CLI first. */
 export async function ipcCall(socketPath: string, cmd: string, args: Record<string, unknown> = {}, timeoutMs = 10000): Promise<unknown> {
   let credential;
   try { credential = loadIpcCredential(socketPath); }

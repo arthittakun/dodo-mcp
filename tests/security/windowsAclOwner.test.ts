@@ -38,7 +38,7 @@ $allow = @($rules | Where-Object { $_.AccessControlType -eq 'Allow' } | ForEach-
 }
 const close = (server: net.Server) => new Promise<void>(resolve => server.close(() => resolve()));
 
-describe.skipIf(process.platform !== 'win32')('0.8.1 native Windows Administrators-owned state regression', () => {
+describe.skipIf(process.platform !== 'win32')('native Windows Administrators-owned state regression', () => {
   let base: string, sid: string, serial = 0;
   beforeAll(() => {
     const identity = JSON.parse(powershell(`

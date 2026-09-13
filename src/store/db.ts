@@ -101,8 +101,8 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     SELECT workspace_id,client_id,scopes FROM grants WHERE revoked_at IS NULL ORDER BY created_at;
   `,
   (db) => {
-    // Migration 3 copied grants.scopes (space-separated) into a JSON ACL.
-    // Repair existing 0.2.0 stores as well as upgrades directly from 0.1.
+    // An earlier schema step copied grants.scopes (space-separated) into a
+    // JSON ACL. Normalize both partially and directly upgraded stores.
     const rows = db.prepare('SELECT workspace_id, client_id, scopes FROM workspace_clients').all() as Array<{workspace_id: string; client_id: string; scopes: string}>;
     const update = db.prepare('UPDATE workspace_clients SET scopes=? WHERE workspace_id=? AND client_id=?');
     for (const row of rows) update.run(JSON.stringify(decodeAccessScopes(row.scopes, true)), row.workspace_id, row.client_id);

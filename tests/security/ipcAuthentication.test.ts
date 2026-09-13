@@ -40,9 +40,9 @@ function raw(endpoint: string, first: unknown, answer?: (hello: Record<string, u
   });
 }
 
-describe('0.8 authenticated owner IPC (real sockets/pipes)', () => {
+describe('authenticated owner IPC (real sockets/pipes)', () => {
   let base: string, serial = 0;
-  beforeAll(() => { base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-ipc08-'))); ensurePrivateDirectory(base); }, 120000);
+  beforeAll(() => { base = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-ipc-'))); ensurePrivateDirectory(base); }, 120000);
   afterAll(() => { removeWithRetry(base, true); });
   const locator = () => ipcSocketPath(base, `auth-test-${++serial}`);
 

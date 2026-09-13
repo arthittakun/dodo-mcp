@@ -539,7 +539,7 @@ function overviewFor(surface: 'compact' | 'hybrid'): AnyToolDef {
         data: {
           ...(result.data as Record<string, unknown>),
           toolSurface: surface,
-          // kept for 0.7.1 compatibility: the compact field names stay.
+          // Public compact-surface field names are stable protocol contract.
           compactToolCount: COMPACT_CATALOG.length,
           fullToolCount: TOOL_CATALOG.length,
           ...(surface === 'hybrid' ? { hybridToolCount: HYBRID_CATALOG.length } : {}),
@@ -555,7 +555,7 @@ const GATEWAYS: AnyToolDef[] = GATEWAY_SPECS.map(buildGateway);
 export const COMPACT_CATALOG: AnyToolDef[] = [overviewFor('compact'), discoverTool, ...GATEWAYS];
 
 /**
- * Hybrid surface (ADR-029 addendum, 0.7.2): for clients that cap the tool
+ * Hybrid surface (ADR-029 addendum): for clients that cap the tool
  * count near ~50, the coverage core comes FIRST (overview, discover, all 17
  * gateways — identical to compact, so any client-side truncation can only
  * drop direct-tool duplicates, never capabilities), followed by the 30 most

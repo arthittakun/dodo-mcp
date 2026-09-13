@@ -283,9 +283,12 @@ const SHUTDOWN_GRACE_MS = 2000;
  * included) enumerate workspace files asynchronously AFTER `initialize`
  * completes, so an immediate references/rename would silently miss files in
  * other modules. We wait until the server has no active progress and has
- * been quiet for STARTUP_QUIET_MS, bounded by STARTUP_SETTLE_MAX_MS.
+ * been quiet for STARTUP_QUIET_MS, bounded by STARTUP_SETTLE_MAX_MS. The
+ * minimum observation window matters because some servers acknowledge
+ * `initialize` before they emit their first indexing progress notification.
  */
 const STARTUP_QUIET_MS = 400;
+const STARTUP_MIN_OBSERVE_MS = 2000;
 const STARTUP_SETTLE_MAX_MS = 5000;
 /** Per request: bounded wait for reported background work to finish before asking. */
 const PRE_REQUEST_IDLE_MAX_MS = 2000;
@@ -721,7 +724,8 @@ export class LspService {
     }
     client.notify('initialized', {});
     this.log(`[lsp:${language}] started ${entry.serverName} (pid ${client.pid ?? '?'})`);
-    const settled = await this.awaitIdle(entry, Math.min(STARTUP_SETTLE_MAX_MS, this.limits.semanticRequestTimeoutMs), STARTUP_QUIET_MS);
+    const settleMax = Math.min(STARTUP_SETTLE_MAX_MS, this.limits.semanticRequestTimeoutMs);
+    const settled = await this.awaitIdle(entry, settleMax, STARTUP_QUIET_MS, Math.min(STARTUP_MIN_OBSERVE_MS, settleMax));
     if (!settled) this.log(`[lsp:${language}] server still busy ${STARTUP_SETTLE_MAX_MS} ms after start; continuing (results may be incomplete until it settles)`);
   }
 
@@ -729,7 +733,7 @@ export class LspService {
    * Resolve true once the server has no active progress work and (when
    * quietMs > 0) no inbound traffic for quietMs; false when maxMs elapses.
    */
-  private awaitIdle(entry: ServerEntry, maxMs: number, quietMs: number): Promise<boolean> {
+  private awaitIdle(entry: ServerEntry, maxMs: number, quietMs: number, minimumMs = 0): Promise<boolean> {
     const started = Date.now();
     return new Promise((resolve) => {
       const check = (): void => {
@@ -739,7 +743,7 @@ export class LspService {
         }
         const now = Date.now();
         const quietFor = now - entry.client.lastInboundAt;
-        if (entry.activeProgress.size === 0 && quietFor >= quietMs) {
+        if (entry.activeProgress.size === 0 && quietFor >= quietMs && now - started >= minimumMs) {
           resolve(true);
           return;
         }

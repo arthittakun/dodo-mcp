@@ -27,6 +27,8 @@ Surface เปลี่ยนจำนวน tools ที่ expose เท่า
 
 Desktop, browser, media, speech, LSP และ OS sandbox ต้องตรวจ dependency และ OS permission ด้วย `dodo setup --check` หรือ `dodo doctor` ระบบจะรายงาน `NOT_SUPPORTED` เมื่อ environment ยังไม่พร้อม และจะไม่เปิด permission หรือดาวน์โหลด model โดยอัตโนมัติ
 
+`dodo setup --plan` ใช้ตรวจขั้นตอนติดตั้งแบบ read-only ส่วน installer ต้องมี `--yes` การใช้ `--import-state` รองรับเฉพาะ config ตำแหน่งมาตรฐานและนำเข้า non-authority preferences เท่านั้น custom `DODO_CONFIG_DIR` ไม่ถูกค้นหรือ merge อัตโนมัติ
+
 ## Client behavior
 
 Remote clients อาจ cache tool catalog ต้องใช้ refresh หรือ recreate connection ตามพฤติกรรมของ client หลังเปลี่ยน surface หรือ schema

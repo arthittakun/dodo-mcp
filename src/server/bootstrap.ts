@@ -41,7 +41,7 @@ export interface BootstrapOptions {
    * runtime workspace switch must stay in the directory the server booted
    * with, whatever the environment looks like later.
    */
-  configDir?: Pick<ConfigDirResolution, 'dir' | 'source' | 'envVar' | 'legacy'>;
+  configDir?: Pick<ConfigDirResolution, 'dir' | 'source' | 'envVar'>;
 }
 
 export interface BootstrappedWorkspace {

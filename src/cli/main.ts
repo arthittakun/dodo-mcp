@@ -71,7 +71,7 @@ program.command('setup')
   .description('check and install missing local dependencies for this OS; existing security permissions remain in force')
   .option('--check', 'read-only readiness report; no installation or configuration writes', false)
   .option('--plan', 'read-only installation/readiness plan', false)
-  .option('--import-state', 'import detected existing Dodo state; preserves the source and refuses live runtime markers', false)
+  .option('--import-state', 'import only reviewed non-authority preferences from detected Dodo state; preserves the source', false)
   .option('--yes', 'acknowledge reviewed package installations; never bypasses OS elevation or desktop consent', false)
   .option('--components <list>', 'all, or comma-separated component names', 'all')
   .option('--enable-web', 'explicitly permit SSRF-guarded outbound web access in owner config', false)
@@ -80,14 +80,18 @@ program.command('setup')
     const { runSetup, parseComponents } = await import('../setup/setup.js');
     try {
       const configResolution = resolveConfigDir(process.env);
-      const report = await runSetup({ cwd: invokedCwd, configDir: configResolution.dir, check: opts.check, plan: opts.plan, yes: opts.yes, enableWeb: opts.enableWeb, components: parseComponents(opts.components), detectLegacy: configResolution.source === 'platform', importLegacy: opts.importState }, line => opts.json ? console.error(line) : console.log(line));
+      const report = await runSetup({ cwd: invokedCwd, configDir: configResolution.dir, check: opts.check, plan: opts.plan, yes: opts.yes, enableWeb: opts.enableWeb, components: parseComponents(opts.components), detectExistingState: configResolution.source === 'platform', importState: opts.importState }, line => opts.json ? console.error(line) : console.log(line));
       if (opts.json) console.log(JSON.stringify(report, null, 2));
       else {
         console.log(`DODO setup: ${report.platform}/${report.arch} (${report.mode})`);
         for (const item of report.components) console.log(`[${item.state}] ${item.component}: ${item.detail}${item.action ? ` — ${item.action}` : ''}`);
-        if (report.migration?.result) console.log(`Imported legacy Dodo state: ${report.migration.result.sourceDir} → ${report.migration.result.targetDir} (source preserved)\nReceipt: ${report.migration.result.receipt}`);
-        else if (report.migration?.plan.state === 'available') console.log(`Existing Dodo state detected at ${report.migration.plan.sourceDir}. Re-run with --import-state to import it; the source will be preserved.`);
-        else if (report.migration?.plan.state === 'blocked') console.log(`Legacy Dodo migration blocked: ${report.migration.plan.reason}`);
+        if (report.stateImport?.result) {
+          console.log(`Imported reviewed Dodo preferences: ${report.stateImport.result.importedConfigFields.join(', ') || 'none'} (source preserved)\nSecurity state reset: ${report.stateImport.result.resetSecurity.join('; ')}\nReceipt: ${report.stateImport.result.receipt}`);
+        } else if (report.stateImport?.plan.state === 'available') {
+          console.log(`Existing Dodo config detected at ${report.stateImport.plan.sourceDir}. Importable preferences: ${report.stateImport.plan.importedConfigFields.join(', ') || 'none'}. OAuth, ACL, trust and permission state will not be copied. Re-run with --import-state to continue.`);
+        } else if (report.stateImport?.plan.state === 'blocked') {
+          console.log(`Dodo state import requires local review: ${report.stateImport.plan.reason}`);
+        }
         console.log(report.complete ? 'All selected components passed their readiness checks.' : 'Not all selected components are ready. Missing permissions/backends are not installation successes.');
         if (report.receipt) console.log(`Receipt: ${report.receipt}\nRestart existing DODO processes to load installed paths/LSP/config. OAuth grants and workspace access were not reset.`);
       }
@@ -831,7 +835,7 @@ Local HTTP + private config:
   dodo start --allow --all            trusted tasks for this run
   dodo --bypass                       trusted tasks, default command sandbox off
 MCP subprocess clients:
-  dodo stdio --root /path/to/project  explicit STDIO (required since 0.2)
+  dodo stdio --root /path/to/project  explicit local STDIO transport
 Desktop (platform helper and explicit app permission required):
   dodo desktop setup                 prepare the platform desktop backend
   dodo desktop disable               revoke desktop access

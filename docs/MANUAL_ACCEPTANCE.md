@@ -2,6 +2,25 @@
 
 ผล manual ต้องบันทึกเป็น `MANUAL_PASS` หรือ `MANUAL_NOT_RUN` พร้อมวันเวลาและ environment ห้ามเดาผลจาก automated test
 
+สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-13) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
+
+## Setup foundation
+
+1. ใช้ config directory ชั่วคราวและรัน `dodo setup --check` กับ `dodo setup --plan`
+2. ตรวจว่าไม่มี config, tools, receipt หรือ project file ถูกสร้าง
+3. เลือก dependency ที่ยังขาดแล้วรันโดยไม่มี `--yes`
+4. ตรวจว่า installer ไม่เริ่มและไม่มี state ถูกเขียน
+5. รันใหม่ด้วย `--yes` เฉพาะใน fixture ที่อนุญาต แล้วตรวจ receipt schema/version และ readiness probe
+
+## Existing-state import
+
+1. สร้าง fixture source ที่มี config preferences, OAuth/key fixture และ state DB fixture
+2. รัน plan และตรวจว่ารายการ import มีเฉพาะ safe config fields
+3. รัน `--import-state` และตรวจว่า source ยังอยู่ครบ
+4. ตรวจ target ไม่มี DB, keys, tokens, ACL, trust, approvals หรือ permission-bearing config
+5. เปลี่ยน source หลัง plan แล้วตรวจว่า import ถูกปฏิเสธและ target ไม่ถูกสร้าง
+6. ทดสอบ malformed/unknown config, symlink และ active IPC marker ให้ fail closed
+
 ## Local Config
 
 1. รัน `dodo start` จาก fixture project

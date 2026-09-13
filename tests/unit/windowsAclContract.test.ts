@@ -10,7 +10,7 @@ const protect = script.slice(script.indexOf("if ($env:DODO_PRIVATE_MODE -eq 'pro
 const verify = script.slice(script.indexOf("} elseif ($env:DODO_PRIVATE_MODE -eq 'verify')"), script.indexOf("} else { throw 'invalid private ACL mode' }"));
 const final = script.slice(script.indexOf('# Do not trust Set-Acl succeeding:'));
 
-describe('0.8.1 Windows ACL source contract (not native Windows evidence)', () => {
+describe('Windows ACL source contract (not native Windows evidence)', () => {
   it('admits only the current owner or Administrators with effective token membership', () => {
     expect(script).toContain("[Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')");
     expect(script).toContain('$repairAdminOwner = ($owner -eq $administratorsSid.Value) -and $principal.IsInRole($administratorsSid)');

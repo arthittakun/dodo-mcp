@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
+import { DodoError } from '../../src/errors.js';
 import { downloadVerified, validateDownloadUrl, WINDOWS_PINS } from '../../src/setup/download.js';
 import { inspectSetup, runSetup, parseComponents, COMPONENTS } from '../../src/setup/setup.js';
 import { ensurePrivateDirectory } from '../../src/platform/privateFs.js';
@@ -40,6 +41,19 @@ describe('explicit dependency setup safety and fidelity',()=>{
     await expect(runSetup({cwd:f.root,configDir:f.configDir,plan:true,enableWeb:true,components:['web']})).rejects.toThrow();
     expect(fs.existsSync(f.configDir)).toBe(false);
   });
+  it('does not run missing-component installers without explicit --yes acknowledgement',async()=>{
+    const f=fixture();
+    try {
+      await runSetup({cwd:f.root,configDir:f.configDir,components:['model']},()=>undefined);
+      throw new Error('expected setup approval refusal');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DodoError);
+      expect((error as DodoError).code).toBe('APPROVAL_REQUIRED');
+      expect((error as DodoError).detail).toEqual({components:['model']});
+    }
+    expect(fs.existsSync(f.configDir)).toBe(false);
+    expect(fs.readdirSync(f.root)).toEqual([]);
+  });
   it('web opt-in changes only that permission while preserving owner configuration',async()=>{
     const f=fixture();ensurePrivateDirectory(f.configDir);
     fs.writeFileSync(path.join(f.configDir,'config.json'),JSON.stringify({version:1,allowWebFetch:false,commandSandbox:'require',allowedHosts:['owner.example'],lsp:{fixture:{command:'fixture-server',args:[],extensions:['.fixture']}}}),{mode:0o600});
@@ -48,7 +62,9 @@ describe('explicit dependency setup safety and fidelity',()=>{
     const saved=JSON.parse(fs.readFileSync(path.join(f.configDir,'config.json'),'utf8'));
     expect(saved.allowWebFetch).toBe(true);expect(saved.commandSandbox).toBe('require');expect(saved.allowedHosts).toEqual(['owner.example']);expect(saved.lsp.fixture.command).toBe('fixture-server');
     expect(fs.existsSync(path.join(f.configDir,'setup.lock'))).toBe(false);
-    expect(fs.existsSync(report.receipt!)).toBe(true);expect(fs.readdirSync(f.root)).toEqual([]);
+    expect(fs.existsSync(report.receipt!)).toBe(true);
+    expect(JSON.parse(fs.readFileSync(report.receipt!,'utf8'))).toMatchObject({schemaVersion:1,kind:'dodo-setup-receipt',webConsentRequested:true});
+    expect(fs.readdirSync(f.root)).toEqual([]);
   });
   it('does not steal an existing setup lock',async()=>{
     const f=fixture();ensurePrivateDirectory(f.configDir);fs.writeFileSync(path.join(f.configDir,'setup.lock'),'another-owner-operation',{mode:0o600});

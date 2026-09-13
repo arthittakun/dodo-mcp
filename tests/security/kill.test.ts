@@ -22,7 +22,7 @@ function fixture() {
   const st = fs.statSync(root);
   store.upsertWorkspace({ id, root, dev: st.dev, ino: st.ino, epoch: 'test-epoch' });
   const socket = ipcSocketPath(config, id);
-  const status = { pid: process.pid, root, workspaceId: id, workspaceEpoch: 'test-epoch', version: '0.4.2', transport: 'http' };
+  const status = { pid: process.pid, root, workspaceId: id, workspaceEpoch: 'test-epoch', version: '1.0.0', transport: 'http' };
   return { config, socket, status, cleanup: () => { store.db.close(); fs.rmSync(base, { recursive: true, force: true }); } };
 }
 const close = (server: net.Server) => new Promise<void>(resolve => server.close(() => resolve()));

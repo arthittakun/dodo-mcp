@@ -4,15 +4,10 @@ Status: accepted, 2026-09-10.
 
 ## Problem
 
-The catalog contains 74 tools. The full tools/list serializes to roughly
-236 KB (95 KB of name+schema payload alone). Remote MCP clients ingest every
-tool definition at connection/scan time; the owner reported ChatGPT no longer
-completing write/edit work after a catalog expansion and temporarily using a smaller
-connection surface. Server-side evidence shows the write
-path itself is healthy: the live audit log records 112 `write_file` ok and 91
-`edit_file` ok in the previous 48 h from OAuth principals, and the full
-HTTP+OAuth and STDIO fixtures pass write/edit round-trips. The remaining
-The relevant change visible to a remote client is catalog size. No hard
+The catalog contains 74 tools. The full `tools/list` serializes to roughly
+236 KB. Remote MCP clients ingest every tool definition at connection time,
+and clients differ in the catalog/schema volume they retain. HTTP+OAuth and
+STDIO fixtures prove the direct write/edit path independently. No hard
 per-client tool limit is claimed; compact mode reduces catalog/schema load and
 avoids requiring clients to ingest every detailed operation schema at
 connection time.
@@ -33,10 +28,11 @@ Two tool surfaces over ONE unchanged capability set:
   `operation` is enum-bound to that gateway's fixed allowlist; every
   full-catalog tool except `project_overview` is reachable through exactly one
   gateway. `dodo_discover` searches operations and returns one operation's
-  full input JSON Schema plus a deterministic `schemaHash`.
+  args-only JSON Schema plus a deterministic `schemaHash`; workspace context
+  remains top-level gateway input and cannot be overridden inside `args`.
 
 Selection: `toolSurface` in the global config overrides the transport default;
-`--tools compact|full` on `dodo start`/`dodo stdio` overrides both for one
+`--tools compact|full|hybrid` on `dodo start`/`dodo stdio` overrides both for one
 run. The setting changes tool exposure only — never permissions.
 
 ## Security invariants (unchanged, now single-pathed)

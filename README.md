@@ -25,6 +25,10 @@ dodo trust --mode edit
 dodo start
 ```
 
+`dodo setup --check` และ `dodo setup --plan` เป็น read-only หากแผนมี dependency ที่ต้องติดตั้ง ให้ตรวจรายการก่อนแล้วจึงรัน `dodo setup --yes --components <list>` ระบบจะไม่เริ่ม installer หากไม่มี `--yes` และ `--yes` ไม่ข้าม sudo, OS permission หรือ owner consent
+
+เมื่อ DODO ตรวจพบ config เดิมในตำแหน่งมาตรฐาน สามารถใช้ `dodo setup --import-state` เพื่อนำเข้าเฉพาะ preference ที่ปลอดภัย เช่น port, search backend, retention และ tool surface ระบบจะสร้าง installation identity ใหม่เสมอและไม่คัดลอก OAuth keys/tokens, client grants, workspace ACL, trust, approvals, schedules, public origin, web/desktop permission, executable registration หรือฐานข้อมูลเดิม ต้นฉบับจะไม่ถูกแก้ไข
+
 เปิด Local Config จาก URL ที่ `dodo` แสดงใน terminal ใช้สำหรับตั้ง trust, public origin, client access และเปลี่ยน workspace เจ้าของเท่านั้น
 
 สำหรับ local MCP client เช่น Codex, Cursor หรือ Claude Desktop:
@@ -101,7 +105,7 @@ DODO ไม่รายงาน tunnel หรือสถานะ client ว�
 - client secret/access token ไม่แสดงใน UI หรือ audit
 - path traversal, symlink/hardlink, secret paths และ stale hashes ถูกปฏิเสธ
 - command environment ใช้ allowlist และไม่ส่ง local auth state ให้ child process
-- repository instructions, `.dodo.json`, legacy project hints และ AGENTS.md ไม่มีอำนาจเพิ่มสิทธิ์
+- repository instructions, `.dodo.json`, project hints และ AGENTS.md ไม่มีอำนาจเพิ่มสิทธิ์
 - gateway ไม่ grant สิทธิ์และไม่ข้าม approval หรือ target operation policy
 
 ดูรายละเอียดที่ [SECURITY](docs/SECURITY.md), [AUTH](docs/AUTH.md) และ [ARCHITECTURE](docs/ARCHITECTURE.md)

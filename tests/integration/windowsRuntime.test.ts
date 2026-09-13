@@ -7,7 +7,7 @@ import { shellSpec } from '../../src/platform/shell.js';
 
 // These are REAL services/child processes on each host, not process.platform
 // mocks. On Windows they exercise CreateProcess, cmd/Git Bash and NTFS.
-describe('0.8 native runtime contracts in a Thai/spaced workspace', () => {
+describe('native runtime contracts in a Thai/spaced workspace', () => {
   let f: ReturnType<typeof platformFixture>;
   beforeAll(() => { f = platformFixture(); }, 120000);
   afterAll(async () => { if (f) await f.close(); }, 120000);

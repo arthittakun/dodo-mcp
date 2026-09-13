@@ -15,7 +15,6 @@ export interface ConfigDirResolution {
   dir: string;
   source: 'env' | 'platform';
   envVar?: 'DODO_CONFIG_DIR';
-  legacy?: boolean;
 }
 
 function nonEmpty(value: string | undefined): string | undefined {
@@ -40,11 +39,11 @@ export function resolveConfigDir(env: NodeJS.ProcessEnv = process.env): ConfigDi
 }
 
 /**
- * Fixed, platform-specific legacy locations that may be imported by the
+ * Fixed, platform-specific existing locations that may be imported by the
  * explicit local-owner setup flow. This function never scans a home
  * directory; callers only inspect the returned paths.
  */
-export function legacyConfigDirs(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string[] {
+export function existingConfigDirs(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string[] {
   const home = os.homedir();
   const candidates: string[] = [];
   if (platform === 'darwin') {
