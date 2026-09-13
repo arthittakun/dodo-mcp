@@ -17,14 +17,17 @@ npm pack
 
 ผล local gate วันที่ 2026-09-14 (macOS, source checkout):
 
-- build: PASS — full 74, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
+- build: PASS — full 80, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 64 files PASS, 2 files platform-skipped; 510 tests PASS, 30 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 66 files PASS, 2 files platform-skipped; 529 tests PASS, 30 tests platform/prerequisite-skipped
 - packaging: 14 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
-- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, full schema = 74 tools และ installed read/search schemas มี federation fields
+- fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 80,
+  Compact = 19, `dodo_media → resource_inspect → resource_read_range` อ่าน 64-byte
+  chunk แล้ว resume ต่อ 32 bytes ที่ offset 64 พร้อม SHA-256 จาก installed artifact
+  สำเร็จ
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -43,8 +46,17 @@ Multi-project federation tests ใช้ HTTP + OAuth fixture จริงกั
 identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
-`projectId` เข้า write operation จำนวน surface ยังคง Full 74 / Compact 19 /
-Hybrid 49
+`projectId` เข้า write operation Phase 04 เพิ่มเฉพาะ Full resource operations ทำให้
+surface ปัจจุบันเป็น Full 80 / Compact 19 / Hybrid 49
+
+Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
+binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
+content hash dedup, concurrent ingest, restart persistence, expired-reference GC,
+old crash-object recovery, disk/reference quotas, expected hash/MIME, corrupt
+decoder input/CAS bytes, anonymous/read-only/revoked ACL, principal ownership,
+stale epoch, private config state, secret/traversal/symlink/hardlink และ target-specific
+inspect approval รวมถึง SQLite aggregate-quota trigger และ orphan grace ที่กัน GC
+ชนกับการสร้าง reference
 
 Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
 Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
@@ -53,10 +65,10 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 74 tools
+- Full surface: 80 tools
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- schema bytes: Full 239,253; Compact 47,185; Hybrid 114,665
+- generated schema metric: Full 264,467; Compact 47,411; Hybrid 114,891 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`

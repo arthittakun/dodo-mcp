@@ -13,7 +13,7 @@ dodo --version
 
 - MCP HTTP + OAuth และ Local Config แบบ loopback
 - Compact HTTP surface 19 tools
-- Full STDIO surface 74 tools
+- Full STDIO surface 80 tools
 - Hybrid surface 49 tools
 - direct coding tools, gateway dispatch และ operation discovery
 - workspace switching จาก Local Config พร้อม readiness และ rollback
@@ -25,6 +25,8 @@ dodo --version
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
 - Cloudflare Tunnel แบบ external หรือ managed foreground พร้อม OS credential references, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
 - owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม target ACL, readiness, source hash และ target-scoped audit
+- Universal Resource Layer + private SHA-256 CAS พร้อม bounded range/resume,
+  deterministic extraction และ MCP image/audio preview
 
 ## ลำดับการใช้ Compact
 

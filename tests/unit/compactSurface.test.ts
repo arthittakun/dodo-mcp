@@ -16,7 +16,7 @@ import {
 
 /** ADR-029: compact surface invariants — pure catalog logic, no server. */
 
-/** The frozen full-catalog contract: 74 tools, exact names, exact order. */
+/** The frozen full-catalog contract: 80 tools, exact names, exact order. */
 const FULL_NAMES = [
   'project_overview', 'list_files', 'read_files', 'read_image', 'read_instructions', 'search_code', 'glob_files',
   'write_file', 'edit_file', 'apply_patch', 'replace_in_files', 'delete_path', 'move_path', 'make_directory',
@@ -31,6 +31,7 @@ const FULL_NAMES = [
   'media_subtitles', 'media_search', 'media_read', 'media_job', 'media_close', 'speech_synthesize',
   'browser_session', 'browser_observe', 'browser_action', 'game_session', 'game_step',
   'workflow_save', 'workflow_search', 'workflow_run',
+  'resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -42,7 +43,7 @@ const discover = COMPACT_CATALOG.find((d) => d.name === 'dodo_discover') as AnyT
 const WS = { workspaceId: 'ws_test', workspaceEpoch: 'boot_test' };
 
 describe('compact surface catalog', () => {
-  it('full catalog is unchanged: 74 tools, exact names and order, no gateways mixed in', () => {
+  it('full catalog is unchanged except for the Phase 04 resource family: 80 exact names/order, no gateways mixed in', () => {
     expect(TOOL_CATALOG.map((d) => d.name)).toEqual(FULL_NAMES);
     expect(surfaceCatalog('full')).toBe(TOOL_CATALOG);
     expect(TOOL_CATALOG.some((d) => d.name.startsWith('dodo_'))).toBe(false);
@@ -155,7 +156,7 @@ describe('dodo_discover', () => {
   it('domain filter restricts matches and empty query lists everything paged', async () => {
     const media = await call(discover, { ...WS, domain: 'media', limit: 25 });
     const ops = (media.data as { matches: Array<{ operation: string; gateway: string }> }).matches;
-    expect(ops.length).toBe(12);
+    expect(ops.length).toBe(18);
     expect(ops.every((m) => m.gateway === 'dodo_media')).toBe(true);
 
     const page1 = await call(discover, { ...WS, limit: 10 });
@@ -190,7 +191,7 @@ describe('dodo_discover', () => {
     expect(full.properties['workspaceId']).toBeDefined();
   });
 
-  it('publishes federation fields through the existing read operations without changing catalog counts', async () => {
+  it('publishes federation fields through the existing read operations while preserving compact/hybrid budgets', async () => {
     const read = await call(discover, { ...WS, operation: 'read_files' });
     const search = await call(discover, { ...WS, operation: 'search_code' });
     const readSchema = (read.data as { inputSchema: { properties: Record<string, unknown> } }).inputSchema;
@@ -198,7 +199,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(74);
+    expect(TOOL_CATALOG).toHaveLength(80);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

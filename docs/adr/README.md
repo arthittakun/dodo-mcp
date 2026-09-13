@@ -48,3 +48,5 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [030 — Windows native candidate and authenticated owner IPC](030-windows-native-candidate.md)
 - [031 — Owner-selected Cloudflare Tunnel supervision](031-owner-selected-tunnel-supervision.md)
 - [032 — Owner-only durable project registry](032-owner-project-registry.md)
+- [033 — Read-only multi-project federation](033-read-only-project-federation.md)
+- [034 — Universal resource identity and private SHA-256 CAS](034-universal-resource-cas.md)

@@ -7,11 +7,12 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 74 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface 80 tools เป็นค่าเริ่มต้น
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
+- มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -71,6 +72,29 @@ Federation รุ่นนี้เป็น read-only การเขียน�
 workspace เจ้าของต้องเปิดโปรเจกต์นั้นผ่าน Local Config แล้วให้ AI เรียก
 `project_overview` และอ่านไฟล์ใหม่ก่อนแก้ จึงไม่สามารถนำ hash หรือ context จาก
 โปรเจกต์อื่นไปใช้เขียนโดยตรงได้
+
+### Universal Resource Layer
+
+ไฟล์ขนาดใหญ่และสื่อใช้ resource contract เดียวกัน โดยเริ่มจาก path ภายใน active
+workspace หรือ `assetId` ที่ principal เดียวกันเป็นเจ้าของ:
+
+```text
+resource_inspect(path="docs/spec.pdf")
+  → resourceId + dodo-resource:// URI + MIME + bytes + SHA-256 + capabilities
+
+resource_read_range(resourceId=..., offset=0, length=65536)
+  → bounded Base64 chunk + chunk hash + principal-bound resumeToken
+
+resource_preview(resourceId=...)
+  → text / MCP image / MCP audio / metadata ตามชนิดและขนาด
+```
+
+HTTP Compact/Hybrid เรียก operation เดียวกันผ่าน `dodo_media` หลังค้นด้วย
+`dodo_discover` CAS เก็บ object แบบ immutable ตาม hash และ deduplicate ข้าม reference
+ได้ แต่ resource ID/URI ไม่ใช่ capability ทุก call ยังตรวจ OAuth, live grant,
+workspace ACL, workspace ID/epoch และ principal ownership ซ้ำ ไม่ ingest `.env`,
+private DODO state, traversal, symlink หรือ hardlink และไม่ inflate/execute archive
+content ดูรายละเอียดที่ [Resources](docs/RESOURCES.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
@@ -164,6 +188,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - command environment ใช้ allowlist และไม่ส่ง local auth state ให้ child process
 - repository instructions, `.dodo.json`, project hints และ AGENTS.md ไม่มีอำนาจเพิ่มสิทธิ์
 - gateway ไม่ grant สิทธิ์และไม่ข้าม approval หรือ target operation policy
+- CAS URI/hash ไม่ grant สิทธิ์; resource ทุก read/range/preview ตรวจ live ACL และ object hash ซ้ำ
 
 ดูรายละเอียดที่ [SECURITY](docs/SECURITY.md), [AUTH](docs/AUTH.md) และ [ARCHITECTURE](docs/ARCHITECTURE.md)
 
@@ -181,6 +206,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - [Task assistance](docs/ASSISTANCE.md)
 - [Multimodal](docs/MULTIMODAL.md)
 - [Project Registry](docs/PROJECTS.md)
+- [Universal resources and CAS](docs/RESOURCES.md)
 - [Manual acceptance](docs/MANUAL_ACCEPTANCE.md)
 - [Test report](docs/TEST_REPORT.md)
 

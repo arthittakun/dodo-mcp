@@ -34,19 +34,19 @@
     "job_cancel",
     "list_jobs"
   ],
-  "fullToolCount": 74,
+  "fullToolCount": 80,
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 47185
+      "schemaBytes": 47411
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 114665
+      "schemaBytes": 114891
     },
     "full": {
-      "toolCount": 74,
-      "schemaBytes": 239253
+      "toolCount": 80,
+      "schemaBytes": 264467
     }
   },
   "tools": [
@@ -1803,7 +1803,7 @@
     {
       "name": "dodo_media",
       "title": "Screen, image, media and speech",
-      "description": "Gateway: bounded screen/image views, local video/audio evidence, transcription, subtitles and local speech synthesis. Set operation to one of: multimodal_status, screen_observe, image_view, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: bounded screen/image views, local video/audio evidence, transcription, subtitles and local speech synthesis. Set operation to one of: multimodal_status, screen_observe, image_view, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract, resource_transform. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": false,
@@ -1824,7 +1824,13 @@
         "media_read",
         "media_job",
         "media_close",
-        "speech_synthesize"
+        "speech_synthesize",
+        "resource_inspect",
+        "resource_read",
+        "resource_read_range",
+        "resource_preview",
+        "resource_extract",
+        "resource_transform"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1856,7 +1862,13 @@
               "media_read",
               "media_job",
               "media_close",
-              "speech_synthesize"
+              "speech_synthesize",
+              "resource_inspect",
+              "resource_read",
+              "resource_read_range",
+              "resource_preview",
+              "resource_extract",
+              "resource_transform"
             ],
             "description": "Target operation to invoke"
           },

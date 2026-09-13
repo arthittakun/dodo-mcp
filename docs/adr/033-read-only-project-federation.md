@@ -37,7 +37,9 @@ DODO adds an isolated `FederationService` for read-only retrieval:
 The existing tool names are retained. `project_overview`, `list_files` and
 `read_files` accept optional `projectId`; `search_code` accepts `projectId` or
 `projectIds`. Compact and Hybrid clients reach the same contract through
-`dodo_read`, so the surfaces remain 74/19/49 tools.
+`dodo_read`, so the Phase 03 surfaces remained 74/19/49 tools. ADR-034 later adds
+six full resource operations through the existing `dodo_media` gateway, making the
+current surfaces 80/19/49 without changing federation behavior.
 
 ## Security consequences
 

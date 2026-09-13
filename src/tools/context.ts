@@ -1,4 +1,5 @@
 import type { MultimodalService } from '../services/multimodal/multimodalService.js';
+import type { ResourceService } from '../services/resources/resourceService.js';
 import type { FederationService } from '../projects/federation.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
@@ -34,6 +35,8 @@ export interface Principal {
 export interface AppServices {
   federation: FederationService;
   multimodal?: MultimodalService;
+  /** Installation CAS with workspace/principal-scoped references. */
+  resources?: ResourceService;
   schedules: ScheduleService;
   version: string;
   config: GlobalConfig;

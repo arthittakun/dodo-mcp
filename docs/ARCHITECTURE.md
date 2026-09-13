@@ -13,7 +13,8 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ workspace services
                                       ├─ changes and jobs
                                       ├─ Git/intelligence/LSP
-                                      └─ assistance/multimodal/workflow
+                                      ├─ assistance/multimodal/workflow
+                                      └─ resource references ──► private SHA-256 CAS
 
 Owner browser/CLI
    │ loopback + capability token / IPC
@@ -84,9 +85,33 @@ Federation audit เขียนอีกแถวด้วย target workspace 
 
 Gateway ไม่เรียก handler ตรง ๆ และไม่สามารถเรียก gateway อื่น, project overview หรือ owner controls
 
+## Universal Resource Layer and CAS
+
+`ResourceService` ผูกกับ active `BootstrappedWorkspace` และสร้าง opaque resource
+reference ที่ bind กับ workspace ID และ digest ของ `grantId` + `clientId` ส่วน
+`CasStore` เป็น installation-private immutable object store ที่
+`<configDir>/store/sha256/<prefix>/<hash>` metadata/reference อยู่ใน SQLite แยกจาก
+object bytes จึง deduplicate object เดียวกันได้โดยไม่ทำให้ hash หรือ URI เป็นสิทธิ์
+
+การ ingest จาก workspace ผ่าน `WorkspaceFS`, regular-file/link checks, file identity
+ก่อนและหลัง streaming และ expected SHA-256/MIME เมื่อ caller ระบุ จาก media asset
+ต้องผ่าน owner lookup ของ `MediaStorage` อีกชั้น ทุก access ตรวจ live OAuth grant,
+client registration, workspace ACL, principal owner, object size และ full SHA-256
+ก่อนอ่าน range
+
+`resource_read`/`resource_read_range` จำกัดหนึ่ง chunk ไม่เกิน 256 KiB และคืน
+resume token ที่ signed/bound กับ workspace, principal, resource/hash และ expiry
+แต่ token ไม่ข้าม authorization `resource_preview` ส่ง image/audio content block
+เฉพาะ output ที่ bounded ส่วน ZIP provider อ่านเฉพาะ central directory โดยไม่
+inflate และ SVG อยู่ใน text path ไม่ถูก render เป็น active content GC ลบ object
+เฉพาะเมื่อไม่มี live reference ภายใต้ SQLite write transaction โดยเว้น grace
+หนึ่งชั่วโมงสำหรับ object ที่เพิ่งสร้าง/verify เพื่อไม่ให้ชนกับขั้นสร้าง reference
+การ publish ใช้ fsynced staging inode + create-if-absent hard link และ SQLite trigger
+บังคับโควตารวม 2 GiB ซ้ำเพื่อรองรับหลาย process
+
 ## Tool surfaces
 
-- Full catalog 74 individual definitions
+- Full catalog 80 individual definitions
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

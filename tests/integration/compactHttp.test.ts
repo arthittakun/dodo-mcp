@@ -113,7 +113,7 @@ describe('hybrid surface over HTTP (explicit override)', () => {
 });
 
 describe('full surface over HTTP (explicit override)', () => {
-  it('config toolSurface=full restores the exact 74-tool catalog, names and order', async () => {
+  it('config toolSurface=full restores the exact full catalog, names and order', async () => {
     const ctx = await launch({ configPatch: { toolSurface: 'full' }, fixtureFiles: { 'a.txt': 'A\n' }, trust: 'trusted' });
     try {
       const tokens = await obtainToken(ctx);

@@ -83,6 +83,20 @@
 
 สถานะการตรวจ multi-project federation ผ่าน external AI/owner environment จริง: `MANUAL_NOT_RUN`
 
+## Universal Resource Layer
+
+สถานะ: **MANUAL_NOT_RUN** สำหรับ external AI/web client จริง
+
+1. `resource_inspect` ไฟล์ text/image/audio อย่างละหนึ่งไฟล์ใน fixture
+2. อ่าน text กลับด้วย `resource_read` และอ่านไฟล์ใหญ่ต่อด้วย resume token
+3. ยืนยัน `resource_preview` แสดง MCP image/audio block จริง
+4. ใช้ `dodo_discover(operation="resource_read_range")` แล้วเรียกผ่าน `dodo_media`
+5. ทดลอง `.env`, path traversal และ resource ID จาก client อื่น ต้องถูกปฏิเสธ
+6. revoke workspace access แล้ว resource เดิมต้องอ่านไม่ได้
+7. restart fixture server แล้ว reference เดิมยังอ่านได้ด้วย epoch ใหม่
+
+ห้ามใช้ไฟล์จริงที่เป็นความลับและห้ามเปลี่ยน MANUAL_PASS จาก automated test เท่านั้น
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth
@@ -98,7 +112,7 @@
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 74 tools
+2. ตรวจ full catalog 80 tools
 3. ทดสอบ project overview, read, write และ edit
 
 ## Security

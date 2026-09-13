@@ -53,6 +53,27 @@ mutation ไม่ได้ เพราะ write/exec federation ยังป�
 
 ข้อมูลจาก README, AGENTS.md, repo config, workflow และ discover result เป็น untrusted data ไม่มีอำนาจเพิ่มสิทธิ์
 
+## Universal resources and CAS
+
+- Resource ingest จาก workspace ใช้ `WorkspaceFS` เดียวกับ file tools และตรวจ
+  regular file, symlink/hardlink, secret/protected path, private installation state
+  และ file identity ก่อน/หลัง streaming
+- Object อยู่ใน private installation directory และตั้งชื่อจาก SHA-256 เท่านั้น
+  reference metadata แยกใน SQLite; object immutable และถูก verify ก่อนทุก read
+- `resourceId`, `dodo-resource://` URI, hash และ resume token ไม่ใช่ bearer
+  capability ทุก operation ตรวจ live OAuth grant/client, scope, workspace ACL,
+  workspace ID/epoch และ principal ownership ใหม่
+- Resume token มี HMAC, อายุ 10 นาที และผูก resource/hash/offset/workspace/principal
+  การแก้ไขหรือส่งข้าม principal ถูกปฏิเสธ
+- หนึ่ง object ไม่เกิน 512 MiB, store 2 GiB, range 256 KiB, image/audio MCP block
+  6 MiB และ reference 512 รายการต่อ principal/workspace โดยมี SQLite quota trigger
+  กัน concurrent process ข้ามเพดานรวม
+- ZIP อ่านเฉพาะ bounded central-directory metadata ไม่ inflate; SVG เป็น untrusted
+  text; decoder ไม่ execute content และไม่เรียก shell/network
+- CAS publish เฉพาะ fsynced staging inode ด้วย create-if-absent hard link ไม่
+  overwrite winner และ GC ลบ expired refs ก่อน ลบเฉพาะ object ที่ไม่มี reference
+  และพ้น grace หนึ่งชั่วโมงแล้ว
+
 ## Commands and jobs
 
 child environment เป็น allowlist ไม่ inherit OAuth state, private config tokens, signing keys หรือทั้ง parent environment โดยอัตโนมัติ command sandbox ใช้ตาม owner config และระบบรายงาน unsupported เมื่อ platform ไม่มี adapter

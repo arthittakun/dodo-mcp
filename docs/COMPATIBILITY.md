@@ -27,7 +27,7 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools
-- STDIO default: Full 74 tools
+- STDIO default: Full 80 tools
 - explicit Hybrid: 49 tools
 - explicit override: `--tools compact|full|hybrid`
 

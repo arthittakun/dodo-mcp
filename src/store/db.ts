@@ -148,6 +148,38 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     ON project_registry(root_dev, root_ino) WHERE removed_at IS NULL;
   CREATE INDEX idx_project_registry_updated
     ON project_registry(removed_at, updated_at DESC);`,
+  `CREATE TABLE resource_objects (
+    hash TEXT PRIMARY KEY,
+    bytes INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    verified_at INTEGER NOT NULL
+  );
+  CREATE TABLE resource_refs (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    object_hash TEXT NOT NULL REFERENCES resource_objects(hash) ON DELETE RESTRICT,
+    mime_type TEXT NOT NULL,
+    source_kind TEXT NOT NULL,
+    source_label TEXT NOT NULL,
+    capabilities TEXT NOT NULL,
+    metadata TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+  );
+  CREATE INDEX idx_resource_refs_owner
+    ON resource_refs(workspace_id, principal, expires_at);
+  CREATE INDEX idx_resource_refs_object
+    ON resource_refs(object_hash);
+  CREATE INDEX idx_resource_refs_expiry
+    ON resource_refs(expires_at);`,
+  `CREATE TRIGGER resource_objects_quota
+    BEFORE INSERT ON resource_objects
+    WHEN NOT EXISTS (SELECT 1 FROM resource_objects WHERE hash=NEW.hash)
+      AND COALESCE((SELECT SUM(bytes) FROM resource_objects),0) + NEW.bytes > 2147483648
+    BEGIN
+      SELECT RAISE(ABORT, 'resource store quota exceeded');
+    END;`,
 ];
 
 /**

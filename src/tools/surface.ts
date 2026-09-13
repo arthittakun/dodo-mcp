@@ -18,7 +18,7 @@ import { envelopeSchema } from './envelope.js';
  * Compact MCP Tool Surface (ADR-029).
  *
  * Remote clients (ChatGPT connectors and similar) ingest EVERY tool schema at
- * connection time; the 74-tool full catalog serializes to hundreds of KB. The
+ * connection time; the full catalog serializes to hundreds of KB. The
  * compact surface exposes the same capabilities through a small set of
  * domain gateways plus `dodo_discover`, while STDIO/local clients keep the
  * full per-tool catalog by default.
@@ -174,6 +174,12 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'media_job',
       'media_close',
       'speech_synthesize',
+      'resource_inspect',
+      'resource_read',
+      'resource_read_range',
+      'resource_preview',
+      'resource_extract',
+      'resource_transform',
     ],
   },
   {

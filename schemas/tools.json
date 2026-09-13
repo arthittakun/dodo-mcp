@@ -1,7 +1,7 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Proposed DODO tool contract, not the MCP protocol spec.",
   "version": 1,
-  "toolCount": 74,
+  "toolCount": 80,
   "tools": [
     {
       "name": "project_overview",
@@ -19023,6 +19023,2007 @@
                 },
                 "required": [
                   "runId"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_inspect",
+      "title": "Ingest or inspect one immutable resource",
+      "description": "Create a workspace/principal-scoped reference to one guarded workspace path or owned media asset, or inspect an existing resourceId. Bytes enter the private content-addressed store only after path/link/file-identity checks and SHA-256 verification. A resourceId/URI is never authority and cannot cross clients or workspaces.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "assetId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "expectedMimeType": {
+            "type": "string",
+            "maxLength": 150,
+            "pattern": "^[a-z0-9!#$&^_.+-]+\\/[a-z0-9!#$&^_.+-]+$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resourceId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "uri": {
+                    "type": "string",
+                    "pattern": "^dodo-resource:\\/\\/.*"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "workspace",
+                          "media_asset",
+                          "transform"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 1024
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "properties": {
+                      "read": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "stream": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "seek": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "preview": {
+                        "type": "boolean"
+                      },
+                      "transform": {
+                        "type": "boolean"
+                      },
+                      "extractText": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "read",
+                      "stream",
+                      "seek",
+                      "preview",
+                      "transform",
+                      "extractText"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "width": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "height": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "format": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "entries": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "deduplicated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "resourceId",
+                  "uri",
+                  "mimeType",
+                  "bytes",
+                  "sha256",
+                  "source",
+                  "capabilities",
+                  "metadata",
+                  "createdAt",
+                  "expiresAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_read",
+      "title": "Read one bounded resource chunk",
+      "description": "Read at most 256 KiB from the beginning of an owned resource. Complete UTF-8 text is returned as text; binary or partial data is bounded Base64 with a signed resumeToken. Access, ACL and object hash are rechecked on every call.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "maxBytes": {
+            "default": 65536,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 262144
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "maxBytes"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "object",
+                    "properties": {
+                      "resourceId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                      },
+                      "uri": {
+                        "type": "string",
+                        "pattern": "^dodo-resource:\\/\\/.*"
+                      },
+                      "mimeType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "workspace",
+                              "media_asset",
+                              "transform"
+                            ]
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 1024
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "capabilities": {
+                        "type": "object",
+                        "properties": {
+                          "read": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "stream": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "seek": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "preview": {
+                            "type": "boolean"
+                          },
+                          "transform": {
+                            "type": "boolean"
+                          },
+                          "extractText": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "read",
+                          "stream",
+                          "seek",
+                          "preview",
+                          "transform",
+                          "extractText"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "maxLength": 80
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "format": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "entries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "deduplicated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "resourceId",
+                      "uri",
+                      "mimeType",
+                      "bytes",
+                      "sha256",
+                      "source",
+                      "capabilities",
+                      "metadata",
+                      "createdAt",
+                      "expiresAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "enum": [
+                      "utf8",
+                      "base64"
+                    ]
+                  },
+                  "data": {
+                    "type": "string"
+                  },
+                  "range": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "endExclusive": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "endExclusive",
+                      "total"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "chunkSha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "eof": {
+                    "type": "boolean"
+                  },
+                  "nextOffset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "resumeToken": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "resource",
+                  "encoding",
+                  "data",
+                  "range",
+                  "chunkSha256",
+                  "eof",
+                  "nextOffset",
+                  "resumeToken"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_read_range",
+      "title": "Read or resume a bounded byte range",
+      "description": "Read one Base64-encoded byte range (maximum 256 KiB) from an owned immutable resource. Continue with resumeToken alone; the signed token is bound to resource hash, workspace and principal but never replaces authorization. Multi-range and unbounded reads are refused.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2048
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 536870912
+          },
+          "length": {
+            "default": 65536,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 262144
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "length"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "object",
+                    "properties": {
+                      "resourceId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                      },
+                      "uri": {
+                        "type": "string",
+                        "pattern": "^dodo-resource:\\/\\/.*"
+                      },
+                      "mimeType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "workspace",
+                              "media_asset",
+                              "transform"
+                            ]
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 1024
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "capabilities": {
+                        "type": "object",
+                        "properties": {
+                          "read": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "stream": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "seek": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "preview": {
+                            "type": "boolean"
+                          },
+                          "transform": {
+                            "type": "boolean"
+                          },
+                          "extractText": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "read",
+                          "stream",
+                          "seek",
+                          "preview",
+                          "transform",
+                          "extractText"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "maxLength": 80
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "format": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "entries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "deduplicated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "resourceId",
+                      "uri",
+                      "mimeType",
+                      "bytes",
+                      "sha256",
+                      "source",
+                      "capabilities",
+                      "metadata",
+                      "createdAt",
+                      "expiresAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "encoding": {
+                    "type": "string",
+                    "enum": [
+                      "utf8",
+                      "base64"
+                    ]
+                  },
+                  "data": {
+                    "type": "string"
+                  },
+                  "range": {
+                    "type": "object",
+                    "properties": {
+                      "start": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "endExclusive": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "start",
+                      "endExclusive",
+                      "total"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "chunkSha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "eof": {
+                    "type": "boolean"
+                  },
+                  "nextOffset": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "resumeToken": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2048
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "resource",
+                  "encoding",
+                  "data",
+                  "range",
+                  "chunkSha256",
+                  "eof",
+                  "nextOffset",
+                  "resumeToken"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_preview",
+      "title": "Preview a resource safely",
+      "description": "Return bounded UTF-8 text, a raster thumbnail MCP image block, a <=6 MiB MCP audio block, or metadata-only evidence. SVG stays untrusted text; unsupported formats are never executed or sent to a shell.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "maxEdge": {
+            "default": 1024,
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 1600
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "maxEdge"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "object",
+                    "properties": {
+                      "resourceId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                      },
+                      "uri": {
+                        "type": "string",
+                        "pattern": "^dodo-resource:\\/\\/.*"
+                      },
+                      "mimeType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "workspace",
+                              "media_asset",
+                              "transform"
+                            ]
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 1024
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "capabilities": {
+                        "type": "object",
+                        "properties": {
+                          "read": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "stream": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "seek": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "preview": {
+                            "type": "boolean"
+                          },
+                          "transform": {
+                            "type": "boolean"
+                          },
+                          "extractText": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "read",
+                          "stream",
+                          "seek",
+                          "preview",
+                          "transform",
+                          "extractText"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "maxLength": 80
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "format": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "entries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "deduplicated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "resourceId",
+                      "uri",
+                      "mimeType",
+                      "bytes",
+                      "sha256",
+                      "source",
+                      "capabilities",
+                      "metadata",
+                      "createdAt",
+                      "expiresAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "previewKind": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "image",
+                      "audio",
+                      "metadata"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "previewMimeType": {
+                    "type": "string"
+                  },
+                  "previewBytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "width": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "height": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "resource",
+                  "previewKind",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_extract",
+      "title": "Extract bounded deterministic resource data",
+      "description": "Extract validated UTF-8 text, safe ZIP central-directory names/sizes, or metadata from an owned resource. Archive entries are never inflated, files are never executed, and OCR/PDF claims are not fabricated when no provider exists.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "kind": {
+            "default": "auto",
+            "type": "string",
+            "enum": [
+              "auto",
+              "text",
+              "metadata",
+              "archive_entries"
+            ]
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "kind"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resource": {
+                    "type": "object",
+                    "properties": {
+                      "resourceId": {
+                        "type": "string",
+                        "maxLength": 100,
+                        "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                      },
+                      "uri": {
+                        "type": "string",
+                        "pattern": "^dodo-resource:\\/\\/.*"
+                      },
+                      "mimeType": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150
+                      },
+                      "bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "source": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "workspace",
+                              "media_asset",
+                              "transform"
+                            ]
+                          },
+                          "label": {
+                            "type": "string",
+                            "maxLength": 1024
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "label"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "capabilities": {
+                        "type": "object",
+                        "properties": {
+                          "read": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "stream": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "seek": {
+                            "type": "boolean",
+                            "const": true
+                          },
+                          "preview": {
+                            "type": "boolean"
+                          },
+                          "transform": {
+                            "type": "boolean"
+                          },
+                          "extractText": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "read",
+                          "stream",
+                          "seek",
+                          "preview",
+                          "transform",
+                          "extractText"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "metadata": {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "maxLength": 80
+                          },
+                          "width": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "format": {
+                            "type": "string",
+                            "maxLength": 40
+                          },
+                          "entries": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "createdAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "expiresAt": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "deduplicated": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "resourceId",
+                      "uri",
+                      "mimeType",
+                      "bytes",
+                      "sha256",
+                      "source",
+                      "capabilities",
+                      "metadata",
+                      "createdAt",
+                      "expiresAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "metadata",
+                      "archive_entries"
+                    ]
+                  },
+                  "text": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  "entries": {
+                    "maxItems": 512,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "maxLength": 1024
+                        },
+                        "compressedBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "uncompressedBytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "directory": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "compressedBytes",
+                        "uncompressedBytes",
+                        "directory"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "provenance": {
+                    "type": "string",
+                    "const": "deterministic_local_decoder_untrusted_content"
+                  }
+                },
+                "required": [
+                  "resource",
+                  "kind",
+                  "truncated",
+                  "provenance"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "resource_transform",
+      "title": "Create a bounded immutable resource transform",
+      "description": "Create a JPEG thumbnail from an owned raster image and store it as a new immutable CAS resource. Decoder input is untrusted, dimensions/output are bounded, source hash is rechecked and inspect-mode owner approval still applies. No external command or network access.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "operation": {
+            "default": "thumbnail",
+            "type": "string",
+            "const": "thumbnail"
+          },
+          "maxEdge": {
+            "default": 1024,
+            "type": "integer",
+            "minimum": 64,
+            "maximum": 1600
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "operation",
+          "maxEdge"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resourceId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "uri": {
+                    "type": "string",
+                    "pattern": "^dodo-resource:\\/\\/.*"
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "source": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "workspace",
+                          "media_asset",
+                          "transform"
+                        ]
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 1024
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "properties": {
+                      "read": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "stream": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "seek": {
+                        "type": "boolean",
+                        "const": true
+                      },
+                      "preview": {
+                        "type": "boolean"
+                      },
+                      "transform": {
+                        "type": "boolean"
+                      },
+                      "extractText": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "read",
+                      "stream",
+                      "seek",
+                      "preview",
+                      "transform",
+                      "extractText"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string",
+                        "maxLength": 80
+                      },
+                      "width": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "height": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "format": {
+                        "type": "string",
+                        "maxLength": 40
+                      },
+                      "entries": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "deduplicated": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "resourceId",
+                  "uri",
+                  "mimeType",
+                  "bytes",
+                  "sha256",
+                  "source",
+                  "capabilities",
+                  "metadata",
+                  "createdAt",
+                  "expiresAt"
                 ],
                 "additionalProperties": false
               },

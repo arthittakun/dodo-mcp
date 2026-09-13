@@ -85,3 +85,12 @@ opt-in `hybrid` surface: 49 tools, compact coverage core first (truncation-
 safe), then 30 direct coding tools (`HYBRID_DIRECT_OPERATIONS`). Selection
 via config/CLI as before; defaults unchanged; every path keeps the shared
 invocation pipeline.
+
+## Addendum (Phase 04): resource operations
+
+ADR-034 adds six individual resource definitions to Full, so the current surfaces
+are Full 80, Compact 19 and Hybrid 49. Compact/Hybrid route the new operations
+through the existing `dodo_media` gateway; no new gateway or direct Hybrid duplicate
+was added. The historical 74-tool measurements above remain the evidence captured
+when this ADR was first accepted. Generated schemas and `docs/TEST_REPORT.md` carry
+the current byte measurements.
