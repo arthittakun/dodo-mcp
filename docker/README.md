@@ -3,7 +3,8 @@
 `linux-test.Dockerfile` runs the supported Linux gate as the unprivileged
 `node` user. `chromium-seccomp.json` is Playwright's Docker seccomp profile
 for sandboxed Chromium, with `openat2` enabled so current runc releases can
-safely reopen `/proc` after applying the container seccomp policy. It is
+safely reopen `/proc` after applying the container seccomp policy and
+`clone3` enabled for current glibc/Node worker threads. It is
 vendored from the matching Playwright v1.63.0
 release and keeps Docker's default syscall policy while allowing the user
 namespace operations Chromium's sandbox needs.

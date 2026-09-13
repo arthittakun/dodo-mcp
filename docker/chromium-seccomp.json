@@ -54,6 +54,7 @@
 			"comment": "Allow create user namespaces",
 			"names": [
 				"clone",
+				"clone3",
 				"setns",
 				"unshare"
 			],
