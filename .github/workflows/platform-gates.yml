@@ -71,7 +71,7 @@ jobs:
     timeout-minutes: 90
     defaults:
       run:
-        shell: pwsh
+        shell: powershell
     # Runner 2.337.0 crashes before step 1 under a th-TH host culture unless
     # the runner process starts in invariant mode. Step processes explicitly
     # restore normal globalization so DODO tests still exercise Windows locale
