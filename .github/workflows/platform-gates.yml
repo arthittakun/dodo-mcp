@@ -41,7 +41,12 @@ jobs:
         run: |
           test "$RUNNER_OS" = Linux
           docker version
-          docker info
+          if ! docker info; then
+            echo "::error::The self-hosted runner account cannot access Docker. Add the runner account to the docker group, then restart the runner so the new group membership takes effect."
+            id
+            stat -c 'docker socket: %A %U:%G %n' /var/run/docker.sock || true
+            exit 1
+          fi
       - name: Run isolated Linux release gate
         run: >-
           node scripts/test-linux-docker.mjs
@@ -67,6 +72,13 @@ jobs:
     defaults:
       run:
         shell: pwsh
+    # Runner 2.337.0 crashes before step 1 under a th-TH host culture unless
+    # the runner process starts in invariant mode. Step processes explicitly
+    # restore normal globalization so DODO tests still exercise Windows locale
+    # behavior. See actions/runner#4686.
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
+      DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
     steps:
       - name: Checkout trusted main revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
