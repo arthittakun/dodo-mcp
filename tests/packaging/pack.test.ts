@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -75,6 +75,13 @@ describe('PACK: npm tarball', () => {
   it('PACK-10: ships assistance/media documentation and explicit setup, never models or recordings', () => {
     for (const file of ['docs/ASSISTANCE.md', 'docs/MULTIMODAL.md', 'docs/RELEASE_NOTES.md', 'scripts/setup-multimodal.mjs', 'scripts/guard-publish.mjs', 'dist/services/multimodal/mediaWorker.js']) expect(fileList).toContain(file);
     expect(fileList.some(f => /^(?:models|tmp|release-evidence)\//.test(f) || /\.(?:bin|mp4|aiff|wav|db)$/.test(f))).toBe(false);
+  });
+
+  it('PACK-16: ships evaluation contracts but no benchmark results or private release evidence', () => {
+    expect(fileList).toContain('dist/evaluation/contracts.js');
+    expect(fileList).toContain('dist/evaluation/dodoBench.js');
+    expect(fileList).toContain('docs/EVALUATION.md');
+    expect(fileList.some((file) => file.startsWith('benchmarks/') || file.startsWith('release-evidence/'))).toBe(false);
   });
 
   it('PACK-01: contains NO secrets, keys, tokens, or state database', () => {

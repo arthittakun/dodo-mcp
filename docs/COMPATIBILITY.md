@@ -63,3 +63,10 @@ Remote clients อาจ cache tool catalog ต้องใช้ refresh หร
 ## Security boundary
 
 Directory guard ไม่ใช่ OS sandbox, repository instructions ไม่มีอำนาจเพิ่มสิทธิ์ และ trusted commands ใช้สิทธิ์ OS ของผู้ใช้จริง
+
+## Evaluation evidence
+
+DodoBench local fixture ใช้ยืนยัน contract บน platform/revision ที่ report ระบุเท่านั้น
+ผลของ macOS ไม่แทน Linux/Windows และ browser case จะเป็น optional skip เมื่อไม่มี
+Playwright Chromium Strict release gate ต้องมี evidence ที่ revision และ lock digest
+ตรงกันจากทุก platform ที่ประกาศรองรับ

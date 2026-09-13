@@ -2,6 +2,15 @@
 
 ## 1.0.0
 
+### DodoBench และ release evidence
+
+- เพิ่ม deterministic DodoBench baseline ครอบคลุม cross-project retrieval, safe edit,
+  runtime diagnosis, resource image, durable recovery, authorization และ optional browser
+- เพิ่ม candidate/strict release gate พร้อม audit, manifest policy, checksum และ fresh
+  exact-tarball smoke ของ CLI, STDIO Full และ HTTP/OAuth Compact
+- รายงานผูกกับ Git revision, dataset, dependency lock, configuration และ platform;
+  model token เป็น `null` เมื่อไม่มี model call และ manual/platform status ไม่ถูกแต่งขึ้น
+
 - เปิดตัว package `dodo-mcp` และ CLI `dodo`
 - เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ safe existing-state preference import แบบ explicit
 - เพิ่ม `dodo tunnel configure/status/start/stop/restart/doctor/logs` สำหรับ external และ managed Cloudflare Tunnel โดยไม่จัดการ Cloudflare account/DNS

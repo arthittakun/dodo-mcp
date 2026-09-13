@@ -18,6 +18,7 @@
 - มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
 - มี Runtime Intelligence สำหรับ task ที่ reconnect ได้, process/test/browser evidence แบบ bounded, snapshot freshness และ diagnosis ที่แยก fact/observation/inference
 - มี Advanced Agent Runtime สำหรับ immutable plan, parallel hypotheses, intent locks, guarded snapshots, evidence-backed completion, restart recovery และ owner-reviewed reusable guidance
+- มี DodoBench และ revision-bound release gate สำหรับ retrieval, safe edit, runtime, resource, recovery, security และ fresh package artifact
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
@@ -323,10 +324,22 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - [Project Registry](docs/PROJECTS.md)
 - [Universal resources and CAS](docs/RESOURCES.md)
 - [Project Brain and incremental index](docs/BRAIN.md)
+- [DodoBench and release gate](docs/EVALUATION.md)
 - [Manual acceptance](docs/MANUAL_ACCEPTANCE.md)
 - [Test report](docs/TEST_REPORT.md)
 
 ## Development
+
+รัน regression benchmark และ candidate release gate จาก source checkout ได้ด้วย:
+
+```bash
+npm run bench
+npm run release:gate
+```
+
+Release gate สร้างหลักฐาน non-secret ใน ignored `release-evidence/` และตรวจ fresh
+exact-tarball ผ่าน STDIO Full กับ HTTP/OAuth Compact โดยไม่ publish npm ดูรายละเอียดที่
+[DodoBench และ Release Gate](docs/EVALUATION.md)
 
 ```bash
 npm ci

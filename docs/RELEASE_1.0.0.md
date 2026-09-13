@@ -38,6 +38,8 @@ dodo --version
 - Advanced Agent Runtime พร้อม immutable plans, bounded parallel hypotheses, path intents,
   managed target dispatch, snapshot rollback, evidence-backed completion, restart recovery
   และ owner-reviewed non-executable skills
+- DodoBench แบบ revision-bound และ release gate ที่ตรวจ real HTTP/OAuth Compact,
+  STDIO Full, security regressions, immutable package checksum และ fresh tarball install
 
 ## ลำดับการใช้ Compact
 

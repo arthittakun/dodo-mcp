@@ -164,6 +164,14 @@ trusted command ใช้สิทธิ์ OS ของผู้ใช้จร
 
 package tarball ต้องไม่มี state DB, private keys, credentials, models, media fixtures หรือ temporary release files
 
+## Evaluation boundary
+
+DodoBench ใช้ OAuth, workspace ACL, scope, epoch, trust, approval และ path/secret guards
+ชุดเดียวกับ runtime จริง ไม่มี benchmark bypass หรือ privileged principal ผลและ release
+evidence ไม่มี token, OAuth code, client secret, private config capability, source content
+หรือ state database และถูก ignore จาก Git/npm Release gate บล็อก high/critical
+production dependency findings แต่ไม่ publish package หรือเปลี่ยน owner configuration
+
 ## Cloudflare Tunnel
 
 เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO มีโหมด external และ managed โดย managed mode supervise เฉพาะ live `cloudflared` child ที่เริ่มจากคำสั่ง `dodo tunnel start --yes` และไม่ใช้ Cloudflare API

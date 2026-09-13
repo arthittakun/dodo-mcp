@@ -20,8 +20,8 @@ npm pack
 - build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 79 files PASS, 2 files platform-skipped; 581 tests PASS, 30 tests platform/prerequisite-skipped
-- packaging: 15 tests PASS
+- core/integration/security/compatibility: 80 files PASS, 2 files platform-skipped; 585 tests PASS, 30 tests platform/prerequisite-skipped
+- packaging: 16 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
 - fresh exact-tarball install: PASS — `dodo --version` = `1.0.0`, Full = 121,
@@ -123,6 +123,19 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
 - Hybrid schema อยู่ใน `schemas/tools.hybrid.json`
+
+## DodoBench / release gate
+
+DodoBench core v1 ใช้ isolated real HTTP + OAuth fixtures ประเมิน 7 เคสบนเครื่องที่มี
+Chromium: retrieval A/B, safe edit, runtime diagnosis, image resource, restart recovery,
+security boundaries และ browser image block ผลแต่ละรอบบันทึก revision/lock/config/OS,
+tool calls, serialized bytes, p50/p95, precision/recall, wrong-file rate, cache hit และ
+security violations โดย `modelTokens=null` เพราะไม่มี model call
+
+Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix แล้วตรวจ CLI 1.0.0,
+STDIO Full 121, HTTP Streamable + OAuth Compact 19 และ write/edit read-back จริง
+Linux/Windows strict platform evidence และ external-AI manual acceptance ยังคงแยกจาก
+local candidate gate
 
 ## Required security scenarios
 

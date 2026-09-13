@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "dataset": {
+    "name": "dodobench-core",
+    "version": "1.0.0"
+  },
+  "requiredCases": [
+    "retrieval-cross-project",
+    "diagnosis-refactor-safety",
+    "runtime-debugging",
+    "resource-multimodal",
+    "recovery-memory-cache",
+    "security-authorization"
+  ],
+  "optionalCases": [
+    "browser-visual"
+  ],
+  "thresholds": {
+    "successRateMin": 1,
+    "wrongFileEditRateMax": 0,
+    "contextPrecisionMin": 1,
+    "contextRecallMin": 1,
+    "cacheHitRateMin": 0.5,
+    "securityViolationsMax": 0,
+    "toolCallsMax": 60,
+    "p95LatencyMsMax": 30000,
+    "humanInterventionsMax": 1
+  }
+}

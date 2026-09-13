@@ -216,3 +216,10 @@ manual external-client acceptance
 ## External clients
 
 เพิ่ม MCP connection ใน client ที่ต้องการ ใช้ OAuth, scan tools และบันทึกจำนวน tools ที่ client แสดงจริง หาก catalog ถูก cache ให้ recreate connection ตาม client instructions
+
+## DodoBench และ release gate
+
+Automated local fixture: รัน `npm run bench` และ `npm run release:gate` แล้วตรวจ
+`gate-report.json` ใต้ ignored `release-evidence/` Manual external AI, owner repository,
+Linux และ Windows ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน `MANUAL_NOT_RUN`
+จากผล benchmark บน macOS เพียงเครื่องเดียว

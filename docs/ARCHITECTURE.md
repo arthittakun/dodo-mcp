@@ -207,6 +207,18 @@ inflate และ SVG อยู่ใน text path ไม่ถูก render เ
 การ publish ใช้ fsynced staging inode + create-if-absent hard link และ SQLite trigger
 บังคับโควตารวม 2 GiB ซ้ำเพื่อรองรับหลาย process
 
+## Evaluation and release evidence
+
+`src/evaluation/` แยก report contract ออกจาก deterministic scoring ส่วน
+`tests/evaluation/dodoBench.test.ts` เรียก real HTTP/OAuth fixtures ผ่าน Compact
+gateways Report ผูก revision, dataset, dependency lock, config และ host environment
+โดยไม่สร้าง model-token estimate
+
+`scripts/release-gate.mjs` สร้าง immutable tarball แล้วส่ง exact file ให้
+`scripts/release-smoke.mjs` ติดตั้งใน fresh prefix Smoke เปิด runtime จาก package ที่
+ติดตั้งใหม่และตรวจ STDIO Full กับ Streamable HTTP/OAuth Compact สคริปต์ไม่ publish
+และไม่ใช้ owner state จริง
+
 ## Tool surfaces
 
 - Full catalog 121 individual definitions (Core 104 + Advanced Agent Runtime 17)

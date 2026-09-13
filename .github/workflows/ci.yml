@@ -24,6 +24,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npx vitest run tests/unit tests/integration tests/security tests/compatibility
+      - run: npm run bench
       - run: npm run test:pack
       - name: tarball manifest
         run: npm pack --dry-run
