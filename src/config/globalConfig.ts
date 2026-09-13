@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { LimitsSchema, DEFAULT_LIMITS, type Limits } from './limits.js';
 import { DodoError } from '../errors.js';
+import { TunnelConfigSchema } from './tunnelConfig.js';
 
 /**
  * Trusted global configuration (spec §5). Lives in the user-owned config dir,
@@ -59,6 +60,8 @@ export const GlobalConfigSchema = z
      * scopes, trust, approvals or guards.
      */
     toolSurface: z.enum(['compact', 'full', 'hybrid']).optional(),
+    /** Local-owner Cloudflare Tunnel process configuration; contains no token. */
+    tunnel: TunnelConfigSchema.default({ mode: 'external', metricsPort: 21732, maxRestarts: 2 }),
     /**
      * Local-only escape hatch for tests/dev: allow an http:// publicUrl.
      * Never set this for real deployments.

@@ -11,7 +11,7 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 | ADR | Decision |
 |---|---|
 | [001](001-one-process-one-workspace.md) | One process = one CWD workspace = one endpoint profile |
-| [002](002-external-tunnel.md) | User-managed external named tunnel |
+| [002](002-external-tunnel.md) | External named tunnel mode (partly superseded by ADR-031) |
 | [003](003-sdk-v2-legacy-stateless.md) | Official MCP SDK v2 + legacy stateless fallback |
 | [004](004-embedded-oauth-provider.md) | Embedded `oidc-provider` authorization server |
 | [005](005-static-client-baseline.md) | Static client registration baseline; DCR off, CIMD deferred |
@@ -46,3 +46,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [028 — Reviewed owner deletion of selected OAuth clients](028-owner-client-deletion.md)
 - [029 — Compact MCP tool surface with capability gateways](029-compact-tool-surface.md)
 - [030 — Windows native candidate and authenticated owner IPC](030-windows-native-candidate.md)
+- [031 — Owner-selected Cloudflare Tunnel supervision](031-owner-selected-tunnel-supervision.md)

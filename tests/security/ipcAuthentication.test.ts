@@ -56,6 +56,18 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
     expect(fs.existsSync(credentialPath(file))).toBe(false);
   });
 
+  it('singleton mode refuses a second listener without replacing the authenticated owner endpoint', async () => {
+    const file = locator();
+    const server = await startIpcServer(file, async () => 'first', { replaceExisting: false, stableWindowsEndpoint: true });
+    try {
+      const before = loadIpcCredential(file);
+      await expect(startIpcServer(file, async () => 'second', { replaceExisting: false, stableWindowsEndpoint: true })).rejects.toThrow();
+      const after = loadIpcCredential(file);
+      expect(after).toEqual(before);
+      expect(await ipcCall(file, 'status')).toBe('first');
+    } finally { await close(server); }
+  });
+
   it('rejects a legacy unauthenticated command before dispatch', async () => {
     const file = locator(); let calls = 0;
     const server = await startIpcServer(file, async () => { calls++; return 'forbidden'; });

@@ -345,6 +345,106 @@
         "hybrid"
       ]
     },
+    "tunnel": {
+      "default": {
+        "mode": "external",
+        "metricsPort": 21732,
+        "maxRestarts": 2
+      },
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "external",
+          "type": "string",
+          "enum": [
+            "external",
+            "managed"
+          ]
+        },
+        "credentialRef": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "const": "os"
+                },
+                "key": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{24}$"
+                }
+              },
+              "required": [
+                "provider",
+                "key"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "const": "env"
+                },
+                "name": {
+                  "type": "string",
+                  "pattern": "^[A-Z][A-Z0-9_]{0,63}$"
+                }
+              },
+              "required": [
+                "provider",
+                "name"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "const": "file"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 4096
+                }
+              },
+              "required": [
+                "provider",
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "executable": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "metricsPort": {
+          "default": 21732,
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535
+        },
+        "maxRestarts": {
+          "default": 2,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        }
+      },
+      "required": [
+        "mode",
+        "metricsPort",
+        "maxRestarts"
+      ],
+      "additionalProperties": false
+    },
     "dangerouslyAllowInsecurePublicUrl": {
       "default": false,
       "type": "boolean"
@@ -366,6 +466,7 @@
     "lsp",
     "envAllowlist",
     "logRetentionDays",
+    "tunnel",
     "dangerouslyAllowInsecurePublicUrl"
   ],
   "additionalProperties": false

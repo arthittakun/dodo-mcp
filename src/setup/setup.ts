@@ -26,7 +26,7 @@ import { activateManagedTools, registerManagedPath } from './managedTools.js';
 import { downloadVerified, verifiedFile, MODEL_PIN, WINDOWS_PINS, extractWindowsZip } from './download.js';
 import { importState, planStateImport, type StateImportPlan, type StateImportResult } from '../config/stateImport.js';
 
-export const COMPONENTS = ['git', 'ripgrep', 'ffmpeg', 'whisper', 'model', 'chromium', 'lsp', 'speech', 'desktop', 'sandbox', 'web'] as const;
+export const COMPONENTS = ['git', 'ripgrep', 'cloudflared', 'ffmpeg', 'whisper', 'model', 'chromium', 'lsp', 'speech', 'desktop', 'sandbox', 'web'] as const;
 export type Component = typeof COMPONENTS[number];
 export type SetupState = 'ready' | 'missing' | 'needs-permission' | 'needs-backend' | 'failed';
 export interface SetupItem { component: Component; state: SetupState; detail: string; action?: string }
@@ -87,6 +87,7 @@ export async function inspectSetup(options: SetupOptions): Promise<SetupReport> 
     let detail: string | undefined;
     if (component === 'git') detail = probe(root, 'git');
     if (component === 'ripgrep') detail = probe(root, 'rg');
+    if (component === 'cloudflared') detail = probe(root, 'cloudflared');
     if (component === 'ffmpeg') { const a = probe(root, 'ffmpeg', ['-version']), b = probe(root, 'ffprobe', ['-version']); if (a && b) detail = `${a}; ffprobe probe passed`; }
     if (component === 'whisper') detail = probe(root, 'whisper-cli', ['--help']) ?? probe(root, 'whisper-cpp', ['--help']);
     if (component === 'model' && await verifiedFile(path.join(options.configDir, 'models', 'ggml-tiny.bin'), MODEL_PIN)) detail = 'multilingual tiny model: exact pinned SHA-256 and size verified';
@@ -258,6 +259,9 @@ export async function runSetup(options: SetupOptions, log: (text: string) => voi
         if (['git', 'ripgrep', 'ffmpeg'].includes(component)) {
           if (process.platform === 'win32') await installPortable(component as 'git' | 'ripgrep' | 'ffmpeg');
           else packageInstall(component, { brew: [component], apt: [component], dnf: [component] });
+        } else if (component === 'cloudflared') {
+          if (process.platform === 'darwin') packageInstall(component, { brew: ['cloudflared'], apt: [], dnf: [] });
+          else throw new Error('automatic cloudflared installation is not enabled on this OS; install the signed official package from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/ then rerun dodo setup --check --components cloudflared');
         } else if (component === 'whisper') {
           if (process.platform === 'win32') await installPortable('whisper');
           else if (process.platform === 'darwin') packageInstall(component, { brew: ['whisper-cpp'], apt: [], dnf: [] });

@@ -4,21 +4,22 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { assertPrivatePath } from '../platform/privateFs.js';
 import { renameWithRetry } from '../platform/fsRetry.js';
 
-export interface IpcCredential { version: 1; nonce: string; token: string; endpoint: string }
+export interface IpcCredential { version: 1; nonce: string; token: string; endpoint: string; transport?: 'stable' }
 export const IPC_FRAME_BYTES = 1024 * 1024;
 export function credentialPath(locator: string): string { return `${locator}.auth`; }
 
 /** Public APIs keep a filesystem locator, not a named-pipe pseudo-file.
  * Windows uses a fresh pipe per listener, so another stdio client's root alias
  * can replace the descriptor without taking over the old instance endpoint. */
-export function ipcTransportPath(locator: string, nonce: string, platform: NodeJS.Platform = process.platform): string {
+export function ipcTransportPath(locator: string, nonce: string, platform: NodeJS.Platform = process.platform, stable = false): string {
   if (platform !== 'win32') return locator;
   const digest = createHash('sha256').update(path.win32.resolve(locator).toLowerCase()).digest('hex').slice(0, 24);
-  return `\\\\.\\pipe\\dodo-${digest}-${nonce}`;
+  return stable ? `\\\\.\\pipe\\dodo-${digest}-singleton` : `\\\\.\\pipe\\dodo-${digest}-${nonce}`;
 }
-export function newIpcCredential(locator: string): IpcCredential {
+export function newIpcCredential(locator: string, options: { stableWindowsEndpoint?: boolean } = {}): IpcCredential {
   const nonce = randomBytes(16).toString('hex');
-  return { version: 1, nonce, token: randomBytes(32).toString('hex'), endpoint: ipcTransportPath(locator, nonce) };
+  const stable = options.stableWindowsEndpoint === true;
+  return { version: 1, nonce, token: randomBytes(32).toString('hex'), endpoint: ipcTransportPath(locator, nonce, process.platform, stable), ...(stable ? { transport: 'stable' as const } : {}) };
 }
 export function loadIpcCredential(locator: string): IpcCredential {
   assertPrivatePath(path.dirname(locator), true);
@@ -28,7 +29,7 @@ export function loadIpcCredential(locator: string): IpcCredential {
   const value: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (!value || typeof value !== 'object') throw new Error('invalid IPC authentication descriptor');
   const c = value as IpcCredential;
-  if (c.version !== 1 || !/^[a-f0-9]{32}$/.test(c.nonce ?? '') || !/^[a-f0-9]{64}$/.test(c.token ?? '') || c.endpoint !== ipcTransportPath(locator, c.nonce)) throw new Error('invalid IPC authentication descriptor');
+  if (c.version !== 1 || !/^[a-f0-9]{32}$/.test(c.nonce ?? '') || !/^[a-f0-9]{64}$/.test(c.token ?? '') || (c.transport !== undefined && c.transport !== 'stable') || c.endpoint !== ipcTransportPath(locator, c.nonce, process.platform, c.transport === 'stable')) throw new Error('invalid IPC authentication descriptor');
   return c;
 }
 export function publishIpcCredential(locator: string, credential: IpcCredential): void {

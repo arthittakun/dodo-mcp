@@ -6,7 +6,7 @@ import { envValue, windowsProgramDataDirectory } from '../platform/system.js';
 /** Child jobs receive a whitelist, not the server's OAuth/config/loader state. */
 const BASE_ALLOWED = ['HOME', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TMPDIR', 'TZ', 'USER', 'LOGNAME', 'SHELL', 'COLORTERM'];
 const WINDOWS_ALLOWED = ['SYSTEMROOT', 'WINDIR', 'SYSTEMDRIVE', 'USERPROFILE', 'HOMEDRIVE', 'HOMEPATH', 'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA', 'TEMP', 'TMP', 'USERNAME', 'USERDOMAIN', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'PROGRAMW6432', 'COMMONPROGRAMFILES', 'PROCESSOR_ARCHITECTURE', 'NUMBER_OF_PROCESSORS'];
-const ALWAYS_DENIED = new Set(['NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH', 'PATH', 'TERM', 'COMSPEC', 'PATHEXT', 'NODE_PATH']);
+const ALWAYS_DENIED = new Set(['NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES', 'DYLD_LIBRARY_PATH', 'LD_LIBRARY_PATH', 'PATH', 'TERM', 'COMSPEC', 'PATHEXT', 'NODE_PATH', 'TUNNEL_TOKEN', 'TUNNEL_TOKEN_FILE']);
 
 export function trustedPath(parentPath: string | undefined, workspaceRoot: string, platform: NodeJS.Platform = process.platform): string {
   const p = platform === 'win32' ? path.win32 : path.posix;

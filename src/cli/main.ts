@@ -103,6 +103,157 @@ program.command('setup')
     }
   });
 
+// --------------------------------------------------------------- tunnel ----
+const tunnel = program.command('tunnel').description('manage or inspect a Cloudflare remotely-managed Tunnel without managing DNS or the Cloudflare account');
+
+tunnel.command('configure')
+  .description('save local tunnel mode and a credential reference; tokens are never written to config')
+  .option('--managed', 'DODO supervises cloudflared in the foreground', false)
+  .option('--external', 'an owner/system service manages the tunnel', false)
+  .option('--os-credential', 'prompt through the reviewed OS credential provider', false)
+  .option('--token-env <name>', 'reference an uppercase environment variable that already contains the token')
+  .option('--token-file <absolute-path>', 'reference an owner-private absolute token file')
+  .option('--cloudflared <absolute-path>', 'owner-selected cloudflared executable outside any workspace')
+  .option('--metrics-port <n>', 'loopback cloudflared readiness port', (v: string) => Number(v))
+  .option('--max-restarts <n>', 'bounded supervisor restarts, 0..5', (v: string) => Number(v))
+  .option('--remove-credential', 'delete an OS-stored credential and clear the reference (requires --yes)', false)
+  .option('--yes', 'confirm credential deletion; does not start cloudflared', false)
+  .option('--json', 'machine-readable non-secret result', false)
+  .action(async (opts: { managed: boolean; external: boolean; osCredential: boolean; tokenEnv?: string; tokenFile?: string; cloudflared?: string; metricsPort?: number; maxRestarts?: number; removeCredential: boolean; yes: boolean; json: boolean }) => {
+    try {
+      if (opts.managed && opts.external) fail('choose --managed or --external');
+      const methods = [opts.osCredential, opts.tokenEnv !== undefined, opts.tokenFile !== undefined].filter(Boolean).length;
+      if (methods > 1) fail('choose only one of --os-credential, --token-env or --token-file');
+      if (opts.removeCredential && methods > 0) fail('--remove-credential cannot be combined with a credential source');
+      if (opts.removeCredential && !opts.yes) fail('credential deletion requires --yes');
+      const { dir } = resolveConfigDir(process.env); ensureConfigDir(dir);
+      const paths = statePaths(dir), current = loadGlobalConfig(paths.configFile);
+      const credentials = await import('../tunnel/credentials.js');
+      const { resolveCloudflared } = await import('../tunnel/supervisor.js');
+      const previousCredentialRef = current.tunnel.credentialRef;
+      let credentialRef = current.tunnel.credentialRef;
+      if (opts.removeCredential) credentialRef = undefined;
+      const baseTunnelInput: Record<string, unknown> = {
+        ...current.tunnel,
+        mode: opts.managed ? 'managed' : opts.external ? 'external' : current.tunnel.mode,
+        ...(credentialRef ? { credentialRef } : {}),
+        ...(opts.metricsPort !== undefined ? { metricsPort: opts.metricsPort } : {}),
+        ...(opts.maxRestarts !== undefined ? { maxRestarts: opts.maxRestarts } : {}),
+        ...(opts.cloudflared !== undefined ? { executable: opts.cloudflared } : {}),
+      };
+      if (!credentialRef) delete baseTunnelInput['credentialRef'];
+      let next = GlobalConfigSchema.parse({ ...current, tunnel: baseTunnelInput });
+      if (opts.cloudflared !== undefined) {
+        const canonical = resolveCloudflared(next);
+        next = GlobalConfigSchema.parse({ ...next, tunnel: { ...next.tunnel, executable: canonical } });
+      }
+      if (opts.osCredential) {
+        const ref = credentials.osTunnelCredentialRef(dir);
+        await credentials.storeOsTunnelCredentialInteractive(ref);
+        credentialRef = ref;
+      } else if (opts.tokenEnv !== undefined) credentialRef = credentials.envTunnelCredentialRef(opts.tokenEnv);
+      else if (opts.tokenFile !== undefined) credentialRef = credentials.fileTunnelCredentialRef(opts.tokenFile);
+      const withCredential: Record<string, unknown> = { ...next.tunnel, ...(credentialRef ? { credentialRef } : {}) };
+      if (!credentialRef) delete withCredential['credentialRef'];
+      next = GlobalConfigSchema.parse({ ...next, tunnel: withCredential });
+      if (next.tunnel.mode === 'managed' && !next.tunnel.credentialRef) fail('managed mode requires --os-credential, --token-env or --token-file');
+      saveGlobalConfig(paths.configFile, next);
+      if (opts.removeCredential && previousCredentialRef) credentials.deleteOsTunnelCredential(previousCredentialRef);
+      const result = { mode: next.tunnel.mode, credential: next.tunnel.credentialRef ? 'configured' : 'not-configured', metricsPort: next.tunnel.metricsPort, maxRestarts: next.tunnel.maxRestarts, cloudflared: next.tunnel.executable ? 'owner-selected' : 'trusted-PATH', started: false };
+      if (opts.json) console.log(JSON.stringify(result, null, 2));
+      else {
+        console.log(`Tunnel mode: ${result.mode}`);
+        console.log(`Credential: ${result.credential} (value is not stored in config or displayed)`);
+        console.log(`Readiness: 127.0.0.1:${result.metricsPort}   Restarts: ${result.maxRestarts}`);
+        console.log(result.mode === 'managed' ? 'Configuration saved. Start explicitly with: dodo tunnel start --yes' : 'External mode saved. DODO will observe health but will not start cloudflared.');
+      }
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}${error.recovery ? `\n  → ${error.recovery}` : ''}`);
+      throw error;
+    }
+  });
+
+async function runTunnelForeground(restart: boolean, json: boolean): Promise<void> {
+  const { dir } = resolveConfigDir(process.env); ensureConfigDir(dir);
+  const config = loadGlobalConfig(statePaths(dir).configFile);
+  const control = await import('../tunnel/control.js');
+  if (restart) {
+    try { await control.stopTunnel(dir); } catch (error) { if (!(error instanceof IpcError)) throw error; }
+    const deadline = Date.now() + 10_000;
+    while ((await control.tunnelStatus(dir, config)).supervisor && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+    if ((await control.tunnelStatus(dir, config)).supervisor) throw new DodoError('TIMEOUT', 'existing tunnel supervisor did not stop within 10 seconds');
+  }
+  const { startManagedTunnel } = await import('../tunnel/supervisor.js');
+  const supervisor = await startManagedTunnel({ configDir: dir, config, onLog: line => { if (!json) console.log(`[dodo:tunnel] ${line}`); } });
+  if (json) console.log(JSON.stringify({ started: true, status: supervisor.status() }));
+  else console.log(`Tunnel supervisor is running in the foreground for ${supervisor.status().publicOrigin}. Press Ctrl-C to stop.`);
+  const stop = () => supervisor.stop();
+  process.once('SIGINT', stop); process.once('SIGTERM', stop);
+  if (process.platform !== 'win32') process.once('SIGHUP', stop);
+  const exitCode = await supervisor.wait();
+  process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop);
+  if (process.platform !== 'win32') process.removeListener('SIGHUP', stop);
+  if (exitCode !== 0) process.exitCode = exitCode;
+}
+
+for (const name of ['start', 'restart'] as const) {
+  tunnel.command(name)
+    .description(name === 'start' ? 'start the configured managed tunnel in the foreground' : 'stop the current managed supervisor and start it again in the foreground')
+    .option('--yes', 'confirm starting a process that connects this machine to the configured Cloudflare Tunnel', false)
+    .option('--json', 'machine-readable startup/status line; diagnostics remain private', false)
+    .action(async (opts: { yes: boolean; json: boolean }) => {
+      if (!opts.yes) fail(`dodo tunnel ${name} requires --yes; no process was started`);
+      try { await runTunnelForeground(name === 'restart', opts.json); }
+      catch (error) {
+        if (error instanceof DodoError || error instanceof IpcError) fail(`${error instanceof DodoError ? `${error.code}: ` : ''}${error.message}`);
+        throw error;
+      }
+    });
+}
+
+tunnel.command('stop').description('ask the authenticated local managed supervisor to stop its owned cloudflared process')
+  .option('--json', 'machine-readable result', false)
+  .action(async (opts: { json: boolean }) => {
+    try {
+      const { stopTunnel } = await import('../tunnel/control.js');
+      const result = await stopTunnel(resolveConfigDir(process.env).dir);
+      if (opts.json) console.log(JSON.stringify(result)); else console.log('Stop requested. DODO will not signal any saved PID or unrelated process.');
+    } catch (error) { if (error instanceof IpcError) fail('no authenticated managed tunnel supervisor is running', 2); throw error; }
+  });
+
+tunnel.command('status').description('show configured mode and authenticated supervisor evidence without reading the credential')
+  .option('--json', 'machine-readable report', false)
+  .action(async (opts: { json: boolean }) => {
+    const { dir } = resolveConfigDir(process.env), config = loadGlobalConfig(statePaths(dir).configFile);
+    const { tunnelStatus } = await import('../tunnel/control.js');
+    const report = await tunnelStatus(dir, config);
+    if (opts.json) console.log(JSON.stringify(report, null, 2));
+    else {
+      console.log(`Configured mode: ${report.configuredMode}`);
+      if (report.supervisor) console.log(`Supervisor: ${report.supervisor.phase}; connected=${report.supervisor.connected}; restarts=${report.supervisor.restarts}/${report.supervisor.maxRestarts}`);
+      else console.log(`Supervisor: not running${report.lastKnown ? `; last phase=${report.lastKnown.phase} at ${report.lastKnown.updatedAt}` : ''}`);
+    }
+  });
+
+tunnel.command('doctor').description('explicitly probe cloudflared, credential availability, local MCP health and configured public health')
+  .option('--json', 'machine-readable non-secret report', false)
+  .action(async (opts: { json: boolean }) => {
+    const { dir } = resolveConfigDir(process.env), config = loadGlobalConfig(statePaths(dir).configFile);
+    const { tunnelDoctor } = await import('../tunnel/control.js');
+    const report = await tunnelDoctor(dir, config);
+    console.log(opts.json ? JSON.stringify(report, null, 2) : JSON.stringify(report, null, 2));
+  });
+
+tunnel.command('logs').description('show bounded redacted managed-tunnel diagnostics')
+  .option('--lines <n>', 'last 1..500 lines', (v: string) => Number(v), 200)
+  .option('--json', 'machine-readable result', false)
+  .action(async (opts: { lines: number; json: boolean }) => {
+    if (!Number.isSafeInteger(opts.lines) || opts.lines < 1 || opts.lines > 500) fail('--lines must be an integer from 1 to 500');
+    const { tunnelLogs } = await import('../tunnel/control.js');
+    const result = await tunnelLogs(resolveConfigDir(process.env).dir, opts.lines);
+    if (opts.json) console.log(JSON.stringify(result, null, 2)); else for (const line of result.lines) console.log(line);
+  });
+
 // ---------------------------------------------------------------- start ----
 program
   .command('start')
@@ -840,7 +991,9 @@ Desktop (platform helper and explicit app permission required):
   dodo desktop setup                 prepare the platform desktop backend
   dodo desktop disable               revoke desktop access
 Remote setup:
-  dodo init --public-url https://...   configure public origin once`,
+  dodo init --public-url https://...   configure public origin once
+  dodo tunnel configure --external    observe an owner/system-managed tunnel
+  dodo tunnel start --yes              run configured cloudflared in foreground`,
 );
 
 function effectiveArgv(): string[] {

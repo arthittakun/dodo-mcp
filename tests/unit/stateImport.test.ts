@@ -38,6 +38,7 @@ function authorityConfig(): Record<string, unknown> {
     allowWebFetch: true,
     lsp: { fixture: { command: '/private/lsp', args: ['--stdio'], extensions: ['.fixture'] } },
     envAllowlist: ['PRIVATE_TOKEN'],
+    tunnel: { mode: 'managed', credentialRef: { provider: 'env', name: 'PRIVATE_TUNNEL_TOKEN' }, executable: '/private/cloudflared', metricsPort: 31111, maxRestarts: 5 },
     dangerouslyAllowInsecurePublicUrl: false,
   };
 }
@@ -59,6 +60,7 @@ describe('security-scoped Dodo state import', () => {
     expect(plan.importedConfigFields).toEqual(['configPort', 'logRetentionDays', 'port', 'searchBackend', 'toolSurface', 'version']);
     expect(plan.importedConfigFields.every(field => (STATE_IMPORT_CONFIG_FIELDS as readonly string[]).includes(field))).toBe(true);
     expect(plan.resetSecurity).toContain('config.allowWebFetch');
+    expect(plan.resetSecurity.some(item => item.includes('tunnel credential'))).toBe(true);
     expect(plan.configSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(fs.existsSync(f.target)).toBe(false);
   });
@@ -88,6 +90,7 @@ describe('security-scoped Dodo state import', () => {
     expect(saved.allowWebFetch).toBe(false);
     expect(saved.lsp).toEqual({});
     expect(saved.envAllowlist).toEqual([]);
+    expect(saved.tunnel).toEqual({ mode: 'external', metricsPort: 21732, maxRestarts: 2 });
     expect(fs.existsSync(path.join(f.target, 'state.db'))).toBe(false);
     expect(fs.existsSync(path.join(f.target, 'keys'))).toBe(false);
     expect(fs.readFileSync(path.join(f.source, 'config.json'))).toEqual(sourceConfig);

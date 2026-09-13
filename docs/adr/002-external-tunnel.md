@@ -1,10 +1,12 @@
 # ADR-002 — User-managed external named tunnel
 
-**Status:** accepted (implemented)
+**Status:** superseded in part by ADR-031; external mode remains supported
 
 **Decision.** DODO binds `127.0.0.1:21730` and nothing else. The user runs their
-own Cloudflare named tunnel (or equivalent) and owns DNS/firewall. DODO never
-runs `cloudflared`, requests Cloudflare tokens, creates DNS, or opens ports.
+own Cloudflare named tunnel (or equivalent) and owns DNS/firewall. This remains
+the `external` mode. ADR-031 adds an explicit local-owner option to supervise
+only `cloudflared`; DODO still never creates/deletes tunnels, manages DNS or
+opens ports.
 
 **Trade-off.** The user does more setup and holds the tunnel credentials. In
 return DODO holds no cloud secrets and has no relay/SaaS to trust.

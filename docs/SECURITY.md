@@ -47,6 +47,14 @@ trusted command ใช้สิทธิ์ OS ของผู้ใช้จร
 
 package tarball ต้องไม่มี state DB, private keys, credentials, models, media fixtures หรือ temporary release files
 
+## Cloudflare Tunnel
+
+เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO มีโหมด external และ managed โดย managed mode supervise เฉพาะ live `cloudflared` child ที่เริ่มจากคำสั่ง `dodo tunnel start --yes` และไม่ใช้ Cloudflare API
+
+Tunnel token อยู่ใน macOS Keychain, Windows Credential Manager, Linux Secret Service หรือ owner-selected secure environment/file config เก็บเพียง credential reference และ executable path ที่เจ้าของเลือก Token ไม่อยู่ใน CLI argv, child arguments, logs, MCP catalog/response, audit หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูกปฏิเสธจาก environment ของ MCP jobs เสมอ
+
+Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose readiness บอกสถานะ Cloudflare connection เท่านั้น ไม่ใช่หลักฐานว่า AI client กำลังเชื่อมต่อ
+
 ## Setup and existing-state import
 
 `dodo setup --check` และ `dodo setup --plan` เป็น read-only การติดตั้ง dependency ที่ยังขาดต้องมี `--yes` จาก local owner ก่อนเริ่ม installer โดย flag นี้ไม่ข้าม OS elevation, Desktop consent หรือ policy อื่น

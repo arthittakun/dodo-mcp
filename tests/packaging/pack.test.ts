@@ -51,7 +51,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'docs/RELEASE_1.0.0.md', 'docs/WINDOWS.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -79,7 +79,7 @@ describe('PACK: npm tarball', () => {
 
   it('PACK-01: contains NO secrets, keys, tokens, or state database', () => {
     const forbidden = [
-      /\.env/, /state\.db/, /jwks\.json/, /cookies\.json/, /\.sock$/, /id_rsa/, /\.pem$/,
+      /\.env/, /state\.db/, /jwks\.json/, /cookies\.json/, /cloudflared\.log$/, /tunnel\/state\.json$/, /\.sock$/, /id_rsa/, /\.pem$/,
       /\.dodo-dev-state/, /node_modules/, /\.git\//,
     ];
     for (const f of fileList) {

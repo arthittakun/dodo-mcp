@@ -4,6 +4,8 @@
 
 - เปิดตัว package `dodo-mcp` และ CLI `dodo`
 - เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ safe existing-state preference import แบบ explicit
+- เพิ่ม `dodo tunnel configure/status/start/stop/restart/doctor/logs` สำหรับ external และ managed Cloudflare Tunnel โดยไม่จัดการ Cloudflare account/DNS
+- Tunnel token ใช้ OS credential store หรือ secure env/file reference และไม่อยู่ใน config/argv/logs/MCP jobs
 - `dodo setup --check/--plan` เป็น read-only และ dependency installer ต้องได้รับ `--yes` ก่อนเริ่ม
 - state import ไม่คัดลอก OAuth material, database, client/workspace authority หรือ permission-bearing config
 - เพิ่ม Compact, Full และ Hybrid MCP tool surfaces

@@ -11,6 +11,7 @@
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control เท่านั้น |
+| Cloudflare Tunnel | external mode ทุก OS; managed process ใช้ OS credential provider และต้องมี `cloudflared` ที่ตรวจพบ |
 | Package | `dodo-mcp` |
 | CLI | `dodo` |
 
@@ -28,6 +29,8 @@ Surface เปลี่ยนจำนวน tools ที่ expose เท่า
 Desktop, browser, media, speech, LSP และ OS sandbox ต้องตรวจ dependency และ OS permission ด้วย `dodo setup --check` หรือ `dodo doctor` ระบบจะรายงาน `NOT_SUPPORTED` เมื่อ environment ยังไม่พร้อม และจะไม่เปิด permission หรือดาวน์โหลด model โดยอัตโนมัติ
 
 `dodo setup --plan` ใช้ตรวจขั้นตอนติดตั้งแบบ read-only ส่วน installer ต้องมี `--yes` การใช้ `--import-state` รองรับเฉพาะ config ตำแหน่งมาตรฐานและนำเข้า non-authority preferences เท่านั้น custom `DODO_CONFIG_DIR` ไม่ถูกค้นหรือ merge อัตโนมัติ
+
+`dodo setup --components cloudflared` ตรวจ executable ได้ทุก OS การติดตั้งอัตโนมัติในรุ่นนี้รองรับ Homebrew บน macOS ส่วน Linux/Windows ใช้ signed official package ที่เจ้าของติดตั้งเอง Managed mode ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret Service; headless environment ใช้ owner-selected env/file reference
 
 ## Client behavior
 

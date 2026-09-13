@@ -4,6 +4,21 @@
 
 สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-13) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
 
+สถานะ Cloudflare Tunnel จริง: `MANUAL_NOT_RUN` (2026-09-13) automated tests ใช้ fake executable และ loopback readiness fixture เท่านั้น ไม่มี Tunnel token, Cloudflare connection, DNS หรือ firewall ใดถูกใช้
+
+## Cloudflare Tunnel
+
+1. สร้าง remotely-managed Tunnel และ public hostname ใน Cloudflare ด้วยบัญชีเจ้าของ
+2. route ทุก path ของ hostname ไป `http://127.0.0.1:21730` และยืนยันว่าไม่มี route ไป `21731`/`21732`
+3. รัน `dodo setup --check --components cloudflared`
+4. รัน `dodo tunnel configure --managed --os-credential` และตรวจว่า config มีเพียง credential reference
+5. รัน `dodo tunnel start --yes` ใน foreground
+6. ตรวจ `dodo tunnel status` ว่า connected หลัง `/ready` ตอบจริง
+7. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
+8. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs` ไม่มี token
+9. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop ด้วย `dodo tunnel stop`
+10. ทำซ้ำบน macOS, Windows และ Linux โดยบันทึก `MANUAL_PASS`/`MANUAL_NOT_RUN` แยก OS
+
 ## Setup foundation
 
 1. ใช้ config directory ชั่วคราวและรัน `dodo setup --check` กับ `dodo setup --plan`

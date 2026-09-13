@@ -13,6 +13,7 @@
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
+- ตรวจและเลือกใช้ Cloudflare Tunnel แบบ external หรือ DODO-managed โดย token อยู่ใน OS credential store/secure reference และการ start ต้องยืนยันทุกครั้ง
 - ไม่ส่ง token, secret หรือ state DB ไปที่ repository และไม่ให้ repository config เพิ่มสิทธิ์
 
 ## เริ่มใช้งาน
@@ -30,6 +31,22 @@ dodo start
 เมื่อ DODO ตรวจพบ config เดิมในตำแหน่งมาตรฐาน สามารถใช้ `dodo setup --import-state` เพื่อนำเข้าเฉพาะ preference ที่ปลอดภัย เช่น port, search backend, retention และ tool surface ระบบจะสร้าง installation identity ใหม่เสมอและไม่คัดลอก OAuth keys/tokens, client grants, workspace ACL, trust, approvals, schedules, public origin, web/desktop permission, executable registration หรือฐานข้อมูลเดิม ต้นฉบับจะไม่ถูกแก้ไข
 
 เปิด Local Config จาก URL ที่ `dodo` แสดงใน terminal ใช้สำหรับตั้ง trust, public origin, client access และเปลี่ยน workspace เจ้าของเท่านั้น
+
+### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
+
+DODO ไม่สร้าง Tunnel, DNS หรือ Cloudflare account ให้ ผู้ใช้สร้าง remotely-managed Tunnel และตั้ง public hostname ให้ route **ทุก path** มาที่ `http://127.0.0.1:21730` ก่อน จากนั้นเลือกได้สองโหมด:
+
+```bash
+# ให้ system service/เจ้าของรัน cloudflared เอง
+dodo tunnel configure --external
+
+# หรือให้ DODO ดูแลเฉพาะ process cloudflared ใน foreground
+dodo setup --check --components cloudflared
+dodo tunnel configure --managed --os-credential
+dodo tunnel start --yes
+```
+
+`--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret Service และ config เก็บเพียง opaque reference สำหรับ headless environment ใช้ `--token-env NAME` หรือ `--token-file /absolute/private/path` ค่า token ไม่อยู่ใน argv, config, tunnel log หรือ MCP response ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย `dodo tunnel doctor` และดู log ที่ redacted ด้วย `dodo tunnel logs`
 
 สำหรับ local MCP client เช่น Codex, Cursor หรือ Claude Desktop:
 
@@ -81,10 +98,10 @@ dodo_read(operation="read_files", args={...})
 ## การเชื่อมต่อ
 
 - **Local MCP:** `http://127.0.0.1:21730/mcp` สำหรับ process ในเครื่อง
-- **Public MCP:** origin HTTPS ของ tunnel ที่เจ้าของจัดการเองและ route ทุก path มายัง MCP listener
+- **Public MCP:** origin HTTPS ของ tunnel ที่เจ้าของสร้างและกำหนด route เอง; DODO อาจ supervise เฉพาะ `cloudflared` process ที่เจ้าของสั่ง
 - **Local Config:** loopback เท่านั้น ใช้ owner capability token และ Host/Origin checks
 
-DODO ไม่รายงาน tunnel หรือสถานะ client ว่าออนไลน์ หากไม่มีหลักฐานจาก request จริง
+DODO รายงาน `connected` เฉพาะเมื่อ managed `cloudflared` ตอบ readiness จริง และ `doctor` แยก local/public health ออกจากกัน สถานะนี้ไม่ใช่หลักฐานว่า ChatGPT หรือ AI client เชื่อมต่อแล้ว
 
 ## สิทธิ์
 

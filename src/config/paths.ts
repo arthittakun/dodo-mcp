@@ -63,7 +63,7 @@ export function existingConfigDirs(env: NodeJS.ProcessEnv = process.env, platfor
 /** Create the config dir tree with restrictive permissions (0700 dirs, 0600 files on POSIX). */
 export function ensureConfigDir(dir: string): void {
   ensurePrivateDirectory(dir);
-  for (const sub of ['keys', 'audit', 'backups', 'journal', 'jobs', 'ipc']) {
+  for (const sub of ['keys', 'audit', 'backups', 'journal', 'jobs', 'ipc', 'tunnel']) {
     ensurePrivateDirectory(path.join(dir, sub));
   }
 }
@@ -80,6 +80,7 @@ export interface StatePaths {
   journalDir: string;
   jobsDir: string;
   ipcDir: string;
+  tunnelDir: string;
 }
 
 export function statePaths(configDir: string): StatePaths {
@@ -95,6 +96,7 @@ export function statePaths(configDir: string): StatePaths {
     journalDir: path.join(configDir, 'journal'),
     jobsDir: path.join(configDir, 'jobs'),
     ipcDir: path.join(configDir, 'ipc'),
+    tunnelDir: path.join(configDir, 'tunnel'),
   };
 }
 

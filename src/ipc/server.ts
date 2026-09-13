@@ -11,12 +11,13 @@ export type IpcHandler = (cmd: string, args: Record<string, unknown>) => Promise
 /** Authenticated one-shot IPC on Unix sockets / Windows named pipes. The
  * token is never sent over the wire; both peers prove possession using fresh
  * challenges, and request/response bodies are authenticated and bounded. */
-export async function startIpcServer(socketPath: string, handler: IpcHandler): Promise<net.Server> {
+export async function startIpcServer(socketPath: string, handler: IpcHandler, options: { replaceExisting?: boolean; stableWindowsEndpoint?: boolean } = {}): Promise<net.Server> {
   ensurePrivateDirectory(path.dirname(socketPath));
-  const credential = newIpcCredential(socketPath);
+  const credential = newIpcCredential(socketPath, options.stableWindowsEndpoint === undefined ? {} : { stableWindowsEndpoint: options.stableWindowsEndpoint });
   if (process.platform !== 'win32' && fs.existsSync(socketPath)) {
     const stat = fs.lstatSync(socketPath);
     if (!stat.isSocket() || stat.isSymbolicLink() || stat.uid !== process.getuid?.()) throw new Error('refusing unexpected IPC path');
+    if (options.replaceExisting === false) throw new Error('authenticated IPC listener already exists');
     // Preserve the legacy root alias: older clients retain their independent
     // instance socket, while the newest local client owns this root alias.
     fs.unlinkSync(socketPath);

@@ -4,6 +4,7 @@ export { startStdioServer, STDIO_PRINCIPAL, type StdioOptions, type RunningStdio
 export { bootstrapWorkspace } from './server/bootstrap.js';
 export { DodoError, ERROR_CODES, type ErrorCode } from './errors.js';
 export { GlobalConfigSchema, loadGlobalConfig, saveGlobalConfig, validatePublicUrl } from './config/globalConfig.js';
+export { TunnelConfigSchema, TunnelCredentialRefSchema, type TunnelConfig, type TunnelCredentialRef } from './config/tunnelConfig.js';
 export { ProjectConfigSchema, loadProjectConfig } from './config/projectConfig.js';
 export { LimitsSchema, DEFAULT_LIMITS } from './config/limits.js';
 export { resolveConfigDir, existingConfigDirs, statePaths, ipcSocketPath } from './config/paths.js';

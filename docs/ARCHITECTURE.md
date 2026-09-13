@@ -19,6 +19,8 @@ Owner browser/CLI
    │ loopback + capability token / IPC
    ▼
 Local Config 127.0.0.1:21731 ──► WorkspaceHost ──► active workspace lifecycle
+
+Local owner CLI ──► authenticated tunnel IPC ──► bounded cloudflared supervisor
 ```
 
 ## Bootstrap and workspace lifecycle
@@ -62,6 +64,12 @@ Global config อยู่นอก workspace ใน platform config directory �
 `dodo setup --import-state` ใช้ state-import pipeline แยกจาก runtime bootstrap โดยอ่านได้เฉพาะ `config.json` ที่เป็น private regular file, validate ด้วย config schema, เลือกเฉพาะ non-authority allowlist, ตรวจ SHA-256 ซ้ำก่อนเขียน และ commit target ด้วย atomic rename การนำเข้าจะไม่เปิด SQLite เดิมหรืออ่าน/copy keys, tokens, ACL, trust, approvals, schedules, executable registrations หรือ runtime state
 
 Repo config เป็น hints-only และไม่สามารถ widen permissions, change OAuth, disable guards หรือ grant client access
+
+## Tunnel lifecycle
+
+Tunnel config อยู่ใน global owner config และมีเฉพาะ mode, opaque credential reference, canonical executable selection, loopback metrics port และ bounded restart count Credential provider แยกตาม OS ส่วน token ถูก resolve เฉพาะตอน start และส่งผ่าน child environment โดยไม่เข้า argv
+
+managed supervisor เป็น foreground process มี state machine `starting → connecting → connected/backoff → stopped/failed`, private bounded/redacted log และ authenticated singleton IPC `status/logs/stop` การ stop อ้างอิง live `ChildProcess` ที่ supervisor ถืออยู่เท่านั้น External mode ไม่ spawn process และ `doctor` ตรวจ local/public health โดยไม่จัดการ Cloudflare account หรือ DNS
 
 ## Optional services
 

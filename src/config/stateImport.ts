@@ -61,6 +61,7 @@ const RESET_SECURITY = [
   'public URL, Host/Origin allowlists and insecure-HTTP override',
   'web and desktop permissions',
   'LSP commands, environment allowlist and sandbox writable paths',
+  'tunnel credential references, executable selection and supervisor settings',
 ] as const;
 
 interface InspectedConfig {

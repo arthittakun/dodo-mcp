@@ -85,7 +85,7 @@ function silence(file: string, seconds = 1): void {
 
 /** Explicit local setup only: fixtures are private and removed; no project code is executed. */
 export async function verifyInstalledComponent(component: string, root: string, configDir: string): Promise<string | undefined> {
-  if (!['git', 'ripgrep', 'speech', 'lsp', 'chromium', 'ffmpeg', 'whisper'].includes(component)) return undefined;
+  if (!['git', 'ripgrep', 'cloudflared', 'speech', 'lsp', 'chromium', 'ffmpeg', 'whisper'].includes(component)) return undefined;
   const directory = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-setup-probe-'))); ensurePrivateDirectory(directory);
   try {
     if (component === 'git') {
@@ -107,6 +107,11 @@ export async function verifyInstalledComponent(component: string, root: string, 
       const output = run(root, binary(root, 'rg'), ['--no-config', '--fixed-strings', '--json', '--', 'DODO_RG_PROBE', file], directory);
       if (!output.split(/\r?\n/).filter(Boolean).some(line => (JSON.parse(line) as { type?: string }).type === 'match')) throw new Error('ripgrep did not return a real fixture match');
       return 'native ripgrep found the exact token in a Thai/spaced fixture path';
+    }
+    if (component === 'cloudflared') {
+      const output = run(root, binary(root, 'cloudflared'), ['--version'], directory);
+      if (!/cloudflared version/i.test(output)) throw new Error('cloudflared did not return its version identity');
+      return 'cloudflared executable started and returned its version; no tunnel, network connection or credential was used';
     }
     if (component === 'speech') {
       const engine = findSpeechEngine(root); if (!engine) throw new Error('no native speech engine passed its readiness probe');

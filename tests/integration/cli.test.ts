@@ -10,11 +10,11 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLI = path.join(ROOT, 'dist/cli/main.js');
 
-function runCli(args: string[], opts: { cwd: string; configDir: string; expectFail?: boolean }): { stdout: string; stderr: string; code: number } {
+function runCli(args: string[], opts: { cwd: string; configDir: string; expectFail?: boolean; env?: NodeJS.ProcessEnv }): { stdout: string; stderr: string; code: number } {
   try {
     const stdout = execFileSync('node', [CLI, ...args], {
       cwd: opts.cwd,
-      env: { ...process.env, DODO_CONFIG_DIR: opts.configDir },
+      env: { ...process.env, ...opts.env, DODO_CONFIG_DIR: opts.configDir },
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -84,6 +84,25 @@ describe('CLI', () => {
     expect(install.code).not.toBe(0);
     expect(install.stderr).toMatch(/no installer was started/);
     expect(fs.existsSync(cfg)).toBe(false);
+  });
+
+  it('CLI tunnel: saves only a credential reference and never starts without explicit --yes', () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'tunnel-cfg-'));
+    const proj = fs.mkdtempSync(path.join(base, 'tunnel-proj-'));
+    const fakeToken = 'cli-fixture-cloudflare-token-1234567890';
+    const configured = runCli(['tunnel', 'configure', '--managed', '--token-env', 'FIXTURE_TUNNEL_TOKEN', '--metrics-port', '32173', '--max-restarts', '1', '--json'], {
+      cwd: proj, configDir: cfg, env: { FIXTURE_TUNNEL_TOKEN: fakeToken },
+    });
+    expect(configured.code).toBe(0);
+    expect(configured.stdout).not.toContain(fakeToken);
+    const configText = fs.readFileSync(path.join(cfg, 'config.json'), 'utf8');
+    expect(configText).not.toContain(fakeToken);
+    expect(JSON.parse(configText).tunnel).toEqual({ mode: 'managed', credentialRef: { provider: 'env', name: 'FIXTURE_TUNNEL_TOKEN' }, metricsPort: 32173, maxRestarts: 1 });
+    const refused = runCli(['tunnel', 'start'], { cwd: proj, configDir: cfg, expectFail: true, env: { FIXTURE_TUNNEL_TOKEN: fakeToken } });
+    expect(refused.code).not.toBe(0); expect(refused.stderr).toContain('--yes');
+    expect(refused.stderr).not.toContain(fakeToken);
+    const status = runCli(['tunnel', 'status', '--json'], { cwd: proj, configDir: cfg });
+    expect(JSON.parse(status.stdout)).toMatchObject({ configuredMode: 'managed', supervisor: null });
   });
 
   it('CLI-10: refuses the home directory as a workspace root', () => {

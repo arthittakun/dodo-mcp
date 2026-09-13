@@ -23,6 +23,7 @@ dodo --version
 - multimodal, browser, game, workflow และ schedule tools ตาม prerequisite
 - setup แบบ plan-first: installer ที่ยังขาดต้องยืนยันด้วย `--yes`
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
+- Cloudflare Tunnel แบบ external หรือ managed foreground พร้อม OS credential references, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
 
 ## ลำดับการใช้ Compact
 
@@ -43,6 +44,17 @@ dodo setup --yes --components git,ripgrep,ffmpeg
 ```
 
 `--check` และ `--plan` ไม่เขียน config หรือเริ่ม installer การใช้ `--import-state` จะเก็บ source เดิมและไม่คัดลอก OAuth, token, database, ACL, trust หรือ permission-bearing configuration
+
+## Tunnel
+
+```bash
+dodo setup --check --components cloudflared
+dodo init --public-url https://mcp.example.com
+dodo tunnel configure --managed --os-credential
+dodo tunnel start --yes
+```
+
+DODO ไม่สร้าง Tunnel/DNS และไม่ใช้ Cloudflare API Token ค่า Tunnel token ไม่ถูกบันทึกใน config หรือส่งเป็น process argument
 
 ## Security
 
