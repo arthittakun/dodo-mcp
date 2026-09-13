@@ -51,6 +51,12 @@ conflict, rollback, jobs, setup และ package installation ผลปัจ�
 candidate evidence บน Node 22/24 แต่ไม่เปลี่ยน manual status เอง Workflow เลือก
 label `windows-ci 02` โดยเฉพาะ และเลิกใช้ runner 01 แล้ว
 
+Workflow เตรียม Portable Git for Windows ใน temp ของ job หากไม่มี Git ใน PATH
+โดยตรึง official release และตรวจ SHA-256 ก่อนแตกไฟล์ เพื่อให้ checkout ได้ `.git`
+และตรวจ source revision จริง PowerShell ของ job ใช้ `RemoteSigned` แบบ process scope
+สำหรับสคริปต์ที่ runner สร้าง ไม่แก้ execution policy ถาวรของเครื่อง และยังบังคับ
+enabled Administrator token สำหรับชุดตรวจ ACL
+
 ## เริ่ม self-hosted runner บนเครื่องที่พบปัญหา locale
 
 หาก runner ล้มก่อน step แรกด้วย `PowerShellPreAmpersandEscape` ให้หยุด runner แล้ว

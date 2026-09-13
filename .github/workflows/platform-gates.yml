@@ -71,7 +71,9 @@ jobs:
     timeout-minutes: 90
     defaults:
       run:
-        shell: powershell
+        # Only this trusted job process may run locally generated scripts;
+        # do not change CurrentUser/LocalMachine policy on the runner host.
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}"
     # Runner 2.337.0 crashes before step 1 under a th-TH host culture unless
     # the runner process starts in invariant mode. Step processes explicitly
     # restore normal globalization so DODO tests still exercise Windows locale
@@ -80,6 +82,28 @@ jobs:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
       DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
     steps:
+      - name: Prepare Git for Windows before checkout
+        run: |
+          $git = Get-Command git.exe -CommandType Application -ErrorAction SilentlyContinue
+          if (-not $git) {
+            # Portable, job-local Git includes Bash for the native shell tests.
+            # Pin both the official release and its published SHA-256 digest.
+            $archive = Join-Path $env:RUNNER_TEMP "dodo-portable-git.7z.exe"
+            $gitRoot = Join-Path $env:RUNNER_TEMP "dodo-portable-git"
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/PortableGit-2.55.0.5-64-bit.7z.exe" -OutFile $archive
+            $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($hash -ne "5aa8a20f6e9abb2c755f0e73c91c687701a46b309ad84a0ca6509380fa4ae290") { throw "Portable Git checksum mismatch" }
+            $extract = Start-Process -FilePath $archive -ArgumentList @('-y', ('-o"{0}"' -f $gitRoot)) -Wait -PassThru
+            if ($extract.ExitCode -ne 0) { throw "Portable Git extraction failed" }
+            $gitCmd = Join-Path $gitRoot "cmd"
+            if (-not (Test-Path -LiteralPath (Join-Path $gitCmd "git.exe"))) { throw "Portable Git executable missing" }
+            Add-Content -LiteralPath $env:GITHUB_PATH -Encoding utf8 -Value $gitCmd
+            $env:PATH = "$gitCmd;$env:PATH"
+            Remove-Item -LiteralPath $archive
+          }
+          git --version
+          if ($LASTEXITCODE -ne 0) { throw "Git is unavailable for source revision verification" }
       - name: Checkout trusted main revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
