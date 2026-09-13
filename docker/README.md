@@ -15,6 +15,9 @@ npm run test:linux:docker
 The container receives only a writeable evidence directory. Source is copied
 into the image, not mounted from the host. The same command runs locally and on
 the dedicated `linux-ci` self-hosted GitHub Actions runner; reports record the
-runner origin explicitly.
+runner origin explicitly. That runner uses Docker host networking because its
+bridge resolver cannot reach public package registries; filesystem and process
+isolation remain containerized, and the workflow accepts trusted `main` pushes
+and manual owner dispatches only.
 
 Source: https://github.com/microsoft/playwright/blob/v1.63.0/utils/docker/seccomp_profile.json

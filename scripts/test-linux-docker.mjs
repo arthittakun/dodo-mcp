@@ -35,6 +35,10 @@ const revision = run('git', ['rev-parse', 'HEAD'], { capture: true, timeout: 30_
 const dirty = run('git', ['status', '--porcelain'], { capture: true, timeout: 30_000 }).length > 0;
 const githubActionsUsed = process.env['GITHUB_ACTIONS'] === 'true';
 if (githubActionsUsed && process.env['GITHUB_SHA'] !== revision) throw new Error('GitHub Actions checkout does not match GITHUB_SHA');
+// The dedicated runner's Docker bridge has no working DNS route. The source
+// revision is trusted main and remains copied into the image; host networking
+// is used only to give build/audit traffic the runner host's working resolver.
+const networkArgs = githubActionsUsed ? ['--network', 'host'] : [];
 const lockDigest = `sha256:${createHash('sha256').update(fs.readFileSync(path.join(root, 'package-lock.json'))).digest('hex')}`;
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 outputDir ||= path.join(root, 'release-evidence', pkg.version, `linux-docker-node${nodeVersion}-${stamp}`);
@@ -43,7 +47,7 @@ fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
 const image = `dodo-mcp-linux-gate:node${nodeVersion}`;
 console.log(`[linux-docker] building ${image} from revision ${revision.slice(0, 12)} (dirty=${dirty})`);
 run('docker', [
-  'build', '--file', 'docker/linux-test.Dockerfile',
+  'build', ...networkArgs, '--file', 'docker/linux-test.Dockerfile',
   '--build-arg', `NODE_VERSION=${nodeVersion}`,
   '--label', `org.opencontainers.image.revision=${revision}`,
   '--tag', image, '.',
@@ -51,7 +55,7 @@ run('docker', [
 
 console.log('[linux-docker] running Linux release gate with Playwright Chromium');
 run('docker', [
-  'run', '--rm', '--init', '--ipc=host',
+  'run', '--rm', '--init', '--ipc=host', ...networkArgs,
   '--security-opt', `seccomp=${path.join(root, 'docker', 'chromium-seccomp.json')}`,
   '--mount', `type=bind,source=${outputDir},target=/evidence`,
   '--env', `DODO_RELEASE_GATE_SOURCE_REVISION=${revision}`,
