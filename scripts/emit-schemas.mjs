@@ -4,18 +4,19 @@
 import { z } from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'schemas');
 fs.mkdirSync(outDir, { recursive: true });
 
-const { TOOL_CATALOG } = await import(path.join(root, 'dist/tools/catalog.js'));
-const { COMPACT_CATALOG, HYBRID_CATALOG, HYBRID_DIRECT_OPERATIONS, GATEWAY_OPERATIONS, surfaceStats } = await import(path.join(root, 'dist/tools/surface.js'));
-const { toolInputShape } = await import(path.join(root, 'dist/tools/context.js'));
-const { envelopeSchema } = await import(path.join(root, 'dist/tools/envelope.js'));
-const { GlobalConfigSchema } = await import(path.join(root, 'dist/config/globalConfig.js'));
-const { ProjectConfigSchema } = await import(path.join(root, 'dist/config/projectConfig.js'));
+const distModule = (relativePath) => pathToFileURL(path.join(root, 'dist', relativePath)).href;
+const { TOOL_CATALOG } = await import(distModule('tools/catalog.js'));
+const { COMPACT_CATALOG, HYBRID_CATALOG, HYBRID_DIRECT_OPERATIONS, GATEWAY_OPERATIONS, surfaceStats } = await import(distModule('tools/surface.js'));
+const { toolInputShape } = await import(distModule('tools/context.js'));
+const { envelopeSchema } = await import(distModule('tools/envelope.js'));
+const { GlobalConfigSchema } = await import(distModule('config/globalConfig.js'));
+const { ProjectConfigSchema } = await import(distModule('config/projectConfig.js'));
 
 const tools = TOOL_CATALOG.map((def) => {
   const inputShape = toolInputShape(def);

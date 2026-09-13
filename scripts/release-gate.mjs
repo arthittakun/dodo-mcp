@@ -27,6 +27,10 @@ const steps = [];
 let failure;
 
 function append(value) { fs.appendFileSync(logFile, value, { mode: 0o600 }); }
+function diagnosticTail(value) {
+  const text = String(value ?? '');
+  return text.length <= 16_384 ? text : `[output truncated to final 16384 characters]\n${text.slice(-16_384)}`;
+}
 function command(program, args, { allowFailure = false, timeout = 20 * 60 * 1000, env = {} } = {}) {
   const label = `${program} ${args.join(' ')}`;
   append(`\n[${new Date().toISOString()}] ${label}\n`);
@@ -36,7 +40,14 @@ function command(program, args, { allowFailure = false, timeout = 20 * 60 * 1000
   const status = result.status ?? (result.error ? 1 : 0);
   steps.push({ command: label, status, durationMs: Date.now() - started });
   if (result.error) throw result.error;
-  if (status !== 0 && !allowFailure) throw new Error(`${label} failed with exit ${status}`);
+  if (status !== 0 && !allowFailure) {
+    if (process.env['CI']) {
+      console.error(`[release-gate] failed command: ${label}`);
+      if (result.stdout) console.error(diagnosticTail(result.stdout));
+      if (result.stderr) console.error(diagnosticTail(result.stderr));
+    }
+    throw new Error(`${label} failed with exit ${status}`);
+  }
   return result;
 }
 function sha(algorithm, file) { return createHash(algorithm).update(fs.readFileSync(file)).digest('hex'); }
