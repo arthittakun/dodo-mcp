@@ -47,3 +47,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [029 — Compact MCP tool surface with capability gateways](029-compact-tool-surface.md)
 - [030 — Windows native candidate and authenticated owner IPC](030-windows-native-candidate.md)
 - [031 — Owner-selected Cloudflare Tunnel supervision](031-owner-selected-tunnel-supervision.md)
+- [032 — Owner-only durable project registry](032-owner-project-registry.md)

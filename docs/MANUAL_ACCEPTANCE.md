@@ -54,6 +54,20 @@
 4. ทำให้ target bootstrap ล้มเหลว
 5. ตรวจว่า workspace เดิมยังเรียก tool ได้
 
+## Project Registry
+
+1. ใช้ `dodo project add /absolute/path --name "Fixture A"` และตรวจว่า `list/info` แสดง canonical path, project ID และ `ready`
+2. เพิ่ม path เดิมซ้ำและตรวจว่า project ID ไม่เปลี่ยน
+3. เปิด Local Config แล้วตรวจว่ารายการแสดง active/readiness โดยไม่มี client secret หรือ token
+4. เพิ่ม Fixture B จากหน้าเว็บ แล้วกดเปิดโปรเจกต์ ตรวจว่า MCP ใช้ B จริงและ AI ต้องเรียก `project_overview` ใหม่
+5. ตรวจว่า trust/client ACL ของ A ไม่ปรากฏใน B
+6. rename directory fixture แล้วเพิ่ม path ใหม่ ตรวจว่า project ID คงเดิมแต่ workspace ID เปลี่ยน
+7. แทน path ด้วย directory identity อื่นและตรวจว่า DODO ปฏิเสธการ takeover
+8. นำรายการออกหลังยืนยัน ตรวจว่าไฟล์ ประวัติ trust และ ACL ยังอยู่
+9. เปิด Local Config โดยไม่มี private fragment, จาก origin อื่น และผ่าน proxy headers; ทุกกรณีต้องถูกปฏิเสธ
+
+สถานะการตรวจ Project Registry บน browser/owner environment จริง: `MANUAL_NOT_RUN`
+
 ## HTTP Compact
 
 1. เชื่อม MCP ด้วย OAuth

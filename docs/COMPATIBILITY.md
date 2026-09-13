@@ -15,6 +15,9 @@
 | Package | `dodo-mcp` |
 | CLI | `dodo` |
 
+Project Registry ใช้ได้ผ่าน `dodo project add/list/info/remove` และ private Local
+Config โดยไม่เปลี่ยนพฤติกรรม `dodo start --root PATH` หรือ single-workspace STDIO
+
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools

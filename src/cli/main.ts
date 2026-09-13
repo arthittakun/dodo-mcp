@@ -24,6 +24,7 @@ import type { StatusData } from '../ipc/protocol.js';
 import { sandboxAvailability } from '../services/jobs/sandbox.js';
 import { DesktopPolicyInputSchema, saveDesktopPolicy } from '../services/desktop/desktopPolicy.js';
 import { INPUT_LIMIT_PROFILES } from '../config/limits.js';
+import { ProjectRegistry, type RegisteredProject } from '../projects/registry.js';
 
 const program = new Command();
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
@@ -66,6 +67,29 @@ function printJsonOrLines(json: boolean, data: unknown, lines: () => string[]): 
   else for (const l of lines()) console.log(l);
 }
 
+function withProjectRegistry<T>(fn: (registry: ProjectRegistry, store: Store) => T): T {
+  const { dir } = resolveConfigDir(process.env);
+  ensureConfigDir(dir);
+  const db = openDatabase(statePaths(dir).dbFile);
+  try {
+    const store = new Store(db);
+    return fn(new ProjectRegistry(store), store);
+  } finally {
+    db.close();
+  }
+}
+
+function projectLines(project: RegisteredProject): string[] {
+  return [
+    `${project.displayName}  ${project.projectId}`,
+    `  Path: ${project.root}`,
+    `  Workspace: ${project.workspaceId}`,
+    `  Status: ${project.availability} — ${project.statusText}`,
+    `  Updated: ${new Date(project.updatedAt).toISOString()}`,
+    ...(project.removedAt === null ? [] : [`  Removed: ${new Date(project.removedAt).toISOString()}`]),
+  ];
+}
+
 // Local-owner dependency setup. Never exposed as an MCP permission-changing tool.
 program.command('setup')
   .description('check and install missing local dependencies for this OS; existing security permissions remain in force')
@@ -100,6 +124,83 @@ program.command('setup')
       if (opts.json) console.log(JSON.stringify({ error: error instanceof DodoError ? error.code : 'SETUP_FAILED', message: (error as Error).message }));
       else console.error(`dodo setup: ${(error as Error).message}`);
       process.exitCode = 1;
+    }
+  });
+
+// --------------------------------------------------------------- project --
+// Installation-level owner registry. It exposes no MCP tool and grants no
+// trust/client access; those remain keyed by the referenced workspace ID.
+const project = program.command('project').description('manage the local owner-only project registry');
+
+project.command('add <path>')
+  .description('register an absolute project directory without changing trust or client access')
+  .option('--name <display-name>', 'local display name (defaults to the directory name)')
+  .option('--json', 'machine-readable result', false)
+  .action((projectPath: string, opts: { name?: string; json: boolean }) => {
+    try {
+      const result = withProjectRegistry((registry) => registry.add(projectPath, opts.name));
+      printJsonOrLines(opts.json, result, () => [
+        result.relocated ? 'Updated the location of an existing project identity.' : result.changed ? 'Project registered.' : 'Project was already registered; nothing changed.',
+        ...projectLines(result.project),
+        'Trust, OAuth grants and workspace client access were not changed.',
+      ]);
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}${error.recovery ? `\n  → ${error.recovery}` : ''}`);
+      throw error;
+    }
+  });
+
+project.command('list')
+  .description('list registered projects and current path readiness')
+  .option('--all', 'include reviewed removals', false)
+  .option('--json', 'machine-readable output', false)
+  .action((opts: { all: boolean; json: boolean }) => {
+    try {
+      const projects = withProjectRegistry((registry) => registry.list({ includeRemoved: opts.all }));
+      printJsonOrLines(opts.json, projects, () => projects.length === 0
+        ? ['no projects registered (add one with: dodo project add /absolute/path)']
+        : projects.flatMap((entry, index) => [...(index ? [''] : []), ...projectLines(entry)]));
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}`);
+      throw error;
+    }
+  });
+
+project.command('info <projectId>')
+  .description('show one project registry entry without displaying credentials')
+  .option('--json', 'machine-readable output', false)
+  .action((projectId: string, opts: { json: boolean }) => {
+    try {
+      const entry = withProjectRegistry((registry) => registry.get(projectId, { includeRemoved: true }));
+      printJsonOrLines(opts.json, entry, () => projectLines(entry));
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}`);
+      throw error;
+    }
+  });
+
+project.command('remove <projectId>')
+  .description('remove one registry entry; never deletes project files, history, trust or ACL state')
+  .option('--yes', 'confirm the reviewed registry removal', false)
+  .option('--json', 'machine-readable output', false)
+  .action((projectId: string, opts: { yes: boolean; json: boolean }) => {
+    try {
+      const result = withProjectRegistry((registry) => {
+        const current = registry.get(projectId);
+        if (!opts.yes) {
+          throw new DodoError('APPROVAL_REQUIRED', `removing ${current.displayName} (${current.projectId}) requires --yes`, {
+            recovery: `review ${current.root}, then run: dodo project remove ${current.projectId} --yes`,
+          });
+        }
+        return registry.remove(projectId);
+      });
+      printJsonOrLines(opts.json, { removed: true, project: result, filesDeleted: false, authorityDeleted: false }, () => [
+        `Removed ${result.displayName} (${result.projectId}) from the project registry.`,
+        'Project files, workspace history, trust and client ACL state were preserved.',
+      ]);
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}${error.recovery ? `\n  → ${error.recovery}` : ''}`);
+      throw error;
     }
   });
 
@@ -408,10 +509,16 @@ program
     try {
       const paths = statePaths(dir);
       const db = openDatabase(paths.dbFile);
-      db.close();
-      checks.push({ name: 'state-db', ok: true, note: 'opens and migrates' });
+      try {
+        checks.push({ name: 'state-db', ok: true, note: 'opens and migrates' });
+        const projects = new ProjectRegistry(new Store(db)).list();
+        const invalid = projects.filter((entry) => entry.availability === 'invalid').length;
+        const unavailable = projects.filter((entry) => !entry.available && entry.availability !== 'invalid').length;
+        checks.push({ name: 'projects', ok: invalid === 0, note: `${projects.length} registered; ${projects.length - invalid - unavailable} ready; ${unavailable} unavailable; ${invalid} invalid` });
+      } finally { db.close(); }
     } catch (err) {
       checks.push({ name: 'state-db', ok: false, note: (err as Error).message });
+      checks.push({ name: 'projects', ok: false, note: 'registry unavailable because state database did not open' });
     }
     try {
       const config = loadGlobalConfig(statePaths(dir).configFile);

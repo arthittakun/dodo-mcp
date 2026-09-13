@@ -21,6 +21,8 @@ Owner browser/CLI
 Local Config 127.0.0.1:21731 ──► WorkspaceHost ──► active workspace lifecycle
 
 Local owner CLI ──► authenticated tunnel IPC ──► bounded cloudflared supervisor
+
+Local owner CLI/Config ──► project registry ──► projectId + workspace reference
 ```
 
 ## Bootstrap and workspace lifecycle
@@ -30,6 +32,17 @@ Local owner CLI ──► authenticated tunnel IPC ──► bounded cloudflared
 `WorkspaceHost` ถือ active workspace เดียวต่อ process การเปลี่ยน workspace ทำแบบ prepare → readiness → drain/teardown → commit และ rollback เมื่อขั้นตอน prepare ล้มเหลว ทุก request resolve active workspace ตอนเริ่ม request และตรวจ identity/epoch ซ้ำใน invocation pipeline
 
 running jobs, in-flight requests, stale Local Config headers และ duplicate server ownership ถูกตรวจเป็น precondition การสลับจะไม่ kill jobs เงียบ ๆ
+
+## Project registry
+
+Project Registry อยู่ใน installation SQLite และใช้ opaque random project ID แยกจาก
+path-derived workspace ID รายการเก็บ canonical root, directory identity, display
+metadata และ readiness เท่านั้น ไม่ใช่ authority store และไม่มี MCP/public route
+
+การ relocate ที่พิสูจน์ directory identity เดิมได้รักษา project ID แต่คำนวณ
+workspace ID จาก path ใหม่ ทำให้ trust และ client ACL ไม่ถูกคัดลอก Registry mutation
+และ audit commit ใน transaction เดียวกัน การ remove เป็น soft removal และไม่ลบไฟล์
+workspace history หรือ security state
 
 ## Tool invocation
 

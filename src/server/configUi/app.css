@@ -201,6 +201,9 @@ legend { font-weight: 600; font-size: .9rem; padding: 0 4px; }
 .client-id { font-size: .8rem; }
 .client .checks { background: var(--panel); }
 .client .actions { margin-top: 10px; }
+.project-entry > * + * { margin-top: 9px; }
+.project-path { display: block; width: 100%; overflow-wrap: anywhere; white-space: normal; }
+.project-status { margin-bottom: 0; }
 .empty { border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 14px; color: var(--muted); }
 
 /* Notice */

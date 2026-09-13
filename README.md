@@ -13,6 +13,7 @@
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
+- มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - ตรวจและเลือกใช้ Cloudflare Tunnel แบบ external หรือ DODO-managed โดย token อยู่ใน OS credential store/secure reference และการ start ต้องยืนยันทุกครั้ง
 - ไม่ส่ง token, secret หรือ state DB ไปที่ repository และไม่ให้ repository config เพิ่มสิทธิ์
 
@@ -31,6 +32,18 @@ dodo start
 เมื่อ DODO ตรวจพบ config เดิมในตำแหน่งมาตรฐาน สามารถใช้ `dodo setup --import-state` เพื่อนำเข้าเฉพาะ preference ที่ปลอดภัย เช่น port, search backend, retention และ tool surface ระบบจะสร้าง installation identity ใหม่เสมอและไม่คัดลอก OAuth keys/tokens, client grants, workspace ACL, trust, approvals, schedules, public origin, web/desktop permission, executable registration หรือฐานข้อมูลเดิม ต้นฉบับจะไม่ถูกแก้ไข
 
 เปิด Local Config จาก URL ที่ `dodo` แสดงใน terminal ใช้สำหรับตั้ง trust, public origin, client access และเปลี่ยน workspace เจ้าของเท่านั้น
+
+ลงทะเบียนโปรเจกต์ที่ต้องการใช้งานบ่อยได้โดยไม่เริ่ม server และไม่เปลี่ยนสิทธิ์:
+
+```bash
+dodo project add /absolute/path/to/project --name "Web application"
+dodo project list
+dodo project info prj_xxxxxxxxxxxx
+dodo project remove prj_xxxxxxxxxxxx --yes
+```
+
+Project Registry ใช้ project ID คงที่แยกจาก workspace authority และแสดง readiness
+ของ path ปัจจุบัน ดู contract ที่ [Project Registry](docs/PROJECTS.md)
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
@@ -140,6 +153,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - [Windows compatibility](docs/WINDOWS.md)
 - [Task assistance](docs/ASSISTANCE.md)
 - [Multimodal](docs/MULTIMODAL.md)
+- [Project Registry](docs/PROJECTS.md)
 - [Manual acceptance](docs/MANUAL_ACCEPTANCE.md)
 - [Test report](docs/TEST_REPORT.md)
 

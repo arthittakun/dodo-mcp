@@ -13,7 +13,7 @@
 
 <header class="topbar">
   <div class="brand">
-    <span class="logo" aria-hidden="true">JJ</span>
+    <span class="logo" aria-hidden="true">DD</span>
     <div>
       <h1>DODO <span class="version" id="version" aria-label="เวอร์ชัน">…</span></h1>
       <p class="sub">Local Config · หน้าตั้งค่าเฉพาะเจ้าของเครื่อง</p>
@@ -88,6 +88,35 @@
       </details>
     </div>
     <div class="card-state error-state" id="ws-error" hidden></div>
+  </section>
+
+  <!-- Project registry -->
+  <section class="card" id="card-projects" aria-labelledby="h-projects">
+    <div class="card-head">
+      <h2 id="h-projects">Project Registry</h2>
+      <span class="badge" id="projects-count" hidden></span>
+    </div>
+    <p class="muted">รายการโปรเจกต์ของเจ้าของเครื่อง ใช้ project ID ที่คงที่เพื่อเตรียม multi-project ในขั้นถัดไป การเพิ่มหรือนำรายการออกไม่เปลี่ยน trust, OAuth หรือสิทธิ์ client</p>
+    <div class="card-state" id="projects-loading">กำลังโหลด…</div>
+    <div class="card-body" id="projects-body" hidden>
+      <div id="projects-list" class="clients" aria-live="polite"></div>
+      <div class="empty" id="projects-empty" hidden>
+        <p><b>ยังไม่มีโปรเจกต์ใน registry</b></p>
+        <p>เพิ่ม absolute path ด้านล่าง โปรเจกต์ที่กำลังเปิดจะยังทำงานได้แม้ไม่ได้ลงทะเบียน</p>
+      </div>
+      <form id="project-add-form" class="form" novalidate>
+        <label for="project-add-path">เพิ่มโปรเจกต์ด้วย absolute path</label>
+        <input id="project-add-path" name="path" type="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/projects/app" aria-describedby="project-add-help project-add-error" required>
+        <label for="project-add-name">ชื่อที่แสดง <span class="muted">(ไม่บังคับ)</span></label>
+        <div class="input-row">
+          <input id="project-add-name" name="displayName" type="text" autocomplete="off" maxlength="120" placeholder="Web application">
+          <button type="submit" class="btn primary" id="project-add">เพิ่มโปรเจกต์</button>
+        </div>
+        <p class="help" id="project-add-help">DODO จะบันทึก canonical realpath และ directory identity ห้ามใช้ home, filesystem root หรือ path ที่ไม่มีอยู่จริง</p>
+        <p class="error" id="project-add-error" role="alert" hidden></p>
+      </form>
+    </div>
+    <div class="card-state error-state" id="projects-error" hidden></div>
   </section>
 
   <section class="card" aria-labelledby="h-desktop">

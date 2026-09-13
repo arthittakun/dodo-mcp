@@ -17,11 +17,19 @@ DODO ใช้หลายชั้นร่วมกัน:
 
 การผ่านชั้นใดชั้นหนึ่งไม่ grant สิทธิ์ชั้นอื่น
 
+Project Registry เป็น owner metadata แยกจาก authority: project ID หรือ readiness
+ไม่ grant OAuth scope, workspace ACL หรือ trust และ AI ไม่มี MCP tool สำหรับเพิ่ม ลบ
+หรือเปลี่ยนรายการโปรเจกต์
+
 ## HTTP and Local Config
 
 MCP และ public route ต้องผ่าน OAuth เสมอ ห้ามใช้ localhost เป็น authentication, ห้ามเปิด CORS เป็น `*`, ห้ามส่ง token ใน query string และห้าม trust proxy headers จากภายนอก
 
 Local Config bind loopback ใช้ private capability token, expiration, Host/Origin checks, forwarded-header rejection และ rate limit ไม่มี Local Config/admin endpoint บน public MCP plane
+
+Project Registry API ใช้ boundary เดียวกันและผูก mutation กับ workspace/epoch ที่
+เจ้าของกำลัง review รายการทุกตัวถูก render ด้วย DOM text APIs การแสดงชื่อ/path จึง
+ไม่สร้าง HTML จากข้อมูล registry
 
 ## Workspace and gateway
 

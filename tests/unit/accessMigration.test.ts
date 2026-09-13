@@ -18,7 +18,7 @@ describe('workspace access migration', () => {
       store.putGrant({id:'revoked',workspaceId:'b',clientId:'client',accountId:'owner',scopes:['dodo:exec']});
       store.revokeGrant('revoked');
       // Restore the actual old schema, including tables added after v4.
-      db.exec('DROP TABLE chat_permissions; DROP TABLE usage_consents; DROP TABLE schedules; DROP TABLE schedule_runs');
+      db.exec('DROP TABLE project_registry; DROP TABLE chat_permissions; DROP TABLE usage_consents; DROP TABLE schedules; DROP TABLE schedule_runs');
       if (version === 2) db.exec('DROP TABLE workspace_clients; DELETE FROM schema_migrations WHERE version >= 3');
       else {
         db.exec('DELETE FROM schema_migrations WHERE version >= 4');

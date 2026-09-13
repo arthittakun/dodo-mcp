@@ -163,6 +163,7 @@
   let lastSavedMode = null;
   let lastPublicUrl = null;
   let lastClientsSig = null;
+  let projectsGeneration = 0;
 
   /* Background refreshes must never clobber what the owner is editing:
    * form sections are only re-rendered when nothing there is dirty or focused,
@@ -172,6 +173,7 @@
       force = true;
       resetClientPicker();
       resetClientManager();
+      projectsGeneration++;
       notify('info', 'Workspace เปลี่ยนแล้ว — ล้างค่าที่ยังไม่บันทึก กรุณาตรวจโปรเจกต์ใหม่ก่อนบันทึก', true);
     }
     state = s;
@@ -208,6 +210,7 @@
     lastRoot = w.root;
     $('ws-hint').hidden = !switchedOnce;
     cardState('ws', 'ready');
+    void loadProjects(force === true);
 
     const desktop = s.desktop && s.desktop.policy;
     $('desktop-mode').textContent = desktop ? desktop.mode : 'off';
@@ -277,6 +280,132 @@
     cardState('clients', 'ready');
     document.getElementById('main').setAttribute('aria-busy', 'false');
   }
+
+  // ---- owner project registry ----
+  function projectStatus(project, active) {
+    if (active) return { className: 'badge ok', text: '● เปิดอยู่' };
+    const labels = {
+      ready: ['badge ok', '● พร้อม'],
+      missing: ['badge warn', '⚠ ไม่พบ path'],
+      symlinked: ['badge danger', '✕ พบ symbolic link'],
+      replaced: ['badge danger', '✕ identity เปลี่ยน'],
+      inaccessible: ['badge warn', '⚠ ตรวจสอบไม่ได้'],
+      invalid: ['badge danger', '✕ metadata ผิดปกติ'],
+      removed: ['badge', '○ นำออกแล้ว'],
+    };
+    const selected = labels[project.availability] || ['badge warn', `⚠ ${project.availability}`];
+    return { className: selected[0], text: selected[1] };
+  }
+
+  async function loadProjects(force) {
+    if (!state || !state.workspace) return;
+    const generation = ++projectsGeneration;
+    const context = workspaceContext();
+    if (force) cardState('projects', 'loading');
+    try {
+      const result = await api('projects', undefined, context);
+      if (generation !== projectsGeneration || !state || result.workspaceId !== state.workspace.workspaceId || result.workspaceEpoch !== state.workspace.epoch) return;
+      renderProjects(result, context);
+      cardState('projects', 'ready');
+    } catch (error) {
+      if (generation !== projectsGeneration) return;
+      cardState('projects', 'error', error.message);
+    }
+  }
+
+  function renderProjects(result, context) {
+    const list = $('projects-list');
+    list.replaceChildren();
+    $('projects-empty').hidden = result.projects.length > 0;
+    $('projects-count').hidden = false;
+    $('projects-count').textContent = `${result.projects.length} โปรเจกต์`;
+    for (const project of result.projects) {
+      const active = project.workspaceId === result.activeWorkspaceId && project.root === state.workspace.root;
+      const article = document.createElement('article');
+      article.className = 'client project-entry';
+      const head = document.createElement('div'); head.className = 'client-head';
+      const titleWrap = document.createElement('div');
+      const name = document.createElement('div'); name.className = 'client-name'; name.textContent = project.displayName;
+      const id = document.createElement('code'); id.className = 'client-id'; id.textContent = project.projectId;
+      titleWrap.append(name, id);
+      const status = document.createElement('span');
+      const statusInfo = projectStatus(project, active);
+      status.className = statusInfo.className; status.textContent = statusInfo.text;
+      head.append(titleWrap, status);
+
+      const root = document.createElement('code'); root.className = 'path project-path'; root.textContent = project.root; root.title = project.root;
+      const description = document.createElement('p'); description.className = 'help project-status'; description.textContent = project.statusText;
+      const details = document.createElement('details'); details.className = 'details';
+      const summary = document.createElement('summary'); summary.textContent = 'รายละเอียด registry';
+      const dl = document.createElement('dl'); dl.className = 'dl';
+      for (const [label, value] of [['Workspace ID', project.workspaceId], ['Directory identity', `${project.identity.dev}:${project.identity.ino}`], ['อัปเดต', new Date(project.updatedAt).toLocaleString()]]) {
+        const dt = document.createElement('dt'); dt.textContent = label;
+        const dd = document.createElement('dd'); dd.textContent = value;
+        dl.append(dt, dd);
+      }
+      details.append(summary, dl);
+
+      const actions = document.createElement('div'); actions.className = 'actions';
+      const switchButton = document.createElement('button'); switchButton.type = 'button'; switchButton.className = 'btn small'; switchButton.textContent = active ? 'กำลังเปิดอยู่' : 'เปิดโปรเจกต์นี้';
+      switchButton.disabled = active || !project.available || !state.workspace.switchSupported;
+      switchButton.addEventListener('click', () => withBusy(switchButton, 'กำลังสลับ…', async () => {
+        try {
+          const switched = await api('workspace/switch', { path: project.root }, context);
+          if (switched.changed) {
+            switchedOnce = true;
+            notify('success', `สลับไปที่ ${project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และ client ต้องมีสิทธิ์ใน workspace ใหม่`, true);
+          }
+          await refresh(true);
+        } catch (error) {
+          notify('error', `เปิดโปรเจกต์ไม่สำเร็จ: ${error.message}${error.data && error.data.recovery ? ` (${error.data.recovery})` : ''}`);
+          await refresh(true);
+        }
+      }));
+      const removeButton = document.createElement('button'); removeButton.type = 'button'; removeButton.className = 'btn danger-outline small'; removeButton.textContent = 'นำออกจากรายการ';
+      removeButton.addEventListener('click', () => withBusy(removeButton, 'กำลังนำออก…', async () => {
+        const warning = active
+          ? `${project.displayName} กำลังเปิดอยู่ การนำออกจะลบเฉพาะรายการ registry และไม่หยุด server ไม่ลบไฟล์ ประวัติ trust หรือ client ACL`
+          : `นำ ${project.displayName} ออกจาก registry? ไฟล์ ประวัติ trust และ client ACL จะไม่ถูกลบ`;
+        if (!(await confirmAction('นำโปรเจกต์ออกจาก registry?', warning, 'นำออกจากรายการ'))) return;
+        try {
+          await api('projects/remove', { projectId: project.projectId, confirmProjectId: project.projectId }, context);
+          notify('success', `นำ ${project.displayName} ออกจาก registry แล้ว โดยไม่ลบไฟล์หรือสิทธิ์เดิม`);
+          await loadProjects(true);
+        } catch (error) { notify('error', `นำโปรเจกต์ออกไม่สำเร็จ: ${error.message}`); }
+      }));
+      actions.append(switchButton, removeButton);
+      article.append(head, root, description, details, actions);
+      list.append(article);
+    }
+  }
+
+  $('project-add-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const pathInput = $('project-add-path');
+    const nameInput = $('project-add-name');
+    const errorElement = $('project-add-error');
+    const projectPath = pathInput.value.trim();
+    const displayName = nameInput.value.trim();
+    errorElement.hidden = true; pathInput.removeAttribute('aria-invalid');
+    if (!projectPath || (!projectPath.startsWith('/') && !/^[A-Za-z]:[\\/]/.test(projectPath))) {
+      errorElement.textContent = '✕ ต้องกรอก absolute path ของโฟลเดอร์'; errorElement.hidden = false; pathInput.setAttribute('aria-invalid', 'true'); pathInput.focus(); return;
+    }
+    const context = workspaceContext();
+    withBusy($('project-add'), 'กำลังเพิ่ม…', async () => {
+      try {
+        const body = { path: projectPath };
+        if (displayName) body.displayName = displayName;
+        const result = await api('projects/add', body, context);
+        pathInput.value = ''; nameInput.value = '';
+        notify(result.changed ? 'success' : 'info', result.relocated ? `อัปเดต path ของ ${result.project.displayName} แล้ว โดยไม่คัดลอกสิทธิ์ workspace เดิม` : result.changed ? `เพิ่ม ${result.project.displayName} ใน registry แล้ว` : 'โปรเจกต์นี้อยู่ใน registry แล้ว');
+        await loadProjects(true);
+      } catch (error) {
+        errorElement.textContent = `✕ ${error.message}${error.data && error.data.recovery ? ` (${error.data.recovery})` : ''}`;
+        errorElement.hidden = false; pathInput.setAttribute('aria-invalid', 'true');
+        notify('error', 'เพิ่มโปรเจกต์ไม่สำเร็จ');
+      }
+    });
+  });
 
   function renderClients(clients, force) {
     const context = workspaceContext();
@@ -525,10 +654,10 @@
       } catch (e) {
         if (e.status === 401) {
           $('card-auth').hidden = false;
-          for (const p of ['ws', 'perm', 'conn', 'clients']) cardState(p, 'error', 'ต้องเปิดจากลิงก์ส่วนตัวใน terminal');
+          for (const p of ['ws', 'projects', 'perm', 'conn', 'clients']) cardState(p, 'error', 'ต้องเปิดจากลิงก์ส่วนตัวใน terminal');
           setChip('chip-config', 'error', '✕', 'ไม่มี token หรือหมดอายุ');
         } else {
-          for (const p of ['ws', 'perm', 'conn', 'clients']) cardState(p, 'error', e.message);
+          for (const p of ['ws', 'projects', 'perm', 'conn', 'clients']) cardState(p, 'error', e.message);
           setChip('chip-mcp', 'error', '✕', 'ติดต่อไม่ได้');
         }
         document.getElementById('main').setAttribute('aria-busy', 'false');
@@ -655,7 +784,7 @@
 
   if (!token) {
     $('card-auth').hidden = false;
-    for (const p of ['ws', 'perm', 'conn', 'clients']) cardState(p, 'error', 'ต้องเปิดจากลิงก์ส่วนตัวใน terminal');
+    for (const p of ['ws', 'projects', 'perm', 'conn', 'clients']) cardState(p, 'error', 'ต้องเปิดจากลิงก์ส่วนตัวใน terminal');
     setChip('chip-config', 'error', '✕', 'ไม่มี token');
     document.getElementById('main').setAttribute('aria-busy', 'false');
   } else {

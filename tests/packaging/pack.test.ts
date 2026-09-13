@@ -147,6 +147,20 @@ describe('PACK: npm tarball', () => {
     expect(JSON.parse(killed)).toMatchObject({ stopped: [], failed: [], authPreserved: true });
   }, 120_000);
 
+  it('PACK-14: installed CLI includes the owner project registry and migrates fresh state', () => {
+    const root = path.join(workDir, 'registered โปรเจกต์');
+    const cfg = path.join(workDir, 'project-registry-cfg');
+    fs.mkdirSync(root, { recursive: true });
+    const options = { cwd: workDir, env: { ...process.env, DODO_CONFIG_DIR: cfg }, encoding: 'utf8' as const };
+    const added = JSON.parse(execFileSync(process.execPath, [installedBin, 'project', 'add', root, '--name', 'Packed project', '--json'], options)) as { project: { projectId: string; root: string } };
+    expect(added.project.projectId).toMatch(/^prj_/);
+    expect(added.project.root).toBe(fs.realpathSync.native(root));
+    const listed = JSON.parse(execFileSync(process.execPath, [installedBin, 'project', 'list', '--json'], options)) as Array<{ projectId: string; displayName: string }>;
+    expect(listed).toEqual([expect.objectContaining({ projectId: added.project.projectId, displayName: 'Packed project' })]);
+    expect(fileList).toContain('dist/projects/registry.js');
+    expect(fileList).toContain('dist/server/configUi/index.html');
+  });
+
   it('PACK-11: installed media setup is wired and check/help do not install or change configuration', () => {
     const helper = path.resolve(path.dirname(installedBin), '../../scripts/setup-multimodal.mjs');
     expect(fs.existsSync(helper)).toBe(true);

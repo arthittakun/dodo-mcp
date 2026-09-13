@@ -11,6 +11,7 @@ import type { WorkspaceHost, SwitchResult } from './workspaceHost.js';
 import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSchema } from '../config/globalConfig.js';
 import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
+import { ProjectRegistry } from '../projects/registry.js';
 
 /**
  * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
@@ -222,6 +223,47 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       clients:registered.slice(0,100).map(c => reviewClientDeletion(ws.store,c.clientId)),
       truncated:registered.length > 100});
   });
+
+  // ---- installation project registry (owner only; never mounted on MCP) ----
+  app.get('/api/projects', (req, res) => {
+    const ws = host.current();
+    if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
+      res.status(409).json({ error: 'Workspace changed. Refresh before reviewing projects.', code: 'STALE_WORKSPACE' }); return;
+    }
+    const projects = new ProjectRegistry(ws.store).list();
+    res.json({
+      workspaceId: ws.workspaceId,
+      workspaceEpoch: ws.epoch,
+      activeWorkspaceId: ws.workspaceId,
+      projects,
+    });
+  });
+
+  app.post('/api/projects/add', (req, res) => {
+    const input = z.object({ path: z.string().min(1).max(4096), displayName: z.string().min(1).max(120).optional() }).strict().safeParse(req.body);
+    if (!input.success) { res.status(400).json({ error: 'Project path and display name are invalid.', code: 'INVALID_INPUT' }); return; }
+    try {
+      const result = new ProjectRegistry(host.current().store).add(input.data.path, input.data.displayName);
+      res.json({ ok: true, ...result, authorityChanged: false });
+    } catch (error) {
+      const { status, body } = ownerStateError(error);
+      res.status(status).json(body);
+    }
+  });
+
+  app.post('/api/projects/remove', (req, res) => {
+    const input = z.object({ projectId: z.string().min(1).max(96), confirmProjectId: z.string().min(1).max(96) }).strict().safeParse(req.body);
+    if (!input.success || input.data.projectId !== input.data.confirmProjectId) {
+      res.status(400).json({ error: 'Project removal requires the exact reviewed project ID.', code: 'INVALID_INPUT' }); return;
+    }
+    try {
+      const project = new ProjectRegistry(host.current().store).remove(input.data.projectId);
+      res.json({ ok: true, removed: true, project, filesDeleted: false, authorityDeleted: false });
+    } catch (error) {
+      const { status, body } = ownerStateError(error);
+      res.status(status).json(body);
+    }
+  });
   app.post('/api/clients/delete', (req, res) => {
     const ws = host.current();
     res.json(deleteReviewedClients(ws.store,DeleteClientsInput.parse(req.body),ws.workspaceId));
@@ -341,6 +383,18 @@ function switchError(err: unknown): { status: number; body: { error: string; cod
     return { status, body: { error: err.message, code: err.code, ...(err.recovery ? { recovery: err.recovery } : {}) } };
   }
   return { status: 500, body: { error: 'workspace switch failed; the previous workspace is still active', code: 'INTERNAL_ERROR' } };
+}
+
+function ownerStateError(err: unknown): { status: number; body: { error: string; code: string; recovery?: string } } {
+  if (err instanceof DodoError) {
+    const status =
+      err.code === 'INVALID_INPUT' || err.code === 'PATH_DENIED' ? 400 :
+      err.code === 'NOT_FOUND' ? 404 :
+      err.code === 'CONFLICT' || err.code === 'MIGRATION_REVIEW_REQUIRED' || err.code === 'RESOURCE_LIMIT' ? 409 :
+      500;
+    return { status, body: { error: err.message, code: err.code, ...(err.recovery ? { recovery: err.recovery } : {}) } };
+  }
+  return { status: 500, body: { error: 'Project registry request failed.', code: 'INTERNAL_ERROR' } };
 }
 
 export type { Request, Response };

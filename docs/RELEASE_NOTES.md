@@ -14,6 +14,8 @@
 - รองรับ Local Config workspace switching พร้อม drain, readiness และ rollback
 - รวม coding, jobs, Git, intelligence, assistance, multimodal, browser, game, workflow และ schedule capabilities
 - เพิ่ม Windows compatibility plan และ setup diagnostics
+- เพิ่ม owner-only Project Registry พร้อม stable project ID, path readiness, CLI CRUD และ Local Config UI
+- Project relocation รักษา project ID เฉพาะเมื่อ directory identity เดิมตรวจได้ และไม่คัดลอก trust/client ACL
 
 ## วิธีอัปเดต
 

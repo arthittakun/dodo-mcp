@@ -20,16 +20,27 @@ npm pack
 - build: PASS — full 74, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 59 files PASS, 2 files platform-skipped; 492 tests PASS, 30 tests platform/prerequisite-skipped
-- packaging: 13 tests PASS
+- core/integration/security/compatibility: 62 files PASS, 2 files platform-skipped; 505 tests PASS, 30 tests platform/prerequisite-skipped
+- packaging: 14 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
-- `npm pack`: 322 files; required runtime/schemas/docs present and forbidden private state/development artifacts absent
+- `npm pack`: 326 files; required runtime/schemas/docs present and forbidden private state/development artifacts absent
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
 Setup foundation tests เพิ่มหลักฐานว่า setup plan/check ไม่เขียน state, installer ไม่เริ่มหากไม่มี `--yes`, setup receipt มี schema/kind ที่กำหนด, state import ใช้ allowlist, ตรวจ source hash ซ้ำ, ไม่ merge target เดิม และไม่คัดลอก DB/keys/OAuth/ACL/trust/permission state รวมถึง fail closed ต่อ malformed/unknown config, links และ live IPC markers
 
 Tunnel tests ใช้ fake `cloudflared` และ loopback readiness fixture พิสูจน์ว่า token ไม่อยู่ใน config/argv/log, job environment ไม่ inherit tunnel variables, private file/link policy fail closed, owner IPC เป็น singleton ที่ authenticated, readiness มาจาก `/ready`, restart มีเพดาน และ stop ใช้ live owned child เท่านั้น ไม่มีการใช้ Cloudflare credential, API, DNS หรือ public network จริง
+
+Project Registry tests ครอบคลุม schema migration, Unicode/spaced canonical paths,
+duplicate และ concurrent add, stable project ID, directory relocation, missing/
+symlink/replaced readiness, corrupt metadata recovery, transactional audit, reviewed
+soft removal, Local Config authentication/XSS boundary, ACL/trust isolation, runtime
+workspace switch และ fresh tarball CLI
+
+Headless Chromium fixture เปิด Local Config จริงที่ ephemeral loopback ports เพิ่ม
+Project B ผ่าน UI, แสดงผลที่ desktop และ 390px, กดเปิดรายการ และตรวจว่า active
+workspace เปลี่ยนเป็น canonical root B สำเร็จ ภาพอยู่ใน local ignored artifacts และ
+ไม่ถูก pack การตรวจบน owner browser/config จริงยังคง `MANUAL_NOT_RUN`
 
 ## Surface evidence
 

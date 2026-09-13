@@ -130,6 +130,24 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
   CREATE UNIQUE INDEX idx_chat_active ON chat_permissions(workspace_id,client_id,chat_id) WHERE revoked_at IS NULL;
   ALTER TABLE usage_consents ADD COLUMN chat_permission_id TEXT;
   CREATE INDEX idx_usage_chat ON usage_consents(chat_permission_id);`,
+  `CREATE TABLE project_registry (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    canonical_root TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    root_dev INTEGER NOT NULL,
+    root_ino INTEGER NOT NULL,
+    metadata_version INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    removed_at INTEGER
+  );
+  CREATE UNIQUE INDEX idx_project_registry_active_root
+    ON project_registry(canonical_root) WHERE removed_at IS NULL;
+  CREATE UNIQUE INDEX idx_project_registry_active_identity
+    ON project_registry(root_dev, root_ino) WHERE removed_at IS NULL;
+  CREATE INDEX idx_project_registry_updated
+    ON project_registry(removed_at, updated_at DESC);`,
 ];
 
 /**
