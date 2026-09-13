@@ -67,6 +67,7 @@
     "test:windows": "vitest run tests/unit/windowsPlatform.test.ts tests/unit/windowsAclContract.test.ts tests/integration/windowsRuntime.test.ts tests/security/windowsNative.test.ts tests/security/windowsAclOwner.test.ts tests/security/ipcAuthentication.test.ts tests/security/rollbackPathPolicy.test.ts",
     "test:all": "npm run typecheck && npm run lint && vitest run tests/unit tests/integration tests/security tests/compatibility && npm run test:pack",
     "release:gate": "node scripts/release-gate.mjs --allow-dirty",
+    "release:gate:ci": "node scripts/release-gate.mjs",
     "release:gate:strict": "node scripts/release-gate.mjs --release",
     "prepublishOnly": "node scripts/guard-publish.mjs",
     "desktop:setup": "node dist/cli/main.js desktop setup",

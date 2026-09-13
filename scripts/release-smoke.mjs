@@ -6,6 +6,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { npmInvocation } from './npm-process.mjs';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
@@ -82,8 +83,8 @@ let stdio;
 let httpClient;
 try {
   fs.writeFileSync(path.join(workspace, 'seed.txt'), 'seed\n');
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const installed = spawnSync(npm, ['install', '--prefix', install, '--no-audit', '--no-fund', args.tarball], { encoding: 'utf8', stdio: 'pipe', timeout: 5 * 60 * 1000, windowsHide: true });
+  const npm = npmInvocation(['install', '--prefix', install, '--ignore-scripts', '--no-audit', '--no-fund', args.tarball]);
+  const installed = spawnSync(npm.program, npm.args, { encoding: 'utf8', stdio: 'pipe', timeout: 5 * 60 * 1000, windowsHide: true });
   if (installed.error || installed.status !== 0) throw new Error(`fresh npm install failed (${installed.status}): ${installed.stderr}`);
   const packageRoot = path.join(install, 'node_modules', 'dodo-mcp');
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));

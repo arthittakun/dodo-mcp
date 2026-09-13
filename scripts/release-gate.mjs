@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { npmInvocation } from './npm-process.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -40,6 +41,10 @@ function command(program, args, { allowFailure = false, timeout = 20 * 60 * 1000
 }
 function sha(algorithm, file) { return createHash(algorithm).update(fs.readFileSync(file)).digest('hex'); }
 function git(args) { return command('git', args).stdout.trim(); }
+function npm(args, options) {
+  const invocation = npmInvocation(args);
+  return command(invocation.program, invocation.args, options);
+}
 
 function sourceState() {
   const assertedRevision = process.env['DODO_RELEASE_GATE_SOURCE_REVISION'];
@@ -69,11 +74,10 @@ let smoke = null;
 let bench = null;
 try {
   if (failure) throw new Error(failure);
-  const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  command(npm, ['run', 'build']);
-  command(npm, ['run', 'typecheck']);
-  command(npm, ['run', 'lint']);
-  command(npm, ['run', 'test:all'], { timeout: 30 * 60 * 1000 });
+  npm(['run', 'build']);
+  npm(['run', 'typecheck']);
+  npm(['run', 'lint']);
+  npm(['run', 'test:all'], { timeout: 30 * 60 * 1000 });
 
   const benchFile = path.join(outputDir, 'dodobench.json');
   command(process.execPath, ['scripts/dodo-bench.mjs', '--output', benchFile], {
@@ -85,7 +89,7 @@ try {
   bench = JSON.parse(fs.readFileSync(benchFile, 'utf8'));
   if (bench.status !== 'PASS') throw new Error('DodoBench regression gate failed');
 
-  const audit = command(npm, ['audit', '--omit=dev', '--json'], { allowFailure: true, timeout: 5 * 60 * 1000 });
+  const audit = npm(['audit', '--omit=dev', '--json'], { allowFailure: true, timeout: 5 * 60 * 1000 });
   const auditJson = JSON.parse(audit.stdout || '{}');
   const vulnerabilities = auditJson.metadata?.vulnerabilities ?? {};
   auditSummary = { dependencies: auditJson.metadata?.dependencies ?? null, vulnerabilities };
@@ -93,7 +97,7 @@ try {
   if ((vulnerabilities.high ?? 0) > 0 || (vulnerabilities.critical ?? 0) > 0) throw new Error('production dependency audit has high or critical vulnerabilities');
 
   const artifactDir = path.join(outputDir, 'artifact'); fs.mkdirSync(artifactDir, { recursive: true });
-  const packed = command(npm, ['pack', '--json', '--pack-destination', artifactDir], { timeout: 5 * 60 * 1000 });
+  const packed = npm(['pack', '--json', '--pack-destination', artifactDir], { timeout: 5 * 60 * 1000 });
   const entries = JSON.parse(packed.stdout); pack = entries[0];
   if (!pack?.filename || !Array.isArray(pack.files)) throw new Error('npm pack returned invalid metadata');
   fs.writeFileSync(path.join(outputDir, 'npm-pack.json'), `${JSON.stringify(pack, null, 2)}\n`, { mode: 0o600 });

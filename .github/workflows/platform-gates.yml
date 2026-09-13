@@ -52,14 +52,13 @@ jobs:
           node scripts/test-linux-docker.mjs
           --node "${{ matrix.node }}"
           --output-dir "$GITHUB_WORKSPACE/release-evidence/ci/linux-node-${{ matrix.node }}"
-      - name: Upload non-secret Linux evidence
+      - name: Summarize Linux evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: linux-docker-node-${{ matrix.node }}
-          path: release-evidence/ci/linux-node-${{ matrix.node }}/
-          if-no-files-found: warn
-          retention-days: 14
+        run: |
+          report="release-evidence/ci/linux-node-${{ matrix.node }}/gate-report.json"
+          if test -f "$report"; then
+            node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(`### Linux Docker / Node ${{ matrix.node }}\n\n- Status: ${r.status}\n- Revision: ${r.source.revision}\n- Tests: ${r.steps.filter(s=>s.command.includes("test:all"))[0]?.status === 0 ? "passed" : "failed or not run"}\n- Fresh install: ${r.freshInstall?.status ?? "NOT_RUN"}`)' "$report" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   windows-native:
     name: Windows native / Node ${{ matrix.node }}
@@ -102,18 +101,18 @@ jobs:
           if ($env:RUNNER_OS -ne "Windows") { throw "windows-ci label is not a Windows runner" }
           if (-not $administrator) { throw "windows-ci must run with an enabled Administrator token for native ACL tests" }
       - name: Install dependencies and Playwright Chromium
-        run: |
-          npm ci --no-audit --no-fund
-          npx playwright install chromium
+        shell: cmd
+        run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium
       - name: Run native Windows release candidate gate
+        shell: cmd
         run: >-
-          node scripts/release-gate.mjs
-          --output-dir "$env:GITHUB_WORKSPACE/release-evidence/ci/windows-node-${{ matrix.node }}"
-      - name: Upload non-secret Windows evidence
+          npm run release:gate:ci --
+          --output-dir "%GITHUB_WORKSPACE%\release-evidence\ci\windows-node-${{ matrix.node }}"
+      - name: Summarize Windows evidence
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: windows-native-node-${{ matrix.node }}
-          path: release-evidence/ci/windows-node-${{ matrix.node }}/
-          if-no-files-found: warn
-          retention-days: 14
+        run: |
+          $reportFile = Join-Path $env:GITHUB_WORKSPACE "release-evidence/ci/windows-node-${{ matrix.node }}/gate-report.json"
+          if (Test-Path -LiteralPath $reportFile) {
+            $report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "### Windows native / Node ${{ matrix.node }}`n`n- Status: $($report.status)`n- Revision: $($report.source.revision)`n- Fresh install: $($report.freshInstall.status)"
+          }
