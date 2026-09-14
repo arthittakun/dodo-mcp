@@ -20,7 +20,7 @@ npm pack
 - build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 82 files PASS, 2 files platform-skipped; 593 tests PASS, 31 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 82 files PASS, 2 files platform-skipped; 594 tests PASS, 31 tests platform/prerequisite-skipped
 - packaging: 16 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
@@ -35,6 +35,11 @@ Native candidate regression เพิ่ม lossless NTFS file IDs ผ่าน 
 replaced-root checks, LSP drive/URI normalization, portable mid-write rollback,
 Windows private-fixture ACL และ writable CAS flush handle ผล local ข้างต้นไม่ใช้
 แทนผล native Windows CI; ต้องตรวจ Node 22/24 บน runner `windows-ci 02` แยกกัน
+
+IPC shutdown regression จำลอง endpoint ที่หายไประหว่างตรวจ identity และยืนยันว่า
+descriptor ปลอมหรือ ACL ที่เปิดกว้างซึ่งยังอยู่ยังถูกปฏิเสธ Packaging ล้างเฉพาะ
+temporary directory ของ suite หลังจบ รวมถึงกรณี test fail เพื่อไม่สะสม native
+dependencies และ private fixture state บนเครื่องที่รันทดสอบซ้ำ
 
 Setup foundation tests เพิ่มหลักฐานว่า setup plan/check ไม่เขียน state, installer ไม่เริ่มหากไม่มี `--yes`, setup receipt มี schema/kind ที่กำหนด, state import ใช้ allowlist, ตรวจ source hash ซ้ำ, ไม่ merge target เดิม และไม่คัดลอก DB/keys/OAuth/ACL/trust/permission state รวมถึง fail closed ต่อ malformed/unknown config, links และ live IPC markers
 

@@ -40,6 +40,9 @@ Desktop, speech, browser และ command sandbox ต้องผ่าน prob
 - `dodo kill` ตรวจและหยุด authenticated IPC endpoints ทีละรายการบน Windows
   เพื่อไม่ให้ synchronous PowerShell ACL probes ขวางการรับ IPC response ของอีก
   endpoint โดยยังตรวจ identity/epoch และรอ shutdown จริง ไม่ใช้ PID จาก state เพื่อส่ง signal
+- หาก endpoint ถูกปิดระหว่างตรวจ IPC identity จะตรวจยืนยันว่า descriptor และ
+  locator หายไปจริง ก่อนรายงานว่าไม่มี endpoint; ข้อมูลเสียหรือ ACL ที่ไม่ปลอดภัย
+  ของ endpoint ที่ยังอยู่ยังเป็น error ตามเดิม
 
 ระบบจะประกาศ native support ได้เมื่อผ่าน named-pipe identity, NTFS
 reparse/ADS/8.3 guards, ACL enforcement, PATHEXT resolution, shell strategy,

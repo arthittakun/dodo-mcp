@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -33,6 +33,12 @@ describe('PACK: npm tarball', () => {
   let fileList: string[];
   let workDir: string;
   let installedBin: string;
+
+  afterAll(() => {
+    // The fresh install includes native dependencies and private fixture state.
+    // Remove only this suite's temporary directory, including after a failure.
+    if (workDir) fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  });
 
   beforeAll(() => {
     workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-pack-'));

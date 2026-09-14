@@ -4,11 +4,11 @@ import path from 'node:path';
 import net from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ipcSocketPath } from '../../src/config/paths.js';
 import { ipcCall } from '../../src/ipc/client.js';
 import { startIpcServer } from '../../src/ipc/server.js';
-import { credentialPath, ipcMac, loadIpcCredential, newIpcCredential, publishIpcCredential, removeIpcCredential } from '../../src/ipc/authentication.js';
+import { credentialPath, ipcIdentity, ipcMac, loadIpcCredential, newIpcCredential, publishIpcCredential, removeIpcCredential } from '../../src/ipc/authentication.js';
 import { ensurePrivateDirectory } from '../../src/platform/privateFs.js';
 import { windowsSystemExecutable } from '../../src/platform/system.js';
 import { removeWithRetry } from '../../src/platform/fsRetry.js';
@@ -66,6 +66,23 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
       expect(after).toEqual(before);
       expect(await ipcCall(file, 'status')).toBe('first');
     } finally { await close(server); }
+  });
+
+  it('observes a shutdown that removes the endpoint during an identity check', async () => {
+    const file = locator(), server = await startIpcServer(file, async () => 'ok');
+    const descriptor = credentialPath(file);
+    const read = fs.readFileSync;
+    // Model the other server process completing shutdown between our private
+    // metadata checks and descriptor read. No authentication check is mocked.
+    const spy = vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
+      if (args[0] === descriptor) {
+        fs.unlinkSync(descriptor);
+        if (process.platform !== 'win32') fs.unlinkSync(file);
+      }
+      return read(...args);
+    });
+    try { expect(ipcIdentity(file)).toBeUndefined(); }
+    finally { spy.mockRestore(); await close(server); }
   });
 
   it('rejects a legacy unauthenticated command before dispatch', async () => {
@@ -130,6 +147,7 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
     const credential = loadIpcCredential(file);
     try {
       fs.writeFileSync(credentialPath(file), JSON.stringify({ ...credential, endpoint: 'untrusted-endpoint' }));
+      expect(() => ipcIdentity(file)).toThrow('descriptor');
       await expect(ipcCall(file, 'status')).rejects.toThrow('descriptor');
     } finally { publishIpcCredential(file, credential); await close(server); }
   });
@@ -138,6 +156,7 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
     const file = locator(), server = await startIpcServer(file, async () => 'ok');
     try {
       fs.chmodSync(credentialPath(file), 0o644);
+      expect(() => ipcIdentity(file)).toThrow(/private/);
       await expect(ipcCall(file, 'status')).rejects.toThrow('not private');
     } finally { fs.chmodSync(credentialPath(file), 0o600); await close(server); }
   });
@@ -148,6 +167,7 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
     const utility = windowsSystemExecutable('icacls.exe'), target = credentialPath(file);
     try {
       execFileSync(utility, [target, '/grant', '*S-1-1-0:(R)'], { shell: false, windowsHide: true, timeout: 10000, stdio: 'ignore' });
+      expect(() => ipcIdentity(file)).toThrow(/private/);
       await expect(ipcCall(file, 'status')).rejects.toThrow('not private');
     } finally {
       execFileSync(utility, [target, '/remove:g', '*S-1-1-0'], { shell: false, windowsHide: true, timeout: 10000, stdio: 'ignore' });

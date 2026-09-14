@@ -33,14 +33,24 @@ const cli = async (args: string[], configDir: string, cwd = os.homedir()) => {
     throw error;
   }
 };
-async function until(check: () => boolean | Promise<boolean>, ms = 15000) {
+async function until(check: () => boolean | Promise<boolean>, ms = 15000, diagnostic?: () => unknown) {
   const end = Date.now() + ms;
   while (!await check()) {
-    if (Date.now() > end) throw Error('fixture condition timed out');
+    if (Date.now() > end) throw Error(`fixture condition timed out${diagnostic ? `: ${JSON.stringify(diagnostic())}` : ''}`);
     await new Promise(resolve => setTimeout(resolve, 50));
   }
 }
 function alive(pid: number) { try { process.kill(pid, 0); return true; } catch { return false; } }
+function processDiagnostic(pid: number) {
+  let linuxState: string | null = null;
+  if (process.platform === 'linux') {
+    try {
+      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+      linuxState = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0] ?? null;
+    } catch { /* the process may already have been reaped */ }
+  }
+  return { pid, alive: alive(pid), linuxState };
+}
 async function closeChild(p: ChildProcess) {
   if (p.exitCode !== null || p.signalCode !== null) return;
   p.kill('SIGTERM');
@@ -92,7 +102,10 @@ describe('dodo kill: CWD-independent shutdown with durable login', () => {
       expect(report.failed).toEqual([]);
       expect(report.stopped).toHaveLength(4);
       expect(report.authPreserved).toBe(true);
-      await until(() => children[0]!.exitCode === 0 && children[1]!.exitCode === 0 && !alive(status.pid) && !alive(secondStatus.pid) && !alive(jobPid));
+      await until(() => children[0]!.exitCode === 0 && children[1]!.exitCode === 0 && !alive(status.pid) && !alive(secondStatus.pid) && !alive(jobPid), 15000, () => ({
+        http: children.slice(0, 2).map(p => ({ pid: p.pid, exitCode: p.exitCode, signal: p.signalCode })),
+        stdio: [processDiagnostic(status.pid), processDiagnostic(secondStatus.pid)], job: processDiagnostic(jobPid),
+      }));
       expect(alive(otherProgram.pid!)).toBe(true);
       expect(children[2]!.exitCode).toBeNull();
       expect((await cli(['status'], otherCfg, roots[3])).stdout).toContain('Workspace:');

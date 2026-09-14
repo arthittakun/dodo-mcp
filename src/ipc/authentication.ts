@@ -58,7 +58,16 @@ export function ipcIdentity(locator: string): string | undefined {
     if (!st.isSocket() || st.isSymbolicLink() || st.uid !== process.getuid?.() || (st.mode & 0o077) !== 0) throw new Error('refusing non-private or unexpected IPC path');
     socketIdentity = `${st.dev}:${st.ino}:${st.ctimeMs}:`;
   }
-  const c = loadIpcCredential(locator);
+  let c: IpcCredential;
+  try { c = loadIpcCredential(locator); }
+  catch (error) {
+    // The owner may finish closing while this process validates the private
+    // descriptor (Windows ACL probes can take longer than shutdown). Treat it
+    // as absent only after rechecking both paths; malformed or non-private
+    // endpoints that still exist must continue to fail closed.
+    if (!ipcEndpointPresent(locator)) return undefined;
+    throw error;
+  }
   return socketIdentity + createHash('sha256').update(c.token + c.nonce).digest('hex');
 }
 export function ipcMac(token: string, domain: string, ...parts: string[]): string {
