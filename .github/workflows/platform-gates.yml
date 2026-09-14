@@ -65,10 +65,16 @@ jobs:
           report="release-evidence/ci/linux-node-${{ matrix.node }}/gate-report.json"
           if test -f "$report"; then
             node scripts/gate-summary.mjs --input-dir "$(dirname "$report")" --github-summary
+            echo "DODO_PUBLIC_SUMMARY_BEGIN"
+            cat "$(dirname "$report")/public-summary.json"
+            echo "DODO_PUBLIC_SUMMARY_END"
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Upload allowlisted Linux summary only
         if: always() && steps.linux_summary.outputs.ready == 'true'
+        # The sanitized summary is also retained in the job log. A repository
+        # artifact-quota outage must not change the release-gate conclusion.
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-node-${{ matrix.node }}-summary
@@ -164,10 +170,16 @@ jobs:
           if (Test-Path -LiteralPath $reportFile) {
             node scripts/gate-summary.mjs --input-dir (Split-Path -Parent $reportFile) --github-summary
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Output "DODO_PUBLIC_SUMMARY_BEGIN"
+            Get-Content -LiteralPath (Join-Path (Split-Path -Parent $reportFile) "public-summary.json")
+            Write-Output "DODO_PUBLIC_SUMMARY_END"
             Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "ready=true"
           }
       - name: Upload allowlisted Windows summary only
         if: always() && steps.windows_summary.outputs.ready == 'true'
+        # The sanitized summary is also retained in the job log. A repository
+        # artifact-quota outage must not change the release-gate conclusion.
+        continue-on-error: true
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-node-${{ matrix.node }}-summary
