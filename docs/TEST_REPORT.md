@@ -41,6 +41,10 @@ descriptor ปลอมหรือ ACL ที่เปิดกว้างซ�
 temporary directory ของ suite หลังจบ รวมถึงกรณี test fail เพื่อไม่สะสม native
 dependencies และ private fixture state บนเครื่องที่รันทดสอบซ้ำ
 
+Fresh-install smoke รัน installed package ใน process ลูก และให้ parent ลบ fixture
+หลังลูก exit เพื่อให้ Windows ปลด native DLL ก่อน cleanup รายงาน `PASS` ถูกเขียน
+หลัง verification และ cleanup สำเร็จทั้งคู่เท่านั้น
+
 Setup foundation tests เพิ่มหลักฐานว่า setup plan/check ไม่เขียน state, installer ไม่เริ่มหากไม่มี `--yes`, setup receipt มี schema/kind ที่กำหนด, state import ใช้ allowlist, ตรวจ source hash ซ้ำ, ไม่ merge target เดิม และไม่คัดลอก DB/keys/OAuth/ACL/trust/permission state รวมถึง fail closed ต่อ malformed/unknown config, links และ live IPC markers
 
 Tunnel tests ใช้ fake `cloudflared` และ loopback readiness fixture พิสูจน์ว่า token ไม่อยู่ใน config/argv/log, job environment ไม่ inherit tunnel variables, private file/link policy fail closed, owner IPC เป็น singleton ที่ authenticated, readiness มาจาก `/ready`, restart มีเพดาน และ stop ใช้ live owned child เท่านั้น ไม่มีการใช้ Cloudflare credential, API, DNS หรือ public network จริง
