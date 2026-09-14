@@ -1,6 +1,6 @@
 # DODO Windows Candidate — Deferred
 
-DODO MCP 1.0.0 ยังไม่ประกาศ native Windows support โค้ดและ tests สำหรับ Windows
+DODO MCP 1.0.1 ยังไม่ประกาศ native Windows support โค้ดและ tests สำหรับ Windows
 บางส่วนมีอยู่เป็น candidate สำหรับ phase สุดท้าย แต่ยังไม่มีหลักฐานจาก Windows 11 จริง
 และ Linux Docker ไม่สามารถใช้แทนหลักฐาน Windows ได้
 

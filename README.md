@@ -1,6 +1,6 @@
 # DODO MCP
 
-**DODO MCP 1.0.0** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.1** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 

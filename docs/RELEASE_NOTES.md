@@ -1,5 +1,29 @@
 # DODO MCP — Release Notes
 
+## 1.0.1
+
+### Platform และ release hardening
+
+- เพิ่ม Linux Docker gate และ Windows native self-hosted gates สำหรับ Node 22/24
+- ทำ Windows checkout/fingerprint ให้ deterministic เมื่อ runner ถูกใช้ซ้ำและมีนโยบาย
+  CRLF ต่างจาก repository โดยตรวจ tracked tree ให้สะอาดก่อนเริ่ม gate
+- release gate ตรวจ typecheck, lint, core/security/compatibility, packaging, production
+  dependency audit, DodoBench และ fresh exact-tarball install
+- เพิ่ม regression tests สำหรับ Linux media, tunnel credential handling และการจัดการ
+  gate evidence โดยไม่เปลี่ยน runtime/API contract จาก 1.0.0
+- ไม่มีการลด OAuth, project ACL, workspace context, approval, path/secret guard,
+  expected-hash conflict protection หรือ command sandbox
+
+## วิธีอัปเดตเป็น 1.0.1
+
+```bash
+npm install -g dodo-mcp@1.0.1
+dodo --version
+```
+
+หลังติดตั้งให้ restart DODO process และ rescan/recreate MCP connection เมื่อ client cache
+tool catalog เดิม
+
 ## 1.0.0
 
 ### Global launcher และ interactive CLI

@@ -2,7 +2,28 @@
 
 ## Scope
 
-รายงานนี้ใช้กับ DODO MCP 1.0.0 source และแยกผล automated กับ manual อย่างชัดเจน
+รายงานนี้ใช้กับ DODO MCP 1.0.1 source และแยกผล automated กับ manual อย่างชัดเจน
+
+## Release 1.0.1 platform gate — 2026-09-15
+
+- macOS local, Node 22: **AUTOMATED_PASS** — core 669 passed / 0 failed / 34 skipped,
+  packaging 16/16, production audit 0 vulnerabilities, DodoBench 7/7 และ fresh
+  exact-tarball install ผ่าน
+- Windows native self-hosted, Node 22: **AUTOMATED_PASS** — core 671 passed / 0 failed /
+  32 skipped, packaging 16/16, production audit 0 vulnerabilities, DodoBench 7/7
+  และ fresh install ผ่าน
+- Windows native self-hosted, Node 24: **AUTOMATED_PASS** — core 671 passed / 0 failed /
+  32 skipped, packaging 16/16, production audit 0 vulnerabilities, DodoBench 7/7
+  และ fresh install ผ่าน
+- Linux Docker: ใช้หลักฐาน gate ที่ผ่านก่อนหน้าและไม่มี runtime source เปลี่ยนหลังจากนั้น;
+  release นี้ไม่ได้รัน Linux ซ้ำตามขอบเขต platform follow-up ที่เจ้าของกำหนด
+- Windows manual acceptance บน desktop/permission จริงและ live AI providers:
+  **MANUAL_NOT_RUN**
+
+Windows CI แก้ persistent-checkout line-ending drift โดยบังคับ canonical Git bytes และ
+ตรวจ clean index ก่อนสร้าง source fingerprint ไม่มีการลด security assertion หรือข้าม
+release gate ส่วน GitHub artifact upload อาจไม่เกิดเมื่อ storage quota เต็ม แต่ sanitized
+summary ยังคงอยู่ใน job log และผล gate ไม่อาศัย artifact upload
 
 ## Optional Sub-agent MCP exposure — 2026-09-14
 
@@ -48,7 +69,7 @@ OAuth scope, ACL, trust, profile authority, approval หรือข้าม gu
 
 ## AI Providers / Multi-project — current source verification
 
-วันที่ 2026-09-14 บน macOS, Node 22.23.2; source v1.0.0 ที่ยังไม่ publish
+วันที่ 2026-09-14 บน macOS, Node 22.23.2; source baseline ก่อน release 1.0.1
 
 | Gate | ผล |
 |---|---|
