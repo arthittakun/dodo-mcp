@@ -132,6 +132,21 @@ jobs:
         with:
           clean: true
           persist-credentials: false
+      - name: Materialize canonical Git bytes
+        run: |
+          # A persistent self-hosted working tree may retain CRLF bytes for
+          # unchanged files after .gitattributes changes. Re-materialize the
+          # trusted HEAD archive so source fingerprints are content-stable.
+          git config --local core.autocrlf false
+          $archive = Join-Path $env:RUNNER_TEMP "dodo-source-${{ matrix.node }}.tar"
+          git archive --format=tar --output=$archive HEAD
+          if ($LASTEXITCODE -ne 0) { throw "could not archive the trusted checkout" }
+          tar.exe -xf $archive -C $env:GITHUB_WORKSPACE
+          if ($LASTEXITCODE -ne 0) { throw "could not materialize the trusted checkout" }
+          Remove-Item -LiteralPath $archive -Force
+          $expected = git rev-parse HEAD:package-lock.json
+          $actual = git hash-object --no-filters package-lock.json
+          if ($expected -ne $actual) { throw "checkout bytes do not match the trusted Git object" }
       - name: Use Node ${{ matrix.node }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
