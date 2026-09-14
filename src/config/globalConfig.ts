@@ -53,6 +53,13 @@ export const GlobalConfigSchema = z
     envAllowlist: z.array(z.string().regex(/^[A-Z0-9_]{1,64}$/)).max(100).default([]),
     logRetentionDays: z.number().int().min(1).max(365).default(7),
     /**
+     * 'personal' is the single-owner fast path: an owner-approved OAuth
+     * installation can use every owner-registered project according to the
+     * token/profile scopes, without duplicate project ACL and AI allowlists.
+     * 'managed' restores explicit per-project ACL/trust/egress controls.
+     */
+    accessMode: z.enum(['personal', 'managed']).default('personal'),
+    /**
      * MCP tool exposure override. Unset = transport default (HTTP serves the
      * COMPACT gateway surface, STDIO serves the FULL per-tool catalog).
      * 'hybrid' = 49 tools: the compact coverage core plus 30 direct coding tools.
@@ -60,6 +67,13 @@ export const GlobalConfigSchema = z
      * scopes, trust, approvals or guards.
      */
     toolSurface: z.enum(['compact', 'full', 'hybrid']).optional(),
+    /**
+     * Expose the four sub-agent operations to MCP clients. Off by default to
+     * keep routine client catalogs focused; the owner-only web workbench can
+     * still create and manage runs. Takes effect after restarting DODO and
+     * rescanning the MCP client. This changes exposure only, never authority.
+     */
+    exposeSubagentsToMcp: z.boolean().default(false),
     /** Local-owner Cloudflare Tunnel process configuration; contains no token. */
     tunnel: TunnelConfigSchema.default({ mode: 'external', startWithDodo: true, metricsPort: 21732, maxRestarts: 2 }),
     /** Last owner-selected registry entry. This is a startup preference, never authority. */

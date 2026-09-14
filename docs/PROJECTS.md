@@ -58,8 +58,8 @@ Host/Origin checks, rate limit และ workspace/epoch headers เดิม �
 MCP/public listener
 
 `dodo --cli` ใช้ registry เดียวกันสำหรับเลือกหรือเพิ่มโปรเจกต์ และบันทึก
-`startupProjectId` เป็น preference ระดับ installation ค่านี้ไม่ใช่ permission
-ไม่เพิ่ม trust/ACL และต้อง resolve registry + ตรวจ readiness ใหม่ทุกครั้งที่เปิด server
+`startupProjectId` เป็น preference ระดับ installation ค่านี้ไม่ข้าม OAuth scope หรือ
+filesystem guards และต้อง resolve registry + ตรวจ readiness ใหม่ทุกครั้งที่เปิด server
 
 `dodo` และ `dodo start` ไม่ยึด process CWD เป็น workspace โดยอัตโนมัติอีกต่อไป:
 
@@ -70,7 +70,9 @@ MCP/public listener
 
 launcher mode ใช้ directory ภายใน private config เป็น resource ชั่วคราวเท่านั้น
 directory นี้ไม่ถูกส่งเป็น project root และ MCP/OAuth data plane ตอบ
-`workspace_required` จนกว่าการเตรียม real workspace จะสำเร็จ
+OAuth login และ authenticated catalog ใช้ได้ระหว่างยังไม่มี default workspace แต่
+ทุก operation ต้องรอ real workspace พร้อม โหมดส่วนตัวพร้อมใช้หลัง owner ลงทะเบียน
+path; โหมด managed ต้องมี owner-granted ACL เพิ่มด้วย
 
 ## Read-only federation
 
@@ -83,31 +85,30 @@ MCP อ่านโปรเจกต์ที่ลงทะเบียนไ�
 - `search_code({projectIds: [...]})` สำหรับค้นพร้อมกันสูงสุด 8 โปรเจกต์
 
 ใน Compact/Hybrid surface ให้ใส่ fields เหล่านี้ใน `args` ของ `dodo_read`
-ตาม schema ที่ `dodo_discover` คืนมา จำนวน tools ปัจจุบันเป็น Full 121, Compact 19
+ตาม schema ที่ `dodo_discover` คืนมา จำนวน tools ปัจจุบันเป็น Full 125, Compact 19
 และ Hybrid 49
 
-`project_overview()` ของ active workspace แสดง `federation.projects` เฉพาะ
-รายการที่ client มี live `dodo:read` ACL เท่านั้น สำหรับ HTTP ต้องเป็น OAuth
-installation identity รุ่นปัจจุบันด้วย legacy workspace-bound grant ใช้ข้าม
-โปรเจกต์ไม่ได้ ส่วน local STDIO เป็น owner process และอ่านรายการที่ owner
-ลงทะเบียนได้
+`project_overview()` ของ active workspace แสดง `federation.projects` เฉพาะรายการ
+ที่ client อ่านได้ โหมดส่วนตัวใช้ live `dodo:read` จาก owner-approved installation
+grant กับ registry; โหมด managed ต้องมี live target ACL เพิ่ม สำหรับ HTTP ต้องเป็น
+OAuth installation identity รุ่นปัจจุบันด้วย Legacy workspace-bound grant ใช้ข้าม
+โปรเจกต์ไม่ได้ ส่วน local STDIO เป็น owner process
 
 ทุก target ถูกตรวจซ้ำก่อนอ่าน:
 
 1. project ID ต้องมาจาก owner registry
 2. canonical path และ directory identity ต้องมีสถานะ `ready`
-3. grant ต้องไม่ถูก revoke และ client ต้องมี `dodo:read` ใน target workspace
+3. grant ต้องไม่ถูก revoke และต้องมี `dodo:read`; managed mode ตรวจ target ACL เพิ่ม
 4. shared ignore/path/secret policy ของ target ถูกสร้างใหม่จาก global policy
 5. request ยังต้องใช้ active workspace ID/epoch ที่ถูกต้อง
 
 ผล federated มี target project ID, workspace ID, federation epoch และ source hash
 แยกจาก envelope ของ active workspace การค้นหลายโปรเจกต์ใช้ quota รวมแบบ bounded;
 target ที่ owner อนุญาตแต่ unavailable ถูกระบุเป็น partial failure ส่วน target ที่
-ไม่มี ACL ทำให้ทั้ง request ถูกปฏิเสธและไม่เผย path/metadata
+ไม่มี authority ตาม access mode ปัจจุบันทำให้ทั้ง request ถูกปฏิเสธและไม่เผย path/metadata
 
-Federation นี้ไม่เปลี่ยน `process.cwd()`, ไม่เปลี่ยน active workspace และไม่เปิด
-write/exec ข้ามโปรเจกต์ เจ้าของต้องเปิด target ผ่าน Local Config และให้ client
-อ่าน context ใหม่ก่อน mutation/command
+Federation นี้ไม่เปลี่ยน `process.cwd()` หรือ default workspace สำหรับ write/exec
+ข้ามโปรเจกต์ใช้ `targetProjectId` แยกจาก read federation ตามหัวข้อถัดไป
 
 ## การนำรายการออก
 
@@ -123,8 +124,23 @@ write/exec ข้ามโปรเจกต์ เจ้าของต้อ�
 
 ## ขอบเขต
 
-process หนึ่งยัง serve active workspace เดียวสำหรับ write, jobs, plans, approvals,
-Desktop และ resource ownership Read-only federation ไม่ใช่ multi-agent coordinator
-และไม่ค้น path ทั้งเครื่องอัตโนมัติ Effectful federation จะเปิดได้ต่อเมื่อมี
-per-project lock, stale-context, approval, journal/rollback และ job ownership ที่
-พิสูจน์ด้วย tests ครบ
+หนึ่ง process มี default workspace หนึ่งตัว และ runtime เป้าหมายแยกกันได้สูงสุด
+16 secondary projects Owner เพิ่ม path เท่านั้น ไม่มีการค้นทั้งเครื่องอัตโนมัติ
+
+## Explicit target routing
+
+Full/Compact รับ `targetProjectId` ระดับบนร่วมกัน เรียก overview ของ target เพื่อรับ
+workspace ID/epoch ก่อนอ่าน/เขียน/รัน การเลือก runtime เกิดก่อน target scope/context
+และ managed ACL checks; client ที่ไม่มีสิทธิ์ default ยังได้รับรายชื่อเฉพาะ projects ที่ได้รับอนุญาต
+เพื่อเลือก target ได้ การไม่ส่ง target คง default behavior เดิม ห้ามผสม target กับ
+`projectId/projectIds` และห้าม nested target/context ใน gateway args
+
+Runtime แต่ละตัวมี epoch, services, workers, jobs, trust และ resource ownership ของตัวเอง
+ถือ private project lease ก่อน bootstrap/recovery และตรวจ readiness ใหม่ก่อน acquire
+Job/agent/request ที่ยังใช้อยู่ทำให้การปิด/ถอด project ถูกปฏิเสธ งาน mutation ทั้งจาก
+MCP/agent/schedule ใช้ queue เดียวต่อ project; command ถือ queue จน job จบ อ่านขนานได้
+และแต่ละ project รันพร้อมกันได้ Hash ยังตรวจตอนถึง queue เพื่อป้องกัน external edits
+
+Projects ในเว็บเลือกหน้าจอแยกจากการตั้ง default Personal mode ใช้ trusted policy กับ
+registered projects โดยตั้งใจ ส่วน managed mode ไม่คัดลอก trust/ACL/approval/run
+override ระหว่าง projects คู่มือ AI/profile permission อยู่ที่ [AI Providers](AI_PROVIDERS.md)

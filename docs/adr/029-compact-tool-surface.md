@@ -97,8 +97,25 @@ the current byte measurements.
 
 ## Addendum (Phase 07): owner-reviewed memory operations
 
-ADR-037 adds five individual memory definitions to Full, so the current surfaces are
+ADR-037 added five individual memory definitions to Full, so the surfaces at that point were
 Full 121, Compact 19 and Hybrid 49. Compact/Hybrid route read operations through
 `dodo_assist_read` and proposal operations through `dodo_assist_change`. Owner approval,
 rejection, prune and learning review remain private IPC commands and are never added
 to any MCP surface.
+
+## Addendum: provider-backed sub-agents
+
+ADR-045 adds four individual Sub-agent definitions, so the current surfaces are Full 125,
+Compact 19 and Hybrid 49. Compact/Hybrid route them through the existing assistance
+gateways. Personal/managed access mode changes authorization decisions only; it does not
+change catalog size or let a gateway bypass the target definition.
+
+## Addendum: optional Sub-agent exposure
+
+The installed capability contract still contains all 125 definitions, but
+`exposeSubagentsToMcp` defaults to false. A live Full surface therefore registers 121
+tools by default. Compact and Hybrid keep their stable 19/49 gateway names while removing
+the four Sub-agent operation values from their schemas, discover index and instructions.
+The private web workbench remains able to create and manage runs. Enabling the setting
+requires a process restart and client catalog rescan; it changes exposure only and never
+authority.

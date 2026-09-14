@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
-import { TOOL_CATALOG } from '../../src/tools/catalog.js';
+import { surfaceCatalog } from '../../src/tools/surface.js';
 
 /** `dodo stdio`: local clients (Claude Code / Cursor / Codex) over stdin/stdout — no tunnel, no OAuth. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -41,7 +41,7 @@ describe('STDIO mode', () => {
 
   it('lists the full catalog and runs the coding loop without OAuth', async () => {
     const list = await client.listTools();
-    expect(list.tools.length).toBe(TOOL_CATALOG.length);
+    expect(list.tools.map((tool) => tool.name)).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
     const ov = await client.callTool({ name: 'project_overview', arguments: {} });
     const env = ov.structuredContent as Record<string, unknown>;
     expect(env['ok']).toBe(true);
@@ -71,6 +71,9 @@ describe('STDIO mode', () => {
   });
 
   it('STDIO-03: explicit stdio without --root serves the client cwd', async () => {
+    await client.close();
+    const until = Date.now() + 5000;
+    while (fs.readdirSync(path.join(cfg, 'runtime-leases')).length && Date.now() < until) await new Promise(r => setTimeout(r, 25));
     // The npx convention: an MCP client runs `npx -y dodo-mcp` with cwd = the project.
     const t = new StdioClientTransport({
       command: 'node',
@@ -83,7 +86,7 @@ describe('STDIO mode', () => {
     await c.connect(t);
     try {
       const list = await c.listTools();
-      expect(list.tools.length).toBe(TOOL_CATALOG.length);
+      expect(list.tools.map((tool) => tool.name)).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
       const ov = await c.callTool({ name: 'project_overview', arguments: {} });
       const data = ((ov.structuredContent as Record<string, unknown>)['data']) as Record<string, unknown>;
       expect(fs.realpathSync(data['root'] as string)).toBe(fs.realpathSync(fixture));

@@ -2,7 +2,7 @@
   "name": "dodo-mcp",
   "version": "1.0.0",
   "author": "Arthittakun",
-  "description": "DODO — local-first MCP server with 121 coding, agent-runtime, context, memory, runtime, project-brain, resource, screen, media, browser and workflow tools; embedded OAuth and workspace permissions.",
+  "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -22,6 +22,7 @@
     "docs/ARCHITECTURE.md",
     "docs/ASSISTANCE.md",
     "docs/AGENT_RUNTIME.md",
+    "docs/AI_PROVIDERS.md",
     "docs/AUTH.md",
     "docs/BRAIN.md",
     "docs/COMPATIBILITY.md",
@@ -53,7 +54,7 @@
     "scripts/guard-publish.mjs"
   ],
   "scripts": {
-    "build": "node scripts/clean-build-artifacts.mjs && tsc -p tsconfig.build.json && node scripts/emit-schemas.mjs && node scripts/copy-ui.mjs",
+    "build": "node scripts/clean-build-artifacts.mjs && tsc -p tsconfig.build.json && node scripts/emit-schemas.mjs && node scripts/vendor-ui.mjs && node scripts/copy-ui.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src tests scripts",
     "test:unit": "vitest run tests/unit",
@@ -102,6 +103,7 @@
     "@types/picomatch": "^4.0.3",
     "eslint": "^9.39.0",
     "pyright": "^1.1.413",
+    "sweetalert2": "11.26.25",
     "typescript-eslint": "^8.70.0",
     "vitest": "5.0.0"
   },

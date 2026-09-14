@@ -7,6 +7,7 @@ import { startServer, type RunningServer } from '../../src/server/appServer.js';
 import { saveGlobalConfig, GlobalConfigSchema } from '../../src/config/globalConfig.js';
 import { statePaths } from '../../src/config/paths.js';
 import { addStaticClient } from '../../src/auth/clients.js';
+import { ALL_SCOPES } from '../../src/security/policy.js';
 import type { TrustMode } from '../../src/store/store.js';
 
 /**
@@ -39,6 +40,7 @@ export interface LaunchOptions {
   configPort?: number; // start the owner-only Local Config plane (0 = ephemeral)
   toolSurface?: 'compact' | 'full' | 'hybrid'; // explicit surface override for this run
   drainTimeoutMs?: number; // workspace-switch drain wait (tests use a short one)
+  deferWorkspace?: boolean; // installation control plane with no selected project
 }
 
 export async function freePort(): Promise<number> {
@@ -97,6 +99,13 @@ export async function launch(opts: LaunchOptions = {}): Promise<TestContext> {
   fs.mkdirSync(configDir, { recursive: true });
   if (!opts.locked) {
     const config = GlobalConfigSchema.parse({
+      // Most security fixtures exercise the explicit multi-client boundary.
+      // Product installs default to personal mode; tests opt into it when the
+      // single-owner fast path is the behavior under test.
+      accessMode: 'managed',
+      // Most existing transport tests exercise the complete catalog contract.
+      // Product installs default this off; dedicated exposure tests cover that path.
+      exposeSubagentsToMcp: true,
       publicUrl,
       port,
       dangerouslyAllowInsecurePublicUrl: true,
@@ -105,7 +114,7 @@ export async function launch(opts: LaunchOptions = {}): Promise<TestContext> {
     });
     saveGlobalConfig(paths.configFile, config);
   } else if (opts.limitsPatch || opts.configPatch) {
-    saveGlobalConfig(paths.configFile, GlobalConfigSchema.parse({ ...(opts.limitsPatch ? { limits: opts.limitsPatch } : {}), ...(opts.configPatch ?? {}) }));
+    saveGlobalConfig(paths.configFile, GlobalConfigSchema.parse({ accessMode: 'managed', exposeSubagentsToMcp: true, ...(opts.limitsPatch ? { limits: opts.limitsPatch } : {}), ...(opts.configPatch ?? {}) }));
   }
 
   const prevEnv = process.env[ENV_KEY];
@@ -114,6 +123,7 @@ export async function launch(opts: LaunchOptions = {}): Promise<TestContext> {
   try {
     server = await startServer({
       invokedCwd: opts.rootOverride ?? fixtureDir,
+      ...(opts.deferWorkspace ? { deferWorkspace: true } : {}),
       portOverride: port,
       quiet: true,
       ...(opts.configPort !== undefined ? { configPort: opts.configPort } : {}),
@@ -188,6 +198,8 @@ export interface OAuthFlowOptions {
   clientSecret?: string;
   verifierOverride?: string; // to test wrong-PKCE
   resource?: string;
+  /** Test-owner ACL step after login; production owners do this in Local Config. */
+  grantWorkspaceAccess?: boolean;
 }
 
 /** Full authorization-code + PKCE dance against a running test server. */
@@ -269,8 +281,12 @@ export async function obtainToken(ctx: TestContext, opts: OAuthFlowOptions = {})
   if (tokenRes.status !== 200) {
     throw new TokenError(`token endpoint ${tokenRes.status}: ${JSON.stringify(tokenBody)}`, tokenBody);
   }
-  const grants = store.listGrants(ctx.server.workspaceId);
+  const grants = store.listGrants().filter((grant) => grant.clientId === clientId && grant.revokedAt === null);
   const grantId = grants[grants.length - 1]?.id ?? '';
+  if (opts.grantWorkspaceAccess !== false) {
+    const projectScopes = scope.split(/\s+/).filter((value): value is (typeof ALL_SCOPES)[number] => (ALL_SCOPES as readonly string[]).includes(value));
+    store.setClientAccess(ctx.server.workspaceId, clientId, projectScopes);
+  }
   const out: TokenSet = {
     accessToken: tokenBody['access_token'] as string,
     clientId,

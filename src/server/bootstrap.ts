@@ -1,3 +1,6 @@
+import { acquireProjectLease } from './projectLease.js';
+import { MutationQueue } from '../security/mutationQueue.js';
+import { isPersonalMode, setAccessMode } from '../security/accessMode.js';
 import { MultimodalService } from '../services/multimodal/multimodalService.js';
 import { ResourceService } from '../services/resources/resourceService.js';
 import { ProjectBrainService } from '../services/brain/brainService.js';
@@ -82,9 +85,16 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
   const limits = config.limits;
 
   const rootInfo = resolveWorkspaceRoot(opts.rootOverride ?? opts.invokedCwd, { allowUnsafe: opts.allowUnsafeRoot ?? false });
+  const releaseLease = acquireProjectLease(configDir, rootInfo.root);
+  let openedDb: Database.Database | undefined;
+  try {
   activateManagedTools(configDir, rootInfo.root);
-  const db = openDatabase(paths.dbFile);
+  const db = openDatabase(paths.dbFile); openedDb = db;
   const store = new Store(db);
+  // Global config is the owner-controlled source for this installation-wide
+  // choice. Mirror it into private state so authorization helpers that only
+  // receive Store can make the same decision for every target runtime.
+  setAccessMode(store, config.accessMode);
   const installSecret = store.installSecret();
   const workspaceId = mintWorkspaceId(installSecret, rootInfo.root);
   const epoch = mintEpoch();
@@ -128,7 +138,10 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     },
     limits,
   );
+  const mutations = new MutationQueue();
+  jobs.mutations = mutations;
   const services: AppServices = {
+    mutations,
     federation: new FederationService(store, config, limits),
     schedules: new ScheduleService({store,workspaceId,epoch,wfs,jobs,config,limits}),
     version: DODO_VERSION,
@@ -149,7 +162,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     projectConfig,
     workspaceId,
     epoch,
-    trustMode: () => opts.runMode ? 'trusted' : store.trustMode(workspaceId),
+    trustMode: () => opts.runMode || isPersonalMode(store) ? 'trusted' : store.trustMode(workspaceId),
   };
 
   services.multimodal = new MultimodalService(services, configDir);
@@ -195,9 +208,11 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
       }
       try {
         db.close();
+        releaseLease();
       } catch {
         /* already closed */
       }
     },
   };
+  } catch (error) { try { openedDb?.close(); } finally { releaseLease(); } throw error; }
 }

@@ -2,7 +2,9 @@
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'tmp/**'] },
+  // configUi/vendor holds pinned third-party dist files (SweetAlert2) copied
+  // verbatim by scripts/vendor-ui.mjs — never hand-edited, never linted.
+  { ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'tmp/**', 'src/server/configUi/vendor/**'] },
   ...tseslint.configs.recommended,
   {
     rules: {

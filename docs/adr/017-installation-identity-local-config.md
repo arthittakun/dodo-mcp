@@ -5,10 +5,19 @@ contract. One running process still serves one canonical CWD/root and epoch.
 
 New consent records are marked `identity-grant:<id> = 2` in durable metadata.
 Tokens carry `dodo_auth: 2`. Verification requires both markers, issuer,
-audience, expiry, live grant and matching client. Resource scopes are the
-intersection of token, grant and current workspace/client ACL. No ACL means
-refusal, including overview. The owner grants a new path from local config;
-no remote tool can grant itself access. Refresh preserves grant version.
+audience, expiry, live grant and matching client. Resource scopes never exceed
+the token/grant intersection. Personal mode applies that ceiling to registered
+projects; managed mode also intersects the current workspace/client ACL.
+No remote tool can register a path or grant itself access. Refresh preserves
+grant version.
+
+OAuth consent is installation-scoped and does not follow the active workspace
+or the CLI process CWD. Completing login never creates a workspace ACL. An
+authenticated client may scan the bounded tool catalog before a project is
+selected. Operations require a real owner-registered project; only managed
+mode requires an additional explicit client ACL there. Pending/approve/deny and
+grant revocation locate the authenticated live HTTP installation process from
+private per-instance IPC metadata, so owner commands work from any directory.
 
 Migration 3 creates workspace_clients and copies active legacy grant scopes to
 their original paths only. Legacy tokens remain bound to their original root.
@@ -28,7 +37,7 @@ are not an isolation boundary. No remote config opt-in in this release.
 
 --allow --all: run-only trusted actions and fetch_url; configured job sandbox.
 --bypass: same plus default commandSandbox off. Neither changes durable trust,
-OAuth, client/path ACLs, file guard, hashes or epoch checks. Flags do not alter
+OAuth, target authority, file guard, hashes or epoch checks. Flags do not alter
 client application's own confirmations. They are local owner capabilities.
 
 Recovery journal reconciliation, recovery status and interrupted-job updates

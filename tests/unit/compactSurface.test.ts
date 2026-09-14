@@ -13,6 +13,7 @@ import {
   surfaceCatalog,
   surfaceStats,
 } from '../../src/tools/surface.js';
+import { instructionsFor } from '../../src/server/instructions.js';
 
 /** ADR-029: compact surface invariants — pure catalog logic, no server. */
 
@@ -41,6 +42,7 @@ const FULL_NAMES = [
   'agent_intent_release', 'agent_read', 'agent_write', 'agent_exec', 'agent_snapshot_create',
   'agent_snapshot_compare', 'agent_snapshot_rollback', 'agent_hypothesis_judge', 'agent_skill_search',
   'agent_skill_inspect', 'agent_skill_propose', 'agent_run_control',
+  'subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -108,7 +110,7 @@ describe('compact surface catalog', () => {
       const schema = operationSchema(gw).inputSchema as { additionalProperties?: boolean; properties: Record<string, { enum?: string[] }> };
       expect(schema.additionalProperties, g.name).toBe(false);
       expect(schema.properties['operation']?.enum).toEqual([...g.operations]);
-      expect(Object.keys(schema.properties).sort()).toEqual(['args', 'operation', 'workspaceEpoch', 'workspaceId']);
+      expect(Object.keys(schema.properties).sort()).toEqual(['args', 'operation', 'targetProjectId', 'workspaceEpoch', 'workspaceId']);
     }
   });
 
@@ -146,6 +148,39 @@ describe('compact surface catalog', () => {
     expect(full.toolCount).toBe(TOOL_CATALOG.length);
     expect(compact.schemaBytes).toBeLessThan(full.schemaBytes * 0.5);
     expect(surfaceStats('compact')).toEqual(compact); // cached & deterministic
+  });
+
+  it('can hide the complete sub-agent feature from live MCP surfaces without changing the static capability catalog', async () => {
+    const hidden = { subagents: false } as const;
+    const subagents = ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'];
+    const full = surfaceCatalog('full', hidden);
+    const compact = surfaceCatalog('compact', hidden);
+    const hybrid = surfaceCatalog('hybrid', hidden);
+
+    expect(TOOL_CATALOG).toHaveLength(125); // the installed capability contract stays complete
+    expect(full).toHaveLength(121);
+    expect(compact).toHaveLength(19);
+    expect(hybrid).toHaveLength(49);
+    for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
+
+    for (const gatewayName of ['dodo_assist_read', 'dodo_assist_change']) {
+      const gateway = compact.find((d) => d.name === gatewayName) as AnyToolDef;
+      const schema = operationSchema(gateway).inputSchema as { properties: { operation: { enum: string[] } } };
+      for (const name of subagents) expect(schema.properties.operation.enum, `${gatewayName}:${name}`).not.toContain(name);
+    }
+
+    const hiddenDiscover = compact.find((d) => d.name === 'dodo_discover') as AnyToolDef;
+    await expect(call(hiddenDiscover, { ...WS, operation: 'subagent_spawn' })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
+    expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
+
+    expect(surfaceStats('full', hidden).toolCount).toBe(121);
+    expect(surfaceStats('compact', hidden).toolCount).toBe(19);
+    expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(125);
+    expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
+    expect(instructionsFor('compact', hidden)).toContain('not exposed');
+    expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
   });
 });
 
@@ -208,7 +243,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(121);
+    expect(TOOL_CATALOG).toHaveLength(125);
     expect(COMPACT_CATALOG).toHaveLength(19);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

@@ -1,3 +1,4 @@
+import type { MutationQueue } from '../../security/mutationQueue.js';
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -74,6 +75,7 @@ export interface InlineOutput {
 }
 
 export class JobManager {
+  mutations?: MutationQueue;
   private shutdownPromise: Promise<void> | undefined;
   private readonly live = new Map<string, LiveJob>();
   private readonly finishedSpools = new Map<string, { stdout: SegmentedSpool; stderr: SegmentedSpool }>();
@@ -112,6 +114,7 @@ export class JobManager {
   }
 
   start(req: StartJobRequest): { jobId: string; pid: number; sandboxed: string | null } {
+    this.mutations?.assertCanStart();
     if (this.shutdownPromise) throw new DodoError('CONFLICT', 'job manager is shutting down');
     if (this.live.size >= this.limits.jobsConcurrentMax) {
       throw new DodoError('RESOURCE_LIMIT', `at most ${this.limits.jobsConcurrentMax} concurrent jobs`, { retryable: true });
@@ -176,6 +179,7 @@ export class JobManager {
       cwd: cwdResolved.rel, recipeId: req.recipeId ?? null, timeoutMs,
     });
 
+    const releaseMutation = this.mutations?.retainJob();
     let child: ChildProcess;
     let scriptCreated = false;
     try {
@@ -195,6 +199,7 @@ export class JobManager {
         stdio: [req.stdin === false ? 'ignore' : 'pipe', 'pipe', 'pipe'],
       });
     } catch (err) {
+      releaseMutation?.();
       if (scriptCreated && scriptPath) fs.rmSync(scriptPath, { force: true });
       stdout.close();
       stderr.close();
@@ -203,6 +208,8 @@ export class JobManager {
       throw new DodoError('INTERNAL_ERROR', `spawn failed: ${(err as Error).message}`);
     }
 
+    child.once('close', () => releaseMutation?.());
+    child.once('error', () => releaseMutation?.());
     const liveJob: LiveJob = { child, stdout, stderr, timeout: undefined, stdinOpen: req.stdin !== false, scriptPath };
     this.live.set(jobId, liveJob);
 

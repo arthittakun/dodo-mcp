@@ -1,13 +1,13 @@
 # DODO MCP
 
-**DODO MCP 1.0.0** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ใช้ OAuth, workspace ACL, trust policy และ file/secret guards เป็นชั้นความปลอดภัยหลัก
+**DODO MCP 1.0.0** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 121 tools เป็นค่าเริ่มต้น
+- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 125 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 121 tools
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -18,10 +18,12 @@
 - มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
 - มี Runtime Intelligence สำหรับ task ที่ reconnect ได้, process/test/browser evidence แบบ bounded, snapshot freshness และ diagnosis ที่แยก fact/observation/inference
 - มี Advanced Agent Runtime สำหรับ immutable plan, parallel hypotheses, intent locks, guarded snapshots, evidence-backed completion, restart recovery และ owner-reviewed reusable guidance
+- มี AI Providers เจ็ด presets/Custom, profiles, model/tool loop และประวัติ private ผ่าน Local Config ([คู่มือ](docs/AI_PROVIDERS.md))
+- เขียน/รันหลายโปรเจกต์พร้อมกันด้วย targetProjectId และคิว mutation แยกโปรเจกต์
 - มี DodoBench และ revision-bound release gate สำหรับ retrieval, safe edit, runtime, resource, recovery, security และ fresh package artifact
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
-- อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
+- อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียน โดย personal mode ไม่ต้องตั้ง ACL ซ้ำ
 - เปิด Cloudflare Tunnel พร้อม `dodo start` ด้วย token ชั่วคราวจาก terminal หรือ Local Config โดยไม่บันทึก token ลงเครื่อง
 - ไม่ส่ง token, secret หรือ state DB ไปที่ repository และไม่ให้ repository config เพิ่มสิทธิ์
 
@@ -36,8 +38,10 @@ dodo --cli
 `dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config +
 Tunnel และรัน setup รวม `cloudflared` โดยไม่ต้อง `cd` เข้าโปรเจกต์
 ก่อน หากเรียก `dodo` หรือ `dodo start` จากโฟลเดอร์ใดก็ตาม ระบบจะเปิดโปรเจกต์ที่
-เจ้าของเลือกล่าสุด หากยังไม่เลือกจะเปิดเฉพาะ control plane และปฏิเสธ MCP/OAuth ด้วย
-`workspace_required` จนกว่าจะเลือก absolute path จาก Local Config หรือเมนู CLI
+เจ้าของเลือกล่าสุด หากยังไม่มีโปรเจกต์ใน registry จะเปิด control plane, OAuth และ
+authenticated tool catalog ได้โดยไม่ใช้ CWD เป็น workspace เมื่อเจ้าของเพิ่มโปรเจกต์
+จาก Local Config แล้ว OAuth client ที่เจ้าของอนุมัติจะใช้โปรเจกต์นั้นได้ทันทีตาม scopes
+ของ token และ Agent Profile ที่เลือก โดยไม่ต้องตั้ง permission ซ้ำต่อ path
 
 เปิดโปรเจกต์โดยตรงและจำไว้สำหรับครั้งถัดไปได้ด้วย:
 
@@ -45,16 +49,35 @@ Tunnel และรัน setup รวม `cloudflared` โดยไม่ต้
 dodo start --root /path/to/your/project
 ```
 
-การเลือกโปรเจกต์ไม่คัดลอก trust หรือ client ACL จากโปรเจกต์อื่น ตั้งสิทธิ์ของโปรเจกต์
-ที่เปิดแล้วผ่าน Local Config หรือคำสั่ง owner ที่ผูกกับ workspace นั้น
+โหมดส่วนตัวใช้ effective trust แบบ trusted กับโปรเจกต์ที่เจ้าของลงทะเบียน คำสั่งจึงรัน
+ด้วยสิทธิ์ OS ของบัญชีเจ้าของและยังผ่าน command sandbox ที่ตั้งไว้, path/secret guards,
+expected hash, workspace context และ OAuth scopes หากต้องแยก client/profile/trust ต่อ
+โปรเจกต์ ให้เปลี่ยนเป็นโหมด managed ที่หน้า Settings
 
 `dodo setup --check` และ `dodo setup --plan` เป็น read-only หากแผนมี dependency ที่ต้องติดตั้ง ให้ตรวจรายการก่อนแล้วจึงรัน `dodo setup --yes --components <list>` ระบบจะไม่เริ่ม installer หากไม่มี `--yes` และ `--yes` ไม่ข้าม sudo, OS permission หรือ owner consent
 
 เมื่อ DODO ตรวจพบ config เดิมในตำแหน่งมาตรฐาน สามารถใช้ `dodo setup --import-state` เพื่อนำเข้าเฉพาะ preference ที่ปลอดภัย เช่น port, search backend, retention และ tool surface ระบบจะสร้าง installation identity ใหม่เสมอและไม่คัดลอก OAuth keys/tokens, client grants, workspace ACL, trust, approvals, schedules, public origin, web/desktop permission, executable registration หรือฐานข้อมูลเดิม ต้นฉบับจะไม่ถูกแก้ไข
 
-เปิด Local Config จาก URL ที่ `dodo` แสดงใน terminal ใช้สำหรับตั้ง trust, public origin, client access และเปลี่ยน workspace เจ้าของเท่านั้น
+เปิด Local Config จาก URL ที่ `dodo` แสดงใน terminal ใช้สำหรับเพิ่มโปรเจกต์, AI
+connections/profiles, public origin และเปลี่ยน access mode เจ้าของเท่านั้น โหมดส่วนตัว
+พร้อมใช้โดยไม่ต้องตั้ง trust/client/profile permission รายโปรเจกต์
 
-ลงทะเบียนโปรเจกต์ที่ต้องการใช้งานบ่อยได้โดยไม่เริ่ม server และไม่เปลี่ยนสิทธิ์:
+หน้าเว็บจัดเป็น dashboard 8 หน้า (ภาพรวม · โปรเจกต์ · Providers & Profiles ·
+Chat & Tasks · Runs & Jobs · Approvals · Knowledge · Settings) หน้าภาพรวมแสดงสถานะ,
+ขั้นตอนถัดไป และสิ่งที่ต้องตรวจสอบเท่านั้น คำอธิบายยาวถูกย้ายไป tooltip (ปุ่ม `?`
+เปิดด้วย hover/โฟกัสคีย์บอร์ด/แตะ ปิดด้วย Escape) และส่วน "รายละเอียดทางเทคนิค"
+ที่พับได้ กล่องยืนยัน/แจ้งผลใช้ SweetAlert2 ที่ vendor มากับแพ็กเกจ (same-origin
+ไม่มี CDN, CSP `'self'` เท่าเดิม) การลบ/ยกเลิก/เปลี่ยนโหมดต้องยืนยันก่อนเสมอ
+และงานที่มีค่าใช้จ่ายหรือผลไม่แน่นอนจะบอกชัดว่า "ไม่ retry อัตโนมัติ"
+
+หน้า **Settings → Sub-agent tools ใน MCP** มีสวิตช์เปิด/ปิดการ expose
+`subagent_spawn`, `subagent_status`, `subagent_result` และ `subagent_control` ให้ AI
+ภายนอก ค่าเริ่มต้นปิดเพื่อให้ catalog สำหรับงานทั่วไปกระชับขึ้น แต่หน้า Chat & Tasks
+ยังสร้างและจัดการ agent ได้ตามเดิม เมื่อเปลี่ยนค่านี้ต้อง restart DODO แล้ว rescan หรือ
+สร้าง MCP app ใหม่ตามพฤติกรรมของ client การตั้งค่านี้เปลี่ยนเฉพาะการมองเห็น tools
+และไม่เพิ่ม OAuth scope, trust, approval หรือสิทธิ์ของ profile
+
+ลงทะเบียนโปรเจกต์ที่ต้องการใช้งานบ่อยได้โดยไม่เริ่ม server:
 
 ```bash
 dodo project add /absolute/path/to/project --name "Web application"
@@ -68,8 +91,8 @@ Project Registry ใช้ project ID คงที่แยกจาก workspac
 
 ### อ่านหลายโปรเจกต์พร้อมกัน
 
-เจ้าของต้องลงทะเบียนแต่ละโปรเจกต์ และให้ `dodo:read` แก่ client ในแต่ละ workspace
-ก่อน การอยู่ใน registry เพียงอย่างเดียวไม่ให้สิทธิ์ AI:
+เจ้าของต้องลงทะเบียนแต่ละโปรเจกต์ โหมดส่วนตัวใช้ OAuth scopes เดิมกับทุก project
+ที่ลงทะเบียน ส่วนโหมด managed ต้องให้ `dodo:read` แก่ client ในแต่ละ workspace:
 
 ```text
 project_overview()
@@ -87,10 +110,11 @@ project/workspace identity, federation epoch และ source hash เพื่�
 ออกจากกัน ค่า `workspaceId`/`workspaceEpoch` ระดับบนของ MCP call ยังคงเป็นของ
 active workspace เสมอ
 
-Federation รุ่นนี้เป็น read-only การเขียนไฟล์และรันคำสั่งยังทำได้เฉพาะ active
-workspace เจ้าของต้องเปิดโปรเจกต์นั้นผ่าน Local Config แล้วให้ AI เรียก
-`project_overview` และอ่านไฟล์ใหม่ก่อนแก้ จึงไม่สามารถนำ hash หรือ context จาก
-โปรเจกต์อื่นไปใช้เขียนโดยตรงได้
+Federation แบบ `projectId/projectIds` ยังคง read-only สำหรับการเขียน/รันหลายโปรเจกต์
+ให้เรียก `project_overview(targetProjectId="prj_…")` แล้วใช้ `targetProjectId` และ
+workspace ID/epoch ที่ได้รับกับทุก operation ต่อมา คนละโปรเจกต์ทำงานพร้อมกันได้
+โดยไม่เปลี่ยน default; งาน mutation ในโปรเจกต์เดียวกันเข้าคิวร่วมกัน
+ดู [การตั้ง AI Providers, Profiles และ Sub-agents ผ่านเว็บ](docs/AI_PROVIDERS.md)
 
 ### Universal Resource Layer
 
@@ -111,7 +135,7 @@ resource_preview(resourceId=...)
 HTTP Compact/Hybrid เรียก operation เดียวกันผ่าน `dodo_media` หลังค้นด้วย
 `dodo_discover` CAS เก็บ object แบบ immutable ตาม hash และ deduplicate ข้าม reference
 ได้ แต่ resource ID/URI ไม่ใช่ capability ทุก call ยังตรวจ OAuth, live grant,
-workspace ACL, workspace ID/epoch และ principal ownership ซ้ำ ไม่ ingest `.env`,
+target authority, workspace ID/epoch และ principal ownership ซ้ำ ไม่ ingest `.env`,
 private DODO state, traversal, symlink หรือ hardlink และไม่ inflate/execute archive
 content ดูรายละเอียดที่ [Resources](docs/RESOURCES.md)
 
@@ -132,7 +156,7 @@ brain_rebuild(mode="incremental", waitMs=10000)
 ใน Compact/Hybrid ให้เรียกผ่าน `dodo_assist_read` หรือ `dodo_assist_change`
 ตาม schema จาก `dodo_discover` ค่า `symbol://` เป็น semantic identity ที่คงเดิม
 เมื่อไฟล์ถูกย้ายแบบ exact-content แต่ URI/index row ไม่ใช่สิทธิ์ ทุก query จะตรวจ
-OAuth, live grant, workspace ACL, workspace ID/epoch, path/secret policy และ SHA-256
+OAuth, live grant, target authority, workspace ID/epoch, path/secret policy และ SHA-256
 ของ source ปัจจุบันใหม่ก่อนคืนผล ดู [Project Brain](docs/BRAIN.md)
 
 ### Context Engine และ Evidence
@@ -218,7 +242,7 @@ dodo_assist_read(operation="agent_snapshot_compare", args={...})
 ```
 
 Run/plan/hypothesis/intent/snapshot/skill ไม่ให้ permission เพิ่ม ทุก target ยังผ่าน
-OAuth scope, live workspace ACL/epoch, trust approval, path/secret guards, expected hash,
+OAuth scope, live target authority/epoch, trust approval, path/secret guards, expected hash,
 command sandbox, idempotency และ audit เดิม `agent_exec` ใช้ explicit argv/owned handles
 เท่านั้น และ cancel/pause coordinator ไม่ kill job ดู
 [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
@@ -296,7 +320,7 @@ dodo_read(operation="read_files", args={...})
 5. ระบบเตรียม workspace ใหม่ก่อนสลับ และคืน workspace เดิมหากเตรียมไม่สำเร็จ
 6. client ต้องเรียก `project_overview` ใหม่เพื่อรับ workspace ID/epoch ใหม่
 
-ระบบไม่ kill jobs เงียบ ๆ และไม่คัดลอก trust หรือ client ACL ไปยัง workspace ใหม่
+ระบบไม่ kill jobs เงียบ ๆ Managed mode ไม่คัดลอก trust หรือ client ACL ไปยัง workspace ใหม่
 
 ## การเชื่อมต่อ
 
@@ -308,7 +332,8 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 
 ## สิทธิ์
 
-สิทธิ์ของ client เป็น intersection ของ OAuth scope, workspace ACL และ local policy:
+ค่าเริ่มต้น **personal** ใช้ OAuth scope + Agent Profile เป็นเพดานและไม่ถามซ้ำต่อ
+โปรเจกต์ ส่วน **managed** ใช้ intersection ของ OAuth scope, workspace ACL และ local policy:
 
 - `inspect` อ่านและวิเคราะห์ได้
 - `edit` ทำ file changes ที่ผ่าน approval/policy ได้
@@ -316,7 +341,15 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 
 โหมด trusted และคำสั่งที่เจ้าของอนุมัติใช้สิทธิ์ OS ของผู้ใช้จริง ควรเปิดเฉพาะ workspace ที่เชื่อถือได้
 
-`dodo --bypass` ปรับ policy เฉพาะรอบนั้นตามที่เจ้าของสั่ง และไม่ปิด OAuth, ACL, workspace context, path guards หรือ secret guards
+`dodo --bypass` ปรับ policy เฉพาะรอบนั้นตามที่เจ้าของสั่ง และไม่ปิด OAuth, target authority, workspace context, path guards หรือ secret guards
+
+Desktop/Chrome consent แบบ `--persist` เป็นระดับ installation อนุญาตครั้งเดียวจาก path
+ใดก็ได้แล้วใช้กับทุกโปรเจกต์ ส่วน macOS Screen Recording/Accessibility ยังต้องกดให้
+สิทธิ์ใน System Settings จริง:
+
+```bash
+dodo desktop allow --app com.google.Chrome --mode control --persist --yes
+```
 
 ## ความปลอดภัย
 
@@ -327,7 +360,7 @@ DODO รายงาน `connected` เฉพาะเมื่อ managed `clou
 - command environment ใช้ allowlist และไม่ส่ง local auth state ให้ child process
 - repository instructions, `.dodo.json`, project hints และ AGENTS.md ไม่มีอำนาจเพิ่มสิทธิ์
 - gateway ไม่ grant สิทธิ์และไม่ข้าม approval หรือ target operation policy
-- CAS URI/hash ไม่ grant สิทธิ์; resource ทุก read/range/preview ตรวจ live ACL และ object hash ซ้ำ
+- CAS URI/hash ไม่ grant สิทธิ์; resource ทุก read/range/preview ตรวจ live target authority และ object hash ซ้ำ
 
 ดูรายละเอียดที่ [SECURITY](docs/SECURITY.md), [AUTH](docs/AUTH.md) และ [ARCHITECTURE](docs/ARCHITECTURE.md)
 

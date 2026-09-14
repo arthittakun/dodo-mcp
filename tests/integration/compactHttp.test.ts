@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { launch, obtainToken, mcpRaw, rpc, parseMcpResponse, callToolLegacy, wsArgs, type TestContext, type TokenSet } from '../helpers/testServer.js';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
-import { COMPACT_CATALOG, HYBRID_CATALOG } from '../../src/tools/surface.js';
+import { COMPACT_CATALOG, HYBRID_CATALOG, surfaceCatalog } from '../../src/tools/surface.js';
 
 /** ADR-029: HTTP defaults to the compact surface; explicit full override keeps the old contract. */
 
-async function listTools(ctx: TestContext, token: string): Promise<Array<{ name: string }>> {
+async function listTools(ctx: TestContext, token: string): Promise<Array<{ name: string; inputSchema?: Record<string, unknown> }>> {
   const res = await mcpRaw(ctx, rpc('tools/list'), token);
   expect(res.status).toBe(200);
-  const body = (await parseMcpResponse(res)) as { result?: { tools?: Array<{ name: string }> } };
+  const body = (await parseMcpResponse(res)) as { result?: { tools?: Array<{ name: string; inputSchema?: Record<string, unknown> }> } };
   return body.result?.tools ?? [];
 }
 
@@ -135,6 +135,47 @@ describe('full surface over HTTP (explicit override)', () => {
       const tokens = await obtainToken(ctx);
       const tools = await listTools(ctx, tokens.accessToken);
       expect(tools.length).toBe(COMPACT_CATALOG.length);
+    } finally {
+      await ctx.cleanup();
+    }
+  }, 120_000);
+});
+
+describe('sub-agent MCP exposure switch', () => {
+  it('defaults off for a live compact server while preserving the 19-tool gateway surface', async () => {
+    const ctx = await launch({ configPatch: { exposeSubagentsToMcp: false }, trust: 'trusted' });
+    try {
+      const tokens = await obtainToken(ctx);
+      const tools = await listTools(ctx, tokens.accessToken);
+      expect(tools.map((tool) => tool.name)).toEqual(surfaceCatalog('compact', { subagents: false }).map((tool) => tool.name));
+      expect(tools).toHaveLength(19);
+
+      const readGateway = tools.find((tool) => tool.name === 'dodo_assist_read');
+      const changeGateway = tools.find((tool) => tool.name === 'dodo_assist_change');
+      const operations = (tool: typeof readGateway) => (((tool?.inputSchema?.['properties'] as Record<string, unknown>)?.['operation'] as { enum?: string[] })?.enum ?? []);
+      expect(operations(readGateway)).not.toEqual(expect.arrayContaining(['subagent_status', 'subagent_result']));
+      expect(operations(changeGateway)).not.toEqual(expect.arrayContaining(['subagent_spawn', 'subagent_control']));
+
+      const overview = await callToolLegacy(ctx, tokens.accessToken, 'project_overview', {});
+      expect(overview.envelope['data']).toMatchObject({
+        toolSurface: 'compact', compactToolCount: 19, fullToolCount: 121, mcpSubagentsEnabled: false,
+      });
+      const hidden = await callToolLegacy(ctx, tokens.accessToken, 'dodo_discover', { ...wsArgs(ctx), operation: 'subagent_spawn' });
+      expect(hidden.isError).toBe(true);
+      expect(hidden.envelope['error']).toMatchObject({ code: 'NOT_FOUND' });
+    } finally {
+      await ctx.cleanup();
+    }
+  }, 120_000);
+
+  it('removes all four direct definitions from Full when disabled', async () => {
+    const ctx = await launch({ toolSurface: 'full', configPatch: { exposeSubagentsToMcp: false } });
+    try {
+      const tokens = await obtainToken(ctx);
+      const names = (await listTools(ctx, tokens.accessToken)).map((tool) => tool.name);
+      expect(names).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
+      expect(names).toHaveLength(121);
+      expect(names).not.toEqual(expect.arrayContaining(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']));
     } finally {
       await ctx.cleanup();
     }

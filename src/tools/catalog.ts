@@ -1,3 +1,4 @@
+import { SUBAGENT_TOOLS } from './subagentTools.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { registerTool, type AnyToolDef, type AppServices } from './context.js';
 import { CORE_TOOL_CATALOG } from './coreCatalog.js';
@@ -21,6 +22,7 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   ...CORE_TOOL_CATALOG,
   // Durable plan/hypothesis/lock/snapshot/skill coordination. Existing 104 names stay an exact prefix.
   ...AGENT_RUNTIME_TOOLS,
+  ...SUBAGENT_TOOLS,
 ];
 
 export function registerCatalog(server: McpServer, services: AppServices): void {

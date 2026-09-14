@@ -37,11 +37,12 @@ describe('M0: transport + OAuth vertical slice', () => {
     expect(JSON.stringify(body)).not.toContain(ctx.fixtureDir);
   });
 
-  it('OAuth flow issued a usable access token bound to the workspace grant', () => {
+  it('OAuth flow issues an installation identity and the owner ACL makes it usable here', () => {
     expect(tokens.accessToken.length).toBeGreaterThan(20);
     expect(tokens.grantId.length).toBeGreaterThan(5);
     const grant = ctx.server.services.store.getGrant(tokens.grantId);
-    expect(grant?.workspaceId).toBe(ctx.server.workspaceId);
+    expect(grant?.workspaceId).toBe('dodo-installation');
+    expect(ctx.server.services.store.clientAccess(ctx.server.workspaceId, tokens.clientId)).toContain('dodo:read');
   });
 
   it(`MCP-01: modern SDK client lists all ${TOOL_COUNT} tools and calls project_overview`, async () => {

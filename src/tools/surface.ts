@@ -34,6 +34,13 @@ import { envelopeSchema } from './envelope.js';
 
 export type ToolSurface = 'compact' | 'full' | 'hybrid';
 
+export interface SurfaceFeatures {
+  /** Expose owner-configured sub-agent operations to MCP clients. Web tasks remain available either way. */
+  subagents: boolean;
+}
+
+const SUBAGENT_OPERATION_NAMES = new Set(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']);
+
 export type DiscoverDomain =
   | 'code'
   | 'exec'
@@ -149,14 +156,14 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Coding-task analysis',
     domain: 'code',
     summary: 'goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries',
-    operations: ['context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'runtime_session_status', 'runtime_task_observe', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose', 'agent_run_status', 'agent_read', 'agent_snapshot_create', 'agent_snapshot_compare', 'agent_skill_search', 'agent_skill_inspect', 'brain_status', 'brain_query', 'brain_symbol'],
+    operations: ['subagent_status', 'subagent_result', 'context_for_task', 'analyze_impact', 'read_symbol', 'context_query', 'context_evidence', 'context_status', 'memory_search', 'memory_inspect', 'memory_status', 'runtime_session_status', 'runtime_task_observe', 'runtime_snapshot', 'runtime_evidence', 'runtime_diagnose', 'agent_run_status', 'agent_read', 'agent_snapshot_create', 'agent_snapshot_compare', 'agent_skill_search', 'agent_skill_inspect', 'brain_status', 'brain_query', 'brain_symbol'],
   },
   {
     name: 'dodo_assist_change',
     title: 'Refactor previews and verification',
     domain: 'code',
     summary: 'preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance',
-    operations: ['preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'runtime_session_open', 'runtime_session_close', 'agent_run_open', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire', 'agent_intent_release', 'agent_hypothesis_judge', 'agent_skill_propose', 'agent_run_control', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
+    operations: ['subagent_spawn', 'subagent_control', 'preview_refactor', 'verify_changes', 'memory_propose', 'memory_learning_propose', 'runtime_session_open', 'runtime_session_close', 'agent_run_open', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire', 'agent_intent_release', 'agent_hypothesis_judge', 'agent_skill_propose', 'agent_run_control', 'brain_rebuild', 'brain_pause', 'brain_cancel'],
   },
   {
     name: 'dodo_media',
@@ -239,6 +246,14 @@ const SCOPE_RANK: Record<OAuthScope, number> = { 'dodo:read': 0, 'dodo:write': 1
 
 const byName = new Map<string, AnyToolDef>(TOOL_CATALOG.map((d) => [d.name, d]));
 
+function gatewaySpecsFor(features: SurfaceFeatures): readonly GatewaySpec[] {
+  if (features.subagents) return GATEWAY_SPECS;
+  return GATEWAY_SPECS.map((spec) => ({
+    ...spec,
+    operations: spec.operations.filter((operation) => !SUBAGENT_OPERATION_NAMES.has(operation)),
+  }));
+}
+
 function targetOf(operation: string): AnyToolDef {
   const def = byName.get(operation);
   /* istanbul ignore next -- construction invariant, validated at module load */
@@ -320,7 +335,7 @@ function buildGateway(spec: GatewaySpec): AnyToolDef {
     handler: async (args, ctx) => {
       const target = targetOf(args.operation);
       const raw = (args.args ?? {}) as Record<string, unknown>;
-      if ('workspaceId' in raw || 'workspaceEpoch' in raw) {
+      if ('workspaceId' in raw || 'workspaceEpoch' in raw || 'targetProjectId' in raw) {
         throw new DodoError('INVALID_INPUT', 'args must not carry workspaceId/workspaceEpoch; the gateway takes them from its top-level fields', {
           recovery: 'remove workspaceId and workspaceEpoch from args; keep them only at the top level of the gateway call',
         });
@@ -360,43 +375,42 @@ interface OperationIndexEntry {
   order: number;
 }
 
-let operationIndex: OperationIndexEntry[] | undefined;
-function index(): OperationIndexEntry[] {
-  if (!operationIndex) {
-    const order = new Map(TOOL_CATALOG.map((d, i) => [d.name, i]));
-    operationIndex = GATEWAY_SPECS.flatMap((spec) =>
-      spec.operations.map((op) => {
-        const def = targetOf(op);
-        return {
-          operation: op,
-          gateway: spec.name,
-          domain: spec.domain,
-          requiredScope: def.requiredScope,
-          action: def.action,
-          description: def.description.slice(0, 200),
-          haystack: `${op} ${def.title} ${def.description}`.toLowerCase(),
-          order: order.get(op) ?? 999,
-        };
-      }),
-    ).sort((a, b) => a.order - b.order);
-  }
-  return operationIndex;
+function buildOperationIndex(specs: readonly GatewaySpec[], exposedCatalog: readonly AnyToolDef[]): OperationIndexEntry[] {
+  const order = new Map(exposedCatalog.map((d, i) => [d.name, i]));
+  return specs.flatMap((spec) =>
+    spec.operations.map((op) => {
+      const def = targetOf(op);
+      return {
+        operation: op,
+        gateway: spec.name,
+        domain: spec.domain,
+        requiredScope: def.requiredScope,
+        action: def.action,
+        description: def.description.slice(0, 200),
+        haystack: `${op} ${def.title} ${def.description}`.toLowerCase(),
+        order: order.get(op) ?? 999,
+      };
+    }),
+  ).sort((a, b) => a.order - b.order);
 }
 
-const schemaCache = new Map<string, { inputSchema: Record<string, unknown>; schemaHash: string }>();
+// Gateways can have the same public name with different feature-filtered
+// definitions. Cache by definition identity so an enabled schema can never
+// leak into a disabled live surface (or vice versa).
+const schemaCache = new WeakMap<AnyToolDef, { inputSchema: Record<string, unknown>; schemaHash: string }>();
 
 /** Deterministic JSON Schema + hash for one tool's full registered input contract. */
 export function operationSchema(def: AnyToolDef): { inputSchema: Record<string, unknown>; schemaHash: string } {
-  let cached = schemaCache.get(def.name);
+  let cached = schemaCache.get(def);
   if (!cached) {
     const inputSchema = z.toJSONSchema(z.object(toolInputShape(def) as z.ZodRawShape).strict(), { target: 'draft-2020-12' }) as Record<string, unknown>;
     cached = { inputSchema, schemaHash: digestOf(inputSchema) };
-    schemaCache.set(def.name, cached);
+    schemaCache.set(def, cached);
   }
   return cached;
 }
 
-const argsSchemaCache = new Map<string, { argsSchema: Record<string, unknown>; schemaHash: string }>();
+const argsSchemaCache = new WeakMap<AnyToolDef, { argsSchema: Record<string, unknown>; schemaHash: string }>();
 
 /**
  * Deterministic JSON Schema + hash for the operation's `args` payload as the
@@ -404,11 +418,11 @@ const argsSchemaCache = new Map<string, { argsSchema: Record<string, unknown>; s
  * (those travel at the gateway's top level and are rejected inside args).
  */
 export function operationArgsSchema(def: AnyToolDef): { argsSchema: Record<string, unknown>; schemaHash: string } {
-  let cached = argsSchemaCache.get(def.name);
+  let cached = argsSchemaCache.get(def);
   if (!cached) {
     const argsSchema = z.toJSONSchema(z.object(def.input as z.ZodRawShape).strict(), { target: 'draft-2020-12' }) as Record<string, unknown>;
     cached = { argsSchema, schemaHash: digestOf(argsSchema) };
-    argsSchemaCache.set(def.name, cached);
+    argsSchemaCache.set(def, cached);
   }
   return cached;
 }
@@ -438,7 +452,9 @@ function usageNotes(def: AnyToolDef): string[] {
   return notes;
 }
 
-const discoverTool = defineTool({
+function buildDiscoverTool(specs: readonly GatewaySpec[], exposedCatalog: readonly AnyToolDef[]): AnyToolDef {
+  const operationIndex = buildOperationIndex(specs, exposedCatalog);
+  return defineTool({
   name: 'dodo_discover',
   title: 'Discover operations behind the compact gateways',
   description:
@@ -456,7 +472,7 @@ const discoverTool = defineTool({
   action: 'read',
   handler: async (args) => {
     if (args.operation !== undefined) {
-      const entry = index().find((e) => e.operation === args.operation);
+      const entry = operationIndex.find((e) => e.operation === args.operation);
       if (!entry) {
         throw new DodoError('NOT_FOUND', `unknown operation ${args.operation}`, {
           recovery: 'call dodo_discover with a query (no operation) to list available operations',
@@ -488,7 +504,7 @@ const discoverTool = defineTool({
       .toLowerCase()
       .split(/[^a-z0-9_]+/)
       .filter((t) => t.length > 1);
-    let entries = index().filter((e) => args.domain === undefined || e.domain === args.domain);
+    let entries = operationIndex.filter((e) => args.domain === undefined || e.domain === args.domain);
     if (tokens.length > 0) {
       const scored = entries
         .map((e) => {
@@ -527,12 +543,37 @@ const discoverTool = defineTool({
       nextCursor: next,
     };
   },
-});
+  });
+}
 
 // ------------------------------------------------------ compact overview --
 const fullOverview = targetOf('project_overview');
 
-function overviewFor(surface: 'compact' | 'hybrid'): AnyToolDef {
+function overviewDataForExposure(data: Record<string, unknown>, subagents: boolean): Record<string, unknown> {
+  if (subagents) return data;
+  const ai = data['ai'];
+  return {
+    ...data,
+    ...(ai && typeof ai === 'object' && !Array.isArray(ai)
+      ? { ai: { ...(ai as Record<string, unknown>), note: 'Sub-agent MCP operations are hidden by the owner. Agent profiles remain available through the private Local Config web workbench.' } }
+      : {}),
+    mcpSubagentsEnabled: false,
+  };
+}
+
+const fullOverviewWithoutSubagents = defineTool({
+  ...fullOverview,
+  handler: async (args, ctx) => {
+    const result = await fullOverview.handler(args, ctx);
+    return { ...result, data: overviewDataForExposure(result.data as Record<string, unknown>, false) };
+  },
+} as Parameters<typeof defineTool>[0]);
+
+function overviewFor(
+  surface: 'compact' | 'hybrid',
+  counts: { compact: number; full: number; hybrid: number },
+  subagents: boolean,
+): AnyToolDef {
   const hint =
     surface === 'compact'
       ? ' This connection uses the COMPACT tool surface: capabilities are invoked through dodo_* gateway tools; call dodo_discover to find an operation and its exact schema.'
@@ -542,25 +583,31 @@ function overviewFor(surface: 'compact' | 'hybrid'): AnyToolDef {
     description: fullOverview.description + hint,
     handler: async (args, ctx) => {
       const result = await fullOverview.handler(args, ctx);
+      const data = overviewDataForExposure(result.data as Record<string, unknown>, subagents);
       return {
         ...result,
         data: {
-          ...(result.data as Record<string, unknown>),
+          ...data,
           toolSurface: surface,
           // Public compact-surface field names are stable protocol contract.
-          compactToolCount: COMPACT_CATALOG.length,
-          fullToolCount: TOOL_CATALOG.length,
-          ...(surface === 'hybrid' ? { hybridToolCount: HYBRID_CATALOG.length } : {}),
+          compactToolCount: counts.compact,
+          fullToolCount: counts.full,
+          ...(surface === 'hybrid' ? { hybridToolCount: counts.hybrid } : {}),
+          mcpSubagentsEnabled: subagents,
         },
       };
     },
   } as Parameters<typeof defineTool>[0]);
 }
 
+const ALL_FEATURES: SurfaceFeatures = { subagents: true };
+const DEFAULT_FEATURES: SurfaceFeatures = { subagents: false };
+const ALL_COUNTS = { compact: 2 + GATEWAY_SPECS.length, full: TOOL_CATALOG.length, hybrid: 2 + GATEWAY_SPECS.length + 30 };
 const GATEWAYS: AnyToolDef[] = GATEWAY_SPECS.map(buildGateway);
+const discoverTool = buildDiscoverTool(GATEWAY_SPECS, TOOL_CATALOG);
 
 /** The compact catalog in a fixed, stable order (overview → discover → gateways). */
-export const COMPACT_CATALOG: AnyToolDef[] = [overviewFor('compact'), discoverTool, ...GATEWAYS];
+export const COMPACT_CATALOG: AnyToolDef[] = [overviewFor('compact', ALL_COUNTS, true), discoverTool, ...GATEWAYS];
 
 /**
  * Hybrid surface (ADR-029 addendum): for clients that cap the tool
@@ -603,7 +650,7 @@ export const HYBRID_DIRECT_OPERATIONS: readonly string[] = [
   'list_jobs',
 ] as const;
 
-export const HYBRID_CATALOG: AnyToolDef[] = [overviewFor('hybrid'), discoverTool, ...GATEWAYS, ...HYBRID_DIRECT_OPERATIONS.map(targetOf)];
+export const HYBRID_CATALOG: AnyToolDef[] = [overviewFor('hybrid', ALL_COUNTS, true), discoverTool, ...GATEWAYS, ...HYBRID_DIRECT_OPERATIONS.map(targetOf)];
 
 {
   const names = new Set(HYBRID_CATALOG.map((d) => d.name));
@@ -614,18 +661,46 @@ export const HYBRID_CATALOG: AnyToolDef[] = [overviewFor('hybrid'), discoverTool
   }
 }
 
+const MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS = TOOL_CATALOG
+  .filter((def) => !SUBAGENT_OPERATION_NAMES.has(def.name))
+  .map((def) => def.name === 'project_overview' ? fullOverviewWithoutSubagents : def);
+const GATEWAY_SPECS_WITHOUT_SUBAGENTS = gatewaySpecsFor(DEFAULT_FEATURES);
+const GATEWAYS_WITHOUT_SUBAGENTS = GATEWAY_SPECS_WITHOUT_SUBAGENTS.map(buildGateway);
+const COUNTS_WITHOUT_SUBAGENTS = {
+  compact: 2 + GATEWAY_SPECS_WITHOUT_SUBAGENTS.length,
+  full: MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS.length,
+  hybrid: 2 + GATEWAY_SPECS_WITHOUT_SUBAGENTS.length + HYBRID_DIRECT_OPERATIONS.length,
+};
+const DISCOVER_WITHOUT_SUBAGENTS = buildDiscoverTool(GATEWAY_SPECS_WITHOUT_SUBAGENTS, MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS);
+const COMPACT_CATALOG_WITHOUT_SUBAGENTS: AnyToolDef[] = [
+  overviewFor('compact', COUNTS_WITHOUT_SUBAGENTS, false),
+  DISCOVER_WITHOUT_SUBAGENTS,
+  ...GATEWAYS_WITHOUT_SUBAGENTS,
+];
+const HYBRID_CATALOG_WITHOUT_SUBAGENTS: AnyToolDef[] = [
+  overviewFor('hybrid', COUNTS_WITHOUT_SUBAGENTS, false),
+  DISCOVER_WITHOUT_SUBAGENTS,
+  ...GATEWAYS_WITHOUT_SUBAGENTS,
+  ...HYBRID_DIRECT_OPERATIONS.map(targetOf),
+];
+
 // ------------------------------------------------------------- surface API --
-export function surfaceCatalog(surface: ToolSurface): AnyToolDef[] {
-  if (surface === 'compact') return COMPACT_CATALOG;
-  if (surface === 'hybrid') return HYBRID_CATALOG;
-  return TOOL_CATALOG;
+export function surfaceCatalog(surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): AnyToolDef[] {
+  if (features.subagents) {
+    if (surface === 'compact') return COMPACT_CATALOG;
+    if (surface === 'hybrid') return HYBRID_CATALOG;
+    return TOOL_CATALOG;
+  }
+  if (surface === 'compact') return COMPACT_CATALOG_WITHOUT_SUBAGENTS;
+  if (surface === 'hybrid') return HYBRID_CATALOG_WITHOUT_SUBAGENTS;
+  return MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS;
 }
 
-export function registerSurface(server: McpServer, services: AppServices, surface: ToolSurface): void {
-  for (const def of surfaceCatalog(surface)) registerTool(server, services, def);
+export function registerSurface(server: McpServer, services: AppServices, surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): void {
+  for (const def of surfaceCatalog(surface, features)) registerTool(server, services, def);
 }
 
-const statsCache = new Map<ToolSurface, { toolCount: number; schemaBytes: number }>();
+const statsCache = new Map<string, { toolCount: number; schemaBytes: number }>();
 
 /**
  * Deterministic size evidence for one surface: tool count plus the UTF-8 byte
@@ -634,10 +709,11 @@ const statsCache = new Map<ToolSurface, { toolCount: number; schemaBytes: number
  * every tool, matching what the MCP SDK serves a client at connection time.
  * Never includes request data or tokens.
  */
-export function surfaceStats(surface: ToolSurface): { toolCount: number; schemaBytes: number } {
-  let cached = statsCache.get(surface);
+export function surfaceStats(surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): { toolCount: number; schemaBytes: number } {
+  const cacheKey = `${surface}:${features.subagents ? 'subagents' : 'no-subagents'}`;
+  let cached = statsCache.get(cacheKey);
   if (!cached) {
-    const tools = surfaceCatalog(surface).map((def) => ({
+    const tools = surfaceCatalog(surface, features).map((def) => ({
       name: def.name,
       title: def.title,
       description: def.description,
@@ -646,7 +722,7 @@ export function surfaceStats(surface: ToolSurface): { toolCount: number; schemaB
       outputSchema: z.toJSONSchema(envelopeSchema(def.output), { target: 'draft-2020-12' }),
     }));
     cached = { toolCount: tools.length, schemaBytes: Buffer.byteLength(JSON.stringify(tools), 'utf8') };
-    statsCache.set(surface, cached);
+    statsCache.set(cacheKey, cached);
   }
   return cached;
 }

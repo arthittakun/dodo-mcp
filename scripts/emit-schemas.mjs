@@ -33,10 +33,21 @@ const tools = TOOL_CATALOG.map((def) => {
   };
 });
 
+const optionalMcpFeatures = {
+  subagents: {
+    configKey: 'exposeSubagentsToMcp',
+    default: false,
+    restartRequired: true,
+    operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
+  },
+};
+
 const catalog = {
-  $comment: 'GENERATED from src/tools — do not edit by hand. Proposed DODO tool contract, not the MCP protocol spec.',
+  $comment: 'GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.',
   version: 1,
   toolCount: tools.length,
+  defaultLiveToolCount: surfaceStats('full', { subagents: false }).toolCount,
+  optionalMcpFeatures,
   tools,
 };
 
@@ -60,10 +71,13 @@ const compactTools = COMPACT_CATALOG.map((def) => {
   };
 });
 writeJson('tools.compact.json', {
-  $comment: 'GENERATED from src/tools — do not edit by hand. Compact gateway surface (default for HTTP); every operation routes through the full tool contract in tools.json.',
+  $comment: 'GENERATED from src/tools — do not edit by hand. Complete Compact capability contract; the default live surface filters optional operation enums according to optionalMcpFeatures.',
   version: 1,
   toolCount: compactTools.length,
+  defaultLiveToolCount: surfaceStats('compact', { subagents: false }).toolCount,
   fullToolCount: TOOL_CATALOG.length,
+  defaultLiveFullToolCount: surfaceStats('full', { subagents: false }).toolCount,
+  optionalMcpFeatures,
   stats: { compact: surfaceStats('compact'), hybrid: surfaceStats('hybrid'), full: surfaceStats('full') },
   tools: compactTools,
 });
@@ -85,11 +99,14 @@ const hybridTools = HYBRID_CATALOG.map((def) => {
   };
 });
 writeJson('tools.hybrid.json', {
-  $comment: 'GENERATED from src/tools — do not edit by hand. Hybrid 49-tool surface (opt-in): the compact coverage core first, then 30 direct coding tools; identical per-operation contract to tools.json.',
+  $comment: 'GENERATED from src/tools — do not edit by hand. Complete Hybrid capability contract; the default live surface filters optional operation enums according to optionalMcpFeatures.',
   version: 1,
   toolCount: hybridTools.length,
+  defaultLiveToolCount: surfaceStats('hybrid', { subagents: false }).toolCount,
   directOperations: [...HYBRID_DIRECT_OPERATIONS],
   fullToolCount: TOOL_CATALOG.length,
+  defaultLiveFullToolCount: surfaceStats('full', { subagents: false }).toolCount,
+  optionalMcpFeatures,
   stats: { compact: surfaceStats('compact'), hybrid: surfaceStats('hybrid'), full: surfaceStats('full') },
   tools: hybridTools,
 });

@@ -130,6 +130,10 @@ export class ScheduleService {
         this.s.store.db.prepare("UPDATE schedules SET status='paused', next_at=NULL WHERE id=?").run(row.id);
         this.audit(row.id, 'schedule.policy-paused'); continue;
       }
+      // A schedule's own overlap still gets a receipt; other mutations defer
+      // this tick without claiming it, so no command bypasses the shared queue.
+      const ownRunning = !!this.s.store.db.prepare("SELECT id FROM jobs WHERE workspace_id=? AND principal=? AND status='running' LIMIT 1").get(this.s.workspaceId, `schedule:${row.id}`);
+      if (this.s.jobs.mutations?.busy && !ownRunning) continue;
       const due = row.next_at;
       const next = this.next(p.spec, now);
       const claimed = this.s.store.db.transaction(() => {

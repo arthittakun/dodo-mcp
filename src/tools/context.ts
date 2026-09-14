@@ -1,3 +1,6 @@
+import type { InstallationRuntime } from '../server/installationRuntime.js';
+import type { MutationQueue } from '../security/mutationQueue.js';
+import { isOwner, projectAuthority } from '../security/projectAuthority.js';
 import type { MultimodalService } from '../services/multimodal/multimodalService.js';
 import type { ResourceService } from '../services/resources/resourceService.js';
 import type { FederationService } from '../projects/federation.js';
@@ -35,9 +38,16 @@ export interface Principal {
   clientId: string;
   sub: string;
   scopes: string[];
+  /** Verified token ceiling; never caller-supplied. */
+  tokenScopes?: string[];
+  projectRestriction?: string;
+  identityGrant?: boolean;
+  expiresAt?: number;
 }
 
 export interface AppServices {
+  installation?: InstallationRuntime;
+  mutations?: MutationQueue;
   federation: FederationService;
   /** Durable, incrementally refreshed project structure index. */
   brain?: ProjectBrainService;
@@ -128,6 +138,7 @@ export interface ToolDef<In extends z.ZodRawShape> {
   handler: (args: z.infer<z.ZodObject<In>>, ctx: ToolCtx) => Promise<HandlerResult>;
 }
 
+const TARGET_PROJECT = { targetProjectId: z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional().describe("Explicit owner-registered target; use its project_overview context") };
 const WORKSPACE_CONTEXT_FIELDS = {
   workspaceId: z.string().min(1).max(128).describe('Workspace id from project_overview'),
   workspaceEpoch: z.string().min(1).max(128).describe('Workspace epoch from project_overview (changes on server restart or workspace switch)'),
@@ -143,7 +154,7 @@ export function defineTool<In extends z.ZodRawShape>(def: ToolDef<In>): AnyToolD
 }
 
 export function toolInputShape(def: AnyToolDef): z.ZodRawShape {
-  return def.noWorkspaceContext ? def.input : { ...WORKSPACE_CONTEXT_FIELDS, ...def.input };
+  return { ...TARGET_PROJECT, ...(def.noWorkspaceContext ? {} : WORKSPACE_CONTEXT_FIELDS), ...def.input };
 }
 
 /**
@@ -162,6 +173,7 @@ export interface InvokeToolOptions {
   args: Record<string, unknown>;
   /** True only when the MCP SDK already validated args against this tool's input schema. */
   validated?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface InvokeToolResult {
@@ -170,15 +182,33 @@ export interface InvokeToolResult {
 }
 
 export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<InvokeToolResult> {
-  const { def, services } = opts;
+  const { def } = opts;
+  let services = opts.services;
+  let targetRelease: (() => void) | undefined;
   const started = Date.now();
-  const ws = { workspaceId: services.workspaceId, epoch: services.epoch };
+  let ws = { workspaceId: services.workspaceId, epoch: services.epoch };
   let envelope: Envelope;
   let principal: Principal | undefined;
   let workspaceAccess = false;
   let extraBlocks: ExtraContentBlock[] = [];
   try {
     principal = typeof opts.principal === 'function' ? opts.principal() : opts.principal;
+    const targetId = opts.args['targetProjectId'];
+    if (targetId !== undefined) {
+      if (typeof targetId !== 'string' || 'projectId' in opts.args || 'projectIds' in opts.args || (opts.args['args'] && typeof opts.args['args'] === 'object' && ('projectId' in opts.args['args'] || 'projectIds' in opts.args['args']))) throw new DodoError('INVALID_INPUT', 'ambiguous project routing');
+      if (!services.installation) throw new DodoError('NOT_SUPPORTED', 'explicit project routing is unavailable');
+      const lease = await services.installation.acquire(targetId, principal);
+      services = lease.services; targetRelease = lease.release;
+      ws = { workspaceId: services.workspaceId, epoch: services.epoch };
+      principal = projectAuthority(services.store, principal, services.workspaceId);
+    } else if (principal.tokenScopes) principal = projectAuthority(services.store, principal, services.workspaceId);
+    if (!principal.scopes.includes('dodo:read') && def.name === 'project_overview' && targetId === undefined && services.installation) {
+      const projects = services.installation.list(principal);
+      if (projects.length) {
+        services.store.audit({principal:principal.grantId,workspaceId:services.workspaceId,tool:def.name,result:'ok',inputDigest:digestOf(opts.args).slice(0,24)});
+        return { envelope: { ...okEnvelope(ws, { selectProjectRequired: true, projects }), workspaceId: null, workspaceEpoch: null }, extraBlocks: [] };
+      }
+    }
     if (principal.scopes.length === 0) throw new DodoError('WORKSPACE_ACCESS_REQUIRED', 'Owner must allow this client for the active workspace in private Local Config; OAuth login is retained');
     if (!scopeSatisfied(def.requiredScope, principal.scopes)) {
       throw new DodoError('FORBIDDEN', `this tool requires the ${def.requiredScope} scope`, {
@@ -209,8 +239,21 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
       });
     }
     const args = opts.validated === true ? opts.args : parseToolInput(def, opts.args);
-    const trust = services.trustMode();
-    const result = await def.handler(args as never, { services, principal, trustMode: trust });
+    const execute = async () => {
+      if (typeof opts.principal === 'function') principal = opts.principal();
+      if (principal!.tokenScopes) principal = projectAuthority(services.store, principal!, services.workspaceId);
+      if (!scopeSatisfied(def.requiredScope, principal!.scopes)) throw new DodoError('FORBIDDEN', 'target permission changed while queued');
+      if (def.name.startsWith('job_') && typeof args['jobId'] === 'string' && !isOwner(principal!)) {
+        const job = services.jobs.getJobChecked(args['jobId'],services.workspaceId);
+        if (job.principal !== principal!.grantId) throw new DodoError('FORBIDDEN','job belongs to another caller');
+      }
+      return def.handler(args as never, { services, principal: principal!, trustMode: services.trustMode() });
+    };
+    const control = ['job_input', 'job_cancel', 'subagent_spawn', 'subagent_control'].includes(def.name);
+    const gateway = def.name.startsWith('dodo_');
+    const result = services.mutations && !gateway && !control && (def.action === 'mutate-files' || def.action === 'exec')
+      ? await services.mutations.run(execute,opts.signal) : await execute();
+    if (!def.output.safeParse(result.data).success) throw new DodoError('INTERNAL_ERROR','target returned an invalid output; review its receipt before retrying');
     extraBlocks = result.contentBlocks ?? [];
     envelope = okEnvelope(ws, result.data, {
       warnings: result.warnings ?? [],
@@ -245,6 +288,7 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
     envelope = errorEnvelope(workspaceAccess ? ws : null, new DodoError('INTERNAL_ERROR', 'audit write failed; the call result was discarded', { retryable: true }).toInfo());
     extraBlocks = [];
   }
+  targetRelease?.();
   return { envelope, extraBlocks };
 }
 
@@ -283,7 +327,7 @@ export function registerTool(server: McpServer, services: AppServices, def: AnyT
       // the envelope contract instead of surfacing as a raw SDK text error.
       let release: (() => void) | undefined;
       try {
-        release = services.beginTool?.();
+        if (args['targetProjectId'] === undefined) release = services.beginTool?.();
       } catch (err) {
         const envelope = errorEnvelope(null, toDodoError(err).toInfo());
         return {
@@ -326,6 +370,9 @@ function principalFrom(ctx: ServerContext, localPrincipal: Principal | undefined
     clientId: auth.clientId,
     sub: typeof extra['sub'] === 'string' ? (extra['sub'] as string) : 'owner',
     scopes: auth.scopes,
+    ...(Array.isArray(extra['tokenScopes']) ? { tokenScopes: extra['tokenScopes'] as string[] } : {}),
+    identityGrant: extra['identityGrant'] === true,
+    ...(auth.expiresAt !== undefined ? { expiresAt: auth.expiresAt } : {}),
   };
 }
 

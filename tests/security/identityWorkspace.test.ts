@@ -11,6 +11,36 @@ function verifier(ctx: TestContext) {
 }
 
 describe('installation identity with explicit workspace access', () => {
+  it('completes installation login without granting the selected workspace', async () => {
+    const ctx = await launch({ toolSurface: 'compact' });
+    try {
+      const token = await obtainToken(ctx, { grantWorkspaceAccess: false });
+      expect(ctx.server.services.store.clientAccess(ctx.server.workspaceId, token.clientId)).toEqual([]);
+      expect((await verifier(ctx).verifyAccessToken(token.accessToken)).scopes).toEqual([]);
+      expect((await mcpRaw(ctx, rpc('tools/list'), token.accessToken)).status).toBe(200);
+      const denied = await callToolLegacy(ctx, token.accessToken, 'project_overview', {});
+      expect((denied.envelope.error as { code: string }).code).toBe('WORKSPACE_ACCESS_REQUIRED');
+      ctx.server.services.store.setClientAccess(ctx.server.workspaceId, token.clientId, ['dodo:read']);
+      expect((await callToolLegacy(ctx, token.accessToken, 'project_overview', {})).envelope.ok).toBe(true);
+    } finally { await ctx.cleanup(); }
+  });
+
+  it('allows OAuth and an authenticated catalog before any project is selected', async () => {
+    const ctx = await launch({ toolSurface: 'compact', deferWorkspace: true });
+    try {
+      expect(ctx.server.workspaceSelected).toBe(false);
+      const token = await obtainToken(ctx, { grantWorkspaceAccess: false });
+      const listed = await mcpRaw(ctx, rpc('tools/list'), token.accessToken);
+      expect(listed.status).toBe(200);
+      const body = await listed.text();
+      expect(body).toContain('dodo_discover');
+      expect(body).not.toContain('launcher-workspace');
+      const denied = await callToolLegacy(ctx, token.accessToken, 'project_overview', {});
+      expect((denied.envelope.error as { code: string }).code).toBe('WORKSPACE_ACCESS_REQUIRED');
+      expect(JSON.stringify(denied.envelope)).not.toContain('launcher-workspace');
+    } finally { await ctx.cleanup(); }
+  });
+
   it('reuses login only after local path consent; rejects old context and revoked access', async () => {
     const a = await launch({ toolSurface: 'full', fixtureFiles:{'a.txt':'A'}});
     const t = await obtainToken(a);

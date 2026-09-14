@@ -126,7 +126,7 @@ export class AgentRuntimeService {
     return {
       schemaVersion: AGENT_SCHEMA_VERSION, run: this.runData(run), plan, hypotheses, intents, snapshots,
       latestJudgement: latestJudgement ? { judgementId: latestJudgement.id, ...parseObject(latestJudgement.payload, {}), contentHash: latestJudgement.content_hash, createdAt: latestJudgement.created_at } : null,
-      note: 'Coordinator state is durable guidance. Target tools, live OAuth/workspace ACL, trust, approvals, path guards and command sandbox remain authoritative.',
+      note: 'Coordinator state is durable guidance. Target tools, live OAuth/target authority, trust, approvals, path guards and command sandbox remain authoritative.',
     };
   }
 

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { startServer, type RunningServer } from '../../src/server/appServer.js';
 import { loadGlobalConfig } from '../../src/config/globalConfig.js';
 import { statePaths } from '../../src/config/paths.js';
+import { addStaticClient } from '../../src/auth/clients.js';
 
 const created: string[] = [];
 const running: RunningServer[] = [];
@@ -39,9 +40,8 @@ describe('global launcher mode', () => {
 
     const health = await (await fetch(`http://127.0.0.1:${server.port}/healthz`)).json() as { workspaceSelected: boolean };
     expect(health.workspaceSelected).toBe(false);
-    const blocked = await fetch(`http://127.0.0.1:${server.port}/mcp`, { method: 'POST' });
-    expect(blocked.status).toBe(503);
-    expect(await blocked.json()).toMatchObject({ error: 'workspace_required' });
+    const protectedCatalog = await fetch(`http://127.0.0.1:${server.port}/mcp`, { method: 'POST' });
+    expect(protectedCatalog.status).toBe(401);
 
     const configUrl = new URL(server.configUrl as string);
     const authorization = `Bearer ${configUrl.hash.slice(1)}`;
@@ -56,6 +56,19 @@ describe('global launcher mode', () => {
       'x-dodo-workspace': initial.controlContext.workspaceId,
       'x-dodo-epoch': initial.controlContext.epoch,
     };
+
+    const registered = addStaticClient(server.services.store, { name: 'unassigned fixture', redirectUris: ['https://example.test/callback'] });
+    const managedResponse = await fetch(`${configUrl.origin}/api/clients/manage`, { headers });
+    expect(managedResponse.status).toBe(200);
+    const managed = await managedResponse.json() as { clients: Array<{ id: string; reviewHash: string }> };
+    const reviewed = managed.clients.find((client) => client.id === registered.clientId);
+    expect(reviewed).toBeDefined();
+    const deleted = await fetch(`${configUrl.origin}/api/clients/delete`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ clients: [{ id: registered.clientId, reviewHash: reviewed!.reviewHash }], confirm: 'delete-selected-clients' }),
+    });
+    expect(deleted.status).toBe(200);
+    expect(server.services.store.getOAuthClient(registered.clientId)).toBeUndefined();
 
     const unauthorized = await fetch(`${configUrl.origin}/api/workspace/switch`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: project }) });
     expect(unauthorized.status).toBe(401);

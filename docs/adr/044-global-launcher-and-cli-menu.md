@@ -18,7 +18,8 @@ mode และใช้ private inert directory ใต้ config directory เ�
 
 - ไม่มี active AI workspace
 - `/healthz` รายงาน `workspaceSelected=false`
-- MCP/OAuth public data plane ตอบ 503 `workspace_required`
+- OAuth installation login และ authenticated tool catalog ใช้ได้ก่อนเลือก workspace;
+  tool operation ไม่มี authority จน owner เพิ่ม real project; managed mode ต้องมี ACL เพิ่ม
 - Local Config ยัง bind loopback และให้ owner เพิ่ม/เลือก absolute path
 - private launcher root ไม่ปรากฏใน UI หรือ client response
 
@@ -28,7 +29,7 @@ in-flight drain, running-job refusal, resource teardown และ fresh workspac
 data plane หากล้มเหลว launcher ยังคงปิด data plane ไม่มี half-switched state
 
 `dodo --cli` เป็น terminal menu ที่เรียก owner operations เดิม ไม่ใช่ MCP tool
-เมนูไม่เปลี่ยน trust, ACL, OAuth grant หรือ OS permission เมนูเริ่มปกติเรียก hidden
+เมนูไม่เปลี่ยน OAuth grant, access mode หรือ OS permission เมนูเริ่มปกติเรียก hidden
 run-scoped Tunnel prompt เดียวกับ `dodo start` ส่วนเมนู local-only ส่ง override สำหรับ
 รอบนั้น Token ไม่ผ่าน readline menu, argv, config หรือ OS credential provider
 

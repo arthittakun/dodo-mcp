@@ -21,7 +21,7 @@ function use(ctx: ToolCtx) {
 
 const runtimeSessionOpenTool = defineTool({
   name: 'runtime_session_open', title: 'Open a durable runtime evidence session',
-  description: 'Open a caller/workspace-scoped runtime session that persists across MCP reconnects and server restarts. This opens no process, browser, network, desktop, microphone or system audio by itself. Handles expire and live OAuth/workspace ACL is rechecked on every use.',
+  description: 'Open a caller/workspace-scoped runtime session that persists across MCP reconnects and server restarts. This opens no process, browser, network, desktop, microphone or system audio by itself. Handles expire and live OAuth/target authority is rechecked on every use.',
   input: { label: z.string().min(1).max(160), ttlMinutes: z.number().int().min(1).max(24 * 60).default(60) }, output: RuntimeSession,
   requiredScope: 'dodo:write', action: 'plan', annotations: plan,
   handler: async (args, ctx) => ({ data: use(ctx).open(ctx, args.label, args.ttlMinutes) }),

@@ -337,6 +337,14 @@
       "minimum": 1,
       "maximum": 365
     },
+    "accessMode": {
+      "default": "personal",
+      "type": "string",
+      "enum": [
+        "personal",
+        "managed"
+      ]
+    },
     "toolSurface": {
       "type": "string",
       "enum": [
@@ -344,6 +352,10 @@
         "full",
         "hybrid"
       ]
+    },
+    "exposeSubagentsToMcp": {
+      "default": false,
+      "type": "boolean"
     },
     "tunnel": {
       "default": {
@@ -476,6 +488,8 @@
     "lsp",
     "envAllowlist",
     "logRetentionDays",
+    "accessMode",
+    "exposeSubagentsToMcp",
     "tunnel",
     "dangerouslyAllowInsecurePublicUrl"
   ],

@@ -1,3 +1,4 @@
+import { InstallationRuntime } from './installationRuntime.js';
 import { instructionsFor } from './instructions.js';
 import { McpServer, type McpServerFactory } from '@modelcontextprotocol/server';
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
@@ -54,12 +55,15 @@ export async function startStdioServer(opts: StdioOptions): Promise<RunningStdio
   attachOptionalServices(ws, log);
   ws.services.localPrincipal = { ...STDIO_PRINCIPAL, scopes: [...STDIO_PRINCIPAL.scopes] };
 
+  const installation = new InstallationRuntime(ws, () => ws, async target => startOwnerControl(target, createIpcDispatcher({ ws: target, transport: { kind: 'stdio', port: 0, locked: false, publicUrl: null }, requestStop: () => void close() })), log);
+
   // STDIO keeps the FULL per-tool catalog by default: local clients (Codex,
   // Claude Code, Cursor) rely on the individual tool contract (ADR-029).
   const surface: ToolSurface = opts.toolSurface ?? ws.config.toolSurface ?? 'full';
+  const surfaceFeatures = { subagents: ws.config.exposeSubagentsToMcp };
   const factory: McpServerFactory = () => {
-    const server = new McpServer({ name: 'dodo', version: DODO_VERSION, title: 'DODO workspace server (stdio)' }, { instructions: instructionsFor(surface) });
-    registerSurface(server, ws.services, surface);
+    const server = new McpServer({ name: 'dodo', version: DODO_VERSION, title: 'DODO workspace server (stdio)' }, { instructions: instructionsFor(surface, surfaceFeatures) });
+    registerSurface(server, ws.services, surface, surfaceFeatures);
     return server;
   };
   const handle = serveStdio(factory, {
@@ -86,6 +90,7 @@ export async function startStdioServer(opts: StdioOptions): Promise<RunningStdio
         try { await handle.close(); } catch { /* transport may already be gone */ }
         await jobsClosed;
         await ownerControl.close();
+        await installation.close();
         await ws.shutdownServices();
         opts.onStopped?.();
       })();
@@ -94,8 +99,8 @@ export async function startStdioServer(opts: StdioOptions): Promise<RunningStdio
   }
 
   {
-    const stats = surfaceStats(surface);
-    log(`[dodo] mcp tool surface | transport=stdio | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes}`);
+    const stats = surfaceStats(surface, surfaceFeatures);
+    log(`[dodo] mcp tool surface | transport=stdio | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'}`);
   }
   log(`[dodo] stdio  |  workspace ${ws.rootInfo.root}  |  ${ws.workspaceId}  |  policy ${ws.services.trustMode()}  |  state ${ws.configDir}`);
   return { root: ws.rootInfo.root, workspaceId: ws.workspaceId, epoch: ws.epoch, ipcPath, close };

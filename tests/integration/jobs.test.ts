@@ -149,15 +149,15 @@ describe('JOB: execution, approvals, output, cancel', () => {
     expect(errCode(res.envelope)).toBe('NOT_FOUND');
   });
 
-  it('JOB-13: concurrency limit is enforced', async () => {
-    ctx.server.services.store.db.exec('SELECT 1'); // touch
-    const started: string[] = [];
-    for (let i = 0; i < 4; i++) {
-      const r = await callToolLegacy(ctx, tokens.accessToken, 'exec_command', { ...wsArgs(ctx), program: 'node', args: ['loop.js'], idempotencyKey: `k-conc-${i}-aaaa` });
-      if (!r.isError) started.push(data(r.envelope)['jobId'] as string);
-    }
-    const over = await callToolLegacy(ctx, tokens.accessToken, 'exec_command', { ...wsArgs(ctx), program: 'node', args: ['loop.js'], idempotencyKey: 'k-conc-over-1' });
-    expect(errCode(over.envelope)).toBe('RESOURCE_LIMIT');
+  it('JOB-13: batch concurrency limit is enforced before any process starts', async () => {
+    const tooMany = await callToolLegacy(ctx, tokens.accessToken, 'run_commands', { ...wsArgs(ctx), commands: Array.from({length:5}, () => ({command:'node loop.js'})), waitMs:1000 });
+    expect(errCode(tooMany.envelope)).toBe('RESOURCE_LIMIT');
+    expect(ctx.server.services.jobs.runningCount()).toBe(0);
+    const batch = await callToolLegacy(ctx, tokens.accessToken, 'run_commands', { ...wsArgs(ctx), commands: Array.from({length:4}, () => ({command:'node loop.js'})), waitMs:1000 });
+    expect(batch.isError).toBe(false);
+    const started = (data(batch.envelope)['results'] as Array<{jobId:string}>).map(r=>r.jobId);
+    expect(started).toHaveLength(4);
+    expect(ctx.server.services.jobs.runningCount()).toBe(4);
     for (const jobId of started) await callToolLegacy(ctx, tokens.accessToken, 'job_cancel', { ...wsArgs(ctx), jobId });
   });
 });

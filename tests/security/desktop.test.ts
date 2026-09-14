@@ -121,6 +121,18 @@ describe('desktop MCP authorization and private owner controls (fake OS adapter 
             await ctx.cleanup();
         }
     });
+    it('reuses persistent native-app consent across projects and revokes it installation-wide', async () => {
+        const { ctx } = await fixture();
+        try {
+            const other = new DesktopService(ctx.server.services.store, 'ws_other_project', 'other-epoch', new FakeDesktop());
+            ctx.server.services.desktop.setPolicy({ mode: 'control', allowedApps: enable.allowedApps, persistent: true });
+            expect(other.policy()).toMatchObject({ mode: 'control', persistent: true, epoch: 'other-epoch' });
+            other.setPolicy({ mode: 'off' });
+            expect(ctx.server.services.desktop.policy()).toMatchObject({ mode: 'off', persistent: false });
+        } finally {
+            await ctx.cleanup();
+        }
+    });
     it.skipIf(process.platform !== 'darwin')('persistent owner CLI grants on macOS take effect live, retain OAuth scopes and forget on offline-capable disable', async () => {
         const { ctx, t, backend } = await fixture();
         try {

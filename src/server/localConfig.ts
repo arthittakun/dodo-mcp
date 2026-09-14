@@ -1,3 +1,4 @@
+import { registerAIAdmin } from './aiAdmin.js';
 import http from 'node:http';
 import { reviewClientDeletion, deleteReviewedClients, DeleteClientsInput } from '../auth/clientDeletion.js';
 import fs from 'node:fs';
@@ -13,6 +14,7 @@ import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
 import { ProjectRegistry } from '../projects/registry.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
+import { accessMode } from '../security/accessMode.js';
 
 /**
  * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
@@ -83,11 +85,14 @@ function loadAsset(name: string): Buffer {
 }
 
 function localClients(ws: BootstrappedWorkspace) {
+  const personal = accessMode(ws.store) === 'personal';
   return ws.store.listOAuthClients().map((c) => ({
     id: c.clientId,
     name: typeof c.payload['client_name'] === 'string' ? c.payload['client_name'] : null,
     public: c.payload['token_endpoint_auth_method'] === 'none',
-    scopes: ws.store.clientAccess(ws.workspaceId, c.clientId),
+    scopes: personal
+      ? [...new Set(ws.store.listGrants().filter(g => g.clientId === c.clientId && g.revokedAt === null).flatMap(g => g.scopes))]
+      : ws.store.clientAccess(ws.workspaceId, c.clientId),
   }));
 }
 
@@ -98,6 +103,8 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   const token = randomBytes(32).toString('hex');
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
+  // Fail fast at startup when the shipped UI is incomplete (broken install).
+  for (const critical of ['workbench.js', 'workbench.css', 'ui/dom.js', 'ui/tooltips.js', 'ui/alerts.js', 'vendor/sweetalert2.min.js', 'vendor/sweetalert2.min.css']) loadAsset(critical);
 
   const app = express();
   app.disable('x-powered-by');
@@ -127,10 +134,31 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     next();
   });
 
-  // ---- static UI (no inline code; CSP 'self') ----
+  // ---- static UI (no inline code; CSP 'self'; SweetAlert2 vendored, no CDN) ----
+  // Assets live only in dist/server/configUi (flat files plus the ui/ and
+  // vendor/ subdirectories). The route is fail-closed: decoded path must match
+  // a strict shape (at most one directory segment, allowlisted extension), and
+  // the resolved file must stay inside UI_DIR. Anything else is 404.
+  const ASSET_TYPES: Record<string, string> = {
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.svg': 'image/svg+xml',
+  };
+  const ASSET_SHAPE = /^(?:[A-Za-z0-9_-]+\/)?[A-Za-z0-9_-][A-Za-z0-9_.-]*(\.css|\.js|\.svg)$/;
   app.get('/', (_req, res) => res.type('html').send(assets.html));
-  app.get('/assets/app.css', (_req, res) => res.type('text/css').send(assets.css));
-  app.get('/assets/app.js', (_req, res) => res.type('text/javascript').send(assets.js));
+  app.use('/assets', (req, res) => {
+    if (req.method !== 'GET') { res.status(404).end(); return; }
+    let relative = '';
+    try { relative = decodeURIComponent(req.path.replace(/^\/+/, '')); } catch { res.status(404).end(); return; }
+    const match = ASSET_SHAPE.exec(relative);
+    if (!match || relative.includes('..') || relative.includes('\\') || relative.includes('\0')) { res.status(404).end(); return; }
+    const file = path.resolve(UI_DIR, relative);
+    if (!file.startsWith(UI_DIR + path.sep)) { res.status(404).end(); return; }
+    let body: Buffer;
+    try { body = fs.readFileSync(file); } catch { res.status(404).end(); return; }
+    res.setHeader('Content-Type', ASSET_TYPES[match[1] as string] ?? 'application/octet-stream');
+    res.send(body);
+  });
 
   // ---- capability check + flood bound for the API ----
   let attempts = 0;
@@ -153,6 +181,8 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     next();
   });
   app.use('/api', express.json({ limit: 32 * 1024 }));
+
+  registerAIAdmin(app, host, info, expiresAt);
 
   // Bind every mutation to the workspace the owner actually reviewed.
   app.use('/api', (req, res, next) => {
@@ -188,6 +218,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       schedules: selected ? ws.services.schedules.list() : [],
       desktop: selected ? { policy: ws.services.desktop.policy() } : null,
       permissions: selected ? {
+        accessMode: accessMode(ws.store),
         savedMode: ws.store.trustMode(ws.workspaceId),
         effectiveMode: ws.services.trustMode(),
         override: info.runMode ?? null,
@@ -236,7 +267,6 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
 
   app.get('/api/clients/manage', (req, res) => {
     const ws = host.current();
-    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before reviewing clients.', code: 'WORKSPACE_REQUIRED' }); return; }
     if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
       res.status(409).json({error:'Workspace changed. Refresh before reviewing clients.',code:'STALE_WORKSPACE'}); return;
     }
@@ -273,13 +303,16 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     }
   });
 
-  app.post('/api/projects/remove', (req, res) => {
+  app.post('/api/projects/remove', async (req, res) => {
     const input = z.object({ projectId: z.string().min(1).max(96), confirmProjectId: z.string().min(1).max(96) }).strict().safeParse(req.body);
     if (!input.success || input.data.projectId !== input.data.confirmProjectId) {
       res.status(400).json({ error: 'Project removal requires the exact reviewed project ID.', code: 'INVALID_INPUT' }); return;
     }
     try {
       const ws = host.current();
+      await ws.services.installation?.closeProject(input.data.projectId);
+      const registered = new ProjectRegistry(ws.store).list().find(p => p.projectId === input.data.projectId);
+      if (registered?.workspaceId === ws.workspaceId && (ws.services.jobs.runningCount() || ws.services.installation?.busy(ws.workspaceId))) throw new DodoError('CONFLICT', 'project has active jobs or agents');
       const project = new ProjectRegistry(ws.store).remove(input.data.projectId);
       const cfg = loadGlobalConfig(ws.paths.configFile);
       if (cfg.startupProjectId === project.projectId) {
@@ -295,7 +328,6 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   });
   app.post('/api/clients/delete', (req, res) => {
     const ws = host.current();
-    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before deleting clients.', code: 'WORKSPACE_REQUIRED' }); return; }
     res.json(deleteReviewedClients(ws.store,DeleteClientsInput.parse(req.body),ws.workspaceId));
   });
 

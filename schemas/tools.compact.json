@@ -1,27 +1,42 @@
 {
-  "$comment": "GENERATED from src/tools — do not edit by hand. Compact gateway surface (default for HTTP); every operation routes through the full tool contract in tools.json.",
+  "$comment": "GENERATED from src/tools — do not edit by hand. Complete Compact capability contract; the default live surface filters optional operation enums according to optionalMcpFeatures.",
   "version": 1,
   "toolCount": 19,
-  "fullToolCount": 121,
+  "defaultLiveToolCount": 19,
+  "fullToolCount": 125,
+  "defaultLiveFullToolCount": 121,
+  "optionalMcpFeatures": {
+    "subagents": {
+      "configKey": "exposeSubagentsToMcp",
+      "default": false,
+      "restartRequired": true,
+      "operations": [
+        "subagent_spawn",
+        "subagent_status",
+        "subagent_result",
+        "subagent_control"
+      ]
+    }
+  },
   "stats": {
     "compact": {
       "toolCount": 19,
-      "schemaBytes": 49071
+      "schemaBytes": 52317
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 116551
+      "schemaBytes": 124657
     },
     "full": {
-      "toolCount": 121,
-      "schemaBytes": 415361
+      "toolCount": 125,
+      "schemaBytes": 443030
     }
   },
   "tools": [
     {
       "name": "project_overview",
       "title": "Project overview",
-      "description": "Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects for which this client has live read ACL. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first. This connection uses the COMPACT tool surface: capabilities are invoked through dodo_* gateway tools; call dodo_discover to find an operation and its exact schema.",
+      "description": "Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects this client may read under the current personal/managed access mode. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first. This connection uses the COMPACT tool surface: capabilities are invoked through dodo_* gateway tools; call dodo_discover to find an operation and its exact schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -33,6 +48,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "projectId": {
             "description": "Optional owner-registered project ID for read-only federation; omit to use the active workspace",
             "type": "string",
@@ -153,6 +173,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -343,6 +368,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -527,6 +557,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -702,6 +737,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -865,6 +905,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1020,6 +1065,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1176,6 +1226,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1332,6 +1387,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1469,7 +1529,7 @@
     {
       "name": "dodo_assist_read",
       "title": "Coding-task analysis",
-      "description": "Gateway: goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, runtime_session_status, runtime_task_observe, runtime_snapshot, runtime_evidence, runtime_diagnose, agent_run_status, agent_read, agent_snapshot_create, agent_snapshot_compare, agent_skill_search, agent_skill_inspect, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: goal-driven context, owner-reviewed memory, static analysis, symbol reads and source-verified project graph queries. Set operation to one of: subagent_status, subagent_result, context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, runtime_session_status, runtime_task_observe, runtime_snapshot, runtime_evidence, runtime_diagnose, agent_run_status, agent_read, agent_snapshot_create, agent_snapshot_compare, agent_skill_search, agent_skill_inspect, brain_status, brain_query, brain_symbol. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1479,6 +1539,8 @@
       },
       "domain": "code",
       "operations": [
+        "subagent_status",
+        "subagent_result",
         "context_for_task",
         "analyze_impact",
         "read_symbol",
@@ -1507,6 +1569,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1522,6 +1589,8 @@
           "operation": {
             "type": "string",
             "enum": [
+              "subagent_status",
+              "subagent_result",
               "context_for_task",
               "analyze_impact",
               "read_symbol",
@@ -1666,7 +1735,7 @@
     {
       "name": "dodo_assist_change",
       "title": "Refactor previews and verification",
-      "description": "Gateway: preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: preview_refactor, verify_changes, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, agent_run_open, agent_plan_set, agent_hypothesis_open, agent_intent_acquire, agent_intent_release, agent_hypothesis_judge, agent_skill_propose, agent_run_control, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: preview-only refactors, memory/learning proposals, explicit verification and owner-controlled Project Brain maintenance. Set operation to one of: subagent_spawn, subagent_control, preview_refactor, verify_changes, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, agent_run_open, agent_plan_set, agent_hypothesis_open, agent_intent_acquire, agent_intent_release, agent_hypothesis_judge, agent_skill_propose, agent_run_control, brain_rebuild, brain_pause, brain_cancel. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -1676,6 +1745,8 @@
       },
       "domain": "code",
       "operations": [
+        "subagent_spawn",
+        "subagent_control",
         "preview_refactor",
         "verify_changes",
         "memory_propose",
@@ -1698,6 +1769,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1713,6 +1789,8 @@
           "operation": {
             "type": "string",
             "enum": [
+              "subagent_spawn",
+              "subagent_control",
               "preview_refactor",
               "verify_changes",
               "memory_propose",
@@ -1884,6 +1962,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2057,6 +2140,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2214,6 +2302,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2368,6 +2461,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2521,6 +2619,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2674,6 +2777,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2827,6 +2935,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2980,6 +3093,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,

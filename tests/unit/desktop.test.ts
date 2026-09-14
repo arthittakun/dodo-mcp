@@ -20,7 +20,7 @@ describe('desktop permission, snapshots and receipts', () => {
     it('allows bounded status without screen reads and reports missing helper', async () => { backend.installed = false; expect((await service.status()).permissions).toBeNull(); expect(backend.calls).toEqual([]); });
     it('requires exact apps and bounded local lifetime; never accepts wildcard or empty apps', () => { expect(() => service.setPolicy({ mode: 'control', allowedApps: ['*'] })).toThrow(); expect(() => service.setPolicy({ mode: 'control', allowedApps: [] })).toThrow(); expect(() => service.setPolicy({ mode: 'view', allowedApps: [win.appId], minutes: 481 })).toThrow(); });
     it('expires, revokes and does not carry authorization to another boot or workspace', async () => { allow(); expect((await service.windows()).windows).toEqual([win]); const reboot = new DesktopService(store, 'ws_test', 'epoch-b', backend, () => now); expect(reboot.policy().mode).toBe('off'); const other = new DesktopService(store, 'ws_other', 'epoch-a', backend, () => now); expect(other.policy().mode).toBe('off'); now += 60001; await expect(service.windows()).rejects.toMatchObject({ code: 'FORBIDDEN' }); });
-    it('remembers explicit consent across boots and time, only for the same workspace', async () => {
+    it('remembers explicit consent across boots, time and registered workspaces in this installation', async () => {
         service.setPolicy({ mode: 'control', allowedApps: [win.appId], persistent: true });
         const oldCapture = await service.capture(42, 800, false, identity);
         now += 365 * 24 * 60 * 60000;
@@ -29,7 +29,7 @@ describe('desktop permission, snapshots and receipts', () => {
         expect((await reboot.windows()).windows).toEqual([win]);
         await expect(reboot.accessibility(oldCapture.data.snapshotId, identity)).rejects.toMatchObject({ code: 'STALE_WORKSPACE' });
         const other = new DesktopService(store, 'ws_other', 'epoch-b', backend, () => now);
-        await expect(other.windows()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+        expect((await other.windows()).windows).toEqual([win]);
     });
     it('keeps snapshots at 30 seconds even when app consent never expires', async () => {
         service.setPolicy({ mode: 'view', allowedApps: [win.appId], persistent: true });
@@ -61,13 +61,13 @@ describe('desktop permission, snapshots and receipts', () => {
         await expect(service.action(c.data.snapshotId, { kind: 'focus' }, 'old-revision', identity, () => undefined)).rejects.toMatchObject({ code: 'STALE_WORKSPACE' });
         expect(backend.calls.filter(c => c['op'] === 'action')).toHaveLength(0);
     });
-    it('a temporary grant replaces remembered consent and does not revive it when expired', async () => {
+    it('a temporary grant can narrow remembered consent and the installation grant resumes after expiry', async () => {
         service.setPolicy({ mode: 'control', allowedApps: [win.appId], persistent: true });
         allow('view');
         expect(service.policy().persistent).toBe(false);
         now += 60001;
-        expect(service.policy().mode).toBe('off');
-        expect(new DesktopService(store, 'ws_test', 'epoch-b', backend, () => now).policy().mode).toBe('off');
+        expect(service.policy()).toMatchObject({ mode: 'control', persistent: true });
+        expect(new DesktopService(store, 'ws_test', 'epoch-b', backend, () => now).policy()).toMatchObject({ mode: 'control', persistent: true });
     });
     it('rejects ambiguous duration and malformed saved consent; legacy grants remain temporary', () => {
         expect(() => service.setPolicy({ mode: 'control', allowedApps: [win.appId], persistent: true, minutes: 60 })).toThrow();

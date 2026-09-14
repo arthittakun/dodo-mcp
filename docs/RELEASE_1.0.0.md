@@ -13,13 +13,15 @@ dodo --version
 
 - MCP HTTP + OAuth และ Local Config แบบ loopback
 - `dodo --cli` interactive owner menu และ global launcher ที่ไม่ใช้ CWD เป็น workspace
-- startup project จาก owner registry; หากยังไม่เลือก MCP/OAuth ปฏิเสธด้วย `workspace_required`
+- startup project จาก owner registry; OAuth installation login และ catalog ใช้ได้ก่อน
+  เลือกโปรเจกต์ Personal mode พร้อมใช้หลัง owner เพิ่ม path ส่วน managed mode เพิ่ม ACL
 - Compact HTTP surface 19 tools
-- Full STDIO surface 121 tools
+- Complete capability catalog 125 tools; Full STDIO ค่าเริ่มต้นแสดง 121 และ owner เปิด Sub-agent MCP exposure แล้วเป็น 125
 - Hybrid surface 49 tools
 - direct coding tools, gateway dispatch และ operation discovery
 - workspace switching จาก Local Config พร้อม readiness และ rollback
-- OAuth scopes, workspace ACL, trust, approval, path/secret guards และ audit
+- Personal mode แบบเพิ่มแล้วใช้ได้ทันที และ managed mode สำหรับ workspace ACL/trust แบบละเอียด
+- OAuth scopes, workspace context, approval, path/secret guards และ audit
 - file changes แบบ hash-verified, journaled และ rollback ได้
 - jobs, Git, semantic tools, LSP และ task assistance
 - multimodal, browser, game, workflow และ schedule tools ตาม prerequisite
@@ -27,7 +29,7 @@ dodo --version
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
 - Cloudflare Tunnel แบบ process-owned พร้อม run-scoped token จาก hidden terminal prompt หรือ Local Config, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
 - `dodo start` เปิด tunnel พร้อม MCP ในรอบเดียว; `--no-tunnel` เปิด local-only และ token ไม่ถูกบันทึกลงเครื่อง
-- owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม target ACL, readiness, source hash และ target-scoped audit
+- owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม live target authority, readiness, source hash และ target-scoped audit
 - Universal Resource Layer + private SHA-256 CAS พร้อม bounded range/resume,
   deterministic extraction และ MCP image/audio preview
 - Project Brain แบบ incremental พร้อม AST symbols/references/import graph,

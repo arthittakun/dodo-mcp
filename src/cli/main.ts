@@ -17,6 +17,7 @@ import { mintWorkspaceId } from '../workspace/identity.js';
 import { openDatabase, openDatabaseReadonly } from '../store/db.js';
 import { Store, type TrustMode } from '../store/store.js';
 import { ipcCall, IpcError } from '../ipc/client.js';
+import { installationIpcCall } from '../ipc/installationClient.js';
 import { formatTerminalLine } from './terminal.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
 import { DodoError } from '../errors.js';
@@ -27,6 +28,7 @@ import { INPUT_LIMIT_PROFILES } from '../config/limits.js';
 import { ProjectRegistry, type RegisteredProject } from '../projects/registry.js';
 import { runCliMenu } from './menu.js';
 import { TunnelRuntime } from '../tunnel/runtime.js';
+import { INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
 
 const program = new Command();
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
@@ -62,6 +64,12 @@ function workspaceIpcPath(root?: string): { ipcPath: string; root: string } {
 async function ipcForCwd(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   const { ipcPath } = workspaceIpcPath();
   return ipcCall(ipcPath, cmd, args);
+}
+
+/** OAuth identity belongs to the installation, not the shell's CWD. */
+async function ipcForInstallation(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
+  const { dir } = resolveConfigDir(process.env);
+  return installationIpcCall(dir, cmd, args);
 }
 
 function printJsonOrLines(json: boolean, data: unknown, lines: () => string[]): void {
@@ -986,13 +994,15 @@ auth
   .option('--json', 'machine-readable output', false)
   .action(async (opts: { json: boolean }) => {
     try {
-      const rows = (await ipcForCwd('auth.pending')) as Array<{
+      const rows = (await ipcForInstallation('auth.pending')) as Array<{
         id: string;
         phrase: string;
         clientId: string;
         redirectUri: string;
         scopes: string;
-        workspaceRoot: string;
+        authorizationTarget: 'installation';
+        accessMode: 'personal' | 'managed';
+        workspaceRoot: null;
       }>;
       printJsonOrLines(opts.json, rows, () =>
         rows.length === 0
@@ -1003,7 +1013,9 @@ auth
               `client:   ${r.clientId}`,
               `callback: ${r.redirectUri}`,
               `scopes:   ${r.scopes}`,
-              `grants:   workspace ${r.workspaceRoot}`,
+              r.accessMode === 'personal'
+                ? 'access:   registered projects, bounded by these OAuth scopes (personal mode)'
+                : 'access:   installation login only; assign project scopes later in Local Config (managed mode)',
               `approve:  dodo auth approve -- ${r.id}`,
               '',
             ]),
@@ -1019,7 +1031,7 @@ auth
   .description('approve a pending OAuth authorization request')
   .action(async (id: string) => {
     try {
-      await ipcForCwd('auth.approve', { id });
+      await ipcForInstallation('auth.approve', { id });
       console.log(`approved: ${id}`);
       console.log('The browser page will now finish the sign-in automatically.');
     } catch (err) {
@@ -1033,7 +1045,7 @@ auth
   .description('deny a pending OAuth authorization request')
   .action(async (id: string) => {
     try {
-      await ipcForCwd('auth.deny', { id });
+      await ipcForInstallation('auth.deny', { id });
       console.log(`denied: ${id}`);
     } catch (err) {
       if (err instanceof IpcError) fail(err.message, 2);
@@ -1047,11 +1059,12 @@ auth
   .option('--json', 'machine-readable output', false)
   .action(async (opts: { json: boolean }) => {
     try {
-      const rows = (await ipcForCwd('auth.grants')) as Array<{
+      const rows = (await ipcForInstallation('auth.grants')) as Array<{
         grantId: string;
         clientId: string;
         scopes: string[];
         thisWorkspace: boolean;
+        installationIdentity: boolean;
         revokedAt: number | null;
       }>;
       printJsonOrLines(opts.json, rows, () =>
@@ -1059,7 +1072,7 @@ auth
           ? ['no grants']
           : rows.map(
               (g) =>
-                `${g.grantId}  client=${g.clientId}  scopes=${g.scopes.join(',')}  ${g.thisWorkspace ? '(this workspace)' : '(other workspace)'}${g.revokedAt ? '  REVOKED' : ''}`,
+                `${g.grantId}  client=${g.clientId}  scopes=${g.scopes.join(',')}  ${g.installationIdentity ? '(installation identity)' : g.thisWorkspace ? '(this workspace)' : '(legacy workspace identity)'}${g.revokedAt ? '  REVOKED' : ''}`,
             ),
       );
     } catch (err) {
@@ -1073,7 +1086,7 @@ auth
   .description('revoke a grant immediately (access + refresh tokens die with it)')
   .action(async (grantId: string) => {
     try {
-      await ipcForCwd('auth.revoke', { grantId });
+      await ipcForInstallation('auth.revoke', { grantId });
       console.log(`revoked: ${grantId}`);
     } catch (err) {
       if (err instanceof IpcError) fail(err.message, 2);
@@ -1211,21 +1224,21 @@ lsp
   });
 
 // Only local owner commands can save desktop consent. No running server is
-// needed for persistent grants or revocation. Active services read this store
-// before every call and reject snapshots/approvals from an older revision.
-function saveDesktopPolicyForCwd(input: unknown) {
+// needed for persistent grants or revocation. Persistent native-app consent is
+// installation-wide; active services still bind snapshots/receipts to their
+// workspace and re-check OAuth, trust and current policy before every call.
+function saveInstallationDesktopPolicy(input: unknown) {
   const args = DesktopPolicyInputSchema.parse(input);
-  const rootInfo = resolveWorkspaceRoot(invokedCwd, {});
   const { dir } = resolveConfigDir(process.env);
   ensureConfigDir(dir);
   const db = openDatabase(statePaths(dir).dbFile);
   try {
     const store = new Store(db);
-    const policy = db.transaction(() => {
-      const wsId = mintWorkspaceId(store.installSecret(), rootInfo.root);
-      return saveDesktopPolicy(store, wsId, 'local-cli', args, Date.now());
-    })();
-    return { root: rootInfo.root, policy };
+    // A CWD-independent owner command may be the first command used with a
+    // fresh state directory. Initialize the installation identity just as a
+    // normal server bootstrap would, without creating a workspace identity.
+    store.installSecret();
+    return db.transaction(() => saveDesktopPolicy(store, INSTALLATION_AUTHORITY_ID, 'local-cli', args, Date.now()))();
   } finally {
     db.close();
   }
@@ -1246,7 +1259,7 @@ desktop.command('setup')
     const { dir } = resolveConfigDir(process.env); ensureConfigDir(dir);
     const result = await setupNativeDesktop(dir, opts.requestPermissions);
     console.log(JSON.stringify(result, null, 2));
-    console.log('OS setup does not change desktop grants. To save app access for this workspace: dodo desktop allow --app <app-id> --mode control --persist --yes');
+    console.log('OS setup does not change DODO access. To allow a named app once for this installation: dodo desktop allow --app <app-id> --mode control --persist --yes');
     console.log(process.platform === 'win32'
       ? 'Windows: use dodo desktop apps for exact IDs. An unlocked interactive session is required; no UAC/secure desktop bypass.'
       : process.platform === 'linux'
@@ -1256,11 +1269,11 @@ desktop.command('setup')
 desktop.command('status').description('show desktop permission and helper status for this running workspace')
   .action(async () => console.log(JSON.stringify(await ipcForCwd('desktop.status'), null, 2)));
 desktop.command('allow')
-  .description('permit named apps for this workspace; --persist saves consent across restarts, even while stopped')
+  .description('permit named apps; --persist remembers consent once for this DODO installation')
   .requiredOption('--app <bundleIds...>', 'exact macOS bundle IDs or win.<hash>/linux.<hash> IDs from dodo desktop apps')
   .option('--mode <mode>', 'view | control', 'view')
   .option('--minutes <n>', 'temporary permission lifetime 1..480 minutes (default 60); excludes --persist', (v: string) => Number(v))
-  .option('--persist', 'remember this workspace app grant until disabled; no running server required', false)
+  .option('--persist', 'remember this app grant for the DODO installation until disabled', false)
   .option('--yes', 'acknowledge that screen/UI access can expose data and affect apps outside the workspace', false)
   .action(async (opts: { app: string[]; mode: string; minutes?: number; persist: boolean; yes: boolean }) => {
     if (!['view', 'control'].includes(opts.mode)) fail('desktop mode must be view or control');
@@ -1275,21 +1288,20 @@ desktop.command('allow')
     }
     const input = { mode: opts.mode, allowedApps: opts.app, persistent: opts.persist, ...(opts.minutes !== undefined ? { minutes: opts.minutes } : {}) };
     if (opts.persist) {
-      const saved = saveDesktopPolicyForCwd(input);
-      console.log(JSON.stringify(saved.policy, null, 2));
-      console.log(`Remembered until disabled for: ${saved.root}`);
-      console.log('Run dodo in this folder. A running server picks this up immediately; other workspace paths are unchanged.');
+      const saved = saveInstallationDesktopPolicy(input);
+      console.log(JSON.stringify(saved, null, 2));
+      console.log('Remembered until disabled for this DODO installation. Every project reuses this native-app consent.');
     } else {
       console.log(JSON.stringify(await ipcForCwd('desktop.policy', input), null, 2));
       console.log('Temporary grant: resets on restart/workspace switch. Use --persist instead of --minutes to remember it.');
     }
     console.log('Revoke and forget: dodo desktop disable (or the private Local Config stop button).');
   });
-desktop.command('disable').description('revoke and forget this workspace desktop grant, even while the server is stopped')
+desktop.command('disable').description('revoke and forget installation-wide desktop consent, even while the server is stopped')
   .action(() => {
-    const saved = saveDesktopPolicyForCwd({ mode: 'off' });
-    console.log(JSON.stringify(saved.policy, null, 2));
-    console.log(`Desktop access disabled and forgotten for: ${saved.root}`);
+    const saved = saveInstallationDesktopPolicy({ mode: 'off' });
+    console.log(JSON.stringify(saved, null, 2));
+    console.log('Desktop access disabled and forgotten for this DODO installation.');
   });
 
 // Static-client helpers are imported lazily to keep CLI startup light.

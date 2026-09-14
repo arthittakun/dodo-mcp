@@ -296,6 +296,9 @@ export class ProjectRegistry {
     const current = this.get(projectId);
     try {
       const tx = this.store.db.transaction(() => {
+        const job = this.store.db.prepare("SELECT 1 FROM jobs WHERE workspace_id=? AND status='running' LIMIT 1").get(current.workspaceId);
+        const agent = this.store.db.prepare("SELECT 1 FROM ai_runs WHERE workspace_id=? AND status NOT IN ('completed','failed','canceled') LIMIT 1").get(current.workspaceId);
+        if (job || agent) throw new DodoError('CONFLICT','project has unfinished jobs or agent runs; finish or cancel them before removal');
         const now = Date.now();
         const changed = this.store.db.prepare('UPDATE project_registry SET removed_at = ?, updated_at = ? WHERE id = ? AND removed_at IS NULL').run(now, now, projectId);
         if (changed.changes !== 1) throw new DodoError('CONFLICT', 'project registry changed concurrently; refresh and retry');

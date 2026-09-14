@@ -32,7 +32,7 @@ export class DesktopService {
     async status() {
         return this.exclusive(async () => {
             if (this.closed) throw new DodoError('STALE_WORKSPACE', 'desktop service closed');
-            return { policy: this.policy(), supported: ['darwin', 'win32', 'linux'].includes(process.platform), helperInstalled: this.backend.available(), permissions: this.backend.available() ? NativeStatusSchema.parse(await this.backend.run({ op: 'status' })) : null, setup: 'dodo setup --components desktop; dodo desktop allow --app <app-id> --mode view|control --yes', scope: 'dodo:exec', coordinateSpace: 'captured-image pixels; window-only', snapshotTtlMs: 30_000 };
+            return { policy: this.policy(), supported: ['darwin', 'win32', 'linux'].includes(process.platform), helperInstalled: this.backend.available(), permissions: this.backend.available() ? NativeStatusSchema.parse(await this.backend.run({ op: 'status' })) : null, setup: 'dodo setup --components desktop; dodo desktop allow --app <app-id> --mode view|control --persist --yes', scope: 'dodo:exec', coordinateSpace: 'captured-image pixels; window-only', snapshotTtlMs: 30_000 };
         });
     }
     private authorize(control = false): DesktopPolicy {

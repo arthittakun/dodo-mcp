@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { defineTool } from './context.js';
 import { DodoError } from '../errors.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
+import { accessMode } from '../security/accessMode.js';
 
 const looseData = z.looseObject({});
 const projectIdInput = z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional()
@@ -11,7 +12,7 @@ export const projectOverviewTool = defineTool({
   name: 'project_overview',
   title: 'Project overview',
   description:
-    'Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects for which this client has live read ACL. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first.',
+    'Bootstrap tool: returns the active workspace root, workspaceId + workspaceEpoch (required by every other tool), trust policy, capabilities, detected manifests/languages, runnable task recipes, a shallow file tree, and a scoped git summary. It also lists owner-registered projects this client may read under the current personal/managed access mode. Pass projectId for a read-only federated overview without switching the active workspace. Never executes project code. Call this first.',
   input: { projectId: projectIdInput },
   output: looseData,
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -72,6 +73,7 @@ export const projectOverviewTool = defineTool({
       warnings.push('Advanced Agent Runtime diagnostics need recovery; inspect this caller workspace state.');
     }
     const desktop = s.desktop.policy();
+    const personal = accessMode(s.store) === 'personal';
     const desktopPlatform = process.platform === 'darwin' ? 'macOS 14+' : process.platform === 'win32' ? 'Windows interactive desktop' : process.platform === 'linux' ? 'Linux X11/XWayland session' : process.platform;
     const federation = s.federation.listAuthorized(ctx.principal);
     return {
@@ -82,12 +84,14 @@ export const projectOverviewTool = defineTool({
         memory,
         runtime,
         agentRuntime,
+        accessMode: personal ? 'personal' : 'managed',
+        ai: { available: Boolean(s.installation), profiles: s.installation?.ai.availableProfiles(s.workspaceId,ctx.principal) ?? [], note: personal ? 'Enabled profiles are ready on every owner-registered project. Spawn still requires dodo:exec and every action keeps its live scope, context, path, secret and sandbox checks.' : 'Only currently authorized profiles are listed; spawn requires dodo:exec, project/provider permission and live action policy. Discover subagent_spawn for its schema.' },
         capabilities: { ...data.capabilities, desktop: { mode: desktop.mode, persistent: desktop.persistent, setupCommand: "dodo desktop setup", permissionCommand: "dodo desktop allow --app <app-id> --mode view|control --yes", rememberCommand: "dodo desktop allow --app <app-id> --mode view|control --persist --yes", platform: desktopPlatform, scope: "dodo:exec" } },
         federation: {
           mode: 'read-only',
           projects: federation.projects,
           maxProjectsPerSearch: 8,
-          note: 'Only owner-registered projects with live read ACL are listed. Pass projectId to project_overview/list_files/read_files, or projectId/projectIds to search_code. Writes and commands remain bound to the active workspace.',
+          note: personal ? 'Owner-registered projects allowed by the live OAuth read scope are listed. Pass projectId for read federation; use targetProjectId plus its workspace context for writes or commands.' : 'Only owner-registered projects with live read ACL are listed. Pass projectId for read federation; use targetProjectId plus its workspace context for writes or commands.',
         },
       },
       warnings,

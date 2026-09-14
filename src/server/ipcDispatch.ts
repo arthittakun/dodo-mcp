@@ -6,6 +6,8 @@ import { phraseFor } from '../util/hash.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
 import { addStaticClient, listStaticClients } from '../auth/clients.js';
 import { DODO_VERSION } from './version.js';
+import { INSTALLATION_AUTHORITY_EPOCH, INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
+import { accessMode } from '../security/accessMode.js';
 
 /**
  * Private-IPC owner commands (spec §8.4), shared by the HTTP and stdio
@@ -126,7 +128,7 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         return { id, status: 'denied' };
       }
       case 'auth.pending': {
-        return store.listPendingApprovals('oauth').filter(a => a.workspaceId === workspaceId && a.epoch === epoch).map((a) => {
+        return store.listPendingApprovals('oauth').filter(a => a.workspaceId === INSTALLATION_AUTHORITY_ID && a.epoch === INSTALLATION_AUTHORITY_EPOCH).map((a) => {
           const interaction = store.oauthFind('Interaction', a.id) as { params?: Record<string, unknown> } | undefined;
           const params = interaction?.params ?? {};
           const summary = JSON.parse(a.summary) as { clientId?: string; redirectUri?: string; scopes?: string[] };
@@ -136,7 +138,9 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
             clientId: String(params['client_id'] ?? summary.clientId ?? 'unknown'),
             redirectUri: String(params['redirect_uri'] ?? summary.redirectUri ?? 'unknown'),
             scopes: String(params['scope'] ?? (summary.scopes ?? []).join(' ')),
-            workspaceRoot: rootInfo.root,
+            authorizationTarget: 'installation',
+            accessMode: accessMode(store),
+            workspaceRoot: null,
             expiresAt: a.expiresAt,
           };
         });
@@ -144,12 +148,14 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
       case 'auth.approve': {
         const id = String(args['id']);
         const row = store.getApproval(id);
-        if (!row || row.kind !== 'oauth' || row.workspaceId !== workspaceId || row.epoch !== epoch) throw new Error('unknown authorization request id');
+        if (!row || row.kind !== 'oauth' || row.workspaceId !== INSTALLATION_AUTHORITY_ID || row.epoch !== INSTALLATION_AUTHORITY_EPOCH) throw new Error('unknown authorization request id');
         if (!store.setApprovalStatus(id, 'approved')) throw new Error(`request is ${row.status}`);
         return { id, status: 'approved' };
       }
       case 'auth.deny': {
         const id = String(args['id']);
+        const row = store.getApproval(id);
+        if (!row || row.kind !== 'oauth' || row.workspaceId !== INSTALLATION_AUTHORITY_ID || row.epoch !== INSTALLATION_AUTHORITY_EPOCH) throw new Error('unknown authorization request id');
         if (!store.setApprovalStatus(id, 'denied')) throw new Error('request not pending');
         return { id, status: 'denied' };
       }
@@ -168,7 +174,8 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
           clientId: g.clientId,
           scopes: g.scopes,
           workspaceId: g.workspaceId,
-          thisWorkspace: g.workspaceId === workspaceId,
+          installationIdentity: store.getMeta(`identity-grant:${g.id}`) === '2',
+          thisWorkspace: g.workspaceId === workspaceId && store.getMeta(`identity-grant:${g.id}`) !== '2',
           createdAt: g.createdAt,
           revokedAt: g.revokedAt,
         }));

@@ -1,0 +1,62 @@
+.page { width: 100%; }
+.workbench-nav { display:flex;gap:6px;flex-wrap:wrap;max-width:var(--shell);margin:0 auto;padding:10px 24px; }
+.workbench-nav .btn { background:transparent;border-color:transparent;color:var(--muted);font-weight:600; }
+.workbench-nav .btn:hover { color:var(--text);background:var(--panel-2);border-color:var(--border-strong); }
+.workbench-nav [aria-pressed=true] { background:var(--accent-soft);color:var(--accent-strong);border-color:color-mix(in srgb,var(--accent) 42%,transparent); }
+
+/* #workbench is a plain layout stack, NOT a card — its sections are the cards. */
+#workbench { min-width:0; display:flex; flex-direction:column; gap:var(--s4); }
+.wb-intro { display:flex; flex-direction:column; gap:var(--s3); }
+.wb-toolbar { display:flex;gap:var(--s3);align-items:end;flex-wrap:wrap;margin:0; }
+.wb-toolbar label { flex:1;min-width:220px; }
+#wb-root { overflow-wrap:anywhere; font-family:var(--mono);font-size:.8rem;margin:0; }
+#wb-body { display:flex; flex-direction:column; gap:var(--s4); }
+
+/* .wb-section matches .card exactly so every page shares one card system. */
+.wb-section { background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:var(--card-pad);margin:0;min-width:0; }
+.wb-section > h2 { margin-bottom:var(--s4); }
+.wb-section > h2 + p.muted { margin-top:calc(var(--s3) * -1);margin-bottom:var(--s5); }
+/* Consistent vertical rhythm between a section's own blocks. */
+.wb-section > * + * { margin-top:var(--s4); }
+/* Trailing action buttons: one tidy wrapping row, even spacing, no margin hacks. */
+.wb-section .btn { margin:0; }
+.wb-section > .btn { margin-top:var(--s4); }
+.wb-section > .btn + .btn { margin-top:var(--s4);margin-left:var(--s2); }
+.wb-form { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s4);margin:0; }
+.wb-form label:has(textarea),.wb-form>button { grid-column:1/-1; }
+.wb-form > .btn { margin-top:0; }
+#workbench label { display:flex;flex-direction:column;gap:6px;font-size:.9rem;font-weight:600;margin:0; }
+#workbench input,#workbench select,#workbench textarea { width:100%;min-width:0;background:var(--code-bg);color:var(--text);border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:9px 11px;font:inherit; }
+#workbench input:focus-visible,#workbench select:focus-visible,#workbench textarea:focus-visible { outline:2px solid var(--focus);outline-offset:1px;border-color:var(--focus); }
+#workbench textarea { min-height:88px;resize:vertical; }
+#workbench .wb-check { flex-direction:row;align-items:center;gap:var(--s2);font-weight:500; }
+#workbench .wb-check input { width:auto; accent-color:var(--accent); }
+#workbench label .help-tip { align-self:flex-start; }
+#workbench .wb-switch { display:flex;align-items:center;gap:10px;cursor:pointer; }
+#workbench .wb-switch input[type="checkbox"] { appearance:none;width:42px;height:24px;min-width:42px;margin:0;padding:0;border:1px solid var(--border-strong);border-radius:999px;background:var(--panel-2);position:relative;transition:background-color .15s ease,border-color .15s ease; }
+#workbench .wb-switch input[type="checkbox"]::after { content:"";position:absolute;width:16px;height:16px;left:3px;top:3px;border-radius:50%;background:var(--muted);transition:transform .15s ease,background-color .15s ease; }
+#workbench .wb-switch input[type="checkbox"]:checked { background:var(--accent);border-color:var(--accent); }
+#workbench .wb-switch input[type="checkbox"]:checked::after { transform:translateX(18px);background:var(--accent-contrast); }
+#workbench .wb-switch input[type="checkbox"]:focus-visible { outline:2px solid var(--focus);outline-offset:2px; }
+@media(prefers-reduced-motion:reduce) { #workbench .wb-switch input[type="checkbox"],#workbench .wb-switch input[type="checkbox"]::after { transition:none; } }
+.wb-model-state { margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:7px;background:var(--panel-2);color:var(--muted); }
+.wb-model-state.error { border-color:var(--danger);color:var(--danger); }
+.wb-model-state p { margin:0 0 8px; }
+.wb-model-list { display:grid;gap:6px;margin:0;padding:0;list-style:none; }
+.wb-model-list li { display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0; }
+.wb-model-list code { overflow-wrap:anywhere; }
+.wb-status { margin:10px 0 0;font-size:.86rem;color:var(--muted);overflow-wrap:anywhere; }
+.wb-status[data-kind=ok] { color:var(--ok); }
+.wb-status[data-kind=error] { color:var(--danger); }
+#wb-notice { padding:0;overflow-wrap:anywhere; }
+#wb-notice:not(:empty) { padding:var(--s3) var(--s4);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--panel-2); }
+#wb-notice:empty { display:none; }
+#wb-notice[data-error=true] { color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--border)); }
+.wb-output { max-height:450px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;background:var(--code-bg);border:1px solid var(--border);border-radius:8px;font-size:.8rem; }
+.wb-empty { padding:30px;border:1px dashed var(--border);text-align:center; }
+.wb-answer { white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;padding:18px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;margin:16px 0; }
+.wb-receipts { display:grid;gap:8px;margin-top:16px; }
+.wb-receipt { border:1px solid var(--border);border-radius:8px;padding:12px;min-width:0; }
+.wb-receipt summary { cursor:pointer;font-size:.9rem;overflow-wrap:anywhere; }
+.wb-receipt summary:focus-visible { outline:2px solid var(--accent);outline-offset:4px; }
+@media(max-width:640px) { .wb-form { grid-template-columns:1fr; } .wb-section { padding:12px; } .workbench-nav { padding:10px 12px; } .wb-toolbar { align-items:stretch; } }

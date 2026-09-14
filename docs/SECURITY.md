@@ -37,9 +37,13 @@ MCP และ public route ต้องผ่าน OAuth เสมอ ห้า
 
 Local Config bind loopback ใช้ private capability token, expiration, Host/Origin checks, forwarded-header rejection และ rate limit ไม่มี Local Config/admin endpoint บน public MCP plane
 
+UI assets เสิร์ฟจากแพ็กเกจเองทั้งหมดรวมถึง SweetAlert2 ที่ vendor แบบ pin version (ไม่มี CDN; CSP ยังเป็น `script-src 'self'; style-src 'self'` โดยไม่มี `unsafe-inline`/`unsafe-eval`) เส้นทาง `/assets` เป็น fail-closed: path ที่ decode แล้วต้องตรงรูปแบบเข้มงวด (ลึกได้หนึ่งระดับเฉพาะ `ui/`, `vendor/`), นามสกุลอยู่ใน allowlist (`.css/.js/.svg`), ปฏิเสธ `..`, backslash, NUL และไฟล์ที่ resolve ออกนอก UI directory ทั้งหมดตอบ 404 ข้อความจาก server/paths/client/provider ทุกตัว render ผ่าน `textContent` (SweetAlert ใช้ `titleText`/`text` เท่านั้น ไม่ใช้ `html`) กล่องยืนยันของ UI เป็นชั้น UX เพิ่มเติม ไม่แทนที่ approval/validation ฝั่ง server
+
 Launcher mode ไม่มี active AI workspace และไม่ใช้ CWD เป็น implicit authority
-private inert root ไม่ถูกแสดงต่อ client; public MCP/OAuth routes ถูกปฏิเสธจน owner
-เลือก target สำเร็จ Mutation จาก Local Config ยังผูกกับ current control context
+private inert root ไม่ถูกแสดงต่อ client; OAuth และ authenticated catalog เปิดให้ตั้ง
+connection ได้ โหมดส่วนตัวซึ่งเป็นค่าเริ่มต้นอนุญาต owner-approved OAuth installation
+ให้ใช้ target ที่ owner ลงทะเบียนตาม token/profile scopes โดยไม่ต้องสร้าง ACL ซ้ำ
+โหมด managed ต้องมี target ACL แยกตามเดิม Mutation จาก Local Config ยังผูกกับ current control context
 workspace/epoch การเลือก startup project เป็น preference เท่านั้นและไม่คัดลอก trust,
 OAuth grant, client ACL, approval, jobs หรือ workspace epoch
 
@@ -55,8 +59,8 @@ Gateway ไม่ bypass OAuth, scope, ACL, trust, approval, sandbox, expected h
 
 Federated read ยังคงตรวจ active workspace ID/epoch ก่อน แล้วตรวจ target readiness,
 grant revocation, target ACL และ shared path/secret guards ซ้ำ ผลลัพธ์มี target
-identity/source hash แต่ไม่ใช่ permission และใช้เป็น expected hash สำหรับ target
-mutation ไม่ได้ เพราะ write/exec federation ยังปิดอยู่
+identity/source hash แต่ไม่ใช่ permission; federation epoch ไม่ใช่ target runtime epoch
+ก่อน mutation ให้เรียก overview ด้วย targetProjectId แล้วอ่านหลักฐานของ target ใหม่
 
 ## Files and secrets
 
@@ -183,6 +187,15 @@ evidence ไม่มี token, OAuth code, client secret, private config capabi
 หรือ state database และถูก ignore จาก Git/npm Release gate บล็อก high/critical
 production dependency findings แต่ไม่ publish package หรือเปลี่ยน owner configuration
 
+### Optional Sub-agent MCP exposure
+
+`exposeSubagentsToMcp` ปิดเป็นค่าเริ่มต้นและควบคุมเฉพาะ tool catalog ของ MCP เมื่อปิด
+Full จะไม่ register สี่ Sub-agent definitions และ Compact/Hybrid จะไม่ใส่ operations
+เหล่านี้ใน gateway enum, server instructions หรือ `dodo_discover` หน้าเว็บ owner-only
+ยังสร้างและจัดการ agent ได้ การเปิดสวิตช์ไม่ grant `dodo:exec`, ไม่เพิ่ม project ACL,
+ไม่เปลี่ยน trust/profile policy และไม่ข้าม approvals, sandbox, path/secret guards หรือ
+workspace context ทุก call ที่เปิดให้เห็นยังผ่าน invocation pipeline เดิมทั้งหมด
+
 ## Cloudflare Tunnel
 
 เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare API เมื่อรัน `dodo start` ใน terminal ระบบถาม Tunnel token แบบซ่อนและ supervise เฉพาะ live `cloudflared` child ของ process นั้น หรือเจ้าของเริ่ม/หยุดรอบเดียวกันจาก Local Config ที่ผ่าน owner authentication
@@ -204,3 +217,34 @@ Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listene
 `dodo setup --import-state` นำเข้าได้เฉพาะ preference allowlist จาก private `config.json`: config version, MCP/config ports, bounded limits, search backend, log retention และ tool surface เท่านั้น ระบบไม่ copy database, OAuth signing keys, cookies, clients, grants, authorization codes, tokens, workspace ACL, trust, approvals, schedules, public URL/Host/Origin allowlists, web/desktop permissions, LSP commands, environment allowlist หรือ sandbox writable paths
 
 ก่อน commit ระบบตรวจ file type, ownership/ACL, link count, symlink, runtime markers, size และ SHA-256 ซ้ำ หาก source เปลี่ยน, schema ไม่ตรง, มี unknown field หรือมี DODO process ใช้งาน state นั้นอยู่ การนำเข้าจะ fail closed และรักษา source/target เดิมไว้
+
+## AI providers และ target projects
+
+Owner-registered `targetProjectId` เลือก runtime ก่อนคำนวณ scope/ACL; token ของ default
+project ไม่เป็น authority ของ target Legacy root-bound grant ยังข้ามไม่ได้ ทุก model
+operation ผ่าน wrapper เดิมพร้อม live checks หลังรอ queue Profile ทำได้เพียงลดสิทธิ์
+และ child run ถูกจำกัดให้ project เดียว ไม่ spawn ต่อหรือเข้าถึง owner controls
+Approved workflow, memory, skill, model output และ repository content ไม่เป็น permission
+
+Provider access เป็น egress permission แยกจาก `allowWebFetch` และแยกต่อ project/profile/
+client ในโหมด managed ส่วนโหมดส่วนตัวถือว่าการเลือก remote profile เพื่อเริ่ม run เป็น
+owner consent สำหรับส่ง bounded context ของ project นั้น ไม่ส่งทั้ง repo/ภาพ/binary อัตโนมัติ
+Loopback Ollama ไม่ใช่หลักฐาน local inference ต้องตรวจ metadata ของ model ก่อนใช้
+ใน project ที่ไม่อนุญาต source egress; endpoint ของเจ้าของยังเป็น trust boundary
+
+Keys ใช้ session memory หรือ macOS Keychain ผ่าน stdin (ไม่ใส่ argv) State เก็บ ref
+เท่านั้น UI ไม่อ่าน key กลับและไม่เก็บใน browser storage Endpoint เปลี่ยนต้องป้อน key
+ใหม่และ connection ที่ใช้งานถูกล็อกไม่ให้แก้กลาง run Public endpoint ต้อง HTTPS
+Private/LAN ต้อง opt-in; DNS ตรวจทุก address แล้ว pin, metadata/admin endpoint ถูกปฏิเสธ
+และ credentials ไม่ตาม redirect Known key echoes ถูกปฏิเสธก่อนบันทึก result/continuation
+
+Run history/continuation อยู่ใน private state แยก workspace/caller ไม่ export reasoning
+ให้ UI ไม่มี raw access/refresh token ใน delegation ก่อนแต่ละ model/tool action ตรวจ
+lease/grant/ACL/profile ใหม่; revoke หยุดขั้นถัดไปและ resume ไม่เปลี่ยน caller เป็น owner
+Unknown outcomes ไม่ auto-retry Queue ไม่แทน expected hash หรือ OS sandbox; shell job
+รันด้วยสิทธิ์ OS-user ภายใต้ sandbox/trust ที่เจ้าของตั้งเดิม
+
+Local Config ยังคง loopback, token expiry, Host/Origin/proxy-header/rate checks และ CSP
+Admin API ไม่อยู่บน public MCP Events ใช้ authenticated fetch/cursor ไม่ใส่ token ใน URL
+ใช้ textContent แสดง path/model/error และไม่ render HTML จากโมเดล Tunnel credential
+ยัง run-scoped ตามเดิม การเริ่ม DODO/Keychain/macOS permissions ต้องผ่านเจ้าของ

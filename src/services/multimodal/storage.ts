@@ -1,3 +1,4 @@
+import { isOwner } from '../../security/projectAuthority.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,7 +14,7 @@ export type Actor = Pick<Principal, 'grantId' | 'clientId'>;
 export function actorKey(actor: Actor): string { return digestOf({ grantId: actor.grantId, clientId: actor.clientId }); }
 export function liveAccess(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:write' | 'dodo:exec'): void {
   if (!ctx.principal.scopes.includes(scope)) throw new DodoError('FORBIDDEN', `requires ${scope}`);
-  if (ctx.services.localPrincipal) return;
+  if (isOwner(ctx.principal)) return;
   const s = ctx.services.store, grant = s.getGrant(ctx.principal.grantId);
   if (!grant || grant.revokedAt !== null || !s.getOAuthClient(ctx.principal.clientId) || !grant.scopes.includes(scope) || !s.clientAccess(ctx.services.workspaceId, ctx.principal.clientId).includes(scope)) {
     throw new DodoError('FORBIDDEN', 'client/grant/workspace access changed; operation stopped');

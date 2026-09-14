@@ -2,9 +2,97 @@
 
 ## Scope
 
-รายงานนี้ใช้กับ DODO MCP 1.0.0 baseline และแยกผล automated กับ manual อย่างชัดเจน
+รายงานนี้ใช้กับ DODO MCP 1.0.0 source และแยกผล automated กับ manual อย่างชัดเจน
 
-## Automated gates
+## Optional Sub-agent MCP exposure — 2026-09-14
+
+เพิ่ม owner-only switch ที่ Local Config → Settings ค่าเริ่มต้นปิด โดยหน้าเว็บ Chat &
+Tasks ยังใช้ agent ได้ Full live catalog เปลี่ยนจาก complete 125 เป็น 121 ขณะที่
+Compact/Hybrid คง 19/49 tool names แต่กรอง operation enum, discover, overview note และ
+server instructions ให้ตรงกับ runtime ผลเปิดสวิตช์ต้อง restart/rescan และไม่ได้เพิ่ม
+OAuth scope, ACL, trust, profile authority, approval หรือข้าม guards ใด ๆ
+
+- `npm run build`, typecheck, lint — **AUTOMATED_PASS**
+- catalog/default/config/auth tests — **AUTOMATED_PASS**: default false, Full 121,
+  opt-in Full 125, Compact/Hybrid 19/49, hidden operation `NOT_FOUND`, stale/unauthorized
+  Local Config writes ถูกปฏิเสธ
+- Chromium UI-04 — **AUTOMATED_PASS**: switch, SweetAlert confirmation, persisted config,
+  restart notice และ Chat & Tasks ยังเข้าถึงได้; console/CSP errors = 0
+- `npm run test:all` — **AUTOMATED_PASS**: 649 passed / 31 skipped / 0 failed ใน
+  94 files ผ่าน, 2 files ข้ามตาม platform และ packaging 16/16
+- exact tarball smoke — **AUTOMATED_PASS**: fixture เปิด option โดยชัดแจ้ง, STDIO 125,
+  HTTP Compact 19, OAuth, write/edit/read-back, target routing และ Sub-agent receipt ผ่าน
+- `npm audit --omit=dev` — **AUTOMATED_PASS**: 0 vulnerabilities
+- owner server restart + external ChatGPT rescan — **MANUAL_NOT_RUN**
+
+## Local Config UI redesign — 2026-09-14 (macOS, Node 22.23.2)
+
+ปรับ Information Architecture เป็น dashboard 8 หน้า, เพิ่มระบบ tooltip ที่เข้าถึงได้, vendor SweetAlert2 11.26.25 (same-origin, CSP `'self'` เดิม ไม่มี `unsafe-inline`/`unsafe-eval`), provider action lifecycle, personal-mode UX และ hardened `/assets` route (normalize + extension allowlist + traversal fail-closed) ผลรันจริง:
+
+- `npm run build` / `npm run typecheck` / `npm run lint` — **AUTOMATED_PASS** (exit 0)
+- `npx vitest run tests/security/localConfig.test.ts` — **AUTOMATED_PASS** 9/9 (รวม CSP ไม่มี CDN, asset traversal/encoded/NUL/deep-path → 404, ไฟล์ first-party ไม่มี `innerHTML`, vendored assets เสิร์ฟจาก same origin)
+- `npx vitest run tests/integration/aiWorkbench.test.ts` — **AUTOMATED_PASS** 1/1 ใน Chromium จริง (nav ใหม่, SweetAlert confirm ก่อน probe, ผลทดสอบมี connection/model/เวลา, XSS ใน model output ไม่ทำงาน, ไม่มี secret ใน storage, 390px ไม่มี horizontal scroll, dark/light, keyboard focus, `pageerror` = 0)
+- `npx vitest run tests/integration/configUiComponents.test.ts` (UI-01..04) — **AUTOMATED_PASS** 4/4 ใน Chromium จริง: tooltip, SweetAlert, double-submit, text-only hostile names, personal/managed controls, theme/reduced motion, 320px และ Sub-agent MCP switch พร้อม restart notice/Chat & Tasks continuity; console error/CSP violation = 0
+- `npm run test:pack` — **AUTOMATED_PASS** 16/16 (PACK-07 ตรวจ ui/ + vendor/ อยู่ใน tarball, ไม่มี URL ภายนอกใน index.html, vendored SweetAlert2 ตรง byte กับ devDependency ที่ pin)
+- `npm run test:all` — **AUTOMATED_PASS**: 649 passed / 31 skipped (Windows-only บน macOS) / 0 failed ใน 94 ไฟล์ + packaging 16/16
+- Screenshot จาก Chromium fixture: `release-evidence/ai-workbench/{providers-desktop,task-desktop,task-mobile,history-mobile-light,overview-320}.png`
+- **MANUAL_NOT_RUN**: การแตะ tooltip บนอุปกรณ์ touch จริง (ทดสอบผ่าน Chromium click-as-tap แล้วเท่านั้น), screen reader จริง (VoiceOver/NVDA), และการใช้งานบนเบราว์เซอร์อื่นนอกจาก Chromium
+
+### Visual pass (theme tokens)
+
+ใช้พื้น charcoal/slate แบบเรียบใน dark mode และ warm neutral ใน light mode แยกชั้นด้วย surface, border และ spacing พร้อม accent ม่วงเฉพาะ control/สถานะสำคัญ ไม่มี gradient, ambient glow หรือ asset ตกแต่งจากภายนอก ส่วน sticky navigation ใช้ `backdrop-filter` เฉพาะเมื่อ browser รองรับ ตรวจด้วย Chromium fixture ว่า dark/light สลับค่าจริง และ `PACK-07` ล็อกข้อกำหนดว่า first-party CSS ต้องไม่มี `linear-gradient`, `radial-gradient` หรือ `conic-gradient` เทสต์ทั้งหมดข้างต้นรันซ้ำผ่านหลังปรับสี (AUTOMATED_PASS ทั้งชุด)
+
+### Layout tidy pass (spacing/grid system)
+
+จัดระเบียบตามหลัก 2026 (8px spacing scale, law of proximity, one shared shell width): เพิ่ม token ระยะ `--s1..--s8` + `--shell`/`--card-pad`, ลบการซ้อน card-in-card (`#workbench` เป็น layout container ไม่ใช่ card แล้ว, `.wb-section` ใช้ chrome เดียวกับ `.card` ทุกหน้า), รวมทุกหน้าให้กว้างเท่ากันและจัดกึ่งกลาง, form field กริด 2 คอลัมน์ระยะสม่ำเสมอ, ปุ่ม action เป็นแถวระยะเท่ากันแทน margin เฉพาะจุด, ยุบ `#wb-notice` ที่ว่างและทำเป็นกล่องเมื่อมีข้อความ ผลรัน gate เต็มล่าสุดหลังจัด layout และเพิ่ม Sub-agent exposure switch: **649 passed / 31 skipped / 0 failed + packaging 16/16** (รวม assertion viewport 320/390 ไม่มี horizontal scroll, personal-mode visibility, dark/light) — AUTOMATED_PASS
+
+## AI Providers / Multi-project — current source verification
+
+วันที่ 2026-09-14 บน macOS, Node 22.23.2; source v1.0.0 ที่ยังไม่ publish
+
+| Gate | ผล |
+|---|---|
+| Build, typecheck, lint | AUTOMATED_PASS |
+| Unit/integration/security/compatibility | AUTOMATED_PASS — 94 files, 649 tests; skipped 2 files / 31 tests ตาม platform/prerequisite |
+| Packaging suite | AUTOMATED_PASS — 16 tests |
+| Production npm audit | AUTOMATED_PASS — 0 vulnerabilities |
+| Chromium owner UI | AUTOMATED_PASS — 1440px/390px, dark/light, keyboard, safe model text, explicit resource image attachment, create file in B and history reconnect without replay |
+| macOS Keychain | AUTOMATED_PASS — synthetic set/get/delete round-trip; fixture item deleted |
+| Exact tarball fresh install | AUTOMATED_PASS — explicit Sub-agent opt-in: Full 125, Compact HTTP 19 + OAuth, write/edit/read-back, target B, provider fixture agent write + receipt; cleanup passed |
+| Linux Docker | NOT_RUN — runner command stops at docker info; local Engine socket unavailable |
+| Live OpenAI, Gemini, Claude, MiniMax, GLM, Kimi, Ollama | MANUAL_NOT_RUN — no live credentials/model inference used |
+| Native Windows for this feature | MANUAL_NOT_RUN — outside this task |
+
+Protocol fixtures exercise all seven presets / five adapters, fragmented streams, tool
+call IDs and continuation/signatures, 429, abort/interruption, credential-echo rejection,
+DNS/private/metadata policy and redirect refusal. These results do not establish live
+model compatibility or provider billing behavior.
+
+Personal-mode regressions prove an owner-approved OAuth token can list/read/write an
+owner-registered Project B with no duplicate workspace ACL, while read-only scope still
+cannot write. Enabled remote profiles are discoverable without a ProjectAI allowlist;
+managed mode remains explicit and retains existing ACL/trust/egress tests. Persistent
+Desktop consent is reused across workspace epochs/projects, temporary consent remains
+workspace-bound, snapshots remain stale across epochs, and installation disable revokes it.
+
+Real HTTP + OAuth fixtures prove parallel A/B jobs and writes, no-default-ACL project
+selection, target scope/context rejection, secret/hash guards and isolated changesets.
+Agent fixtures verify write/read/edit/exec/read, actual stdout receipts, inspect approvals,
+queued revocation/conflict, owned-job cancellation, no recursive spawn, idempotency,
+explicit process-crash recovery and uncertain-outcome refusal. Runtime teardown tests
+prove new requests cannot acquire a closing target while the default remains usable.
+
+Private non-secret evidence is retained under release-evidence/ai-workbench (ignored and
+not packaged): gate log, audit, artifact manifest/checksum, fresh-install report and five
+actual UI screenshots. The npm manifest includes all 11 UI assets, AI runtime modules,
+Full/Compact/Hybrid schemas and the AI provider guide; development docs, conversations,
+state databases, media/model files and credentials are absent.
+
+No live provider or external ChatGPT acceptance is reported as MANUAL_PASS. No publish,
+global reinstall, existing-server restart or tunnel/DNS change is part of this work.
+
+## Baseline gates before AI Providers / Multi-project
+
 
 ```bash
 npm run build
@@ -63,8 +151,9 @@ Tunnel tests ใช้ fake `cloudflared` และ loopback readiness fixture �
 
 Global launcher และ interactive CLI tests พิสูจน์ว่า `dodo --cli` แสดง/เลือก/เพิ่ม
 โปรเจกต์ได้, setup menu ระบุ cloudflared, launcher ไม่ใช้ invocation CWD หรือเผย
-private inert root, MCP ถูกปิดด้วย `workspace_required` ก่อนเลือก target, invalid target
-ไม่เปิด data plane และ successful switch ใช้ real canonical root พร้อมบันทึก registry
+private inert root, anonymous MCP ยังได้ 401, OAuth installation login และ authenticated
+catalog ใช้ได้ก่อนเลือก target แต่ tool invocation ไม่มี ACL, invalid target ไม่เปิดสิทธิ์
+และ successful switch ใช้ real canonical root พร้อมบันทึก registry
 preference Local Config Tunnel fixture พิสูจน์ซ้ำว่า unauthenticated request ถูกปฏิเสธ,
 config endpoint ปฏิเสธ raw token, session endpoint ตอบ `tokenStored:false`, raw token
 ไม่อยู่ใน response/config/audit และ owner เริ่ม/หยุด process-owned runtime ได้
@@ -82,7 +171,8 @@ identity/source hash, target-scoped audit, bounded partial failure, installation
 identity + per-project ACL, live ACL revocation, stale active epoch, legacy grant
 refusal, secret/traversal/replaced-root guards และ strict rejection เมื่อพยายามส่ง
 `projectId` เข้า write operation Universal Resource, Project Brain และ Context Engine
-operations และ Advanced Agent Runtime ทำให้ surface ปัจจุบันเป็น Full 121 / Compact 19 / Hybrid 49
+operations และ Advanced Agent Runtime ทำให้ complete catalog เป็น 125; live default
+เป็น Full 121 / Compact 19 / Hybrid 49 เพราะซ่อน Sub-agent operations จนกว่า owner จะเปิด
 
 Universal Resource tests ใช้ HTTP + OAuth และ Compact gateway จริง ครอบคลุม text,
 binary range/resume, image/audio MCP blocks, raster transform, PDF/ZIP metadata,
@@ -150,10 +240,11 @@ workspace เปลี่ยนเป็น canonical root B สำเร็จ 
 
 ## Surface evidence
 
-- Full surface: 121 tools
+- Complete Full capability schema: 125 tools
+- Full live default: 121 tools; owner opt-in Sub-agent exposure: 125
 - Compact surface: 19 tools
 - Hybrid surface: 49 tools
-- generated schema metric: Full 415,361; Compact 49,071; Hybrid 116,551 bytes
+- generated schema metric: Full 443,030; Compact 52,317; Hybrid 124,657 bytes
 - Compact schema เป็น catalog แยกและลด schema load ตอนเชื่อมต่อ
 - Full schema อยู่ใน `schemas/tools.json`
 - Compact schema อยู่ใน `schemas/tools.compact.json`
@@ -167,8 +258,10 @@ security boundaries และ browser image block ผลแต่ละรอบ
 tool calls, serialized bytes, p50/p95, precision/recall, wrong-file rate, cache hit และ
 security violations โดย `modelTokens=null` เพราะไม่มี model call
 
-Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix แล้วตรวจ CLI 1.0.0,
-STDIO Full 121, HTTP Streamable + OAuth Compact 19 และ write/edit read-backจริง
+Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix เปิด Sub-agent exposure
+แบบ explicit แล้วตรวจ CLI 1.0.0, STDIO Full 125, HTTP Streamable + OAuth Compact 19,
+write/edit read-back และ Sub-agent receipt จริง ค่า default-off ถูกตรวจแยกใน STDIO/HTTP/
+packaging regressions
 Release policy ใช้ macOS local และ Linux Docker โดย report ต้องมี revision/lock digest
 ตรงกันก่อน strict gate จะผ่าน Linux Docker image ติดตั้ง Playwright Chromium
 Dedicated self-hosted GitHub Actions รัน Linux X64 Docker และ Windows X64 native
@@ -179,7 +272,7 @@ candidate บน Node 22/24 โดยไม่รับ untrusted pull requests 
 
 - anonymous HTTP request ได้ 401
 - read-only scope เรียก write/exec ไม่ได้
-- token ที่ไม่มี workspace ACL ถูกปฏิเสธ
+- managed mode: token ที่ไม่มี workspace ACL ถูกปฏิเสธ; personal mode ยังต้องมี owner-registered target และ live scope
 - workspace mismatch และ stale epoch ถูกปฏิเสธ
 - secret, traversal, symlink และ hardlink guard fail closed
 - inspect mode ยังคง target approval

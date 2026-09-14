@@ -40,7 +40,15 @@
 
 ## Local Config
 
-1. จาก directory ที่ไม่ใช่โปรเจกต์และ config ใหม่ รัน `dodo` แล้วตรวจว่า MCP ตอบ `workspace_required`
+0. UI ใหม่ (2026-09-14): ตรวจบนเครื่องจริงว่า (ก) nav 8 หน้าใช้ได้ทั้ง desktop และมือถือ
+   (ข) tooltip `?` เปิดด้วยการแตะบนอุปกรณ์ touch จริงและ screen reader อ่านได้
+   (ค) กล่องยืนยัน SweetAlert แสดงก่อนการลบ/ยกเลิก/เปลี่ยนโหมดทุกครั้ง
+   (ง) ผลทดสอบ Provider แสดงชื่อ connection, โมเดล, ชนิดการทดสอบ และเวลา
+   — สถานะปัจจุบัน: ผ่านใน Chromium fixture (ดู TEST_REPORT); อุปกรณ์ touch จริงและ
+   screen reader จริงยัง **MANUAL_NOT_RUN**
+1. จาก directory ที่ไม่ใช่โปรเจกต์และ config ใหม่ รัน `dodo` แล้วตรวจว่า anonymous MCP ได้ 401,
+   OAuth login และ authenticated `tools/list` ใช้ได้ แต่ `project_overview` ได้
+   `WORKSPACE_ACCESS_REQUIRED` และไม่เผย private inert root
 2. เปิด Local Config URL จาก terminal
 3. ตรวจว่าไม่มี root จาก CWD ปรากฏ และ Project Registry ยังเพิ่ม/เลือก path ได้
 4. เพิ่ม fixture A โดยเลือก “เปิดโปรเจกต์นี้ทันที” แล้วตรวจ root, MCP/OAuth และ config listener
@@ -216,14 +224,27 @@ manual external-client acceptance
 ## STDIO Full
 
 1. รัน `dodo stdio --root /absolute/fixture`
-2. ตรวจ full catalog 121 tools
+2. ตรวจ full catalog ค่าเริ่มต้น 121 tools และไม่มี `subagent_*`
 3. ทดสอบ project overview, read, write และ edit
+
+## Sub-agent MCP exposure
+
+Automated catalog/API/Chromium/fresh-package fixtures: **AUTOMATED_PASS**
+
+1. เปิด Local Config → Settings และตรวจว่าสวิตช์ “เปิดให้ MCP clients เห็น Sub-agent tools” ปิดเป็นค่าเริ่มต้น
+2. ตรวจ Full live catalog มี 121 tools; Compact/Hybrid มี 19/49 ชื่อและ discover หา `subagent_spawn` ไม่พบ
+3. ตรวจ Chat & Tasks ยังสร้างและดูงานได้จากหน้าเว็บ
+4. เปิดสวิตช์ ยืนยันผ่าน dialog แล้วตรวจข้อความว่าต้อง restart/rescan
+5. restart fixture เท่านั้น แล้วตรวจ Full มี 125 และ Compact discover/gateway มี `subagent_spawn/status/result/control`
+6. ปิดสวิตช์อีกครั้ง restart และตรวจว่า run history ยังอยู่ แต่ MCP definitions ถูกซ่อน
+
+การ restart server จริงและ rescan ผ่าน ChatGPT/remote client จริง: **MANUAL_NOT_RUN**
 
 ## Security
 
 - anonymous HTTP ต้อง 401
 - read-only token ต้องถูกปฏิเสธเมื่อเรียก write/exec
-- client ที่ไม่มี ACL ต้องถูกปฏิเสธ
+- managed mode: client ที่ไม่มี ACL ต้องถูกปฏิเสธ; personal mode: unregistered target ต้องถูกปฏิเสธ
 - inspect mode ต้องมี owner approval
 - secret paths และ traversal ต้องถูกปฏิเสธ
 - ห้ามแสดง client secret, access token หรือ private config token
@@ -240,3 +261,23 @@ Automated fixtures: รัน `npm run bench`, `npm run release:gate` บน mac
 candidate บน trusted main/manual เท่านั้น Manual external AI, owner repository และ
 Windows 11 ต้องรายงานแยกตาม environment จริง ห้ามเปลี่ยน `MANUAL_NOT_RUN` จากผล
 automated บน macOS, Linux Docker หรือ Windows runner
+
+## AI Providers / Multi-project owner acceptance
+
+ใช้ fixture A/B แยกจาก source ของเจ้าของ ไม่ทดสอบ paid inference โดยไม่มีเจ้าของตั้ง
+credentials ผ่าน private UI ผลต้องแยกตาม provider/model/platform ไม่รวมเป็น PASS เดียว
+
+- เพิ่ม provider/model/profile ผ่านเว็บ เลือก session/Keychain และ grant project/client/egress
+- ทดสอบ synthetic inference และ tool calling ด้วยปุ่มแยก เก็บเวลา/model/ผล ไม่มี key
+- MCP caller A spawn บน A พร้อม web owner run บน B; read-back/diff/test receipts ต้องตรง
+- Read-only เขียนหรือ spawn ไม่ได้; managed mode ที่ไม่มี target ACL ถูกปฏิเสธ และ inspect ขอ approval เฉพาะ operation
+- แก้ไฟล์ภายนอกระหว่าง read/edit ต้อง conflict ไม่ overwrite
+- Pause/cancel, ปิด browser/reconnect, expiry/revoke, restart/Resume ไม่ replay side effects
+- Unknown inference/action outcome ต้องรอ review ไม่ส่งซ้ำเงียบ ๆ
+- ตรวจ Keychain dialog และ local Ollama metadata รวมกรณี cloud model บน loopback
+- ตรวจภาพจาก explicit resource paths และตอบกลับ text/tool results ไม่มี raw reasoning/key
+- ตรวจ desktop/390px/theme/keyboard, history search/delete/retention และ advanced owner controls
+
+Live OpenAI, Gemini, Claude, MiniMax, GLM, Kimi, Ollama: MANUAL_NOT_RUN สำหรับงานนี้
+จนกว่าจะมีหลักฐานจาก account/model จริง Browser automation และ synthetic Keychain
+round-trip เป็น AUTOMATED_PASS ไม่ใช้แทน MANUAL_PASS ของ provider

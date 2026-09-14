@@ -15,7 +15,9 @@ describe('OAuth approval command copying', () => {
 
   function owner(args: string[]) {
     return exec(process.execPath, [cli, ...args], {
-      cwd: ctx.fixtureDir,
+      // OAuth owner commands are installation-scoped and must work from an
+      // unrelated shell directory.
+      cwd: ctx.configDir,
       env: { ...process.env, DODO_CONFIG_DIR: ctx.configDir },
       timeout: 10_000,
     });
@@ -25,8 +27,8 @@ describe('OAuth approval command copying', () => {
     'the printed command approves the exact seeded request %s over IPC', async (id) => {
       const store = ctx.server.services.store;
       const seed = (requestId: string) => store.createApproval({
-        id: requestId, kind: 'oauth', workspaceId: ctx.server.workspaceId,
-        epoch: ctx.server.epoch, ttlMs: 60_000,
+        id: requestId, kind: 'oauth', workspaceId: 'dodo-installation',
+        epoch: 'installation-auth-v2', ttlMs: 60_000,
         summary: JSON.stringify({ clientId: 'fixture-client', redirectUri: ctx.redirectUri, scopes: ['dodo:read'] }),
       });
       seed(id);

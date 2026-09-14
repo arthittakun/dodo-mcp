@@ -1,3 +1,4 @@
+import { isOwner } from '../security/projectAuthority.js';
 import { z } from 'zod';
 import { policyGate, defineTool } from './context.js';
 import { withIdempotency } from './changeTools.js';
@@ -229,7 +230,7 @@ export const listJobsTool = defineTool({
   requiredScope: 'dodo:read',
   action: 'read',
   handler: async (args, ctx) => {
-    const jobs = ctx.services.jobs.list(ctx.services.workspaceId, args.limit).map((j) => ({
+    const jobs = ctx.services.jobs.list(ctx.services.workspaceId, 100).filter(j => isOwner(ctx.principal) || j.principal === ctx.principal.grantId).slice(0,args.limit).map((j) => ({
       jobId: j.id,
       status: j.status,
       kind: j.kind,

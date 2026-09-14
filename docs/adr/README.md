@@ -60,3 +60,5 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [042 — Project directory generation identity](042-project-directory-generation-identity.md)
 - [043 — Trusted self-hosted platform gates](043-trusted-self-hosted-platform-gates.md)
 - [044 — Global launcher and interactive owner menu](044-global-launcher-and-cli-menu.md)
+- [045 — Explicit project runtimes and provider-backed sub-agents](045-ai-providers-multiproject.md)
+- [046 — Personal add-and-use mode](046-personal-access-mode.md)

@@ -40,6 +40,7 @@ export interface WorkspaceHostOptions {
   log: (line: string) => void;
   /** How long to wait for in-flight MCP requests before refusing the switch. */
   drainTimeoutMs?: number;
+  busy?: () => boolean;
 }
 
 export interface SwitchInput {
@@ -99,6 +100,7 @@ export function createWorkspaceHost(opts: WorkspaceHostOptions): WorkspaceHost {
     if (target.root === current.rootInfo.root) {
       return { changed: false, root: current.rootInfo.root, workspaceId: current.workspaceId, epoch: current.epoch, previousRoot: current.rootInfo.root, trustMode: current.services.trustMode() };
     }
+    if (opts.busy?.()) throw new DodoError('CONFLICT', 'project has active agents or explicitly targeted requests');
     const running = current.services.jobs.runningCount();
     if (running > 0) {
       throw new DodoError('CONFLICT', `${running} job(s) are still running in the current workspace`, {
@@ -126,6 +128,7 @@ export function createWorkspaceHost(opts: WorkspaceHostOptions): WorkspaceHost {
           recovery: 'wait for them to finish or cancel them, then retry',
         });
       }
+      if (opts.busy?.()) throw new DodoError('CONFLICT', 'target project requests are still running');
       // 2. Another live process for that root would be clobbered by our IPC bind.
       const nextId = mintWorkspaceId(prev.store.installSecret(), target.root);
       if (opts.isRootServedElsewhere && (await opts.isRootServedElsewhere(nextId))) {

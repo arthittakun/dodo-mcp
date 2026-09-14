@@ -140,7 +140,7 @@ describe('CLI', () => {
     expect(res.stderr).toMatch(/no running DODO/);
   });
 
-  it.skipIf(process.platform !== 'darwin')('CLI desktop on macOS: save before start, survive restart, isolate nested roots and revoke while stopped', async () => {
+  it.skipIf(process.platform !== 'darwin')('CLI desktop on macOS: save before start, reuse across roots and revoke installation consent while stopped', async () => {
     const cfg = fs.mkdtempSync(path.join(base, 'desktop-cfg-'));
     const mono = fs.mkdtempSync(path.join(base, 'desktop-mono-'));
     const web = path.join(mono, 'โปรเจกต์ ITP006', 'apps', 'web');
@@ -152,7 +152,7 @@ describe('CLI', () => {
     expect(fs.readdirSync(web)).toEqual([]);
     expect(runCli(['status'], { cwd: web, configDir: cfg }).code).not.toBe(0); // save never starts a listener
     const epochs = new Set<string>();
-    for (const [cwd, mode] of [[web, 'control'], [web, 'control'], [mono, 'off'], [web, 'off']] as const) {
+    for (const [cwd, mode] of [[web, 'control'], [web, 'control'], [mono, 'control'], [web, 'off']] as const) {
       if (epochs.size === 3) {
         const disabled = runCli(['desktop', 'disable'], { cwd: web, configDir: cfg });
         expect(disabled.code).toBe(0);
@@ -213,10 +213,10 @@ describe('CLI', () => {
   });
 
   it.each([
-    { args: ['start'] as string[], mode: 'inspect' },
-    { args: ['start', '--allow', '--all'], mode: 'trusted' },
-    { args: ['--bypass'], mode: 'trusted' },
-  ])('CLI-NEW: explicit --root opens the reviewed workspace and private config', async ({ args, mode }) => {
+    { args: ['start'] as string[] },
+    { args: ['start', '--allow', '--all'] },
+    { args: ['--bypass'] },
+  ])('CLI-NEW: explicit --root opens the reviewed workspace and private config', async ({ args }) => {
     const cfg = fs.mkdtempSync(path.join(base, 'new-cfg-'));
     const proj = fs.mkdtempSync(path.join(base, 'new-proj-'));
     const port = await freePort();
@@ -233,9 +233,9 @@ describe('CLI', () => {
       const state = await res.json() as { workspace: { root: string; switchSupported: boolean }; permissions: { effectiveMode: string; savedMode: string; override: string | null } };
       expect(fs.realpathSync(state.workspace.root)).toBe(fs.realpathSync(proj));
       expect(state.workspace.switchSupported).toBe(true);
-      expect(state.permissions.effectiveMode).toBe(mode);
+      expect(state.permissions.effectiveMode).toBe('trusted');
       expect(state.permissions.savedMode).toBe('inspect');
-      expect(state.permissions.override).toBe(mode === 'trusted' ? (commandArgs.includes('--bypass') ? 'bypass' : 'allow-all') : null);
+      expect(state.permissions.override).toBe(commandArgs.includes('--bypass') ? 'bypass' : commandArgs.includes('--allow') ? 'allow-all' : null);
       expect((await fetch(`http://127.0.0.1:${port}/mcp`,{method:'POST'})).status).toBe(401);
       expect((await fetch(`http://127.0.0.1:${port}/api/state`)).status).toBe(404);
     } finally {
@@ -262,7 +262,9 @@ describe('CLI', () => {
       expect(state.workspace).toBeNull();
       expect(state.connection.workspaceSelected).toBe(false);
       expect(log).not.toContain(fs.realpathSync(unrelated));
-      expect((await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST' })).status).toBe(503);
+      // The catalog endpoint is available for installation OAuth setup, but
+      // still requires a bearer token and grants no project access by itself.
+      expect((await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST' })).status).toBe(401);
     } finally {
       child.kill('SIGTERM');
       if (child.exitCode === null && child.signalCode === null) await new Promise<void>((resolve) => child.once('close', () => resolve()));

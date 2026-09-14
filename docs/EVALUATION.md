@@ -39,7 +39,7 @@ npm run release:gate
 
 คำสั่งนี้รัน build, typecheck, lint, test suite, DodoBench, production dependency
 audit, immutable `npm pack` manifest/checksum และ fresh exact-tarball smoke ซึ่งตรวจ
-`dodo --version`, STDIO Full 121 tools, Streamable HTTP + OAuth Compact 19 tools และ
+`dodo --version`, STDIO Full 125 tools, Streamable HTTP + OAuth Compact 19 tools และ
 write → read → edit → read-back ผ่าน Compact gateway
 
 หลักฐาน non-secret ถูกเขียนใต้ `release-evidence/<version>/` ซึ่งถูก ignore ทั้ง Git

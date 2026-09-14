@@ -48,7 +48,7 @@ source นั้น และ source ที่อ้างชื่อ symbol �
 nodes, edges, metrics และ run state จึงไม่เกิด graph ครึ่งรุ่น
 
 index เป็น evidence ที่สร้างใหม่ได้ ไม่ใช่ authority ทุก `brain_query` และ
-`brain_symbol` ตรวจ principal/live grant/workspace ACL, workspace context,
+`brain_symbol` ตรวจ principal/live grant/target authority, workspace context,
 `WorkspaceFS` policy และ SHA-256 ปัจจุบันซ้ำ stale row ถูกตัดออกโดย default และ
 cursor ใช้ HMAC ผูก query, workspace และ principal การเปลี่ยน workspace ปิด parser,
 scheduler และ run เดิมก่อนปิด database
@@ -59,8 +59,10 @@ scheduler และ run เดิมก่อนปิด database
 
 HTTP launcher เริ่มได้โดยไม่มี active project เพื่อให้ `dodo` รันจาก directory ใดก็ได้
 ระหว่างนี้ process bootstrap private inert root ใต้ config directory สำหรับ control-plane
-resources เท่านั้น `workspaceSelected=false` ปิด MCP/OAuth data plane ด้วย 503
-`workspace_required`; `/healthz` และ Local Config ยังพร้อมให้เจ้าของเลือกโปรเจกต์
+resources เท่านั้น `workspaceSelected=false` ยังเปิด OAuth installation login และ
+authenticated MCP catalog เพื่อให้ remote client เชื่อมต่อได้ก่อน แต่ invocation pipeline
+ไม่ให้สิทธิ์กับ inert root และคืน `WORKSPACE_ACCESS_REQUIRED` จนมี registered target จริง
+`/healthz` และ Local Config ยังพร้อมให้เจ้าของเพิ่มหรือเลือกโปรเจกต์
 เมื่อ target ผ่าน shared root policy, readiness และ WorkspaceHost switch lifecycle แล้ว
 จึง flip active state, เริ่ม schedules และให้ request ใหม่สร้าง MCP context ของ root จริง
 
@@ -81,7 +83,7 @@ store และไม่มี MCP/public route การใช้ birth time �
 จาก inode เดิมที่ Linux อาจนำกลับมาใช้ซ้ำ
 
 การ relocate ที่พิสูจน์ directory identity เดิมได้รักษา project ID แต่คำนวณ
-workspace ID จาก path ใหม่ ทำให้ trust และ client ACL ไม่ถูกคัดลอก Registry mutation
+workspace ID จาก path ใหม่ ทำให้ managed trust และ client ACL ไม่ถูกคัดลอก Registry mutation
 และ audit commit ใน transaction เดียวกัน การ remove เป็น soft removal และไม่ลบไฟล์
 workspace history หรือ security state
 
@@ -95,29 +97,29 @@ read service ของตัวเอง พร้อม process-local federatio
 
 request ยังยึด active workspace ID/epoch ใน invocation pipeline แล้ว federation
 ตรวจ installation identity, grant revocation, token/grant read scope และ target
-workspace ACL ซ้ำ Project Registry ถูก resolve และตรวจ canonical directory identity
+authority ตาม access mode ซ้ำ Project Registry ถูก resolve และตรวจ canonical directory identity
 ทุกครั้งก่อนใช้ cache cache key ผูก workspace ID, registry update และ
 dev/inode/birthtimeNs
 
 cross-project search รับสูงสุด 8 project IDs แบ่ง result quota รวมและทำ target ที่
 พร้อมแบบ concurrent ผลแต่ละ target มี project/workspace identity, epoch และ hashes
 ของ source files Target ที่ authorized แต่ unavailable แสดงเป็น partial failure;
-หาก target ใดไม่มี ACL request ทั้งก้อนถูกปฏิเสธก่อนคืนผล
+หาก target ใดไม่มี authority request ทั้งก้อนถูกปฏิเสธก่อนคืนผล
 
 Federation audit เขียนอีกแถวด้วย target workspace ID นอกเหนือจาก outer tool audit
-ของ active workspace ทำให้ history กรองตาม project ได้ รุ่นนี้เปิดเฉพาะ read tools
-การ write/exec/jobs/plans ยังคงผูก active `BootstrappedWorkspace` เพียงตัวเดียว
+ของ active workspace ทำให้ history กรองตาม project ได้ `projectId/projectIds` เปิดเฉพาะ
+read tools; write/exec/jobs/plans ใช้ explicit `targetProjectId` เพื่อเลือก runtime แยก
 
 ## Tool invocation
 
 ทุก direct tool และ gateway ใช้ pipeline กลาง:
 
 1. resolve principal
-2. ตรวจ active workspace และ ACL
+2. เลือก target runtime (หรือ default เมื่อไม่ระบุ) แล้วตรวจ workspace และ target authority
 3. ตรวจ workspace ID/epoch
 4. ตรวจ required OAuth scope
 5. parse input schema แบบ strict
-6. ตรวจ trust/action/approval และ idempotency
+6. ตรวจ effective trust/action/approval และ idempotency
 7. เรียก handler
 8. validate output และส่ง content blocks
 9. บันทึก audit แบบ scrubbed
@@ -235,11 +237,33 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 
 ## Tool surfaces
 
-- Full catalog 121 individual definitions (Core 104 + Advanced Agent Runtime 17)
+- Complete capability catalog 125 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4)
+- Full live catalog ค่าเริ่มต้น 121 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 125
 - Compact catalog 19 definitions: overview, discover และ gateways
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 
-`schemas/tools.json` เป็น full schema ส่วน compact และ hybrid เป็น schema แยก การเลือก surface เปลี่ยนการ expose เท่านั้น ไม่เปลี่ยน permission
+`schemas/tools.json` เป็น complete full schema ส่วน compact และ hybrid เป็น schema แยก
+พร้อม metadata ของ optional feature ค่า `exposeSubagentsToMcp=false` จะกรองสี่
+Sub-agent definitions ออกจาก Full และกรองสี่ operation names ออกจาก gateway schemas,
+instructions และ `dodo_discover` ของ Compact/Hybrid โดยจำนวน gateway names ยังคง
+19/49 การเลือก surface หรือ feature exposure ไม่เปลี่ยน permission
+
+## Personal และ managed access mode
+
+Global config ค่าเริ่มต้นเป็น `personal` สำหรับ installation ที่มีเจ้าของคนเดียว การ
+อนุมัติ OAuth หนึ่งครั้งให้ installation identity และ scope ceiling จากนั้นทุก path ที่
+owner เพิ่มลง Project Registry พร้อมใช้ตาม scopes โดยไม่สร้าง client ACL ซ้ำ Effective
+trust เป็น `trusted` และ enabled AI profile ใช้ได้กับ registered projects ทั้งหมด การ
+เลือก remote profile เป็น owner consent ให้ส่ง bounded context ของโปรเจกต์นั้น
+
+`managed` คงโมเดลละเอียดเดิม: target authority เป็น intersection ของ token/grant scope,
+workspace client ACL, saved trust, profile/client allowlist และ source-egress choice
+การเปลี่ยน mode ทำได้เฉพาะ authenticated Local Config และมีผลกับ request ใหม่ทันที
+
+ทั้งสอง mode ใช้ invocation pipeline เดียวกันและยังตรวจ live grant/revocation,
+workspace ID/epoch, registered target/readiness, path/secret/symlink/hardlink guards,
+expected hash, idempotency และ owner-configured command sandbox Profile ลด scopes ได้
+แต่เพิ่มไม่ได้ Repo config, model output และ remembered data ไม่เปลี่ยน access mode
 
 ## State and security
 
@@ -274,3 +298,34 @@ Optional services ถูกสร้างจาก config และ probe readi
 ## Observability
 
 startup log แสดง transport, selected surface, tool count และ schema bytes แบบ bounded ไม่ log request args, token หรือ file content
+
+## Installation runtimes และ AI execution
+
+`InstallationRuntime` ถือ installation Store แยกจากอายุ default workspace และ lazy-open
+registered target runtimes ภายใต้ lease ก่อน recovery แต่ละ runtime มี refs/jobs/queue
+ของตนเอง การเปิด B ไม่ปิด A; explicit routes ใช้ manager refcount และ default switch
+ยังใช้ WorkspaceHost drain guard การ release ref เป็น idempotent
+
+`projectAuthority` แยก identity (expiry/audience/live grant) จาก target scope intersection
+และ legacy binding `invokeToolDefinition` เป็นจุดร่วมของ direct/gateway/model actions
+รวม strict input/output validation, fresh principal หลังรอ queue, context, policy/audit
+MutationQueue ใช้ AsyncLocalStorage เพื่อ nested invocation และ job-held references;
+queued cancellation ถอน waiter ได้ ไม่มี handler/private-owner dispatcher ที่โมเดลเรียกเอง
+
+AISettings เก็บ metadata ใน `ai_settings`; key อยู่ session Buffer หรือ macOS Keychain
+Adapter ห้าชนิดมี native request/stream decoder และ continuation แยกตาม protocol
+Network resolve-all/validate/pin, refuse redirects, timeout/response cap และตรวจ live
+run authority ก่อนส่ง request Subagents จำกัด tools จาก catalog เดิมและลด caller scope
+ผ่าน profile พร้อม project restriction Personal mode ใช้ owner-selected profile เป็น
+egress consent ส่วน managed mode เพิ่ม project/provider/client egress checks
+
+`ai_runs` เก็บ bounded private continuation/delegation (ไม่มี raw OAuth token), usage,
+idempotency digest และ execution ownership `ai_events` เก็บ visible progress/receipts
+แบบ cursor Jobs ที่ agent เริ่มถูกติดตามจนเสร็จและส่ง observed output กลับโมเดล
+Unknown outcome เป็น review barrier; process restart ไม่ replay และต้อง explicit Resume
+จากผู้เรียกเดิม Config/profile digest เปลี่ยนระหว่าง run จะหยุดและให้สร้าง task ใหม่
+
+Owner UI อยู่ `configUi/workbench.js/.css` ใช้ authenticated same-origin fetch และ
+`aiAdmin.ts` บน private listener เท่านั้น CLI/advanced web controls ใช้ IPC dispatcher,
+setup/config validation ชุดเดิม ไม่มี secret fallback หรือการเปิด permission อัตโนมัติ
+รายละเอียด [ADR-045](adr/045-ai-providers-multiproject.md)

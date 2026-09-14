@@ -586,6 +586,13 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     // path. Leave every v1 row invalid for explicit owner review/re-add.
     db.exec('ALTER TABLE project_registry ADD COLUMN root_birthtime_ns TEXT');
   },
+  `CREATE TABLE ai_settings (kind TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY(kind,id));
+   CREATE TABLE ai_runs (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, owner TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+     digest TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+     UNIQUE(workspace_id,owner,idempotency_key));
+   CREATE TABLE ai_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL REFERENCES ai_runs(id) ON DELETE CASCADE,
+     created_at INTEGER NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL);
+   CREATE INDEX idx_ai_runs_owner ON ai_runs(workspace_id,owner,created_at);`,
 ];
 
 /**

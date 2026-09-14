@@ -3,6 +3,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import net from 'node:net';
+import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { npmInvocation } from './npm-process.mjs';
@@ -65,7 +66,7 @@ async function oauthToken({ baseUrl, redirectUri, store, addStaticClient }) {
   }, body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: redirectUri, code_verifier: verifier, resource: `${baseUrl}/mcp` }) });
   const body = await token.json();
   if (token.status !== 200 || typeof body.access_token !== 'string') throw new Error(`OAuth token exchange failed (${token.status})`);
-  return body.access_token;
+  return { accessToken: body.access_token, clientId: registered.clientId };
 }
 
 function envelope(result) {
@@ -82,6 +83,7 @@ for (const directory of [install, workspace, config]) fs.mkdirSync(directory);
 let running;
 let stdio;
 let httpClient;
+let fixtureProvider;
 try {
   fs.writeFileSync(path.join(workspace, 'seed.txt'), 'seed\n');
   const npm = npmInvocation(['install', '--prefix', install, '--ignore-scripts', '--no-audit', '--no-fund', args.tarball]);
@@ -92,6 +94,11 @@ try {
   const cli = path.join(packageRoot, 'dist', 'cli', 'main.js');
   const versionRun = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8', timeout: 30_000, windowsHide: true });
   if (versionRun.status !== 0 || versionRun.stdout.trim() !== packageJson.version) throw new Error('installed CLI version smoke failed');
+
+  // Product default keeps optional sub-agent operations out of MCP catalogs.
+  // This release smoke explicitly opts in because it verifies the packaged
+  // sub-agent MCP contract end-to-end as well as the default in test suites.
+  fs.writeFileSync(path.join(config, 'config.json'), `${JSON.stringify({ version: 1, exposeSubagentsToMcp: true }, null, 2)}\n`, { mode: 0o600 });
 
   const stdioClient = new Client({ name: 'release-stdio-smoke', version: '1' });
   stdio = new StdioClientTransport({ command: process.execPath, args: [cli, 'stdio'], cwd: workspace, env: { ...process.env, DODO_CONFIG_DIR: config }, stderr: 'pipe' });
@@ -109,12 +116,12 @@ try {
   const port = await freePort(); const baseUrl = `http://127.0.0.1:${port}`;
   fs.mkdirSync(config, { recursive: true });
   const paths = pathsModule.statePaths(config);
-  configModule.saveGlobalConfig(paths.configFile, configModule.GlobalConfigSchema.parse({ publicUrl: baseUrl, port, dangerouslyAllowInsecurePublicUrl: true }));
+  configModule.saveGlobalConfig(paths.configFile, configModule.GlobalConfigSchema.parse({ publicUrl: baseUrl, port, dangerouslyAllowInsecurePublicUrl: true, exposeSubagentsToMcp: true }));
   const previous = process.env.DODO_CONFIG_DIR; process.env.DODO_CONFIG_DIR = config;
   try { running = await startServer({ invokedCwd: workspace, portOverride: port, quiet: true, toolSurface: 'compact' }); }
   finally { if (previous === undefined) delete process.env.DODO_CONFIG_DIR; else process.env.DODO_CONFIG_DIR = previous; }
   running.services.store.setTrustMode(running.workspaceId, 'trusted');
-  const accessToken = await oauthToken({ baseUrl, redirectUri: 'http://127.0.0.1:19998/dodo-release-smoke', store: running.services.store, addStaticClient: clientModule.addStaticClient });
+  const { accessToken, clientId } = await oauthToken({ baseUrl, redirectUri: 'http://127.0.0.1:19998/dodo-release-smoke', store: running.services.store, addStaticClient: clientModule.addStaticClient });
   const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), { authProvider: { token: async () => accessToken } });
   httpClient = new Client({ name: 'release-http-smoke', version: '1' });
   await httpClient.connect(transport);
@@ -127,16 +134,47 @@ try {
   envelope(await httpClient.callTool({ name: 'dodo_write', arguments: { ...context, operation: 'edit_file', args: { path: 'smoke.txt', expectedHash: firstFile.hash ?? firstFile.sha256, edits: [{ find: 'alpha', replace: 'beta' }] } } }));
   const read2 = envelope(await httpClient.callTool({ name: 'dodo_read', arguments: { ...context, operation: 'read_files', args: { files: [{ path: 'smoke.txt' }] } } }));
   if (read2.data.files[0].content !== 'beta\n') throw new Error('installed compact write/edit read-back failed');
+  const { ProjectRegistry } = await import(pathToFileURL(path.join(packageRoot,'dist/projects/registry.js')).href);
+  const secondRoot = path.join(args.fixtureDir,'project-b'); fs.mkdirSync(secondRoot);
+  const target = new ProjectRegistry(running.services.store).add(secondRoot,'Installed project B').project;
+  running.services.store.setClientAccess(target.workspaceId,clientId,['dodo:read','dodo:write','dodo:exec']);
+  const targetOverview = envelope(await httpClient.callTool({name:'project_overview',arguments:{targetProjectId:target.projectId}}));
+  running.services.store.setTrustMode(target.workspaceId,'trusted');
+  const targetContext = {targetProjectId:target.projectId,workspaceId:targetOverview.workspaceId,workspaceEpoch:targetOverview.workspaceEpoch};
+  envelope(await httpClient.callTool({name:'dodo_write',arguments:{...targetContext,operation:'write_file',args:{path:'target.txt',content:'B'}}}));
+  if(fs.readFileSync(path.join(secondRoot,'target.txt'),'utf8')!=='B'||fs.existsSync(path.join(workspace,'target.txt'))) throw new Error('installed target routing failed');
+  let modelCalls=0;
+  fixtureProvider=http.createServer(async(req,res)=>{
+    for await (const chunk of req) void chunk;
+    const output=modelCalls++===0?[{type:'function_call',call_id:'installed-write',name:'write_file',arguments:JSON.stringify({path:'agent.txt',content:'agent B'})}]:[{type:'message',content:[{type:'output_text',text:'File created in B.'}]}];
+    res.setHeader('content-type','text/event-stream');res.end(`data: ${JSON.stringify({type:'response.completed',response:{output}})}\n\n`);
+  });
+  await new Promise(resolve=>fixtureProvider.listen(0,'127.0.0.1',resolve));
+  const ai=running.services.installation.ai;
+  const connection=await ai.settings.saveConnection({name:'Installed fixture',provider:'custom',protocol:'responses',baseUrl:`http://127.0.0.1:${fixtureProvider.address().port}/v1`,allowPrivateNetwork:true},'synthetic-install-fixture-key');
+  const profile=ai.settings.saveProfile({name:'Installed coding',connectionId:connection.id,model:'fixture',toolCalling:true,scopes:['dodo:read','dodo:write','dodo:exec']});
+  ai.settings.savePermission({projectId:target.projectId,profileIds:[profile.id],allowedClientIds:[clientId],allowSourceEgress:true});
+  const spawned=envelope(await httpClient.callTool({name:'dodo_assist_change',arguments:{...targetContext,operation:'subagent_spawn',args:{profileId:profile.id,task:'Create agent.txt in this project',idempotencyKey:'fresh-installed-agent'}}}));
+  let finished;
+  for(let attempts=0;attempts<100;attempts++){
+    finished=envelope(await httpClient.callTool({name:'dodo_assist_read',arguments:{...targetContext,operation:'subagent_result',args:{runId:spawned.data.id}}})).data;
+    if(['completed','failed','waiting_auth'].includes(finished.status))break;
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  if(finished.status!=='completed'||modelCalls!==2||!finished.events.some(e=>e.kind==='tool'&&e.payload.operation==='write_file'&&e.payload.ok)||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.existsSync(path.join(workspace,'agent.txt'))) throw new Error('installed agent target/receipt smoke failed');
+  for(const name of ['index.html','app.js','app.css','workbench.js','workbench.css'])if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
   const report = { schemaVersion: 1, status: 'PASS', package: { name: packageJson.name, version: packageJson.version },
     cliVersion: versionRun.stdout.trim(), stdio: { surface: 'full', toolCount: fullCount, overviewOk: stdioOverview.ok === true },
-    http: { transport: 'streamable-http', oauth: true, surface: 'compact', toolCount: compactCount, writeEditReadBack: true },
+    http: { transport: 'streamable-http', oauth: true, surface: 'compact', toolCount: compactCount, writeEditReadBack: true, targetRouting:true, subagentWriteReceipt:true },
+    ui: {assets:5}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
     installation: { source: 'exact-tarball', freshPrefix: true, freshConfig: true }, generatedAt: new Date().toISOString() };
-  if (fullCount !== 121 || compactCount !== 19) throw new Error(`surface count mismatch: full=${fullCount} compact=${compactCount}`);
+  if (fullCount !== 125 || compactCount !== 19) throw new Error(`surface count mismatch: full=${fullCount} compact=${compactCount}`);
   fs.mkdirSync(path.dirname(args.output), { recursive: true }); fs.writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
 } finally {
   if (httpClient) await httpClient.close().catch(() => undefined);
   if (stdio) await stdio.close().catch(() => undefined);
   if (running) await running.close().catch(() => undefined);
+  if (fixtureProvider) await new Promise(resolve=>fixtureProvider.close(resolve));
   // Native modules stay mapped until this process exits, even after closing
   // SQLite/services. The parent owns directory cleanup after worker exit.
 }

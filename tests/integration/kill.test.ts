@@ -91,11 +91,12 @@ describe('dodo kill: CWD-independent shutdown with durable login', () => {
       const jobPid = Number(fs.readFileSync(path.join(root, 'worker.pid'), 'utf8'));
       const status = JSON.parse((await cli(['status', '--json'], cfg, root)).stdout) as { pid: number };
 
-      // A second stdio client of the same root replaces its legacy root alias;
-      // the first process must remain discoverable by its instance endpoint.
+      // Project leases forbid two executors for one root. A second project's
+      // stdio process must still be found by installation-wide owner shutdown.
+      const secondRoot = path.join(base, 'second-stdio'); fs.mkdirSync(secondRoot);
       secondClient = new Client({ name: 'second-kill-test', version: '1.0.0' });
-      await secondClient.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, 'stdio', '--root', root], env: { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>, stderr: 'pipe' }));
-      const secondStatus = JSON.parse((await cli(['status', '--json'], cfg, root)).stdout) as { pid: number };
+      await secondClient.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, 'stdio', '--root', secondRoot], env: { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>, stderr: 'pipe' }));
+      const secondStatus = JSON.parse((await cli(['status', '--json'], cfg, secondRoot)).stdout) as { pid: number };
       expect(secondStatus.pid).not.toBe(status.pid);
 
       const report = JSON.parse((await cli(['kill', '--json'], cfg)).stdout) as KillReport;

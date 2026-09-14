@@ -1,3 +1,4 @@
+import { isOwner, projectAuthority } from '../security/projectAuthority.js';
 import { DodoError, toDodoError } from '../errors.js';
 import type { GlobalConfig } from '../config/globalConfig.js';
 import type { Limits } from '../config/limits.js';
@@ -62,9 +63,10 @@ export interface FederatedSearchFailure {
  * Read-only, owner-curated multi-project federation (Phase 03).
  *
  * A registered path is metadata, never authority. Every access re-reads the
- * registry, checks its directory identity/readiness, and intersects the live
- * OAuth grant with the TARGET workspace ACL. The active process workspace is
- * never switched and process.cwd() is never touched.
+ * registry, checks its directory identity/readiness, and evaluates the live
+ * target authority. Personal mode uses the approved grant scopes; managed mode
+ * intersects them with the TARGET workspace ACL. The active process workspace
+ * is never switched and process.cwd() is never touched.
  */
 export class FederationService {
   private readonly registry: ProjectRegistry;
@@ -110,11 +112,11 @@ export class FederationService {
           instructions:
             'This is a federated read-only overview. The project.workspaceId/project.workspaceEpoch identify the target evidence only. ' +
             'For the next MCP call, keep using the ACTIVE workspaceId/workspaceEpoch from this response envelope and pass projectId inside the selected read operation. ' +
-            'Switch the project through owner-only Local Config before any edit or command.',
+            'For an edit or command, call project_overview with targetProjectId and use that returned workspace context on later target-routed calls.',
           project: scope(runtime, sourceHash),
           federation: { mode: 'read-only', activeWorkspaceChanged: false, requestContext: activeRequestContext },
         },
-        warnings: ['Federated access is read-only. Switch the owner-selected active workspace before editing files or running commands.'],
+        warnings: ['This projectId access is read-only. Use explicit targetProjectId routing for edits or commands.'],
         truncated: data.treeTruncated,
       };
     } catch (error) {
@@ -298,12 +300,11 @@ export class FederationService {
   }
 
   private canRead(project: RegisteredProject, principal: Principal): boolean {
-    if (isLocalOwner(principal)) return true;
-    if (!principal.scopes.includes('dodo:read')) return false;
-    const grant = this.store.getGrant(principal.grantId);
-    if (!grant || grant.revokedAt !== null || grant.clientId !== principal.clientId || !grant.scopes.includes('dodo:read')) return false;
-    if (this.store.getMeta(`identity-grant:${principal.grantId}`) !== '2') return false;
-    return this.store.clientAccess(project.workspaceId, principal.clientId).includes('dodo:read');
+    try {
+      return projectAuthority(this.store, principal, project.workspaceId).scopes.includes('dodo:read');
+    } catch {
+      return false;
+    }
   }
 
   private sourceHashes(runtime: ProjectRuntime, result: SearchResult): Array<{ path: string; hash: string }> {
@@ -363,5 +364,5 @@ function scope(runtime: ProjectRuntime, sourceHash: string): FederatedProjectSco
 }
 
 function isLocalOwner(principal: Principal): boolean {
-  return principal.grantId === 'local-stdio' && principal.clientId === 'stdio' && principal.sub === 'owner';
+  return isOwner(principal);
 }

@@ -7,7 +7,9 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
-import { COMPACT_CATALOG } from '../../src/tools/surface.js';
+import { COMPACT_CATALOG, surfaceCatalog } from '../../src/tools/surface.js';
+import { GlobalConfigSchema, saveGlobalConfig } from '../../src/config/globalConfig.js';
+import { statePaths } from '../../src/config/paths.js';
 
 /** ADR-029: STDIO keeps the FULL catalog by default; --tools compact is an explicit opt-in. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -38,16 +40,17 @@ describe('STDIO surfaces', () => {
     fs.rmSync(cfg, { recursive: true, force: true });
   });
 
-  it('default STDIO serves the full per-tool catalog unchanged', async () => {
+  it('default STDIO serves the full catalog with optional sub-agent tools hidden', async () => {
     const { client, transport } = spawnClient(fixture, cfg, []);
     await client.connect(transport);
     try {
       const list = await client.listTools();
-      expect(list.tools.map((t) => t.name)).toEqual(TOOL_CATALOG.map((d) => d.name));
+      expect(list.tools.map((t) => t.name)).toEqual(surfaceCatalog('full', { subagents: false }).map((d) => d.name));
       const ov = await client.callTool({ name: 'project_overview', arguments: {} });
       const env = ov.structuredContent as { ok: boolean; workspaceId: string; workspaceEpoch: string; data: Record<string, unknown> };
       expect(env.ok).toBe(true);
       expect(env.data['toolSurface']).toBeUndefined();
+      expect(env.data['mcpSubagentsEnabled']).toBe(false);
       const ws = { workspaceId: env.workspaceId, workspaceEpoch: env.workspaceEpoch };
       const w = await client.callTool({ name: 'write_file', arguments: { ...ws, path: 'full.txt', content: 'full\n' } });
       expect((w.structuredContent as { ok: boolean }).ok).toBe(true);
@@ -66,6 +69,8 @@ describe('STDIO surfaces', () => {
       const ov = await client.callTool({ name: 'project_overview', arguments: {} });
       const env = ov.structuredContent as { ok: boolean; workspaceId: string; workspaceEpoch: string; data: Record<string, unknown> };
       expect(env.data['toolSurface']).toBe('compact');
+      expect(env.data['mcpSubagentsEnabled']).toBe(false);
+      expect(env.data['fullToolCount']).toBe(121);
       const ws = { workspaceId: env.workspaceId, workspaceEpoch: env.workspaceEpoch };
       const w = await client.callTool({ name: 'dodo_write', arguments: { ...ws, operation: 'write_file', args: { path: 'compact.txt', content: 'alpha\n' } } });
       expect((w.structuredContent as { ok: boolean }).ok).toBe(true);
@@ -81,6 +86,25 @@ describe('STDIO surfaces', () => {
       expect(((r2.structuredContent as { data: { files: Array<{ content: string }> } }).data).files[0]?.content).toBe('beta\n');
     } finally {
       await client.close();
+    }
+  }, 60_000);
+
+  it('owner opt-in restores all four sub-agent operations to the STDIO catalog', async () => {
+    const enabledCfg = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-cstdio-enabled-'));
+    try {
+      saveGlobalConfig(statePaths(enabledCfg).configFile, GlobalConfigSchema.parse({ exposeSubagentsToMcp: true }));
+      execFileSync('node', [CLI, 'trust', '--mode', 'trusted', '--yes'], { cwd: fixture, env: { ...process.env, DODO_CONFIG_DIR: enabledCfg }, stdio: 'pipe' });
+      const { client, transport } = spawnClient(fixture, enabledCfg, []);
+      await client.connect(transport);
+      try {
+        const names = (await client.listTools()).tools.map((tool) => tool.name);
+        expect(names).toEqual(TOOL_CATALOG.map((tool) => tool.name));
+        expect(names.slice(-4)).toEqual(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']);
+      } finally {
+        await client.close();
+      }
+    } finally {
+      fs.rmSync(enabledCfg, { recursive: true, force: true });
     }
   }, 60_000);
 });

@@ -16,11 +16,19 @@ Desktop tools ทำงานกับ application ที่เจ้าขอ�
 
 1. ตรวจด้วย `dodo setup --check`
 2. ให้ OS permission เองตาม platform
-3. เพิ่ม app identifier แบบ exact ผ่าน Local Config หรือ CLI
+3. เพิ่ม app identifier แบบ exact ผ่าน Local Config หรือ CLI หากใช้ `--persist` จะจำครั้งเดียวระดับ DODO installation และใช้ต่อได้ทุกโปรเจกต์
 4. เรียก status/view ก่อน action
 5. ทุก action ต้องใช้ target scope, owner permission, trust และ approval ตาม policy
 
 Desktop action เป็น effectful operation ใช้ idempotency และ observation freshness เพื่อป้องกัน action กับหน้าต่างที่เปลี่ยนไปแล้ว หากผลลัพธ์ไม่แน่นอน ระบบไม่ retry เอง
+
+```bash
+dodo desktop allow --app com.google.Chrome --mode control --persist --yes
+```
+
+คำสั่งนี้รันจาก path ใดก็ได้ สิทธิ์ Screen Recording/Accessibility ของ macOS ยังเป็น
+สิทธิ์ระดับ OS ที่เจ้าของต้องอนุญาตเอง Persistent consent ไม่ข้าม OAuth `dodo:exec`,
+workspace ID/epoch, current snapshot, idempotency หรือ app allowlist
 
 ## Limitations
 

@@ -3,7 +3,7 @@ import { defineTool, policyGate } from './context.js';
 import { DesktopActionSchema, WindowSchema, AccessibilitySchema, CaptureSchema } from '../services/desktop/protocol.js';
 export const desktopStatusTool = defineTool({
     name: 'desktop_status', title: 'Desktop capability and permission status',
-    description: 'Check DODO desktop permission for this workspace/epoch and macOS helper availability. persistent=true means the owner explicitly saved app consent for this path until disabled; expiresAt=null means no grant expiry. Snapshots still expire within 30 seconds. Does not capture the screen or prompt for OS permission. Desktop access is OFF until the owner enables it locally; trusted/bypass do not enable it.',
+    description: 'Check DODO native desktop permission and helper availability. persistent=true means the owner explicitly saved named-app consent once for this DODO installation until disabled; expiresAt=null means no grant expiry. Temporary grants remain workspace/epoch-bound and snapshots still expire within 30 seconds. Does not capture the screen or prompt for OS permission. Desktop access is OFF until the owner enables it locally; trusted/bypass do not enable it.',
     input: {}, output: z.looseObject({}), requiredScope: 'dodo:read', action: 'read',
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     handler: async (_args, ctx) => ({ data: await ctx.services.desktop.status() }),

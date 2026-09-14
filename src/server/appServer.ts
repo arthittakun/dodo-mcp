@@ -1,3 +1,4 @@
+import { InstallationRuntime } from './installationRuntime.js';
 import { instructionsFor } from './instructions.js';
 import http from 'node:http';
 import { ipcEndpointPresent } from '../ipc/authentication.js';
@@ -99,8 +100,9 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const launcherRoot = launcherConfig ? statePaths(launcherConfig.dir).launcherWorkspaceDir : undefined;
 
   // ---- workspace bootstrap (initial root, and later roots for a switch) ----
-  // The launcher root is private and inert. Public MCP/OAuth routes are gated
-  // until the owner switches to a real project through Local Config/CLI.
+  // The launcher root is private and inert. It may expose the authenticated
+  // catalog, but every operation remains denied until a project ACL is set or
+  // the caller explicitly targets an authorized registered project.
   const launcherBootstrap = launcherRoot !== undefined && launcherConfig !== undefined
     ? { rootOverride: launcherRoot, configDir: launcherConfig }
     : opts.rootOverride !== undefined
@@ -119,6 +121,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // Tool exposure only — never permissions (ADR-029). HTTP defaults to the
   // compact gateway surface so remote clients ingest a small catalog.
   const surface: ToolSurface = opts.toolSurface ?? config.toolSurface ?? 'compact';
+  const surfaceFeatures = { subagents: config.exposeSubagentsToMcp };
   const bootstrapFor = (root: string): BootstrappedWorkspace => {
     const ws = bootstrapWorkspace({
       invokedCwd: opts.invokedCwd,
@@ -176,15 +179,6 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, authConfigured: !locked, workspaceSelected });
   });
 
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    if (workspaceSelected) { next(); return; }
-    res.status(503).setHeader('Cache-Control', 'no-store').json({
-      error: 'workspace_required',
-      error_description: 'No project is active. The owner must select or add one in the private Local Config page or dodo --cli.',
-      path: req.path === '/mcp' ? '/mcp' : undefined,
-    });
-  });
-
   let mcpHandlerClose: (() => Promise<void>) | undefined;
 
   if (locked) {
@@ -210,6 +204,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       workspaceId: () => active().workspaceId,
     });
     const verifier = buildTokenVerifier({
+      targetRouting: true,
       issuer: issuer as string,
       resourceUrl: resourceUrl as string,
       jwks,
@@ -258,13 +253,13 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     // Per-request server instances: the catalog binds to whatever workspace
     // is active when the request arrives.
     const factory: McpServerFactory = () => {
-      const server = new McpServer({ name: 'dodo', version: DODO_VERSION, title: 'DODO workspace server' }, { instructions: instructionsFor(surface) });
+      const server = new McpServer({ name: 'dodo', version: DODO_VERSION, title: 'DODO workspace server' }, { instructions: instructionsFor(surface, surfaceFeatures) });
       const workspace = active();
       registerSurface(server, { ...workspace.services, beginTool: () => {
         const host = hostRef.host;
         if (closing || (host && (host.state() !== 'ready' || host.current() !== workspace))) throw new DodoError('STALE_WORKSPACE', 'workspace changed; call project_overview again');
         return host ? host.inflight.enter() : () => undefined;
-      } }, surface);
+      } }, surface, surfaceFeatures);
       return server;
     };
     const mcpHandler = createMcpHandler(factory, {
@@ -274,11 +269,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     mcpHandlerClose = mcpHandler.close;
     const nodeHandler = toNodeHandler(mcpHandler, { onerror: (err) => log(`[dodo] mcp-adapter: ${err.message}`) });
 
+    const pendingBodies = new WeakMap<Request, () => void>();
     // Switch gate + in-flight accounting: while the owner switches workspace,
     // new calls are told to retry; calls already running are drained first.
-    const switchGate = (_req: Request, res: Response, next: NextFunction) => {
+    const switchGate = (req: Request, res: Response, next: NextFunction) => {
+      pendingBodies.get(req)?.();
       const host = hostRef.host;
-      if (closing || (host && host.state() !== 'ready')) {
+      const targeted = typeof (req.body as {params?:{arguments?:{targetProjectId?:unknown}}} | undefined)?.params?.arguments?.targetProjectId === 'string';
+      if (closing || (!targeted && host && host.state() !== 'ready')) {
         res
           .status(503)
           .setHeader('Retry-After', '2')
@@ -286,7 +284,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
           .json({ error: 'workspace_switching', error_description: 'the owner is switching the active workspace; retry in a moment and call project_overview again' });
         return;
       }
-      const done = host ? host.inflight.enter() : () => undefined;
+      const done = host && !targeted ? host.inflight.enter() : () => undefined;
       res.once('close', done);
       res.once('finish', done);
       next();
@@ -294,12 +292,16 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
 
     app.all(
       '/mcp',
-      switchGate,
+      (req: Request, res: Response, next: NextFunction) => {
+        const done = hostRef.host ? hostRef.host.inflight.enter() : () => undefined;
+        pendingBodies.set(req,done); res.once('close',done); res.once('finish',done); next();
+      },
       requireBearerAuth({
         verifier,
         resourceMetadataUrl: getOAuthProtectedResourceMetadataUrl(new URL(resourceUrl as string)),
       }),
       express.json({ limit: limits.requestBodyBytes }),
+      switchGate,
       (req: Request, res: Response) => {
         res.setHeader('Cache-Control', 'no-store');
         void nodeHandler(req, res, req.body);
@@ -342,11 +344,11 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       }
     });
     httpServer.listen(port, '127.0.0.1', () => resolve());
-  });
+  }).catch(async error => { await mcpHandlerClose?.(); await ws0.shutdownServices(); installDb.close(); throw error; });
   const actualPort = (httpServer.address() as net.AddressInfo).port;
   {
-    const stats = surfaceStats(surface);
-    log(`[dodo] mcp tool surface | transport=http | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes}`);
+    const stats = surfaceStats(surface, surfaceFeatures);
+    log(`[dodo] mcp tool surface | transport=http | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'}`);
   }
 
   function closeHttp(): Promise<void> {
@@ -389,12 +391,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     }
     throw err;
   }
+  const installation = new InstallationRuntime(ws0, active, resourcesFor, log, [21730, 21731, actualPort, opts.configPort ?? config.configPort]);
   hostRef.host = createWorkspaceHost({
     initial: ws0,
     initialResources,
     bootstrap: bootstrapFor,
     resources: resourcesFor,
     isRootServedElsewhere,
+    busy: () => installation.busy(active().workspaceId),
     log,
     ...(opts.drainTimeoutMs !== undefined ? { drainTimeoutMs: opts.drainTimeoutMs } : {}),
   });
@@ -403,8 +407,11 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   if (workspaceSelected) startSchedules(ws0);
   theHost.onSwitch(next => {
     workspaceSelected = true;
+    installation.attach(next);
     startSchedules(next);
   });
+
+  installation.defaultReady = () => theHost.state() === 'ready';
 
   // ---- owner-only Local Config plane ------------------------------------
   let localConfig: LocalConfigServer | undefined;
@@ -418,10 +425,12 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         ...(opts.tunnelRuntime ? { tunnelRuntime: opts.tunnelRuntime } : {}),
         log,
       });
+      installation.ai.settings.ports.push(Number(new URL(localConfig.url).port));
     }
   } catch (err) {
     await closeHttp();
     await mcpHandlerClose?.();
+    await installation.close();
     await theHost.close();
     try {
       installDb.close();
@@ -443,6 +452,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
           await closeHttp();
           await jobsClosed;
           await mcpHandlerClose?.();
+          await installation.close();
           await theHost.close(); // current IPC socket + current workspace services
           try { installDb.close(); } catch { /* already closed */ }
         } catch { /* shutdown is best effort */ }
@@ -459,7 +469,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     workspaceSelected ? `Workspace ID: ${workspaceId}  |  epoch: ${epoch}` : 'Workspace ID: (ยังไม่สร้าง context สำหรับ AI)',
     `MCP: http://127.0.0.1:${actualPort}/mcp`,
     locked ? `Public: (not configured — server is LOCKED; run: dodo init --public-url https://your-host)` : `Public: ${issuer}/mcp`,
-    !workspaceSelected ? 'Auth: waiting for owner to select a workspace — all tool access refused' : locked ? 'Auth: LOCKED / setup required — all tool access refused' : `Auth: OAuth enabled  |  Policy: ${services.trustMode()}`,
+    !workspaceSelected ? 'Auth: OAuth installation login available; project access remains denied until owner ACL assignment' : locked ? 'Auth: LOCKED / setup required — all tool access refused' : `Auth: OAuth enabled  |  Policy: ${services.trustMode()}`,
     workspaceSelected ? `Exec: ${services.trustMode() === 'trusted' ? 'allowed by trusted mode (OS-user privileges!)' : 'local approval required'}  |  OS sandbox: ${config.commandSandbox === 'off' ? 'NOT enabled' : `${config.commandSandbox} (adapter: ${services.jobs ? 'configured' : 'n/a'})`}` : 'Exec: disabled until a workspace is selected',
     'Tunnel: external / managed by you',
     `State: ${configDir}${configDirEnvVar ? ` (from ${configDirEnvVar})` : configDirSource === 'env' ? ' (from explicit environment override)' : ''}`,

@@ -32,8 +32,15 @@
   function readTheme() { try { const v = localStorage.getItem(THEME_KEY); return THEME_ORDER.includes(v) ? v : 'dark'; } catch (_e) { return 'dark'; } }
   function applyTheme(pref) {
     const effective = pref === 'system' ? (mq.matches ? 'dark' : 'light') : pref;
-    document.documentElement.dataset.theme = effective;
-    document.documentElement.dataset.themePref = pref;
+    const root = document.documentElement;
+    const changed = root.dataset.theme !== effective;
+    root.dataset.theme = effective;
+    root.dataset.themePref = pref;
+    // Some engines don't re-resolve var()-based backgrounds for elements that
+    // were styled while hidden and later shown, when only :root's theme
+    // attribute changes. Force one full style recomputation so every element
+    // picks up the new palette immediately.
+    if (changed) { root.style.display = 'none'; void root.offsetHeight; root.style.display = ''; }
     const [icon, label] = THEME_UI[pref];
     themeBtn.textContent = `${icon} ${label}`;
     themeBtn.setAttribute('aria-label', `สลับธีม: ${label}`);
@@ -47,9 +54,16 @@
   });
 
   // ---- notices (no alert()) ----
+  const alerts = () => {
+    const ui = window.DodoUI;
+    return ui && ui.alerts && ui.alerts.available() ? ui.alerts : null;
+  };
   const notice = $('notice');
   let noticeTimer = 0;
   function notify(kind, text, sticky) {
+    // Backend-confirmed successes become a toast; errors stay as the sticky
+    // inline bar (and important callers additionally raise a modal).
+    if (kind === 'success' && !sticky && alerts() && alerts().toast('success', text)) return;
     clearTimeout(noticeTimer);
     notice.dataset.kind = kind;
     notice.querySelector('.notice-icon').textContent = kind === 'success' ? '✓' : kind === 'error' ? '✕' : 'ℹ';
@@ -59,9 +73,14 @@
   }
   $('notice-close').addEventListener('click', () => { notice.hidden = true; });
 
-  // ---- confirm dialog ----
+  // ---- confirm: SweetAlert2 (vendored) first, <dialog> then confirm() fallback ----
   const dialog = $('confirm');
-  function confirmAction(title, text, okLabel) {
+  async function confirmAction(title, text, okLabel) {
+    const a = alerts();
+    if (a) {
+      const result = await a.confirm({ title, text, confirmText: okLabel || 'ยืนยัน', danger: true });
+      if (result !== null) return result;
+    }
     return new Promise((resolve) => {
       $('confirm-title').textContent = title;
       $('confirm-text').textContent = text;
@@ -131,6 +150,7 @@
       const original = button.textContent;
       button.textContent = 'คัดลอกแล้ว ✓';
       setTimeout(() => { button.textContent = original; }, 1500);
+      if (alerts()) alerts().toast('success', 'คัดลอกไปยังคลิปบอร์ดแล้ว');
     } else {
       notify('error', 'คัดลอกอัตโนมัติไม่ได้ ให้เลือกข้อความแล้วคัดลอกเอง');
     }
@@ -223,13 +243,19 @@
     $('desktop-mode').textContent = desktop ? desktop.mode : 'off';
     $('desktop-summary').textContent = desktop && desktop.mode !== 'off'
       ? desktop.persistent
-        ? `อนุญาต ${desktop.allowedApps.join(', ')} — จำไว้สำหรับโปรเจกต์นี้จนกว่าจะปิดสิทธิ์`
+        ? `อนุญาต ${desktop.allowedApps.join(', ')} — จำครั้งเดียวสำหรับ DODO ทุกโปรเจกต์จนกว่าจะปิดสิทธิ์`
         : `อนุญาต ${desktop.allowedApps.join(', ')} ถึง ${new Date(desktop.expiresAt).toLocaleTimeString()} (สิทธิ์ของ workspace รอบนี้)`
       : 'การอ่านและควบคุมหน้าต่างปิดอยู่';
     $('desktop-disable').disabled = !desktop || desktop.mode === 'off';
 
-    // permissions
+    // permissions — personal mode hides the per-project ACL/trust ceremony
+    // entirely (a short note with a tooltip replaces it); managed mode keeps
+    // every original control. Pure presentation: no scope/guard changes.
     const p = s.permissions;
+    const personalMode = Boolean(w && p && p.accessMode === 'personal');
+    $('card-perm').hidden = personalMode;
+    $('card-clients').hidden = personalMode;
+    $('personal-note').hidden = !personalMode;
     if (!w || !p) {
       $('perm-saved').textContent = 'รอเลือก workspace';
       $('perm-effective').textContent = 'รอเลือก workspace';
@@ -242,8 +268,9 @@
       $('perm-help').textContent = 'เลือกโปรเจกต์ก่อนจึงจะตั้ง trust mode ได้';
       cardState('perm', 'ready');
     } else {
-    document.querySelectorAll('#perm-form input').forEach((input) => { input.disabled = false; });
-    $('perm-save').disabled = false;
+    const personal = p.accessMode === 'personal';
+    document.querySelectorAll('#perm-form input').forEach((input) => { input.disabled = personal; });
+    $('perm-save').disabled = personal;
     $('perm-saved').textContent = MODE_LABEL[p.savedMode] || p.savedMode;
     const eff = $('perm-effective');
     eff.textContent = MODE_LABEL[p.effectiveMode] || p.effectiveMode;
@@ -258,7 +285,10 @@
     ebadge.textContent = p.effectiveMode === 'trusted' ? '⚠ trusted: รันด้วยสิทธิ์ OS ของคุณ' : `● ${MODE_TEXT[p.effectiveMode] || p.effectiveMode}`;
     ebadge.className = p.effectiveMode === 'trusted' ? 'badge warn' : 'badge ok';
     const ov = $('perm-override');
-    if (p.override) {
+    if (personal) {
+      ov.hidden = false;
+      $('perm-override-text').textContent = 'โหมดส่วนตัวมีผล: โปรเจกต์ที่เจ้าของเพิ่มพร้อมอ่าน แก้ไฟล์ และรันคำสั่งทันทีตาม OAuth token/profile scopes คำสั่งใช้สิทธิ์ OS ของคุณ ส่วน sandbox, path/secret guards และ expected hash ยังทำงาน';
+    } else if (p.override) {
       ov.hidden = false;
       $('perm-override-text').textContent = p.override === 'bypass'
         ? 'รอบนี้เปิดด้วย --bypass: ทุก action เป็น trusted และ command sandbox ค่าเริ่มต้นถูกปิด คำสั่งรันด้วยสิทธิ์ OS ของบัญชีคุณโดยไม่ถาม ค่าที่บันทึกด้านล่างจะมีผลก็ต่อเมื่อ restart โดยไม่ใช้ flag'
@@ -271,7 +301,9 @@
       if (radio) radio.checked = true;
     }
     lastSavedMode = p.savedMode;
-    $('perm-help').textContent = p.override
+    $('perm-help').textContent = personal
+      ? 'ไม่ต้องบันทึก trust แยกต่อโปรเจกต์ เปลี่ยนเป็นโหมดแยกสิทธิ์ได้จาก Settings'
+      : p.override
       ? 'บันทึกได้ แต่สิทธิ์ที่มีผลรอบนี้ยังเป็น trusted จาก override จนกว่าจะ restart โดยไม่ใช้ flag'
       : 'มีผลกับคำขอถัดไป ไม่ยกเลิกงานที่รันอยู่แล้ว';
     cardState('perm', 'ready');

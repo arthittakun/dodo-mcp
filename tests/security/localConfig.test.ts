@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
+import path from 'node:path';
 import { bootstrapWorkspace } from '../../src/server/bootstrap.js';
 import { startLocalConfig, type LocalConfigInfo } from '../../src/server/localConfig.js';
 import { addStaticClient } from '../../src/auth/clients.js';
@@ -9,7 +10,9 @@ import type { TunnelStatus } from '../../src/tunnel/supervisor.js';
 
 async function setup(runMode?: 'allow-all' | 'bypass', info: LocalConfigInfo = {}) {
   const old = process.env['DODO_CONFIG_DIR'];
-  process.env['DODO_CONFIG_DIR'] = mkTmpDir('dodo-admin-cfg-');
+  const configDir = mkTmpDir('dodo-admin-cfg-');
+  process.env['DODO_CONFIG_DIR'] = configDir;
+  saveGlobalConfig(path.join(configDir, 'config.json'), GlobalConfigSchema.parse({ accessMode: 'managed' }));
   const ws = bootstrapWorkspace({ invokedCwd: mkTmpDir('dodo-admin-root-'), log: () => {}, ...(runMode ? { runMode } : {}) });
   if (old === undefined) delete process.env['DODO_CONFIG_DIR']; else process.env['DODO_CONFIG_DIR'] = old;
   const admin = await startLocalConfig(ws, 0, info);
@@ -122,12 +125,38 @@ describe('local config boundary', () => {
       expect(html).not.toMatch(/<script>[^<]/); // no inline script blocks
       expect(html).not.toMatch(/ on[a-z]+=/); // no inline handlers
       expect(html).not.toContain(s.token);
-      const js = await fetch(`${s.url.origin}/assets/app.js`);
-      expect(js.status).toBe(200);
-      expect(js.headers.get('content-type')).toContain('javascript');
-      expect(await js.text()).not.toContain('innerHTML');
+      // Same-origin only: no CDN in the CSP and no absolute script/style URLs in the page.
+      expect(csp).not.toMatch(/https?:\/\//);
+      expect(html).not.toMatch(/(?:src|href)="https?:/);
+      // First-party scripts render untrusted values via textContent, never innerHTML.
+      for (const name of ['app.js', 'workbench.js', 'ui/dom.js', 'ui/tooltips.js', 'ui/alerts.js']) {
+        const js = await fetch(`${s.url.origin}/assets/${name}`);
+        expect(js.status, name).toBe(200);
+        expect(js.headers.get('content-type'), name).toContain('javascript');
+        expect(await js.text(), name).not.toContain('innerHTML');
+      }
+      // Vendored SweetAlert2 ships from the same origin with the pinned bytes.
+      expect((await fetch(`${s.url.origin}/assets/vendor/sweetalert2.min.js`)).status).toBe(200);
+      const vendorCss = await fetch(`${s.url.origin}/assets/vendor/sweetalert2.min.css`);
+      expect(vendorCss.status).toBe(200);
+      expect(vendorCss.headers.get('content-type')).toContain('text/css');
       expect((await fetch(`${s.url.origin}/assets/app.css`)).status).toBe(200);
       expect((await fetch(`${s.url.origin}/assets/nope.js`)).status).toBe(404);
+      // Traversal, deep paths and non-allowlisted extensions are fail-closed 404s
+      // (rawHttp bypasses fetch's client-side path normalization).
+      const port = Number(s.url.port);
+      for (const evil of [
+        '/assets/../package.json',
+        '/assets/%2e%2e/package.json',
+        '/assets/vendor/../../package.json',
+        '/assets/vendor/../app.js/../../package.json',
+        '/assets/ui/nested/too/deep.js',
+        '/assets/vendor/VERSION.txt',
+        '/assets/app.js%00.css',
+      ]) {
+        const res = await rawHttp({ port } as TestContext, { method: 'GET', path: evil, host: `127.0.0.1:${port}` });
+        expect(res.status, evil).toBe(404);
+      }
       const st = await (await fetch(`${s.url.origin}/api/state`, { headers: { authorization: `Bearer ${s.token}` } })).json() as { workspace: { switchSupported: boolean }; connection: { mcpLocalUrl: string | null } };
       expect(st.workspace.switchSupported).toBe(false);
       expect(st.connection.mcpLocalUrl).toBeNull();

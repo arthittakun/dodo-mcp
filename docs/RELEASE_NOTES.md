@@ -10,8 +10,12 @@
   active AI workspace แทนการใช้ CWD โดยอัตโนมัติ; `--root` เลือกและจำ root แบบ explicit
 - Local Config เพิ่มโปรเจกต์แล้วเปิดได้ทันที และรองรับสถานะก่อนเลือก workspace
 - `dodo start` และ Local Config รับ Cloudflare token แบบ run-scoped ไม่บันทึกลงเครื่อง และหยุด child พร้อม DODO
-- การเลือก startup project ไม่เพิ่ม authority และ MCP/OAuth ถูกปิดด้วย
-  `workspace_required` จนกว่า real workspace จะพร้อม
+- เพิ่ม personal mode เป็นค่าเริ่มต้น: owner เพิ่ม project, connection และ profile แล้วใช้
+  ได้ทันทีตาม OAuth/profile scopes โดยไม่ตั้ง ACL/trust/egress ซ้ำ; managed mode เดิมยังมี
+- persistent Desktop/Chrome named-app consent เป็นระดับ installation อนุญาตครั้งเดียว
+  จาก directory ใดก็ได้ ขณะที่ OS permission, scopes, snapshots และ app allowlist ยังตรวจครบ
+- เพิ่มสวิตช์ Settings สำหรับ expose Sub-agent operations ให้ MCP โดยค่าเริ่มต้นปิด;
+  หน้าเว็บ Chat & Tasks ยังใช้ agent ได้ และการเปิดสวิตช์ไม่เพิ่มสิทธิ์ใด ๆ
 
 ### DodoBench และ release evidence
 

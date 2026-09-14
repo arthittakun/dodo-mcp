@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
-import { COMPACT_CATALOG, HYBRID_CATALOG } from '../../src/tools/surface.js';
+import { COMPACT_CATALOG, HYBRID_CATALOG, surfaceCatalog } from '../../src/tools/surface.js';
 import { resolveTrustedExecutable } from '../../src/platform/execResolve.js';
 import { batchInvocation } from '../../src/platform/shell.js';
 
@@ -72,9 +72,23 @@ describe('PACK: npm tarball', () => {
   });
 
   it('PACK-07: ships the Local Config UI assets next to the compiled server', () => {
-    for (const asset of ['dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js']) {
+    for (const asset of [
+      'dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js',
+      'dist/server/configUi/workbench.js', 'dist/server/configUi/workbench.css',
+      'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
+      'dist/server/configUi/vendor/sweetalert2.min.js', 'dist/server/configUi/vendor/sweetalert2.min.css',
+    ]) {
       expect(fileList, asset).toContain(asset);
     }
+    // The UI never loads anything from a CDN: no absolute script/style URLs.
+    const html = fs.readFileSync(path.join(ROOT, 'src/server/configUi/index.html'), 'utf8');
+    expect(html).not.toMatch(/(?:src|href)="https?:/);
+    const appCss = fs.readFileSync(path.join(ROOT, 'src/server/configUi/app.css'), 'utf8');
+    expect(appCss).not.toMatch(/(?:linear|radial|conic)-gradient\s*\(/i);
+    // The vendored SweetAlert2 matches the pinned devDependency byte-for-byte.
+    const pinned = fs.readFileSync(path.join(ROOT, 'node_modules/sweetalert2/dist/sweetalert2.min.js'));
+    const vendored = fs.readFileSync(path.join(ROOT, 'src/server/configUi/vendor/sweetalert2.min.js'));
+    expect(vendored.equals(pinned)).toBe(true);
   });
 
   it('PACK-08: ships the desktop helper source without installing or enabling desktop access', () => {
@@ -211,7 +225,7 @@ describe('PACK: npm tarball', () => {
       expect(e.ok).toBe(true); expect(e.data.root).toBe(fs.realpathSync(root));
       const read = await client.callTool({name:'read_files',arguments:{workspaceId:e.workspaceId,workspaceEpoch:e.workspaceEpoch,files:[{path:'proof.txt'}]}});
       expect(JSON.stringify(read.structuredContent)).toContain('packed fixture');
-      expect((await client.listTools()).tools).toHaveLength(TOOL_CATALOG.length);
+      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
     } finally {await client.close();}
   });
 
@@ -223,12 +237,20 @@ describe('PACK: npm tarball', () => {
     expect(hybrid.toolCount).toBe(49);
     expect(hybrid.tools.map((t) => t.name)).toEqual(HYBRID_CATALOG.map((t) => t.name));
     const compact = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/tools.compact.json'), 'utf8')) as {
-      toolCount: number; fullToolCount: number; stats: { compact: { schemaBytes: number }; full: { schemaBytes: number } };
+      toolCount: number; defaultLiveToolCount: number; fullToolCount: number; defaultLiveFullToolCount: number;
+      optionalMcpFeatures: { subagents: { default: boolean; operations: string[] } };
+      stats: { compact: { schemaBytes: number }; full: { schemaBytes: number } };
       tools: Array<{ name: string; inputSchema: { additionalProperties: unknown }; operations?: string[] }>;
     };
     expect(compact.toolCount).toBe(COMPACT_CATALOG.length);
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
+    expect(compact.defaultLiveToolCount).toBe(19);
+    expect(compact.defaultLiveFullToolCount).toBe(121);
+    expect(compact.optionalMcpFeatures.subagents).toMatchObject({
+      default: false,
+      operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
+    });
     expect(compact.tools.map((t) => t.name)).toEqual(COMPACT_CATALOG.map((t) => t.name));
     for (const t of compact.tools) expect(t.inputSchema.additionalProperties, t.name).toBe(false);
     expect(compact.stats.compact.schemaBytes).toBeLessThan(compact.stats.full.schemaBytes * 0.5);

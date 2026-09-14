@@ -358,7 +358,7 @@ export class ContextEngineService {
       evidence: { current: byFreshness.get('current') ?? 0, stale: byFreshness.get('stale') ?? 0, unavailable: byFreshness.get('unavailable') ?? 0 },
       metrics: { queries, cacheHits: hits, cacheHitRate: queries ? hits / queries : 0, averageLatencyMs: queries ? (metrics?.['total_latency_ms'] ?? 0) / queries : 0, candidates: metrics?.['candidates'] ?? 0, returned: metrics?.['returned'] ?? 0, staleTransitions: metrics?.['stale_transitions'] ?? 0, lastTermCoverage: metrics?.['last_term_coverage'] ?? 0, lastQueryAt: metrics?.['last_query_at'] ?? null },
       sources: this.baseSourceStatus(),
-      note: 'Cache entries and evidence are scoped to the active workspace and caller. Every reuse rechecks live ACL and source dependencies.',
+      note: 'Cache entries and evidence are scoped to the active workspace and caller. Every reuse rechecks live target authority and source dependencies.',
     };
   }
 
@@ -747,7 +747,7 @@ export class ContextEngineService {
       { source: 'semantic_graph', status: this.services.brain ? 'available' : 'unavailable', note: this.services.brain ? 'Project Brain rows are source-hash verified.' : 'Project Brain is unavailable.' },
       { source: 'git', status: 'available', note: 'Availability is checked per query.' },
       { source: 'memory', status: this.services.memory ? 'available' : 'unavailable', note: this.services.memory ? 'Owner-reviewed memory is source-verified per query.' : 'Durable memory service is unavailable.' },
-      { source: 'runtime', status: this.services.runtime ? 'available' : 'unavailable', note: this.services.runtime ? 'Caller-scoped bounded runtime metadata with live ACL and source-hash verification.' : 'Runtime Intelligence is unavailable.' },
+      { source: 'runtime', status: this.services.runtime ? 'available' : 'unavailable', note: this.services.runtime ? 'Caller-scoped bounded runtime metadata with live target authority and source-hash verification.' : 'Runtime Intelligence is unavailable.' },
     ];
   }
 

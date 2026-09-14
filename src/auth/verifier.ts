@@ -16,6 +16,8 @@ export interface VerifierOptions {
   jwks: JwksFile;
   /** Static binding (stdio / tests). */
   workspaceId?: string;
+  /** HTTP defers only target binding, never token identity validation. */
+  targetRouting?: boolean;
   store?: Store;
   /**
    * Per-call binding: the ACTIVE workspace of a `dodo start` process can be
@@ -62,12 +64,13 @@ export function buildTokenVerifier(opts: VerifierOptions): OAuthTokenVerifier {
         throw new OAuthError(OAuthErrorCode.InvalidToken, 'client mismatch');
       }
       const identityGrant = payload['dodo_auth'] === 2 && store.getMeta(`identity-grant:${grantId}`) === '2';
-      if (!identityGrant && (grant.workspaceId !== workspaceId || tokenWs !== workspaceId)) {
+      if (!identityGrant && (tokenWs !== grant.workspaceId || (!opts.targetRouting && tokenWs !== workspaceId))) {
         // Token from another workspace on the same hostname: consent is
         // per-workspace; never disclose the current root in the refusal.
         throw new OAuthError(OAuthErrorCode.InvalidToken, 'token is not valid for this workspace');
       }
       let scopes = typeof payload['scope'] === 'string' ? (payload['scope'] as string).split(' ').filter(Boolean) : [];
+      const tokenScopes = [...scopes];
       {
         const access = store.clientAccess(workspaceId, clientId);
         scopes = scopes.filter((scope) => access.includes(scope) && grant.scopes.includes(scope));
@@ -81,6 +84,8 @@ export function buildTokenVerifier(opts: VerifierOptions): OAuthTokenVerifier {
         expiresAt: exp,
         resource: new URL(opts.resourceUrl),
         extra: {
+          tokenScopes,
+          identityGrant,
           grantId,
           workspaceId,
           sub: typeof payload['sub'] === 'string' ? payload['sub'] : 'owner',

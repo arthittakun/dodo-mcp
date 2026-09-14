@@ -28,9 +28,10 @@ Config page without restarting, re-authorizing OAuth clients, or losing state.
   pending approvals of the old workspace/epoch → audit.
 - Any failure before commit discards the half-built workspace and leaves the
   old one serving; failures after commit are logged and never roll back.
-- Nothing is copied between workspaces: the new root's saved trust mode and
-  client ACL rows apply; a client without an ACL row is refused until the
-  owner allows it; context captured from the old workspace fails
+- Nothing is copied between workspaces. Managed mode uses the new root's saved
+  trust mode and client ACL rows; personal mode derives trusted policy and
+  target scopes from the owner-approved installation grant. In both modes,
+  context captured from the old workspace fails
   `WORKSPACE_MISMATCH` / `STALE_WORKSPACE`; plans expire; the run mode
   (`--allow --all` / `--bypass`) is a per-process owner capability and
   carries over.

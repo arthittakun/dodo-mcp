@@ -27,8 +27,14 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 19 tools
-- STDIO default: Full 121 tools (Core 104 + Advanced Agent Runtime 17)
+- STDIO default: Full 121 tools; เปิด Sub-agent MCP exposure แล้วเป็น 125
 - explicit Hybrid: 49 tools
+
+Complete capability schema มี 125 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
+ซ่อน `subagent_spawn/status/result/control` จาก MCP เท่านั้น หน้าเว็บ Chat & Tasks ยัง
+ใช้ได้ Compact/Hybrid คงจำนวน 19/49 tool names แต่กรอง operation enum, instructions
+และ discover index ให้ตรงกับ live runtime หลังเปลี่ยนค่าต้อง restart และให้ client
+โหลด catalog ใหม่
 - explicit override: `--tools compact|full|hybrid`
 
 Surface เปลี่ยนจำนวน tools ที่ expose เท่านั้น ไม่เปลี่ยน permission หรือ security policy
@@ -72,3 +78,15 @@ DodoBench local fixture ใช้ยืนยัน contract บน platform/rev
 ติดตั้ง Playwright Chromium เพื่อรัน browser case จริง Dedicated self-hosted GitHub
 Actions รัน Linux Docker และ Windows native candidate เฉพาะ trusted main/manual
 Windows manual acceptance ยังคง `MANUAL_NOT_RUN` จนกว่าจะทดสอบบน Windows 11 จริง
+
+## AI Providers / Multi-project
+
+Full เพิ่ม `subagent_spawn/status/result/control` เป็น 125 tools Compact ยังคง 19 และ
+Hybrid 49 โดยใช้ assist gateways เดิม Full/Compact รองรับ optional `targetProjectId`
+STDIO default ยัง Full; HTTP default ยัง Compact Refresh/recreate MCP app ตาม client
+เพื่อรับ schema ใหม่ รัน `project_overview` ใหม่ก่อนใช้ epoch หลัง restart
+
+Protocol fixtures ครอบคลุม Responses, Gemini Interactions, Anthropic, Chat Completions
+และ Ollama Native ทั้งเจ็ด presets ซึ่งไม่เท่ากับ live API/model compatibility ของแต่ละ
+account Session credentials ใช้ได้โดยไม่ต้อง Keychain; persistent Keychain ตรวจบน macOS
+Linux Docker และ live providers ต้องดูผลแยกใน TEST_REPORT ไม่ใช้ผล macOS แทน

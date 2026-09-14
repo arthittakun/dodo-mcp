@@ -3,7 +3,8 @@ import type Provider from 'oidc-provider';
 import type { Store } from '../store/store.js';
 import { phraseFor } from '../util/hash.js';
 import { ALL_SCOPES } from '../security/policy.js';
-import { OWNER_ACCOUNT_ID } from './constants.js';
+import { INSTALLATION_AUTHORITY_EPOCH, INSTALLATION_AUTHORITY_ID, OWNER_ACCOUNT_ID } from './constants.js';
+import { isPersonalMode } from '../security/accessMode.js';
 
 /**
  * Owner-consent interactions (spec §8.4).
@@ -27,10 +28,10 @@ export interface InteractionRouterOptions {
   provider: Provider;
   store: Store;
   resourceUrl: string;
-  /** Static binding (tests). */
+  /** @deprecated OAuth consent is installation-scoped; retained for source compatibility. */
   workspaceId?: string;
   epoch?: string;
-  /** Per-request binding: the active workspace may be switched at runtime (ADR-019). */
+  /** @deprecated OAuth consent no longer follows the selected workspace. */
   active?: () => { workspaceId: string; epoch: string };
 }
 
@@ -43,11 +44,7 @@ interface OAuthApprovalSummary {
 
 export function interactionRouter(opts: InteractionRouterOptions): Router {
   const { provider, store } = opts;
-  const active = (): { workspaceId: string; epoch: string } => {
-    if (opts.active) return opts.active();
-    if (opts.workspaceId === undefined || opts.epoch === undefined) throw new Error('interactionRouter needs workspaceId+epoch or active()');
-    return { workspaceId: opts.workspaceId, epoch: opts.epoch };
-  };
+  const authority = { workspaceId: INSTALLATION_AUTHORITY_ID, epoch: INSTALLATION_AUTHORITY_EPOCH };
   const router = Router();
 
   router.get('/interaction/:uid', async (req: Request, res: Response) => {
@@ -60,7 +57,7 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
       const requested = typeof params['scope'] === 'string' ? (params['scope'] as string).split(' ').filter(Boolean) : [];
       const scopes = requested.filter((s) => (ALL_SCOPES as string[]).includes(s));
       const effectiveScopes = scopes.length > 0 ? scopes : [...ALL_SCOPES];
-      const { workspaceId, epoch } = active();
+      const { workspaceId, epoch } = authority;
       const existing = store.getApproval(details.uid);
       if (existing && (existing.workspaceId !== workspaceId || existing.epoch !== epoch)) {
         res.status(400).send('Workspace changed; start a fresh authorization request.'); return;
@@ -90,7 +87,7 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
         .type('html')
         .setHeader('Cache-Control', 'no-store')
         .setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'")
-        .send(interactionPage(details.uid, phraseFor(details.uid), clientId, effectiveScopes));
+        .send(interactionPage(details.uid, phraseFor(details.uid), clientId, effectiveScopes, isPersonalMode(store)));
     } catch {
       res.status(400).type('text/plain').send('Unknown or expired authorization request.');
     }
@@ -114,7 +111,7 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
         res.status(403).json({ error: 'bad interaction header' });
         return;
       }
-      const { workspaceId, epoch } = active();
+      const { workspaceId, epoch } = authority;
       const approval = store.getApproval(details.uid);
       if (!approval || approval.kind !== 'oauth' || approval.workspaceId !== workspaceId || approval.epoch !== epoch || approval.status !== 'approved') {
         res.status(403).json({ error: 'not approved' });
@@ -153,7 +150,6 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
         scopes: summary.scopes,
       });
       store.setMeta(`identity-grant:${grantId}`, '2');
-      store.setClientAccess(workspaceId, clientId, summary.scopes);
       const returnTo = await provider.interactionResult(
         req,
         res,
@@ -169,19 +165,20 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
   return router;
 }
 
-function interactionPage(uid: string, phrase: string, clientId: string, scopes: string[]): string {
+function interactionPage(uid: string, phrase: string, clientId: string, scopes: string[], personal: boolean): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
   return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>DODO authorization</title>
 <body style="font-family:system-ui;max-width:38rem;margin:3rem auto;line-height:1.5;padding:0 1rem">
 <h1 style="font-size:1.4rem">Authorize this connection on your terminal</h1>
-<p>A client is asking for access to a DODO workspace.</p>
+<p>A client is asking to connect to this DODO installation.</p>
+<p><strong>${personal ? 'Personal mode is active.' : 'Managed mode is active.'}</strong> ${personal ? 'After local approval, this client can use owner-registered projects according to these OAuth scopes; no second project permission step is needed.' : 'This login grants no project access. The owner assigns each project and its read/write/exec scopes later in Local Config.'}</p>
 <table style="border-collapse:collapse">
 <tr><td style="padding:.2rem .8rem .2rem 0;color:#555">Request ID</td><td><code>${esc(uid)}</code></td></tr>
 <tr><td style="padding:.2rem .8rem .2rem 0;color:#555">Check phrase</td><td><strong>${esc(phrase)}</strong></td></tr>
 <tr><td style="padding:.2rem .8rem .2rem 0;color:#555">Client</td><td><code>${esc(clientId)}</code></td></tr>
 <tr><td style="padding:.2rem .8rem .2rem 0;color:#555">Scopes</td><td><code>${esc(scopes.join(' '))}</code></td></tr>
 </table>
-<p>On the machine running DODO, verify the same request ID, phrase, client, callback URL and workspace with:</p>
+<p>On the machine running DODO, verify the same request ID, phrase, client and callback URL with:</p>
 <pre style="background:#f4f4f4;padding:.6rem">dodo auth pending
 dodo auth approve -- ${esc(uid)}</pre>
 <p id="st" aria-live="polite">Waiting for local approval…</p>
