@@ -20,7 +20,7 @@ npm pack
 - build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 82 files PASS, 2 files platform-skipped; 594 tests PASS, 31 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 82 files PASS, 2 files platform-skipped; 595 tests PASS, 31 tests platform/prerequisite-skipped
 - packaging: 16 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum

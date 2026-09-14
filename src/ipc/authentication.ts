@@ -65,7 +65,13 @@ export function ipcIdentity(locator: string): string | undefined {
     // descriptor (Windows ACL probes can take longer than shutdown). Treat it
     // as absent only after rechecking both paths; malformed or non-private
     // endpoints that still exist must continue to fail closed.
-    if (!ipcEndpointPresent(locator)) return undefined;
+    // existsSync also returns false for access errors. Only actual ENOENT on
+    // both paths proves disappearance; denied/unreadable paths are not success.
+    const gone = [credentialPath(locator), locator].every(file => {
+      try { fs.lstatSync(file); return false; }
+      catch (missing) { return (missing as NodeJS.ErrnoException).code === 'ENOENT'; }
+    });
+    if (gone) return undefined;
     throw error;
   }
   return socketIdentity + createHash('sha256').update(c.token + c.nonce).digest('hex');

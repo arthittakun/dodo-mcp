@@ -85,6 +85,21 @@ describe('authenticated owner IPC (real sockets/pipes)', () => {
     finally { spy.mockRestore(); await close(server); }
   });
 
+  it('does not classify an access-denied descriptor as a completed shutdown', async () => {
+    const file = locator(), server = await startIpcServer(file, async () => 'ok');
+    const descriptor = credentialPath(file), read = fs.readFileSync, exists = fs.existsSync;
+    let denied = false;
+    // existsSync returns false for EACCES too. Simulate an access change after
+    // the initial check; the endpoints still exist and must not count as gone.
+    const existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation(p => denied && (p === file || p === descriptor) ? false : exists(p));
+    const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation((...args: Parameters<typeof fs.readFileSync>) => {
+      if (args[0] === descriptor) { denied = true; throw Object.assign(new Error('fixture access denied'), { code: 'EACCES' }); }
+      return read(...args);
+    });
+    try { expect(() => ipcIdentity(file)).toThrow('fixture access denied'); }
+    finally { readSpy.mockRestore(); existsSpy.mockRestore(); await close(server); }
+  });
+
   it('rejects a legacy unauthenticated command before dispatch', async () => {
     const file = locator(); let calls = 0;
     const server = await startIpcServer(file, async () => { calls++; return 'forbidden'; });
