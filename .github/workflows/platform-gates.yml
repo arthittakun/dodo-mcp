@@ -127,6 +127,13 @@ jobs:
           }
           git --version
           if ($LASTEXITCODE -ne 0) { throw "Git is unavailable for source revision verification" }
+          # Configure an existing persistent checkout before actions/checkout
+          # refreshes its index. A brand-new checkout is governed by the
+          # repository's .gitattributes instead.
+          if (Test-Path -LiteralPath (Join-Path $env:GITHUB_WORKSPACE ".git")) {
+            git -C $env:GITHUB_WORKSPACE config --local core.autocrlf false
+            if ($LASTEXITCODE -ne 0) { throw "could not configure canonical checkout bytes" }
+          }
       - name: Checkout trusted main revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -144,9 +151,13 @@ jobs:
           tar.exe -xf $archive -C $env:GITHUB_WORKSPACE
           if ($LASTEXITCODE -ne 0) { throw "could not materialize the trusted checkout" }
           Remove-Item -LiteralPath $archive -Force
+          git update-index --really-refresh
+          if ($LASTEXITCODE -ne 0) { throw "could not refresh the canonical checkout index" }
           $expected = git rev-parse HEAD:package-lock.json
           $actual = git hash-object --no-filters package-lock.json
           if ($expected -ne $actual) { throw "checkout bytes do not match the trusted Git object" }
+          $dirty = @(git status --porcelain --untracked-files=no)
+          if ($dirty.Count -ne 0) { throw "canonical checkout retained tracked changes ($($dirty.Count) path(s))" }
       - name: Use Node ${{ matrix.node }}
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
