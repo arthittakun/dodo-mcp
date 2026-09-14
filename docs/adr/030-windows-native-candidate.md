@@ -42,18 +42,20 @@ budget, never deleting a destination or clearing read-only attributes to force
 a write. Preserve BOM and CRLF bytes in source edits.
 
 OAuth, workspace/client ACLs, trust modes, per-action approvals, journals and
-compact/hybrid/full exposure retain their existing authority. Windows has no
-DODO command sandbox; requested sandboxing fails closed. Schedules require an
-explicit unsandboxed specification and separate local owner approval. Desktop
-and macOS speech remain unsupported on Windows; no silent privilege downgrade.
+compact/hybrid/full exposure retain their existing authority. The current
+candidate includes Windows sandbox integration with native status/confinement
+receipt checks, a C# desktop helper and SAPI speech. These are optional backends:
+missing prerequisites or required confinement must fail closed, not silently
+run unsandboxed. Source availability is not proof of positive native acceptance;
+see WINDOWS.md for outstanding Windows 11, desktop and confinement gates.
 
 ## Compatibility and rollout
 
 The project keeps its current baseline while the Windows support status remains
-EXPERIMENTAL until the proposal's native gates pass. Add an allow-failure
-Windows Node 22/24 CI evidence job first; do not skip entire legacy suites to
-produce green results. Only after native tests and Windows 11 manual acceptance
-may that job become required and documentation say supported.
+EXPERIMENTAL until the proposal's native gates pass. The current Windows Node
+22/24 CI jobs fail the workflow on test failure; do not skip legacy assertions
+to produce green results. A green automated workflow does not replace Windows 11
+manual acceptance or by itself permit documentation to say supported.
 
 The IPC protocol intentionally has no unauthenticated fallback. Owners
 must stop running servers from the existing installation or terminal before

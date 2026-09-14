@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sourceFingerprint } from './gate-evidence.mjs';
+import { privateCommand } from './gate-command.mjs';
 
+let initializedLog;
+function main() {
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 let nodeVersion = '22';
@@ -16,12 +19,19 @@ for (let index = 2; index < process.argv.length; index += 1) {
   else throw new Error(`unknown argument: ${arg}`);
 }
 if (!['22', '24'].includes(nodeVersion)) throw new Error('--node must be 22 or 24');
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+outputDir ||= path.join(root, 'release-evidence', pkg.version, `linux-docker-node${nodeVersion}-${stamp}`);
+fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+for (const file of ['gate-report.json', 'docker-verification.json', 'linux-driver.log']) {
+  if (fs.existsSync(path.join(outputDir, file))) throw new Error('use a fresh evidence directory');
+}
+const driverLog = path.join(outputDir, 'linux-driver.log');
+fs.writeFileSync(driverLog, '', { flag: 'wx', mode: 0o600 });
+initializedLog = driverLog;
 
 function run(program, args, options = {}) {
-  const result = spawnSync(program, args, {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: options.capture ? 'pipe' : 'inherit',
+  const result = privateCommand(program, args, {
+    cwd: root, logFile: driverLog,
     timeout: options.timeout ?? 45 * 60 * 1000,
     env: process.env,
   });
@@ -40,9 +50,7 @@ if (githubActionsUsed && process.env['GITHUB_SHA'] !== revision) throw new Error
 // is used only to give build/audit traffic the runner host's working resolver.
 const networkArgs = githubActionsUsed ? ['--network', 'host'] : [];
 const lockDigest = `sha256:${createHash('sha256').update(fs.readFileSync(path.join(root, 'package-lock.json'))).digest('hex')}`;
-const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-outputDir ||= path.join(root, 'release-evidence', pkg.version, `linux-docker-node${nodeVersion}-${stamp}`);
-fs.mkdirSync(outputDir, { recursive: true, mode: 0o700 });
+const fingerprint = sourceFingerprint(root);
 
 const image = `dodo-mcp-linux-gate:node${nodeVersion}`;
 const container = `dodo-mcp-linux-gate-node${nodeVersion}-${process.pid}-${Date.now()}`;
@@ -63,6 +71,7 @@ try {
     '--env', `DODO_RELEASE_GATE_SOURCE_REVISION=${revision}`,
     '--env', `DODO_RELEASE_GATE_SOURCE_DIRTY=${dirty}`,
     '--env', `DODO_RELEASE_GATE_GITHUB_ACTIONS=${githubActionsUsed}`,
+    '--env', `DODO_RELEASE_GATE_SOURCE_FINGERPRINT=${fingerprint}`,
     image,
   ]);
 } catch (error) {
@@ -90,6 +99,7 @@ if (report.host?.platform !== 'linux') throw new Error(`expected Linux evidence,
 if (report.source?.revision !== revision || report.source?.dependencyLockSha256 !== lockDigest) {
   throw new Error('Linux evidence does not match the host revision/package lock');
 }
+if (sourceFingerprint(root) !== fingerprint || report.source?.fingerprint !== fingerprint) throw new Error('candidate source changed or Docker copy differs');
 if (report.source?.dirty !== dirty || report.source?.provenance !== 'docker-host-git') {
   throw new Error('Linux evidence source attestation is invalid');
 }
@@ -111,4 +121,13 @@ const verification = {
 };
 fs.writeFileSync(path.join(outputDir, 'docker-verification.json'), `${JSON.stringify(verification, null, 2)}\n`, { mode: 0o600 });
 console.log(`[linux-docker] AUTOMATED_PASS | node=${report.host.node} | arch=${report.host.arch} | browser=${verification.browserCase}`);
-console.log(`[linux-docker] evidence=${outputDir}`);
+console.log('[linux-docker] detailed evidence retained privately');
+}
+
+try { main(); } catch (error) {
+  if (initializedLog) try {
+    fs.appendFileSync(initializedLog, `\n[DRIVER FAILURE] ${error instanceof Error ? error.message : String(error)}\n`);
+  } catch { /* Keep log I/O errors private too. */ }
+  console.error('[linux-docker] failed; inspect private linux-driver.log and gate.log; diagnostics withheld');
+  process.exitCode = 1;
+}

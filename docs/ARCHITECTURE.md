@@ -1,5 +1,21 @@
 # DODO MCP — Architecture
 
+## Platform evidence
+
+`release-gate.mjs` collects separate core/packaging JSON reports from `test:all`,
+validates their assertion counts, and binds the run to HEAD, dependency lock and
+a fingerprint of code/tests/gate inputs (including untracked candidate files).
+The fingerprint excludes generated dist/schemas and documentation; it is checked
+again at completion. Docker also checks the actual copied inputs against the host
+fingerprint. A dirty candidate remains ineligible for a clean release claim.
+
+Private command capture is shared by the release gate and Linux Docker driver.
+`gate-summary.mjs` writes a separate allowlisted public summary; it never rewrites
+the authoritative private report or promotes manual acceptance. Evidence output
+directories cannot reuse old gate/test reports. Linux images require real ffmpeg
+and eSpeak coverage; absence of those prerequisites is a gate failure, while
+Whisper/interactive desktop remain explicitly separate gates.
+
 ## Overview
 
 DODO แบ่งเป็น data plane สำหรับ MCP tools และ owner control plane สำหรับ Local Config/CLI ทั้งสอง plane ใช้ state และ workspace lifecycle เดียวกัน แต่ public MCP ไม่มี admin endpoint

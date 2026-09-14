@@ -1,5 +1,5 @@
 .git
-.github
+# Include public workflows in the copied source fingerprint.
 .codex
 .dodo-dev-state
 .serena

@@ -1,7 +1,17 @@
 import { defineConfig } from 'vitest/config';
+import path from 'node:path';
+
+// Separate machine reports for the two Vitest invocations in test:all.
+// The release gate supplies a fresh private directory, never a public log path.
+const reportDir = process.env['DODO_TEST_REPORT_DIR'];
+const packaging = process.argv.some(arg => arg.replaceAll('\\', '/').includes('tests/packaging'));
 
 export default defineConfig({
   test: {
+    ...(reportDir ? {
+      reporters: ['default', 'json'] as const,
+      outputFile: { json: path.join(reportDir, packaging ? 'packaging-tests.json' : 'core-tests.json') },
+    } : {}),
     include: ['tests/**/*.test.ts'],
     globalSetup: ['tests/helpers/globalSetup.ts'],
     // Integration/security suites boot real HTTP servers and real child

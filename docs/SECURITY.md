@@ -1,5 +1,17 @@
 # DODO MCP — Security
 
+## Release evidence privacy
+
+The DODO release-gate and Linux Docker-driver scripts capture child stdout/stderr and failure diagnostics in private
+ignored logs. CI readiness does not dump Docker/host details. Only an explicitly
+allowlisted `public-summary.json` is uploaded, with seven-day retention: revision,
+lock/code fingerprint, platform/architecture/Node, step exit codes, test counts
+including skips, audit counts and package hashes. Arbitrary error messages,
+command arguments, test names, owner paths and runner identity are not copied.
+Raw evidence is not suitable for public upload. GitHub's automatic Set up job
+machine-name output and previously published logs require separate owner action;
+these changes do not erase historical disclosures.
+
 ## Security model
 
 DODO ใช้หลายชั้นร่วมกัน:

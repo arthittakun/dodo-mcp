@@ -1,6 +1,18 @@
 node_modules/
 dist/
 *.tgz
+# Local credentials and state; ignore rules do not remove existing Git history.
+.env
+.env.*
+!.env.example
+.npmrc
+state.db
+state.db-*
+auth.json
+cookies.json
+jwks.json
+*.pem
+*.key
 .codex/
 .dodo-dev-state/
 coverage/

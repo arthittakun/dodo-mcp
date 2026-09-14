@@ -51,6 +51,12 @@ describe('Cloudflare Tunnel credential boundaries', () => {
     const dir = fixture(), privateFile = path.join(dir, 'private'), link = path.join(dir, 'link'), publicFile = path.join(dir, 'public');
     fs.writeFileSync(privateFile, token, { mode: 0o600 }); fs.symlinkSync(privateFile, link);
     fs.writeFileSync(publicFile, token, { mode: 0o644 });
+    // Creation modes are filtered by the caller's umask. Set and verify the
+    // synthetic public file's actual mode so umask 077 still tests denial.
+    fs.chmodSync(publicFile, 0o644);
+    expect(fs.statSync(publicFile).mode & 0o777).toBe(0o644);
+    expect(fs.statSync(privateFile).mode & 0o777).toBe(0o600);
+    expect(fileTunnelCredentialRef(privateFile).provider).toBe('file');
     expect(() => fileTunnelCredentialRef(link)).toThrow(/symbolic link/);
     expect(() => fileTunnelCredentialRef(publicFile)).toThrow(/private/);
   });

@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to test (Linux Docker may be verified locally)
+        type: choice
+        required: true
+        default: windows
+        options: [windows, linux, all]
 
 # Self-hosted runners execute repository code. Do not add pull_request or
 # pull_request_target without a separate, disposable runner trust boundary.
@@ -17,6 +24,8 @@ concurrency:
 jobs:
   linux-docker:
     name: Linux Docker / Node ${{ matrix.node }}
+    # Local Docker evidence is accepted; remote Linux runs are owner-selected.
+    if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'linux' || inputs.platform == 'all')
     strategy:
       fail-fast: false
       matrix:
@@ -40,11 +49,8 @@ jobs:
       - name: Verify Linux Docker runner
         run: |
           test "$RUNNER_OS" = Linux
-          docker version
-          if ! docker info; then
-            echo "::error::The self-hosted runner account cannot access Docker. Add the runner account to the docker group, then restart the runner so the new group membership takes effect."
-            id
-            stat -c 'docker socket: %A %U:%G %n' /var/run/docker.sock || true
+          if ! docker info >/dev/null 2>&1; then
+            echo "::error::Docker is unavailable to this runner. Ask the owner to check the daemon and runner access locally."
             exit 1
           fi
       - name: Run isolated Linux release gate
@@ -53,15 +59,26 @@ jobs:
           --node "${{ matrix.node }}"
           --output-dir "$GITHUB_WORKSPACE/release-evidence/ci/linux-node-${{ matrix.node }}"
       - name: Summarize Linux evidence
+        id: linux_summary
         if: always()
         run: |
           report="release-evidence/ci/linux-node-${{ matrix.node }}/gate-report.json"
           if test -f "$report"; then
-            node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1],"utf8")); console.log(`### Linux Docker / Node ${{ matrix.node }}\n\n- Status: ${r.status}\n- Revision: ${r.source.revision}\n- Tests: ${r.steps.filter(s=>s.command.includes("test:all"))[0]?.status === 0 ? "passed" : "failed or not run"}\n- Fresh install: ${r.freshInstall?.status ?? "NOT_RUN"}`)' "$report" >> "$GITHUB_STEP_SUMMARY"
+            node scripts/gate-summary.mjs --input-dir "$(dirname "$report")" --github-summary
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+      - name: Upload allowlisted Linux summary only
+        if: always() && steps.linux_summary.outputs.ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: linux-node-${{ matrix.node }}-summary
+          path: release-evidence/ci/linux-node-${{ matrix.node }}/public-summary.json
+          if-no-files-found: error
+          retention-days: 7
 
   windows-native:
     name: Windows native / Node ${{ matrix.node }}
+    if: github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'all'
     strategy:
       fail-fast: false
       matrix:
@@ -140,10 +157,20 @@ jobs:
           npm run release:gate:ci --
           --output-dir "%GITHUB_WORKSPACE%\release-evidence\ci\windows-node-${{ matrix.node }}"
       - name: Summarize Windows evidence
+        id: windows_summary
         if: always()
         run: |
           $reportFile = Join-Path $env:GITHUB_WORKSPACE "release-evidence/ci/windows-node-${{ matrix.node }}/gate-report.json"
           if (Test-Path -LiteralPath $reportFile) {
-            $report = Get-Content -LiteralPath $reportFile -Raw | ConvertFrom-Json
-            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "### Windows native / Node ${{ matrix.node }}`n`n- Status: $($report.status)`n- Revision: $($report.source.revision)`n- Fresh install: $($report.freshInstall.status)"
+            node scripts/gate-summary.mjs --input-dir (Split-Path -Parent $reportFile) --github-summary
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "ready=true"
           }
+      - name: Upload allowlisted Windows summary only
+        if: always() && steps.windows_summary.outputs.ready == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-node-${{ matrix.node }}-summary
+          path: release-evidence/ci/windows-node-${{ matrix.node }}/public-summary.json
+          if-no-files-found: error
+          retention-days: 7

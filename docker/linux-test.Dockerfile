@@ -2,10 +2,11 @@ ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-bookworm-slim
 
 ENV CI=1 \
+    DODO_TEST_REQUIRE_LINUX_MEDIA=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ \
+    && apt-get install -y --no-install-recommends ca-certificates git python3 make g++ ffmpeg espeak-ng \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
