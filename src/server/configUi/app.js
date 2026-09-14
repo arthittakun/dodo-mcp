@@ -76,7 +76,8 @@
 
   // ---- API ----
   function workspaceContext() {
-    return state && state.workspace ? { 'x-dodo-workspace': state.workspace.workspaceId, 'x-dodo-epoch': state.workspace.epoch } : {};
+    const context = state && (state.controlContext || state.workspace);
+    return context ? { 'x-dodo-workspace': context.workspaceId, 'x-dodo-epoch': context.epoch } : {};
   }
   async function api(path, body, context = workspaceContext()) {
     const headers = { Authorization: `Bearer ${token}`, ...context };
@@ -163,13 +164,16 @@
   let lastSavedMode = null;
   let lastPublicUrl = null;
   let lastClientsSig = null;
+  let lastTunnelFormSig = null;
   let projectsGeneration = 0;
 
   /* Background refreshes must never clobber what the owner is editing:
    * form sections are only re-rendered when nothing there is dirty or focused,
    * unless the refresh was user-initiated (force). */
   function render(s, force) {
-    if (state && (state.workspace.workspaceId !== s.workspace.workspaceId || state.workspace.epoch !== s.workspace.epoch)) {
+    const previousWorkspace = state && state.workspace ? `${state.workspace.workspaceId}:${state.workspace.epoch}` : null;
+    const nextWorkspace = s.workspace ? `${s.workspace.workspaceId}:${s.workspace.epoch}` : null;
+    if (state && previousWorkspace !== nextWorkspace) {
       force = true;
       resetClientPicker();
       resetClientManager();
@@ -180,7 +184,8 @@
     $('version').textContent = s.version ? `v${s.version}` : '';
     // chips
     const c = s.connection || {};
-    if (c.mcpLocalUrl) setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `เปิดที่ ${c.mcpLocalUrl.replace(/^http:\/\//, '')}`);
+    if (c.workspaceSelected === false) setChip('chip-mcp', 'warn', '⚠', 'เปิดอยู่ แต่รอเจ้าของเลือก workspace');
+    else if (c.mcpLocalUrl) setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `เปิดที่ ${c.mcpLocalUrl.replace(/^http:\/\//, '')}`);
     else setChip('chip-mcp', 'warn', '○', 'ไม่มี HTTP listener ใน entry นี้');
     if (c.oauthConfigured === true) setChip('chip-oauth', 'ok', '●', `เปิดใช้ · ${c.activePublicUrl}`);
     else if (c.oauthConfigured === false) setChip('chip-oauth', 'warn', '⚠', 'LOCKED — ยังไม่ตั้ง public URL');
@@ -191,28 +196,30 @@
 
     // workspace
     const w = s.workspace;
-    $('ws-name').textContent = w.name || w.root;
+    $('ws-name').textContent = w ? (w.name || w.root) : 'ยังไม่ได้เลือกโปรเจกต์';
     const rootEl = $('ws-root');
-    rootEl.textContent = w.root;
-    rootEl.title = w.root;
-    $('ws-id').textContent = w.workspaceId;
-    $('ws-epoch').textContent = w.epoch;
-    $('ws-jobs').textContent = w.runningJobs > 0 ? `${w.runningJobs} งาน (สลับ workspace ไม่ได้จนกว่าจะเสร็จหรือถูกยกเลิก)` : 'ไม่มี';
-    $('ws-recovery').textContent = w.recoveryRequired > 0 ? `${w.recoveryRequired} รายการ — ดูด้วย dodo recover` : 'ไม่มี';
+    rootEl.textContent = w ? w.root : 'เลือกจาก Project Registry หรือใส่ absolute path ด้านล่าง';
+    rootEl.title = w ? w.root : '';
+    $('ws-id').textContent = w ? w.workspaceId : 'จะสร้างเมื่อเลือกโปรเจกต์';
+    $('ws-epoch').textContent = w ? w.epoch : '—';
+    $('ws-jobs').textContent = w ? (w.runningJobs > 0 ? `${w.runningJobs} งาน (สลับ workspace ไม่ได้จนกว่าจะเสร็จหรือถูกยกเลิก)` : 'ไม่มี') : 'ไม่มี workspace';
+    $('ws-recovery').textContent = w ? (w.recoveryRequired > 0 ? `${w.recoveryRequired} รายการ — ดูด้วย dodo recover` : 'ไม่มี') : '—';
     const badge = $('ws-state-badge');
     if (s.state === 'switching') { badge.textContent = '⟳ กำลังสลับ'; badge.className = 'badge info'; badge.hidden = false; }
+    else if (!w) { badge.textContent = '⚠ รอเลือกโปรเจกต์'; badge.className = 'badge warn'; badge.hidden = false; }
     else if (w.runningJobs > 0) { badge.textContent = `▶ ${w.runningJobs} งานกำลังรัน`; badge.className = 'badge warn'; badge.hidden = false; }
     else { badge.hidden = true; }
-    $('ws-switch').disabled = !w.switchSupported || s.state === 'switching';
-    $('ws-path').disabled = !w.switchSupported;
-    if (!w.switchSupported) $('ws-path-help').textContent = 'entry นี้ (stdio) ผูกกับโฟลเดอร์ที่ client เปิดมา การสลับ workspace ทำได้เฉพาะเมื่อรันด้วย dodo start';
-    if (lastRoot !== null && lastRoot !== w.root) switchedOnce = true;
-    lastRoot = w.root;
+    const canSwitch = Boolean(s.workspaceSwitchSupported || (w && w.switchSupported));
+    $('ws-switch').disabled = !canSwitch || s.state === 'switching';
+    $('ws-path').disabled = !canSwitch;
+    if (!canSwitch) $('ws-path-help').textContent = 'entry นี้ (stdio) ผูกกับโฟลเดอร์ที่ client เปิดมา การสลับ workspace ทำได้เฉพาะเมื่อรันด้วย dodo start';
+    if (w && lastRoot !== null && lastRoot !== w.root) switchedOnce = true;
+    lastRoot = w ? w.root : null;
     $('ws-hint').hidden = !switchedOnce;
     cardState('ws', 'ready');
     void loadProjects(force === true);
 
-    const desktop = s.desktop && s.desktop.policy;
+    const desktop = w && s.desktop && s.desktop.policy;
     $('desktop-mode').textContent = desktop ? desktop.mode : 'off';
     $('desktop-summary').textContent = desktop && desktop.mode !== 'off'
       ? desktop.persistent
@@ -223,6 +230,20 @@
 
     // permissions
     const p = s.permissions;
+    if (!w || !p) {
+      $('perm-saved').textContent = 'รอเลือก workspace';
+      $('perm-effective').textContent = 'รอเลือก workspace';
+      $('perm-effective-badge').hidden = false;
+      $('perm-effective-badge').className = 'badge warn';
+      $('perm-effective-badge').textContent = '⚠ ยังไม่มีสิทธิ์ที่มีผล';
+      $('perm-override').hidden = true;
+      document.querySelectorAll('#perm-form input').forEach((input) => { input.disabled = true; });
+      $('perm-save').disabled = true;
+      $('perm-help').textContent = 'เลือกโปรเจกต์ก่อนจึงจะตั้ง trust mode ได้';
+      cardState('perm', 'ready');
+    } else {
+    document.querySelectorAll('#perm-form input').forEach((input) => { input.disabled = false; });
+    $('perm-save').disabled = false;
     $('perm-saved').textContent = MODE_LABEL[p.savedMode] || p.savedMode;
     const eff = $('perm-effective');
     eff.textContent = MODE_LABEL[p.effectiveMode] || p.effectiveMode;
@@ -254,6 +275,7 @@
       ? 'บันทึกได้ แต่สิทธิ์ที่มีผลรอบนี้ยังเป็น trusted จาก override จนกว่าจะ restart โดยไม่ใช้ flag'
       : 'มีผลกับคำขอถัดไป ไม่ยกเลิกงานที่รันอยู่แล้ว';
     cardState('perm', 'ready');
+    }
 
     // connection
     $('conn-local').textContent = c.mcpLocalUrl || 'ไม่มีใน entry นี้';
@@ -274,9 +296,29 @@
     $('conn-restart').hidden = !c.restartRequired;
     cardState('conn', 'ready');
 
+    // tunnel (token is deliberately never returned by the server)
+    const tunnel = s.tunnel || {};
+    const serverFormSig = JSON.stringify([tunnel.mode || 'external', Number(tunnel.metricsPort || 21732), Number(tunnel.maxRestarts ?? 2)]);
+    const browserFormSig = JSON.stringify([$('tunnel-mode').value, Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
+    const tunnelDirty = !force && lastTunnelFormSig !== null && ($('tunnel-token').value.length > 0 || browserFormSig !== lastTunnelFormSig);
+    if (!tunnelDirty) {
+      $('tunnel-mode').value = tunnel.mode || 'external';
+      $('tunnel-metrics').value = String(tunnel.metricsPort || 21732);
+      $('tunnel-restarts').value = String(tunnel.maxRestarts ?? 2);
+      $('tunnel-token').value = '';
+    }
+    lastTunnelFormSig = serverFormSig;
+    $('tunnel-badge').className = tunnel.credentialConfigured ? 'badge ok' : 'badge warn';
+    $('tunnel-badge').textContent = tunnel.credentialConfigured
+      ? `● token อยู่ใน ${tunnel.credentialProvider === 'os' ? tunnel.osCredential.provider : tunnel.credentialProvider}`
+      : '⚠ ยังไม่มี token';
+    $('tunnel-remove').disabled = !tunnel.credentialConfigured;
+
     // clients
-    $('clients-root').textContent = s.workspace.root;
+    $('clients-root').textContent = w ? w.root : 'ยังไม่ได้เลือกโปรเจกต์';
     renderClients(s.clients || [], force);
+    $('clients-add').hidden = !w;
+    $('clients-manage').hidden = !w;
     cardState('clients', 'ready');
     document.getElementById('main').setAttribute('aria-busy', 'false');
   }
@@ -298,13 +340,13 @@
   }
 
   async function loadProjects(force) {
-    if (!state || !state.workspace) return;
+    if (!state || !state.controlContext) return;
     const generation = ++projectsGeneration;
     const context = workspaceContext();
     if (force) cardState('projects', 'loading');
     try {
       const result = await api('projects', undefined, context);
-      if (generation !== projectsGeneration || !state || result.workspaceId !== state.workspace.workspaceId || result.workspaceEpoch !== state.workspace.epoch) return;
+      if (generation !== projectsGeneration || !state || result.workspaceId !== state.controlContext.workspaceId || result.workspaceEpoch !== state.controlContext.epoch) return;
       renderProjects(result, context);
       cardState('projects', 'ready');
     } catch (error) {
@@ -320,7 +362,7 @@
     $('projects-count').hidden = false;
     $('projects-count').textContent = `${result.projects.length} โปรเจกต์`;
     for (const project of result.projects) {
-      const active = project.workspaceId === result.activeWorkspaceId && project.root === state.workspace.root;
+      const active = Boolean(state.workspace) && project.workspaceId === result.activeWorkspaceId && project.root === state.workspace.root;
       const article = document.createElement('article');
       article.className = 'client project-entry';
       const head = document.createElement('div'); head.className = 'client-head';
@@ -347,7 +389,7 @@
 
       const actions = document.createElement('div'); actions.className = 'actions';
       const switchButton = document.createElement('button'); switchButton.type = 'button'; switchButton.className = 'btn small'; switchButton.textContent = active ? 'กำลังเปิดอยู่' : 'เปิดโปรเจกต์นี้';
-      switchButton.disabled = active || !project.available || !state.workspace.switchSupported;
+      switchButton.disabled = active || !project.available || !state.workspaceSwitchSupported;
       switchButton.addEventListener('click', () => withBusy(switchButton, 'กำลังสลับ…', async () => {
         try {
           const switched = await api('workspace/switch', { path: project.root }, context);
@@ -396,9 +438,17 @@
         const body = { path: projectPath };
         if (displayName) body.displayName = displayName;
         const result = await api('projects/add', body, context);
-        pathInput.value = ''; nameInput.value = '';
-        notify(result.changed ? 'success' : 'info', result.relocated ? `อัปเดต path ของ ${result.project.displayName} แล้ว โดยไม่คัดลอกสิทธิ์ workspace เดิม` : result.changed ? `เพิ่ม ${result.project.displayName} ใน registry แล้ว` : 'โปรเจกต์นี้อยู่ใน registry แล้ว');
-        await loadProjects(true);
+        if ($('project-add-open').checked) {
+          const switched = await api('workspace/switch', { path: result.project.root }, context);
+          switchedOnce = Boolean(switched.changed);
+          notify('success', `เพิ่มและเปิด ${result.project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และ client ต้องได้รับสิทธิ์สำหรับ workspace นี้`, true);
+          pathInput.value = ''; nameInput.value = '';
+          await refresh(true);
+        } else {
+          pathInput.value = ''; nameInput.value = '';
+          notify(result.changed ? 'success' : 'info', result.relocated ? `อัปเดต path ของ ${result.project.displayName} แล้ว โดยไม่คัดลอกสิทธิ์ workspace เดิม` : result.changed ? `เพิ่ม ${result.project.displayName} ใน registry แล้ว` : 'โปรเจกต์นี้อยู่ใน registry แล้ว');
+          await loadProjects(true);
+        }
       } catch (error) {
         errorElement.textContent = `✕ ${error.message}${error.data && error.data.recovery ? ` (${error.data.recovery})` : ''}`;
         errorElement.hidden = false; pathInput.setAttribute('aria-invalid', 'true');
@@ -609,11 +659,16 @@
 
   let scheduleSignature = '';
   function renderSchedules(s) {
-    const signature = JSON.stringify([s.workspace.workspaceId,s.workspace.epoch,s.schedules]);
+    const signature = JSON.stringify([s.workspace && s.workspace.workspaceId,s.workspace && s.workspace.epoch,s.schedules]);
     if (signature === scheduleSignature) return;
     scheduleSignature = signature;
-    const context = {'x-dodo-workspace':s.workspace.workspaceId, 'x-dodo-epoch':s.workspace.epoch};
+    const schedules = $('schedules-list'); schedules.replaceChildren();
     const text = (tag, value) => { const el = document.createElement(tag); el.textContent = value; return el; };
+    if (!s.workspace) {
+      schedules.append(text('p', 'เลือกโปรเจกต์ก่อนจึงจะดูหรือจัดการงานตั้งเวลาได้'));
+      return;
+    }
+    const context = {'x-dodo-workspace':s.workspace.workspaceId, 'x-dodo-epoch':s.workspace.epoch};
     const action = (box, label, run) => {
       const b = text('button',label); b.className = 'btn primary'; b.type = 'button';
       b.addEventListener('click', () => withBusy(b,'กำลังบันทึก…', async () => {
@@ -621,7 +676,6 @@
         catch (e) { notify('error',e.message); }
       })); box.append(b);
     };
-    const schedules = $('schedules-list'); schedules.replaceChildren();
     for (const job of s.schedules || []) {
       const box = document.createElement('article'); box.className='client';
       box.append(text('h3',job.spec.name + ' · ' + job.status),text('p','โปรเจกต์: ' + job.root),text('pre',job.spec.command));
@@ -702,7 +756,7 @@
         await refresh(true);
       } finally {
         $('ws-progress').hidden = true;
-        input.disabled = !(state && state.workspace && state.workspace.switchSupported);
+        input.disabled = !(state && state.workspaceSwitchSupported);
       }
     });
   });
@@ -774,6 +828,59 @@
     const c = state && state.connection;
     copyText(c ? (c.mcpPublicUrl || (c.publicUrl ? `${c.publicUrl}/mcp` : '')) : '', ev.currentTarget);
   });
+
+  // ---- Cloudflare Tunnel ----
+  $('tunnel-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const errorElement = $('tunnel-error');
+    const tokenInput = $('tunnel-token');
+    errorElement.hidden = true;
+    tokenInput.removeAttribute('aria-invalid');
+    const metricsPort = Number($('tunnel-metrics').value);
+    const maxRestarts = Number($('tunnel-restarts').value);
+    const tokenValue = tokenInput.value.trim();
+    if (!Number.isSafeInteger(metricsPort) || metricsPort < 1024 || metricsPort > 65535 || !Number.isSafeInteger(maxRestarts) || maxRestarts < 0 || maxRestarts > 5) {
+      errorElement.textContent = '✕ Metrics port ต้องอยู่ระหว่าง 1024–65535 และ restart ต้องอยู่ระหว่าง 0–5';
+      errorElement.hidden = false;
+      return;
+    }
+    if ($('tunnel-mode').value === 'managed' && !tokenValue && !(state && state.tunnel && state.tunnel.credentialConfigured)) {
+      errorElement.textContent = '✕ managed mode ต้องมี Tunnel token';
+      errorElement.hidden = false;
+      tokenInput.setAttribute('aria-invalid', 'true');
+      tokenInput.focus();
+      return;
+    }
+    withBusy($('tunnel-save'), 'กำลังบันทึก…', async () => {
+      try {
+        const body = { mode: $('tunnel-mode').value, metricsPort, maxRestarts };
+        if (tokenValue) body.token = tokenValue;
+        const result = await api('tunnel/config', body);
+        tokenInput.value = '';
+        notify('success', result.credentialConfigured
+          ? 'บันทึก Tunnel แล้ว token อยู่ใน OS credential store และยังไม่ได้เริ่ม tunnel'
+          : 'บันทึกค่า Tunnel แล้ว และยังไม่ได้เริ่ม tunnel');
+        await refresh(true);
+      } catch (error) {
+        tokenInput.value = '';
+        errorElement.textContent = `✕ ${error.message}`;
+        errorElement.hidden = false;
+        notify('error', 'บันทึก Tunnel ไม่สำเร็จ');
+      }
+    });
+  });
+
+  $('tunnel-remove').addEventListener('click', () => withBusy($('tunnel-remove'), 'กำลังลบ…', async () => {
+    if (!(await confirmAction('ลบ Cloudflare Tunnel token?', 'DODO จะลบ token จาก OS credential store และเปลี่ยนเป็น external mode โดยไม่หยุด process อื่น', 'ลบ token'))) return;
+    try {
+      await api('tunnel/config', { mode: 'external', removeCredential: true, confirm: 'remove-tunnel-credential' });
+      $('tunnel-token').value = '';
+      notify('success', 'ลบ Tunnel token แล้ว');
+      await refresh(true);
+    } catch (error) {
+      notify('error', `ลบ Tunnel token ไม่สำเร็จ: ${error.message}`);
+    }
+  }));
 
   // ---- misc ----
   $('refresh').addEventListener('click', (ev) => withBusy(ev.currentTarget, '⟳ …', () => refresh(true)));

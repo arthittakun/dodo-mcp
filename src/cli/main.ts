@@ -25,6 +25,7 @@ import { sandboxAvailability } from '../services/jobs/sandbox.js';
 import { DesktopPolicyInputSchema, saveDesktopPolicy } from '../services/desktop/desktopPolicy.js';
 import { INPUT_LIMIT_PROFILES } from '../config/limits.js';
 import { ProjectRegistry, type RegisteredProject } from '../projects/registry.js';
+import { runCliMenu } from './menu.js';
 
 const program = new Command();
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
@@ -88,6 +89,119 @@ function projectLines(project: RegisteredProject): string[] {
     `  Updated: ${new Date(project.updatedAt).toISOString()}`,
     ...(project.removedAt === null ? [] : [`  Removed: ${new Date(project.removedAt).toISOString()}`]),
   ];
+}
+
+function startupProject(): RegisteredProject | undefined {
+  try {
+    return withProjectRegistry((registry) => {
+      const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+      const projectId = loadGlobalConfig(configFile).startupProjectId;
+      return projectId ? registry.get(projectId) : undefined;
+    });
+  } catch {
+    return undefined;
+  }
+}
+
+function selectStartupProject(projectId: string): RegisteredProject {
+  return withProjectRegistry((registry) => {
+    const project = registry.get(projectId);
+    if (!project.available) throw new DodoError('CONFLICT', project.statusText);
+    const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+    const config = loadGlobalConfig(configFile);
+    saveGlobalConfig(configFile, GlobalConfigSchema.parse({ ...config, startupProjectId: project.projectId }));
+    return project;
+  });
+}
+
+function addAndSelectProject(projectPath: string, displayName?: string): RegisteredProject {
+  return withProjectRegistry((registry) => {
+    const project = registry.add(projectPath, displayName).project;
+    const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+    const config = loadGlobalConfig(configFile);
+    saveGlobalConfig(configFile, GlobalConfigSchema.parse({ ...config, startupProjectId: project.projectId }));
+    return project;
+  });
+}
+
+interface HttpLaunchOptions {
+  root?: string;
+  port?: number;
+  publicUrl?: string;
+  allowUnsafeRoot?: boolean;
+  quiet?: boolean;
+  allow?: boolean;
+  all?: boolean;
+  bypass?: boolean;
+  tools?: string;
+}
+
+async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
+  if (Boolean(opts.allow) !== Boolean(opts.all)) fail('use --allow and --all together');
+  if (opts.tools !== undefined && !['compact', 'full', 'hybrid'].includes(opts.tools)) fail('--tools must be compact, full or hybrid');
+
+  let root = opts.root;
+  if (root !== undefined && !opts.allowUnsafeRoot) root = addAndSelectProject(root).root;
+  if (root === undefined) {
+    const remembered = startupProject();
+    if (remembered?.available) root = remembered.root;
+  }
+
+  const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+  const startOpts: Parameters<typeof startServer>[0] = {
+    configPort: loadGlobalConfig(configFile).configPort,
+    ...(opts.bypass ? { runMode: 'bypass' as const } : opts.allow ? { runMode: 'allow-all' as const } : {}),
+    invokedCwd,
+    ...(root === undefined ? { deferWorkspace: true } : { rootOverride: root }),
+    allowUnsafeRoot: opts.allowUnsafeRoot ?? false,
+    quiet: opts.quiet ?? false,
+    onLog: (line) => console.log(formatTerminalLine(line)),
+    onStopped: () => process.exit(0),
+  };
+  if (opts.port !== undefined && !Number.isNaN(opts.port)) startOpts.portOverride = opts.port;
+  if (opts.publicUrl !== undefined) startOpts.publicUrlOverride = opts.publicUrl;
+  if (opts.tools !== undefined) startOpts.toolSurface = opts.tools as 'compact' | 'full' | 'hybrid';
+  const server = await startServer(startOpts);
+  const stop = async (signal: string) => {
+    console.log(`\n[dodo] ${signal} received — shutting down (finishing journal safe point, closing jobs)…`);
+    await server.close();
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void stop('SIGINT'));
+  process.on('SIGTERM', () => void stop('SIGTERM'));
+}
+
+async function configureTunnelFromMenu(): Promise<void> {
+  const credentials = await import('../tunnel/credentials.js');
+  const { dir } = resolveConfigDir(process.env);
+  ensureConfigDir(dir);
+  const configFile = statePaths(dir).configFile;
+  const current = loadGlobalConfig(configFile);
+  const ref = credentials.osTunnelCredentialRef(dir);
+  const candidate = GlobalConfigSchema.parse({ ...current, tunnel: { ...current.tunnel, mode: 'managed', credentialRef: ref } });
+  await credentials.storeOsTunnelCredentialInteractive(ref);
+  try {
+    saveGlobalConfig(configFile, candidate);
+  } catch (error) {
+    try { credentials.deleteOsTunnelCredential(ref); } catch { /* keep the config-write error authoritative */ }
+    throw error;
+  }
+}
+
+async function setupFromMenu(check: boolean): Promise<void> {
+  const { runSetup, parseComponents } = await import('../setup/setup.js');
+  const configResolution = resolveConfigDir(process.env);
+  const report = await runSetup({
+    cwd: invokedCwd,
+    configDir: configResolution.dir,
+    check,
+    yes: !check,
+    components: parseComponents('all'),
+    detectExistingState: configResolution.source === 'platform',
+  }, line => console.log(line));
+  console.log(`DODO setup: ${report.platform}/${report.arch} (${report.mode})`);
+  for (const item of report.components) console.log(`[${item.state}] ${item.component}: ${item.detail}${item.action ? ` — ${item.action}` : ''}`);
+  console.log(report.complete ? 'ทุก component พร้อมใช้งาน' : 'บาง component ยังต้องติดตั้ง อนุญาต หรือเตรียม backend เพิ่ม');
 }
 
 // Local-owner dependency setup. Never exposed as an MCP permission-changing tool.
@@ -355,11 +469,32 @@ tunnel.command('logs').description('show bounded redacted managed-tunnel diagnos
     if (opts.json) console.log(JSON.stringify(result, null, 2)); else for (const line of result.lines) console.log(line);
   });
 
+// --------------------------------------------------------------- menu -----
+program.command('cli')
+  .description('open the interactive local owner menu')
+  .action(async () => {
+    try {
+      await runCliMenu({
+        listProjects: () => withProjectRegistry((registry) => registry.list()),
+        startupProject,
+        selectProject: selectStartupProject,
+        addProject: addAndSelectProject,
+        start: async (root) => launchHttp(root === undefined ? {} : { root }),
+        configureTunnel: configureTunnelFromMenu,
+        setupAll: () => setupFromMenu(false),
+        checkSetup: () => setupFromMenu(true),
+      }, { input: process.stdin, output: process.stdout });
+    } catch (error) {
+      if (error instanceof DodoError) fail(`${error.code}: ${error.message}${error.recovery ? `\n  → ${error.recovery}` : ''}`);
+      throw error;
+    }
+  });
+
 // ---------------------------------------------------------------- start ----
 program
   .command('start')
-  .description('start the MCP server for the current directory (foreground)')
-  .option('--root <path>', 'workspace root override (local CLI only)')
+  .description('start the MCP server for the saved project, or wait for a project selection (foreground)')
+  .option('--root <path>', 'select and remember an explicit workspace root (local CLI only)')
   .option('--port <n>', 'listen port (default from config, initially 21730)', (v) => Number.parseInt(v, 10))
   .option('--public-url <url>', 'public origin override for this run (local CLI only)')
   .option('--allow-unsafe-root', 'permit filesystem root / home / other unusually broad workspace roots', false)
@@ -370,29 +505,7 @@ program
   .option('--quiet', 'suppress the startup banner', false)
   .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string }) => {
     try {
-      if (opts.allow !== opts.all) fail('use --allow and --all together');
-      if (opts.tools !== undefined && !['compact', 'full', 'hybrid'].includes(opts.tools)) fail('--tools must be compact, full or hybrid');
-      const startOpts: Parameters<typeof startServer>[0] = {
-        configPort: loadGlobalConfig(statePaths(resolveConfigDir(process.env).dir).configFile).configPort,
-        ...(opts.bypass ? { runMode: 'bypass' as const } : opts.allow ? { runMode: 'allow-all' as const } : {}),
-        invokedCwd,
-        allowUnsafeRoot: opts.allowUnsafeRoot,
-        quiet: opts.quiet,
-        onLog: (line) => console.log(formatTerminalLine(line)),
-        onStopped: () => process.exit(0),
-      };
-      if (opts.root !== undefined) startOpts.rootOverride = opts.root;
-      if (opts.port !== undefined && !Number.isNaN(opts.port)) startOpts.portOverride = opts.port;
-      if (opts.publicUrl !== undefined) startOpts.publicUrlOverride = opts.publicUrl;
-      if (opts.tools !== undefined) startOpts.toolSurface = opts.tools as 'compact' | 'full' | 'hybrid';
-      const server = await startServer(startOpts);
-      const stop = async (signal: string) => {
-        console.log(`\n[dodo] ${signal} received — shutting down (finishing journal safe point, closing jobs)…`);
-        await server.close();
-        process.exit(0);
-      };
-      process.on('SIGINT', () => void stop('SIGINT'));
-      process.on('SIGTERM', () => void stop('SIGTERM'));
+      await launchHttp(opts);
     } catch (err) {
       if (err instanceof DodoError) fail(`${err.message}${err.recovery ? `\n  → ${err.recovery}` : ''}`);
       throw err;
@@ -1174,6 +1287,7 @@ Remote setup:
 
 function effectiveArgv(): string[] {
   if (process.argv.length <= 2) return [...process.argv, 'start'];
+  if (process.argv.length === 3 && process.argv[2] === '--cli') return [...process.argv.slice(0, 2), 'cli'];
   if (process.argv[2] === '--bypass') return [...process.argv.slice(0, 2), 'start', ...process.argv.slice(2)];
   return process.argv;
 }

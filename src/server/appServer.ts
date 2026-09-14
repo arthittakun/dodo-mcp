@@ -8,7 +8,7 @@ import { toNodeHandler } from '@modelcontextprotocol/node';
 import type net from 'node:net';
 
 import { DodoError } from '../errors.js';
-import { ipcSocketPath } from '../config/paths.js';
+import { ensureConfigDir, ipcSocketPath, resolveConfigDir, statePaths } from '../config/paths.js';
 import { validatePublicUrl } from '../config/globalConfig.js';
 import { loadOrCreateJwks, loadOrCreateCookieKeys } from '../auth/keys.js';
 import { buildProvider } from '../auth/provider.js';
@@ -34,6 +34,8 @@ export interface StartOptions {
   /** process.cwd() captured at the CLI entrypoint, before anything else. */
   invokedCwd: string;
   rootOverride?: string;
+  /** Start the owner control plane without exposing a workspace until one is selected. */
+  deferWorkspace?: boolean;
   portOverride?: number;
   publicUrlOverride?: string;
   allowUnsafeRoot?: boolean;
@@ -64,6 +66,8 @@ export interface RunningServer {
   /** Private Local Config URL (contains the capability in the fragment) or null when not started. */
   configUrl: string | null;
   host: WorkspaceHost;
+  /** False only for the owner launcher before a real project is selected. */
+  readonly workspaceSelected: boolean;
   bannerLines: string[];
   switchWorkspace(input: SwitchInput): Promise<SwitchResult>;
   close(): Promise<void>;
@@ -84,10 +88,24 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   let closing = false;
   let shutdownPromise: Promise<void> | undefined;
 
+  if (opts.deferWorkspace && opts.rootOverride !== undefined) {
+    throw new DodoError('INVALID_INPUT', 'deferWorkspace cannot be combined with an explicit root');
+  }
+  const launcherConfig = opts.deferWorkspace ? resolveConfigDir(process.env) : undefined;
+  if (launcherConfig) ensureConfigDir(launcherConfig.dir);
+  const launcherRoot = launcherConfig ? statePaths(launcherConfig.dir).launcherWorkspaceDir : undefined;
+
   // ---- workspace bootstrap (initial root, and later roots for a switch) ----
+  // The launcher root is private and inert. Public MCP/OAuth routes are gated
+  // until the owner switches to a real project through Local Config/CLI.
+  const launcherBootstrap = launcherRoot !== undefined && launcherConfig !== undefined
+    ? { rootOverride: launcherRoot, configDir: launcherConfig }
+    : opts.rootOverride !== undefined
+      ? { rootOverride: opts.rootOverride }
+      : {};
   const ws0 = bootstrapWorkspace({
     invokedCwd: opts.invokedCwd,
-    ...(opts.rootOverride !== undefined ? { rootOverride: opts.rootOverride } : {}),
+    ...launcherBootstrap,
     allowUnsafeRoot: opts.allowUnsafeRoot ?? false,
     log,
     ...(runMode ? { runMode } : {}),
@@ -119,6 +137,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // workspace (a workspace's own connection is closed when it is switched out).
   const installDb = openDatabase(paths.dbFile);
   const installStore = new Store(installDb);
+  let workspaceSelected = !opts.deferWorkspace;
 
   // Assigned once the IPC resources exist; closures below read it per request.
   const hostRef: { host: WorkspaceHost | undefined } = { host: undefined };
@@ -151,7 +170,16 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   app.use(originValidation(originAllowlist));
 
   app.get('/healthz', (_req: Request, res: Response) => {
-    res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, authConfigured: !locked });
+    res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, authConfigured: !locked, workspaceSelected });
+  });
+
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (workspaceSelected) { next(); return; }
+    res.status(503).setHeader('Cache-Control', 'no-store').json({
+      error: 'workspace_required',
+      error_description: 'No project is active. The owner must select or add one in the private Local Config page or dodo --cli.',
+      path: req.path === '/mcp' ? '/mcp' : undefined,
+    });
   });
 
   let mcpHandlerClose: (() => Promise<void>) | undefined;
@@ -368,15 +396,24 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     ...(opts.drainTimeoutMs !== undefined ? { drainTimeoutMs: opts.drainTimeoutMs } : {}),
   });
   const theHost = hostRef.host;
-  const startSchedules = (ws: BootstrappedWorkspace) => ws.services.schedules.start(() => !closing && theHost.state() === 'ready' && theHost.current() === ws);
-  startSchedules(ws0);
-  theHost.onSwitch(next => startSchedules(next));
+  const startSchedules = (ws: BootstrappedWorkspace) => ws.services.schedules.start(() => !closing && workspaceSelected && theHost.state() === 'ready' && theHost.current() === ws);
+  if (workspaceSelected) startSchedules(ws0);
+  theHost.onSwitch(next => {
+    workspaceSelected = true;
+    startSchedules(next);
+  });
 
   // ---- owner-only Local Config plane ------------------------------------
   let localConfig: LocalConfigServer | undefined;
   try {
     if (opts.configPort !== undefined) {
-      localConfig = await startLocalConfig(theHost, opts.configPort, { version: DODO_VERSION, transport: transportInfo(), runMode: runMode ?? null, log });
+      localConfig = await startLocalConfig(theHost, opts.configPort, {
+        version: DODO_VERSION,
+        transport: transportInfo(),
+        runMode: runMode ?? null,
+        workspaceSelected: () => workspaceSelected,
+        log,
+      });
     }
   } catch (err) {
     await closeHttp();
@@ -414,12 +451,12 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const { rootInfo, workspaceId, epoch, services } = ws0;
   const banner = [
     `DODO ${DODO_VERSION}  |  foreground`,
-    `Workspace: ${rootInfo.root}`,
-    `Workspace ID: ${workspaceId}  |  epoch: ${epoch}`,
+    workspaceSelected ? `Workspace: ${rootInfo.root}` : 'Workspace: (ยังไม่ได้เลือก — เพิ่มหรือเลือกใน Local Config / dodo --cli)',
+    workspaceSelected ? `Workspace ID: ${workspaceId}  |  epoch: ${epoch}` : 'Workspace ID: (ยังไม่สร้าง context สำหรับ AI)',
     `MCP: http://127.0.0.1:${actualPort}/mcp`,
     locked ? `Public: (not configured — server is LOCKED; run: dodo init --public-url https://your-host)` : `Public: ${issuer}/mcp`,
-    locked ? 'Auth: LOCKED / setup required — all tool access refused' : `Auth: OAuth enabled  |  Policy: ${services.trustMode()}`,
-    `Exec: ${services.trustMode() === 'trusted' ? 'allowed by trusted mode (OS-user privileges!)' : 'local approval required'}  |  OS sandbox: ${config.commandSandbox === 'off' ? 'NOT enabled' : `${config.commandSandbox} (adapter: ${services.jobs ? 'configured' : 'n/a'})`}`,
+    !workspaceSelected ? 'Auth: waiting for owner to select a workspace — all tool access refused' : locked ? 'Auth: LOCKED / setup required — all tool access refused' : `Auth: OAuth enabled  |  Policy: ${services.trustMode()}`,
+    workspaceSelected ? `Exec: ${services.trustMode() === 'trusted' ? 'allowed by trusted mode (OS-user privileges!)' : 'local approval required'}  |  OS sandbox: ${config.commandSandbox === 'off' ? 'NOT enabled' : `${config.commandSandbox} (adapter: ${services.jobs ? 'configured' : 'n/a'})`}` : 'Exec: disabled until a workspace is selected',
     'Tunnel: external / managed by you',
     `State: ${configDir}${configDirEnvVar ? ` (from ${configDirEnvVar})` : configDirSource === 'env' ? ' (from explicit environment override)' : ''}`,
   ];
@@ -450,6 +487,9 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     },
     configUrl: localConfig?.url ?? null,
     host: theHost,
+    get workspaceSelected() {
+      return workspaceSelected;
+    },
     bannerLines: banner,
     switchWorkspace: (input) => theHost.switchTo(input),
     close: () => shutdown(),

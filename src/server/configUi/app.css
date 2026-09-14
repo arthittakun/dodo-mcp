@@ -138,11 +138,11 @@ a { color: var(--accent); }
 label { font-size: .9rem; font-weight: 600; }
 .input-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .input-row input { flex: 1 1 260px; min-width: 0; }
-input[type="text"], input[type="url"], select {
+input[type="text"], input[type="url"], input[type="password"], input[type="number"], select {
   font: inherit; color: var(--text); background: var(--code-bg); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   padding: 9px 11px; width: 100%;
 }
-input[type="text"]:focus-visible, input[type="url"]:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+input[type="text"]:focus-visible, input[type="url"]:focus-visible, input[type="password"]:focus-visible, input[type="number"]:focus-visible, select:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
 input[aria-invalid="true"] { border-color: var(--danger); }
 .help { color: var(--muted); font-size: .84rem; margin: 0; }
 .error { color: var(--danger); font-size: .88rem; margin: 0; }

@@ -67,10 +67,10 @@
       </div>
 
       <form id="ws-form" class="form" novalidate>
-        <label for="ws-path">เปลี่ยนโปรเจกต์ (absolute path ของโฟลเดอร์ในเครื่องนี้)</label>
+        <label for="ws-path">เลือกหรือเปลี่ยนโปรเจกต์ (absolute path ของโฟลเดอร์ในเครื่องนี้)</label>
         <div class="input-row">
           <input id="ws-path" name="path" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/projects/app" aria-describedby="ws-path-help ws-path-error" required>
-          <button type="submit" class="btn primary" id="ws-switch">เปลี่ยนโปรเจกต์</button>
+          <button type="submit" class="btn primary" id="ws-switch">เปิดโปรเจกต์</button>
         </div>
         <p class="help" id="ws-path-help">ต้องเป็นโฟลเดอร์ที่มีอยู่จริง ไม่ใช่ home หรือ root ของดิสก์ DODO จะปฏิเสธถ้ามีงานกำลังรันหรือมี DODO อีกตัวเปิดโฟลเดอร์นั้นอยู่ เบราว์เซอร์เลือกโฟลเดอร์ในเครื่องให้โดยตรงไม่ได้ จึงต้องพิมพ์หรือวาง path เอง</p>
         <p class="error" id="ws-path-error" role="alert" hidden></p>
@@ -112,6 +112,7 @@
           <input id="project-add-name" name="displayName" type="text" autocomplete="off" maxlength="120" placeholder="Web application">
           <button type="submit" class="btn primary" id="project-add">เพิ่มโปรเจกต์</button>
         </div>
+        <label class="check"><input type="checkbox" id="project-add-open" checked><span>เปิดโปรเจกต์นี้ทันทีหลังเพิ่ม</span></label>
         <p class="help" id="project-add-help">DODO จะบันทึก canonical realpath และ directory identity ห้ามใช้ home, filesystem root หรือ path ที่ไม่มีอยู่จริง</p>
         <p class="error" id="project-add-error" role="alert" hidden></p>
       </form>
@@ -203,6 +204,30 @@
       </form>
     </div>
     <div class="card-state error-state" id="conn-error" hidden></div>
+  </section>
+
+  <section class="card" id="card-tunnel" aria-labelledby="h-tunnel">
+    <div class="card-head"><h2 id="h-tunnel">Cloudflare Tunnel</h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
+    <p class="muted">DODO เก็บ token ใน Keychain / Credential Manager / Secret Service ของระบบเท่านั้น ไม่แสดง token เดิมและไม่บันทึกลง config, log หรือ command arguments</p>
+    <form id="tunnel-form" class="form" novalidate>
+      <label for="tunnel-mode">โหมดการทำงาน</label>
+      <select id="tunnel-mode" name="mode">
+        <option value="external">external — คุณรัน cloudflared เอง</option>
+        <option value="managed">managed — DODO ดูแล process cloudflared</option>
+      </select>
+      <label for="tunnel-token">Cloudflare Tunnel token</label>
+      <input id="tunnel-token" name="token" type="password" autocomplete="new-password" spellcheck="false" maxlength="8192" placeholder="วาง token ใหม่เพื่อบันทึกใน OS credential store" aria-describedby="tunnel-help tunnel-error">
+      <p class="help" id="tunnel-help">เว้นว่างไว้เพื่อคง token เดิม การบันทึกไม่เริ่ม tunnel อัตโนมัติ ใช้ <code>dodo tunnel start --yes</code> เมื่อพร้อมเชื่อมต่อ</p>
+      <div class="two-col">
+        <label>Metrics port<input id="tunnel-metrics" type="number" min="1024" max="65535" inputmode="numeric"></label>
+        <label>จำนวน restart สูงสุด<input id="tunnel-restarts" type="number" min="0" max="5" inputmode="numeric"></label>
+      </div>
+      <p class="error" id="tunnel-error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="tunnel-save">บันทึก Tunnel</button>
+        <button type="button" class="btn danger-outline" id="tunnel-remove">ลบ token ที่บันทึก</button>
+      </div>
+    </form>
   </section>
 
   <section class="card" aria-labelledby="h-schedules">

@@ -12,6 +12,13 @@ import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSche
 import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
 import { ProjectRegistry } from '../projects/registry.js';
+import {
+  deleteOsTunnelCredential,
+  osCredentialAvailability,
+  osTunnelCredentialRef,
+  storeOsTunnelCredentialValue,
+} from '../tunnel/credentials.js';
+import type { TunnelCredentialRef } from '../config/tunnelConfig.js';
 
 /**
  * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
@@ -31,6 +38,15 @@ export interface LocalConfigInfo {
   /** What the MCP listener of this process looks like (absent for entries without one). */
   transport?: { port: number; locked: boolean; publicUrl: string | null };
   runMode?: 'allow-all' | 'bypass' | null;
+  /** Dynamic because the launcher can activate its first real workspace. */
+  workspaceSelected?: () => boolean;
+  /** Test seam for the OS credential boundary; production uses the reviewed providers above. */
+  tunnelCredentials?: {
+    availability(): { available: boolean; provider: string; reason?: string };
+    ref(configDir: string): TunnelCredentialRef;
+    store(ref: TunnelCredentialRef, token: string): Promise<void>;
+    remove(ref: TunnelCredentialRef): void;
+  };
   log?: (line: string) => void;
 }
 
@@ -89,6 +105,13 @@ function localClients(ws: BootstrappedWorkspace) {
 export async function startLocalConfig(target: Target, port = 21731, info: LocalConfigInfo = {}): Promise<LocalConfigServer> {
   const host: WorkspaceHost = isHost(target) ? target : staticHost(target);
   const switchSupported = isHost(target);
+  const hasWorkspace = () => info.workspaceSelected?.() ?? true;
+  const tunnelCredentials = info.tunnelCredentials ?? {
+    availability: osCredentialAvailability,
+    ref: osTunnelCredentialRef,
+    store: storeOsTunnelCredentialValue,
+    remove: deleteOsTunnelCredential,
+  };
   const token = randomBytes(32).toString('hex');
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
@@ -163,11 +186,14 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     const ws = host.current();
     const cfg = loadGlobalConfig(ws.paths.configFile);
     const transport = info.transport;
+    const selected = hasWorkspace();
     res.json({
       version: info.version ?? ws.services.version,
       state: host.state(),
       generatedAt: Date.now(),
-      workspace: {
+      controlContext: { workspaceId: ws.workspaceId, epoch: ws.epoch },
+      workspaceSwitchSupported: switchSupported,
+      workspace: selected ? {
         root: ws.rootInfo.root,
         name: path.basename(ws.rootInfo.root),
         workspaceId: ws.workspaceId,
@@ -175,17 +201,18 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         runningJobs: ws.services.jobs.runningCount(),
         recoveryRequired: ws.store.listChangesetsByStatus('recovery_required').filter((c) => c.workspaceId === ws.workspaceId).length,
         switchSupported,
-      },
-      schedules: ws.services.schedules.list(),
-      desktop: { policy: ws.services.desktop.policy() },
-      permissions: {
+      } : null,
+      schedules: selected ? ws.services.schedules.list() : [],
+      desktop: selected ? { policy: ws.services.desktop.policy() } : null,
+      permissions: selected ? {
         savedMode: ws.store.trustMode(ws.workspaceId),
         effectiveMode: ws.services.trustMode(),
         override: info.runMode ?? null,
         commandSandbox: ws.config.commandSandbox,
         allowWebFetch: ws.config.allowWebFetch,
-      },
+      } : null,
       connection: {
+        workspaceSelected: selected,
         mcpLocalUrl: transport ? `http://127.0.0.1:${transport.port}/mcp` : null,
         publicUrl: cfg.publicUrl ?? '',
         mcpPublicUrl: transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
@@ -195,7 +222,16 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         localConfigOrigin: `http://127.0.0.1:${actualPort}`,
         expiresAt,
       },
-      clients: localClients(ws).filter((c) => c.scopes.length > 0),
+      tunnel: {
+        mode: cfg.tunnel.mode,
+        credentialConfigured: Boolean(cfg.tunnel.credentialRef),
+        credentialProvider: cfg.tunnel.credentialRef?.provider ?? null,
+        osCredential: tunnelCredentials.availability(),
+        cloudflared: cfg.tunnel.executable ? 'owner-selected' : 'trusted-PATH',
+        metricsPort: cfg.tunnel.metricsPort,
+        maxRestarts: cfg.tunnel.maxRestarts,
+      },
+      clients: selected ? localClients(ws).filter((c) => c.scopes.length > 0) : [],
     });
   });
 
@@ -203,6 +239,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   // owner explicitly opens the add-client picker for the reviewed workspace.
   app.get('/api/access/available', (req, res) => {
     const ws = host.current();
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before granting client access.', code: 'WORKSPACE_REQUIRED' }); return; }
     if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
       res.status(409).json({ error: 'Workspace changed. Refresh before adding a client.', code: 'STALE_WORKSPACE' }); return;
     }
@@ -215,6 +252,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
 
   app.get('/api/clients/manage', (req, res) => {
     const ws = host.current();
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before reviewing clients.', code: 'WORKSPACE_REQUIRED' }); return; }
     if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
       res.status(409).json({error:'Workspace changed. Refresh before reviewing clients.',code:'STALE_WORKSPACE'}); return;
     }
@@ -234,7 +272,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     res.json({
       workspaceId: ws.workspaceId,
       workspaceEpoch: ws.epoch,
-      activeWorkspaceId: ws.workspaceId,
+      activeWorkspaceId: hasWorkspace() ? ws.workspaceId : null,
       projects,
     });
   });
@@ -257,7 +295,14 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       res.status(400).json({ error: 'Project removal requires the exact reviewed project ID.', code: 'INVALID_INPUT' }); return;
     }
     try {
-      const project = new ProjectRegistry(host.current().store).remove(input.data.projectId);
+      const ws = host.current();
+      const project = new ProjectRegistry(ws.store).remove(input.data.projectId);
+      const cfg = loadGlobalConfig(ws.paths.configFile);
+      if (cfg.startupProjectId === project.projectId) {
+        const next = { ...cfg };
+        delete next.startupProjectId;
+        saveGlobalConfig(ws.paths.configFile, GlobalConfigSchema.parse(next));
+      }
       res.json({ ok: true, removed: true, project, filesDeleted: false, authorityDeleted: false });
     } catch (error) {
       const { status, body } = ownerStateError(error);
@@ -266,16 +311,83 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   });
   app.post('/api/clients/delete', (req, res) => {
     const ws = host.current();
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before deleting clients.', code: 'WORKSPACE_REQUIRED' }); return; }
     res.json(deleteReviewedClients(ws.store,DeleteClientsInput.parse(req.body),ws.workspaceId));
   });
 
   app.post('/api/schedule/approve', (req, res) => {
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
     const p = z.object({id:z.string().max(100),digest:z.string().max(100)}).strict().parse(req.body);
     res.json(host.current().services.schedules.approve(p.id,p.digest));
   });
   app.post('/api/schedule/revoke', (req, res) => {
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
     const p = z.object({id:z.string().max(100)}).strict().parse(req.body);
     res.json(host.current().services.schedules.revoke(p.id));
+  });
+
+  // ---- Cloudflare Tunnel settings --------------------------------------
+  // A raw token is accepted only on this authenticated loopback control
+  // plane and handed directly to the OS credential provider over stdin.
+  app.post('/api/tunnel/config', async (req, res) => {
+    const input = z.object({
+      mode: z.enum(['external', 'managed']).optional(),
+      token: z.string().min(20).max(8192).optional(),
+      removeCredential: z.boolean().optional(),
+      confirm: z.literal('remove-tunnel-credential').optional(),
+      metricsPort: z.number().int().min(1024).max(65535).optional(),
+      maxRestarts: z.number().int().min(0).max(5).optional(),
+    }).strict().safeParse(req.body);
+    if (!input.success || (input.data.token !== undefined && input.data.removeCredential)) {
+      res.status(400).json({ error: 'Invalid tunnel configuration.', code: 'INVALID_INPUT' }); return;
+    }
+    if (input.data.removeCredential && input.data.confirm !== 'remove-tunnel-credential') {
+      res.status(400).json({ error: 'Removing the tunnel credential requires exact confirmation.', code: 'INVALID_INPUT' }); return;
+    }
+    const ws = host.current();
+    try {
+      const current = loadGlobalConfig(ws.paths.configFile);
+      let credentialRef = current.tunnel.credentialRef;
+      if (input.data.token !== undefined) {
+        const availability = tunnelCredentials.availability();
+        if (!availability.available) throw new DodoError('NOT_SUPPORTED', availability.reason ?? 'OS credential storage is unavailable');
+        const ref = tunnelCredentials.ref(ws.configDir);
+        await tunnelCredentials.store(ref, input.data.token);
+        credentialRef = ref;
+        // Best effort: do not retain the submitted value in the parsed body.
+        req.body.token = '';
+      } else if (input.data.removeCredential) {
+        if (credentialRef) tunnelCredentials.remove(credentialRef);
+        credentialRef = undefined;
+      }
+      const tunnelInput: Record<string, unknown> = {
+        ...current.tunnel,
+        ...(input.data.mode ? { mode: input.data.mode } : {}),
+        ...(input.data.metricsPort !== undefined ? { metricsPort: input.data.metricsPort } : {}),
+        ...(input.data.maxRestarts !== undefined ? { maxRestarts: input.data.maxRestarts } : {}),
+        ...(credentialRef ? { credentialRef } : {}),
+      };
+      if (!credentialRef) delete tunnelInput['credentialRef'];
+      const next = GlobalConfigSchema.parse({ ...current, tunnel: tunnelInput });
+      if (next.tunnel.mode === 'managed' && !next.tunnel.credentialRef) {
+        throw new DodoError('INVALID_INPUT', 'Managed tunnel mode requires a stored credential.');
+      }
+      saveGlobalConfig(ws.paths.configFile, next);
+      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.config', result: input.data.removeCredential ? 'credential-removed' : input.data.token !== undefined ? 'credential-stored' : 'saved' });
+      res.json({
+        ok: true,
+        mode: next.tunnel.mode,
+        credentialConfigured: Boolean(next.tunnel.credentialRef),
+        credentialProvider: next.tunnel.credentialRef?.provider ?? null,
+        metricsPort: next.tunnel.metricsPort,
+        maxRestarts: next.tunnel.maxRestarts,
+        started: false,
+      });
+    } catch (error) {
+      req.body.token = '';
+      const { status, body } = switchError(error);
+      res.status(status).json(body);
+    }
   });
 
   // ---- saved trust / public origin ----
@@ -294,6 +406,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         saveGlobalConfig(ws.paths.configFile, GlobalConfigSchema.parse({ ...config, publicUrl: url.origin }));
         restartRequired = (info.transport?.publicUrl ?? null) !== url.origin;
       }
+      if (input.data.mode && !hasWorkspace()) throw new DodoError('CONFLICT', 'Select a workspace before changing its trust mode.');
       if (input.data.mode) ws.store.setTrustMode(ws.workspaceId, input.data.mode);
       ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.config', result: 'saved' });
       res.json({ ok: true, restartRequired, savedMode: ws.store.trustMode(ws.workspaceId), effectiveMode: ws.services.trustMode() });
@@ -304,6 +417,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
 
   // Owner-only emergency stop; enabling is explicit through local IPC/CLI.
   app.post('/api/desktop/disable', (_req, res) => {
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
     const policy = host.current().services.desktop.setPolicy({ mode: 'off' });
     res.json({ ok: true, policy });
   });
@@ -311,6 +425,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   // ---- per-workspace client ACL ----
   app.post('/api/access', (req, res) => {
     const ws = host.current();
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace before granting client access.', code: 'WORKSPACE_REQUIRED' }); return; }
     const input = z.object({ clientId: z.string().min(1).max(128), scopes: z.array(z.enum(ALL_SCOPES)).max(3), addOnly: z.boolean().optional() }).strict().safeParse(req.body);
     if (!input.success || !ws.store.listOAuthClients().some((c) => c.clientId === input.data.clientId)) {
       res.status(400).json({ error: 'Invalid client or scopes' });
@@ -334,7 +449,19 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     const before = host.current();
     try {
       const result: SwitchResult = await host.switchTo({ path: input.data.path });
-      res.json({ ok: true, ...result, needsProjectOverview: result.changed });
+      let startupRemembered = true;
+      if (result.changed || hasWorkspace()) {
+        try {
+          const ws = host.current();
+          const registered = new ProjectRegistry(ws.store).add(ws.rootInfo.root).project;
+          const cfg = loadGlobalConfig(ws.paths.configFile);
+          saveGlobalConfig(ws.paths.configFile, GlobalConfigSchema.parse({ ...cfg, startupProjectId: registered.projectId }));
+        } catch (error) {
+          startupRemembered = false;
+          info.log?.(`[dodo] workspace selected but startup preference could not be saved: ${(error as Error).message}`);
+        }
+      }
+      res.json({ ok: true, ...result, needsProjectOverview: result.changed, startupRemembered });
     } catch (err) {
       const { status, body } = switchError(err);
       try {

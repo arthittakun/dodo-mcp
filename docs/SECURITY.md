@@ -37,6 +37,12 @@ MCP และ public route ต้องผ่าน OAuth เสมอ ห้า
 
 Local Config bind loopback ใช้ private capability token, expiration, Host/Origin checks, forwarded-header rejection และ rate limit ไม่มี Local Config/admin endpoint บน public MCP plane
 
+Launcher mode ไม่มี active AI workspace และไม่ใช้ CWD เป็น implicit authority
+private inert root ไม่ถูกแสดงต่อ client; public MCP/OAuth routes ถูกปฏิเสธจน owner
+เลือก target สำเร็จ Mutation จาก Local Config ยังผูกกับ current control context
+workspace/epoch การเลือก startup project เป็น preference เท่านั้นและไม่คัดลอก trust,
+OAuth grant, client ACL, approval, jobs หรือ workspace epoch
+
 Project Registry API ใช้ boundary เดียวกันและผูก mutation กับ workspace/epoch ที่
 เจ้าของกำลัง review รายการทุกตัวถูก render ด้วย DOM text APIs การแสดงชื่อ/path จึง
 ไม่สร้าง HTML จากข้อมูล registry
@@ -182,6 +188,11 @@ production dependency findings แต่ไม่ publish package หรือ�
 เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO มีโหมด external และ managed โดย managed mode supervise เฉพาะ live `cloudflared` child ที่เริ่มจากคำสั่ง `dodo tunnel start --yes` และไม่ใช้ Cloudflare API
 
 Tunnel token อยู่ใน macOS Keychain, Windows Credential Manager, Linux Secret Service หรือ owner-selected secure environment/file config เก็บเพียง credential reference และ executable path ที่เจ้าของเลือก Token ไม่อยู่ใน CLI argv, child arguments, logs, MCP catalog/response, audit หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูกปฏิเสธจาก environment ของ MCP jobs เสมอ
+
+Local Config รับ token เฉพาะ POST ที่ผ่าน private capability, Host/Origin/proxy checks,
+rate limit และ control-context headers แล้วส่งค่าไป OS credential provider ผ่าน stdin
+Response/config/audit เก็บเฉพาะ provider reference และสถานะ การบันทึกไม่อนุญาตให้ AI
+ตั้ง token และไม่เริ่ม network process; `dodo tunnel start --yes` ยังคงเป็น owner action แยก
 
 Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose readiness บอกสถานะ Cloudflare connection เท่านั้น ไม่ใช่หลักฐานว่า AI client กำลังเชื่อมต่อ
 

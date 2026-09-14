@@ -57,9 +57,20 @@ scheduler และ run เดิมก่อนปิด database
 
 `bootstrapWorkspace` เปิด database, store, root policy, ignore engine, planner/applier, jobs, Git, search, intelligence และ optional services สำหรับ root เดียว
 
+HTTP launcher เริ่มได้โดยไม่มี active project เพื่อให้ `dodo` รันจาก directory ใดก็ได้
+ระหว่างนี้ process bootstrap private inert root ใต้ config directory สำหรับ control-plane
+resources เท่านั้น `workspaceSelected=false` ปิด MCP/OAuth data plane ด้วย 503
+`workspace_required`; `/healthz` และ Local Config ยังพร้อมให้เจ้าของเลือกโปรเจกต์
+เมื่อ target ผ่าน shared root policy, readiness และ WorkspaceHost switch lifecycle แล้ว
+จึง flip active state, เริ่ม schedules และให้ request ใหม่สร้าง MCP context ของ root จริง
+
 `WorkspaceHost` ถือ active workspace เดียวต่อ process การเปลี่ยน workspace ทำแบบ prepare → readiness → drain/teardown → commit และ rollback เมื่อขั้นตอน prepare ล้มเหลว ทุก request resolve active workspace ตอนเริ่ม request และตรวจ identity/epoch ซ้ำใน invocation pipeline
 
 running jobs, in-flight requests, stale Local Config headers และ duplicate server ownership ถูกตรวจเป็น precondition การสลับจะไม่ kill jobs เงียบ ๆ
+
+`startupProjectId` ชี้ owner registry entry เพื่อเลือก startup root แต่ไม่ใช่ authority
+ระบบ resolve canonical identity/readiness ใหม่ทุก startup และ fallback เป็น launcher mode
+เมื่อพิสูจน์ target ไม่ได้ ไม่มี service ใดเปลี่ยน root จาก `process.cwd()`
 
 ## Project registry
 

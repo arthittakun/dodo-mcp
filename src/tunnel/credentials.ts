@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { DodoError } from '../errors.js';
 import { TunnelCredentialRefSchema, type TunnelCredentialRef } from '../config/tunnelConfig.js';
@@ -144,6 +144,22 @@ function powershell(script: string, key: string, inheritStdio = false): ReturnTy
   );
 }
 
+function powershellWithInput(script: string, key: string, input: Buffer): ReturnType<typeof spawnSync> {
+  const env: NodeJS.ProcessEnv = {
+    SYSTEMROOT: envValue(process.env, 'SystemRoot', 'win32'),
+    WINDIR: envValue(process.env, 'windir', 'win32'),
+    USERPROFILE: envValue(process.env, 'USERPROFILE', 'win32'),
+    TEMP: envValue(process.env, 'TEMP', 'win32'),
+    TMP: envValue(process.env, 'TMP', 'win32'),
+    DODO_TUNNEL_CREDENTIAL_ID: windowsCredentialTarget(key),
+  };
+  return spawnSync(
+    windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'),
+    ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')],
+    { input, env, shell: false, windowsHide: true, timeout: 30_000, maxBuffer: 4096, encoding: 'utf8', stdio: ['pipe', 'ignore', 'pipe'] },
+  );
+}
+
 export function osCredentialAvailability(): { available: boolean; provider: string; reason?: string } {
   try {
     if (process.platform === 'darwin') { macSecurity(); return { available: true, provider: 'macOS Keychain' }; }
@@ -179,6 +195,57 @@ export async function storeOsTunnelCredentialInteractive(ref: TunnelCredentialRe
   catch (error) {
     try { deleteOsTunnelCredential(ref); } catch { /* original store/read refusal remains authoritative */ }
     throw error;
+  }
+}
+
+/**
+ * Store a token received by the authenticated loopback owner UI. The token is
+ * passed to the OS provider over child stdin only; it is never placed in argv,
+ * environment variables, config, receipts, logs or error messages.
+ */
+export async function storeOsTunnelCredentialValue(refInput: TunnelCredentialRef, raw: string): Promise<void> {
+  const ref = TunnelCredentialRefSchema.parse(refInput);
+  if (ref.provider !== 'os') throw new DodoError('INVALID_INPUT', 'OS credential storage requires an OS credential reference');
+  const token = validateTunnelToken(raw);
+  // security(1)'s prompt asks for the new value twice, even with -U. Supplying
+  // both copies over stdin keeps the value out of argv/env and allows the
+  // authenticated browser flow to use the same Keychain boundary.
+  const input = Buffer.from(process.platform === 'darwin' ? `${token}\n${token}\n` : `${token}\n`, 'utf8');
+  let result: ReturnType<typeof spawnSync>;
+  try {
+    if (process.platform === 'darwin') {
+      // `-w` as the final option asks security(1) to read the value instead of
+      // exposing it as the next argv item.
+      result = spawnSync(macSecurity(), ['add-generic-password', '-U', '-a', ref.key, '-s', KEYCHAIN_SERVICE, '-w'], {
+        input, shell: false, windowsHide: true, timeout: 120_000, maxBuffer: 4096, stdio: ['pipe', 'ignore', 'pipe'],
+      });
+    } else if (process.platform === 'win32') {
+      const script = `Add-Type -TypeDefinition @'\n${WIN_CREDENTIAL_TYPE}\n'@\n$p=[Console]::In.ReadLine()\ntry{[DodoTunnelCredential]::Write($env:DODO_TUNNEL_CREDENTIAL_ID,$p)}finally{$p=$null}`;
+      result = powershellWithInput(script, ref.key, input);
+    } else if (process.platform === 'linux') {
+      result = spawnSync(linuxSecretTool(), ['store', '--label=DODO Cloudflare Tunnel', 'service', KEYCHAIN_SERVICE, 'account', ref.key], {
+        input, shell: false, windowsHide: true, timeout: 30_000, maxBuffer: 4096, stdio: ['pipe', 'ignore', 'pipe'],
+      });
+    } else {
+      throw new DodoError('NOT_SUPPORTED', `no reviewed OS credential provider for ${process.platform}`);
+    }
+  } finally {
+    input.fill(0);
+  }
+  if (result.error || result.status !== 0) throw new DodoError('INTERNAL_ERROR', 'OS credential store refused the tunnel credential; no config reference was saved');
+  try {
+    const stored = Buffer.from(await readTunnelCredential(ref), 'utf8');
+    const expected = Buffer.from(token, 'utf8');
+    try {
+      if (stored.length !== expected.length || !timingSafeEqual(stored, expected)) throw new Error('credential round-trip mismatch');
+    } finally {
+      stored.fill(0);
+      expected.fill(0);
+    }
+  } catch (error) {
+    try { deleteOsTunnelCredential(ref); } catch { /* original store/read refusal remains authoritative */ }
+    if (error instanceof DodoError) throw error;
+    throw new DodoError('INTERNAL_ERROR', 'OS credential store could not verify the tunnel credential; the new value was removed');
   }
 }
 

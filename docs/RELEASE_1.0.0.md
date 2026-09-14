@@ -12,6 +12,8 @@ dodo --version
 ## ความสามารถหลัก
 
 - MCP HTTP + OAuth และ Local Config แบบ loopback
+- `dodo --cli` interactive owner menu และ global launcher ที่ไม่ใช้ CWD เป็น workspace
+- startup project จาก owner registry; หากยังไม่เลือก MCP/OAuth ปฏิเสธด้วย `workspace_required`
 - Compact HTTP surface 19 tools
 - Full STDIO surface 121 tools
 - Hybrid surface 49 tools
@@ -24,6 +26,7 @@ dodo --version
 - setup แบบ plan-first: installer ที่ยังขาดต้องยืนยันด้วย `--yes`
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
 - Cloudflare Tunnel แบบ external หรือ managed foreground พร้อม OS credential references, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
+- Local Config ตั้ง Tunnel token ผ่าน OS credential store ได้โดยไม่ echo/persist ค่า raw
 - owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม target ACL, readiness, source hash และ target-scoped audit
 - Universal Resource Layer + private SHA-256 CAS พร้อม bounded range/resume,
   deterministic extraction และ MCP image/audio preview

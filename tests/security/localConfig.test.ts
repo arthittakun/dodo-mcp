@@ -1,15 +1,16 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
 import { bootstrapWorkspace } from '../../src/server/bootstrap.js';
-import { startLocalConfig } from '../../src/server/localConfig.js';
+import { startLocalConfig, type LocalConfigInfo } from '../../src/server/localConfig.js';
 import { addStaticClient } from '../../src/auth/clients.js';
 import { mkTmpDir, rawHttp, type TestContext } from '../helpers/testServer.js';
 
-async function setup(runMode?: 'allow-all' | 'bypass') {
+async function setup(runMode?: 'allow-all' | 'bypass', info: LocalConfigInfo = {}) {
   const old = process.env['DODO_CONFIG_DIR'];
   process.env['DODO_CONFIG_DIR'] = mkTmpDir('dodo-admin-cfg-');
   const ws = bootstrapWorkspace({ invokedCwd: mkTmpDir('dodo-admin-root-'), log: () => {}, ...(runMode ? { runMode } : {}) });
   if (old === undefined) delete process.env['DODO_CONFIG_DIR']; else process.env['DODO_CONFIG_DIR'] = old;
-  const admin = await startLocalConfig(ws, 0);
+  const admin = await startLocalConfig(ws, 0, info);
   const url = new URL(admin.url);
   const token = url.hash.slice(1);
   return { ws, admin, url, token, close: async () => { await admin.close(); await ws.shutdownServices(); } };
@@ -133,6 +134,51 @@ describe('local config boundary', () => {
       expect(sw.status).toBe(501);
       expect(((await sw.json()) as { code: string }).code).toBe('NOT_SUPPORTED');
       expect((await fetch(`${s.url.origin}/api/workspace/switch`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status).toBe(401);
+    } finally { await s.close(); }
+  });
+
+  it('stores a submitted Tunnel token only through the OS credential boundary and never echoes or persists it', async () => {
+    let stored = '';
+    let removed = false;
+    const ref = { provider: 'os' as const, key: 'a'.repeat(24) };
+    const s = await setup(undefined, {
+      tunnelCredentials: {
+        availability: () => ({ available: true, provider: 'fixture credential store' }),
+        ref: () => ref,
+        store: async (_ref, token) => { stored = token; },
+        remove: () => { removed = true; stored = ''; },
+      },
+    });
+    const submitted = 'fixture-cloudflare-tunnel-token-1234567890';
+    try {
+      const context = { 'x-dodo-workspace': s.ws.workspaceId, 'x-dodo-epoch': s.ws.epoch, 'content-type': 'application/json' };
+      const unauthenticated = await fetch(`${s.url.origin}/api/tunnel/config`, { method: 'POST', headers: context, body: JSON.stringify({ mode: 'managed', token: submitted }) });
+      expect(unauthenticated.status).toBe(401);
+      expect(stored).toBe('');
+
+      const saved = await fetch(`${s.url.origin}/api/tunnel/config`, {
+        method: 'POST',
+        headers: { ...context, authorization: `Bearer ${s.token}` },
+        body: JSON.stringify({ mode: 'managed', token: submitted, metricsPort: 32174, maxRestarts: 1 }),
+      });
+      expect(saved.status).toBe(200);
+      const responseText = await saved.text();
+      expect(responseText).not.toContain(submitted);
+      expect(JSON.parse(responseText)).toMatchObject({ ok: true, mode: 'managed', credentialConfigured: true, credentialProvider: 'os', started: false });
+      expect(stored).toBe(submitted);
+      expect(fs.readFileSync(s.ws.paths.configFile, 'utf8')).not.toContain(submitted);
+      expect(JSON.stringify(s.ws.store.recentAudit(s.ws.workspaceId, 20))).not.toContain(submitted);
+
+      const unconfirmed = await fetch(`${s.url.origin}/api/tunnel/config`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ removeCredential: true }),
+      });
+      expect(unconfirmed.status).toBe(400);
+      expect(removed).toBe(false);
+      const deleted = await fetch(`${s.url.origin}/api/tunnel/config`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ mode: 'external', removeCredential: true, confirm: 'remove-tunnel-credential' }),
+      });
+      expect(deleted.status).toBe(200);
+      expect(removed).toBe(true);
     } finally { await s.close(); }
   });
 

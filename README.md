@@ -30,10 +30,23 @@
 ```bash
 npm install -g dodo-mcp
 dodo setup --check
-cd /path/to/your/project
-dodo trust --mode edit
-dodo start
+dodo --cli
 ```
+
+`dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config,
+ตั้ง Cloudflare Tunnel token และรัน setup รวม `cloudflared` โดยไม่ต้อง `cd` เข้าโปรเจกต์
+ก่อน หากเรียก `dodo` หรือ `dodo start` จากโฟลเดอร์ใดก็ตาม ระบบจะเปิดโปรเจกต์ที่
+เจ้าของเลือกล่าสุด หากยังไม่เลือกจะเปิดเฉพาะ control plane และปฏิเสธ MCP/OAuth ด้วย
+`workspace_required` จนกว่าจะเลือก absolute path จาก Local Config หรือเมนู CLI
+
+เปิดโปรเจกต์โดยตรงและจำไว้สำหรับครั้งถัดไปได้ด้วย:
+
+```bash
+dodo start --root /path/to/your/project
+```
+
+การเลือกโปรเจกต์ไม่คัดลอก trust หรือ client ACL จากโปรเจกต์อื่น ตั้งสิทธิ์ของโปรเจกต์
+ที่เปิดแล้วผ่าน Local Config หรือคำสั่ง owner ที่ผูกกับ workspace นั้น
 
 `dodo setup --check` และ `dodo setup --plan` เป็น read-only หากแผนมี dependency ที่ต้องติดตั้ง ให้ตรวจรายการก่อนแล้วจึงรัน `dodo setup --yes --components <list>` ระบบจะไม่เริ่ม installer หากไม่มี `--yes` และ `--yes` ไม่ข้าม sudo, OS permission หรือ owner consent
 
@@ -223,6 +236,10 @@ dodo setup --check --components cloudflared
 dodo tunnel configure --managed --os-credential
 dodo tunnel start --yes
 ```
+
+บน macOS `dodo setup --yes` เลือก component `cloudflared` อยู่ในชุด `all` แล้ว
+หน้า Local Config และ `dodo --cli` รับ token ผ่าน owner-only flow เดียวกัน โดยค่า token
+ไปยัง OS credential store และไม่ถูกแสดงกลับ การบันทึก token ไม่เริ่ม tunnel อัตโนมัติ
 
 `--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret Service และ config เก็บเพียง opaque reference สำหรับ headless environment ใช้ `--token-env NAME` หรือ `--token-file /absolute/private/path` ค่า token ไม่อยู่ใน argv, config, tunnel log หรือ MCP response ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย `dodo tunnel doctor` และดู log ที่ redacted ด้วย `dodo tunnel logs`
 

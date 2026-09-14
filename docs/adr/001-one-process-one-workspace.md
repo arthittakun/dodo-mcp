@@ -1,6 +1,7 @@
 # ADR-001 — One process = one CWD workspace = one endpoint profile
 
-**Status:** accepted (implemented)
+**Status:** superseded in part by ADR-019 and ADR-044. The one-active-workspace
+invariant remains; CWD startup and restart-only switching do not.
 
 **Decision.** A DODO process serves exactly one workspace root — the realpath of
 `process.cwd()` captured at the CLI entrypoint — and one public issuer/profile.

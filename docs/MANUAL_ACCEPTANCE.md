@@ -38,13 +38,26 @@
 
 ## Local Config
 
-1. รัน `dodo start` จาก fixture project
+1. จาก directory ที่ไม่ใช่โปรเจกต์และ config ใหม่ รัน `dodo` แล้วตรวจว่า MCP ตอบ `workspace_required`
 2. เปิด Local Config URL จาก terminal
-3. ตรวจ root, absolute path, MCP status, OAuth status และ config listener
-4. เปลี่ยนไปยัง fixture project B
-5. ตรวจว่า overview จาก MCP เห็น B จริง
-6. ตรวจ workspace ID/epoch เปลี่ยน และหน้าเว็บแจ้งให้โหลด context ใหม่
-7. กลับไป A แล้วตรวจว่า ACL/trust ไม่ปะปน
+3. ตรวจว่าไม่มี root จาก CWD ปรากฏ และ Project Registry ยังเพิ่ม/เลือก path ได้
+4. เพิ่ม fixture A โดยเลือก “เปิดโปรเจกต์นี้ทันที” แล้วตรวจ root, MCP/OAuth และ config listener
+5. ปิดแล้วเปิด `dodo` จาก directory อื่น ตรวจว่า A ถูกเลือกจาก registry preference
+6. เปลี่ยนไปยัง fixture project B
+7. ตรวจว่า overview จาก MCP เห็น B จริง
+8. ตรวจ workspace ID/epoch เปลี่ยน และหน้าเว็บแจ้งให้โหลด context ใหม่
+9. กลับไป A แล้วตรวจว่า ACL/trust ไม่ปะปน
+
+## Interactive CLI
+
+1. รัน `dodo --cli` จาก Home/Desktop และตรวจว่าแสดง project ที่เลือกล่าสุด
+2. เลือก project เดิมและเพิ่ม fixture ใหม่ด้วย absolute path
+3. ตรวจว่า server ใช้ root ที่เลือก ไม่ใช่ CWD
+4. เลือก setup check และตรวจว่ารายการมี cloudflared
+5. เลือกตั้ง Tunnel token ด้วย fixture credential แล้วตรวจ process list/config/log/audit
+   ไม่มี token จากนั้นลบ credential ผ่าน Local Config
+
+สถานะ owner-browser/terminal สำหรับ launcher และเมนูใหม่: `MANUAL_NOT_RUN`
 
 ## Workspace safety
 

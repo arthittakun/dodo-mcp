@@ -57,6 +57,21 @@ DODO ไม่ถือว่า `missing`, `symlinked`, `replaced`, `inaccessib
 Host/Origin checks, rate limit และ workspace/epoch headers เดิม ไม่มี route นี้บน
 MCP/public listener
 
+`dodo --cli` ใช้ registry เดียวกันสำหรับเลือกหรือเพิ่มโปรเจกต์ และบันทึก
+`startupProjectId` เป็น preference ระดับ installation ค่านี้ไม่ใช่ permission
+ไม่เพิ่ม trust/ACL และต้อง resolve registry + ตรวจ readiness ใหม่ทุกครั้งที่เปิด server
+
+`dodo` และ `dodo start` ไม่ยึด process CWD เป็น workspace โดยอัตโนมัติอีกต่อไป:
+
+- ถ้าโปรเจกต์ที่เลือกล่าสุดยัง `ready` จะเปิด root นั้น
+- ถ้ายังไม่เลือกหรือรายการไม่พร้อม จะเปิด launcher mode โดยไม่มี active AI workspace
+- เจ้าของเลือก path แรกจาก Local Config, `dodo --cli` หรือ `dodo start --root PATH`
+- `dodo stdio --root PATH` ยังคง explicit เพราะ STDIO lifecycle ถูก client เป็นผู้สร้าง
+
+launcher mode ใช้ directory ภายใน private config เป็น resource ชั่วคราวเท่านั้น
+directory นี้ไม่ถูกส่งเป็น project root และ MCP/OAuth data plane ตอบ
+`workspace_required` จนกว่าการเตรียม real workspace จะสำเร็จ
+
 ## Read-only federation
 
 MCP อ่านโปรเจกต์ที่ลงทะเบียนไว้ได้โดยไม่เปลี่ยน active workspace ผ่าน tools เดิม:

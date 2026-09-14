@@ -159,7 +159,7 @@ describe('CLI', () => {
         expect(disabled.stdout).toContain('disabled and forgotten');
       }
       const port = await freePort();
-      const child = spawn(process.execPath, [CLI, 'start', '--port', String(port), '--quiet'], {
+      const child = spawn(process.execPath, [CLI, 'start', '--root', cwd, '--port', String(port), '--quiet'], {
         cwd, env: { ...process.env, DODO_CONFIG_DIR: cfg }, stdio: ['ignore', 'pipe', 'pipe'],
       });
       let log = '';
@@ -213,15 +213,16 @@ describe('CLI', () => {
   });
 
   it.each([
-    { args: [] as string[], mode: 'inspect' },
+    { args: ['start'] as string[], mode: 'inspect' },
     { args: ['start', '--allow', '--all'], mode: 'trusted' },
     { args: ['--bypass'], mode: 'trusted' },
-  ])('CLI-NEW: $args opens current workspace and private config', async ({ args, mode }) => {
+  ])('CLI-NEW: explicit --root opens the reviewed workspace and private config', async ({ args, mode }) => {
     const cfg = fs.mkdtempSync(path.join(base, 'new-cfg-'));
     const proj = fs.mkdtempSync(path.join(base, 'new-proj-'));
     const port = await freePort();
     fs.writeFileSync(path.join(cfg, 'config.json'), JSON.stringify({ port, configPort: 0 }));
-    const child = spawn('node', [CLI, ...args], { cwd: proj, env: { ...process.env, DODO_CONFIG_DIR: cfg }, stdio: ['ignore','pipe','pipe'] });
+    const commandArgs = args[0] === '--bypass' ? [...args, '--root', proj] : [...args, '--root', proj];
+    const child = spawn('node', [CLI, ...commandArgs], { cwd: base, env: { ...process.env, DODO_CONFIG_DIR: cfg }, stdio: ['ignore','pipe','pipe'] });
     let log = '';
     child.stdout.on('data', c => { log += String(c); });
     try {
@@ -234,12 +235,37 @@ describe('CLI', () => {
       expect(state.workspace.switchSupported).toBe(true);
       expect(state.permissions.effectiveMode).toBe(mode);
       expect(state.permissions.savedMode).toBe('inspect');
-      expect(state.permissions.override).toBe(mode === 'trusted' ? (args.includes('--bypass') ? 'bypass' : 'allow-all') : null);
+      expect(state.permissions.override).toBe(mode === 'trusted' ? (commandArgs.includes('--bypass') ? 'bypass' : 'allow-all') : null);
       expect((await fetch(`http://127.0.0.1:${port}/mcp`,{method:'POST'})).status).toBe(401);
       expect((await fetch(`http://127.0.0.1:${port}/api/state`)).status).toBe(404);
     } finally {
       child.kill('SIGTERM');
       if (child.exitCode === null && child.signalCode === null) await new Promise<void>(resolve => child.once('close', () => resolve()));
+    }
+  }, 20000);
+
+  it('CLI launcher: bare dodo from an arbitrary directory exposes no workspace until the owner selects one', async () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'launcher-cfg-'));
+    const unrelated = fs.mkdtempSync(path.join(base, 'launcher-cwd-'));
+    const port = await freePort();
+    fs.writeFileSync(path.join(cfg, 'config.json'), JSON.stringify({ port, configPort: 0 }));
+    const child = spawn(process.execPath, [CLI], { cwd: unrelated, env: { ...process.env, DODO_CONFIG_DIR: cfg }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let log = '';
+    child.stdout.on('data', (chunk) => { log += String(chunk); });
+    child.stderr.on('data', (chunk) => { log += String(chunk); });
+    try {
+      await waitFor(async () => log.includes('Private config') ? 'ready' : undefined, 15000);
+      const privateUrl = new URL(log.match(/http:\/\/127\.0\.0\.1:\d+\/#([a-f0-9]+)/)![0]);
+      const response = await fetch(`${privateUrl.origin}/api/state`, { headers: { authorization: `Bearer ${privateUrl.hash.slice(1)}` } });
+      expect(response.status).toBe(200);
+      const state = await response.json() as { workspace: null; connection: { workspaceSelected: boolean } };
+      expect(state.workspace).toBeNull();
+      expect(state.connection.workspaceSelected).toBe(false);
+      expect(log).not.toContain(fs.realpathSync(unrelated));
+      expect((await fetch(`http://127.0.0.1:${port}/mcp`, { method: 'POST' })).status).toBe(503);
+    } finally {
+      child.kill('SIGTERM');
+      if (child.exitCode === null && child.signalCode === null) await new Promise<void>((resolve) => child.once('close', () => resolve()));
     }
   }, 20000);
 
@@ -252,7 +278,7 @@ describe('CLI', () => {
     }
   });
 
-  it('CLI-03/CLI-01: start binds the CWD (not the install dir) and status reports it over IPC', async () => {
+  it('CLI-03/CLI-01: explicit --root selects the project without binding the process CWD', async () => {
     const cfg = fs.mkdtempSync(path.join(base, 'cfg-'));
     // Monorepo layout: start inside apps/web.
     const mono = fs.mkdtempSync(path.join(base, 'mono-'));
@@ -264,8 +290,8 @@ describe('CLI', () => {
     fs.writeFileSync(path.join(cfg, 'config.json'), JSON.stringify({configPort:0}));
     const logFile = path.join(cfg, 'child.log');
     const logFd = fs.openSync(logFile, 'w');
-    const child = spawn('node', [CLI, 'start', '--port', String(port), '--quiet'], {
-      cwd: web,
+    const child = spawn('node', [CLI, 'start', '--root', web, '--port', String(port), '--quiet'], {
+      cwd: base,
       env: { ...process.env, DODO_CONFIG_DIR: cfg },
       stdio: ['ignore', logFd, logFd],
     });
@@ -278,7 +304,7 @@ describe('CLI', () => {
         throw new Error(`${e}; child log: ${fs.readFileSync(logFile, 'utf8').slice(0, 800)}`);
       });
       const status = JSON.parse(runCli(['status', '--json'], { cwd: web, configDir: cfg }).stdout) as { root: string };
-      expect(fs.realpathSync(status.root)).toBe(fs.realpathSync(web)); // CWD, not the parent monorepo root
+      expect(fs.realpathSync(status.root)).toBe(fs.realpathSync(web));
       expect(status.root).not.toContain('SIBLING_SECRET');
     } finally {
       child.kill('SIGTERM');

@@ -2,6 +2,17 @@
 
 ## 1.0.0
 
+### Global launcher และ interactive CLI
+
+- เพิ่ม `dodo --cli` เป็นเมนู owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด server ตั้ง Tunnel
+  token และ setup dependencies รวม cloudflared
+- `dodo`/`dodo start` ใช้โปรเจกต์ที่ owner เลือกล่าสุด หรือเปิด launcher mode ที่ไม่มี
+  active AI workspace แทนการใช้ CWD โดยอัตโนมัติ; `--root` เลือกและจำ root แบบ explicit
+- Local Config เพิ่มโปรเจกต์แล้วเปิดได้ทันที และรองรับสถานะก่อนเลือก workspace
+- Local Config ตั้ง Cloudflare token ผ่าน OS credential store โดยไม่ echo/persist raw token
+- การเลือก startup project ไม่เพิ่ม authority และ MCP/OAuth ถูกปิดด้วย
+  `workspace_required` จนกว่า real workspace จะพร้อม
+
 ### DodoBench และ release evidence
 
 - เพิ่ม deterministic DodoBench baseline ครอบคลุม cross-project retrieval, safe edit,

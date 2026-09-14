@@ -69,7 +69,7 @@ describe('dodo kill: CWD-independent shutdown with durable login', () => {
       const roots = ['A', 'B', 'โปรเจกต์ C', 'other-config-root'].map(n => path.join(base, n));
       for (const root of roots) fs.mkdirSync(root);
       for (const [root, config] of [[roots[0]!, cfg], [roots[1]!, cfg], [roots[3]!, otherCfg]]) {
-        const p = spawn(process.execPath, [CLI, 'start', '--port', String(await freePort()), '--quiet'], {
+        const p = spawn(process.execPath, [CLI, 'start', '--root', root!, '--port', String(await freePort()), '--quiet'], {
           cwd: root, env: { ...process.env, DODO_CONFIG_DIR: config }, stdio: 'ignore',
         });
         children.push(p);

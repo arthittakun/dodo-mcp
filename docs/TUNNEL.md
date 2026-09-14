@@ -15,9 +15,7 @@ Tunnel ต้อง route health, discovery, OAuth และ MCP ทุก path 
 
 ```bash
 dodo init --public-url https://mcp.example.com
-cd /path/to/project
-dodo trust --mode edit
-dodo start
+dodo start --root /path/to/project
 ```
 
 ## เลือกโหมด
@@ -38,6 +36,9 @@ dodo tunnel configure --managed --os-credential
 dodo tunnel start --yes
 ```
 
+`dodo setup --yes` ใช้ component `all` เป็นค่าเริ่มต้นและรวม `cloudflared` บน macOS
+หรือเลือกจากเมนู `dodo --cli` ข้อ “ติดตั้ง/ตรวจ dependencies ทั้งหมด” ได้
+
 เปิด terminal นี้ไว้ตลอดการใช้งาน คำสั่งที่มีให้คือ:
 
 ```bash
@@ -57,6 +58,12 @@ dodo tunnel restart --yes
 - `--token-file /absolute/private/path`: owner-private regular file, ห้าม symlink/hardlink
 
 DODO ไม่รับ token เป็น CLI argument และไม่ใส่ token ใน `cloudflared` argv โดยส่งผ่าน environment ของ child ที่สร้างเองเท่านั้น Tunnel diagnostics ถูกจำกัดขนาดและ redact ก่อนเขียนลง private state MCP jobs จะไม่ได้รับ `TUNNEL_TOKEN` หรือ `TUNNEL_TOKEN_FILE` แม้ owner จะใส่ชื่อไว้ใน environment allowlist
+
+หน้า Local Config มีส่วน **Cloudflare Tunnel** สำหรับบันทึก token และ mode ผ่าน
+private loopback capability เดิม Token ถูกส่งใน request body ไปยัง listener
+`127.0.0.1:21731` เท่านั้น จากนั้น backend ส่งเข้า Keychain/Credential Manager/
+Secret Service ทาง stdin ไม่วางใน argv/env/config/audit/error และไม่ส่งค่ากลับหน้าเว็บ
+การลบต้องยืนยัน และการบันทึกไม่ start `cloudflared` เอง
 
 managed mode ใช้ bounded restart หลัง `cloudflared` จบ retry ของตัวเอง และ `stop` ส่งสัญญาณเฉพาะ live child handle ที่ supervisor เป็นผู้สร้าง ไม่มีการ kill saved PID หรือ process ชื่อเหมือนกัน
 
