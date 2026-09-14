@@ -91,7 +91,7 @@ describe('security-scoped Dodo state import', () => {
     expect(saved.allowWebFetch).toBe(false);
     expect(saved.lsp).toEqual({});
     expect(saved.envAllowlist).toEqual([]);
-    expect(saved.tunnel).toEqual({ mode: 'external', metricsPort: 21732, maxRestarts: 2 });
+    expect(saved.tunnel).toEqual({ mode: 'external', startWithDodo: true, metricsPort: 21732, maxRestarts: 2 });
     expect(fs.existsSync(path.join(f.target, 'state.db'))).toBe(false);
     expect(fs.existsSync(path.join(f.target, 'keys'))).toBe(false);
     expect(fs.readFileSync(path.join(f.source, 'config.json'))).toEqual(sourceConfig);

@@ -14,8 +14,7 @@ export interface CliMenuActions {
   startupProject(): CliMenuProject | undefined;
   selectProject(projectId: string): CliMenuProject;
   addProject(path: string, displayName?: string): CliMenuProject;
-  start(root?: string): Promise<void>;
-  configureTunnel(): Promise<void>;
+  start(root?: string, tunnel?: boolean): Promise<void>;
   setupAll(): Promise<void>;
   checkSetup(): Promise<void>;
 }
@@ -38,10 +37,10 @@ export function menuText(startup: CliMenuProject | undefined): string {
     'DODO Control Center',
     `โปรเจกต์เริ่มต้น: ${selected}`,
     '',
-    '  1) เปิด MCP + Local Config',
-    '  2) เลือกโปรเจกต์ที่บันทึกไว้ แล้วเปิด MCP',
-    '  3) เพิ่มโปรเจกต์จาก absolute path แล้วเปิด MCP',
-    '  4) ตั้ง Cloudflare Tunnel token (เก็บใน OS credential store)',
+    '  1) เปิด MCP + Local Config + Tunnel (ถาม token ชั่วคราว)',
+    '  2) เลือกโปรเจกต์ที่บันทึกไว้ แล้วเปิด MCP + Tunnel',
+    '  3) เพิ่มโปรเจกต์จาก absolute path แล้วเปิด MCP + Tunnel',
+    '  4) เปิด MCP แบบ local เท่านั้น (ไม่เปิด Tunnel)',
     '  5) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared',
     '  6) ตรวจ dependencies แบบไม่ติดตั้ง',
     '  0) ออก',
@@ -111,13 +110,10 @@ export async function runCliMenu(actions: CliMenuActions, streams: CliMenuStream
         continue;
       }
       if (choice === '4') {
-        try {
-          await actions.configureTunnel();
-          write(streams.output, 'บันทึก Tunnel token แล้ว โดยไม่ได้เริ่ม tunnel อัตโนมัติ\n');
-        } catch (error) {
-          write(streams.output, `ตั้ง Tunnel ไม่สำเร็จ: ${(error as Error).message}\n`);
-        }
-        continue;
+        const project = actions.startupProject();
+        rl.close();
+        await actions.start(project?.available ? project.root : undefined, false);
+        return;
       }
       if (choice === '5') {
         const confirmed = (await rl.question('ติดตั้ง components ที่ขาด รวม cloudflared? พิมพ์ yes เพื่อดำเนินการ: ')).trim().toLowerCase();

@@ -2,9 +2,9 @@
 
 **Status:** accepted (implemented)
 
-**Decision.** DODO supports two tunnel modes. `external` observes owner/system-managed connectivity and never starts a process. `managed` starts only an owner-selected, trusted `cloudflared` executable in the foreground after `dodo tunnel start --yes`. The owner still creates the remotely-managed Tunnel, public hostname and DNS in Cloudflare.
+**Decision.** DODO starts only an owner-selected, trusted `cloudflared` executable owned by the current HTTP process. `dodo start` can attach it immediately; the authenticated Local Config can start or stop the same process-owned runtime. The owner still creates the remotely-managed Tunnel, public hostname and DNS in Cloudflare.
 
-Tunnel tokens live in the platform credential store or an explicit secure env/file reference. Global config stores only the reference. The managed child receives the token through its dedicated environment; it is absent from argv, logs, MCP, audit and job environments.
+The default flow uses a run-scoped token entered through a hidden terminal prompt or the authenticated loopback Local Config. The token is never persisted in global config or an OS credential store. A process-owned `TunnelRuntime` forwards it through the managed child's dedicated environment and stops that child with DODO; it is absent from argv, logs, MCP, audit and job environments. Explicit secure credential references remain supported only by advanced standalone tunnel commands for compatibility.
 
 The supervisor uses a separate authenticated singleton owner IPC endpoint, loopback readiness, bounded restarts, private bounded/redacted logs and live child handles for termination. It never signals a saved PID or searches by process name. Local Config and the metrics listener remain loopback-only and are not part of the public route.
 

@@ -16,8 +16,7 @@ function actions(events: string[]): CliMenuActions {
     startupProject: () => project,
     selectProject: (id) => { events.push(`select:${id}`); return project; },
     addProject: (root, name) => { events.push(`add:${root}:${name ?? ''}`); return { ...project, root, displayName: name ?? project.displayName }; },
-    start: async (root) => { events.push(`start:${root ?? 'none'}`); },
-    configureTunnel: async () => { events.push('tunnel'); },
+    start: async (root, tunnel = true) => { events.push(`start:${root ?? 'none'}:${tunnel ? 'tunnel' : 'local'}`); },
     setupAll: async () => { events.push('setup'); },
     checkSetup: async () => { events.push('check'); },
   };
@@ -49,20 +48,26 @@ describe('interactive CLI menu', () => {
   it('starts the remembered project and can select a different registered entry', async () => {
     const direct: string[] = [];
     await run('1\n', direct);
-    expect(direct).toEqual(['start:/tmp/web-app']);
+    expect(direct).toEqual(['start:/tmp/web-app:tunnel']);
 
     const selected: string[] = [];
     await run('2\n1\n', selected);
-    expect(selected).toEqual(['select:prj_abcdefgh', 'start:/tmp/web-app']);
+    expect(selected).toEqual(['select:prj_abcdefgh', 'start:/tmp/web-app:tunnel']);
   });
 
   it('adds an absolute path before starting and exits without side effects', async () => {
     const added: string[] = [];
     await run('3\n/tmp/new-app\nNew app\n', added);
-    expect(added).toEqual(['add:/tmp/new-app:New app', 'start:/tmp/new-app']);
+    expect(added).toEqual(['add:/tmp/new-app:New app', 'start:/tmp/new-app:tunnel']);
 
     const exited: string[] = [];
     await run('0\n', exited);
     expect(exited).toEqual([]);
+  });
+
+  it('can start the remembered project without prompting for a tunnel token', async () => {
+    const local: string[] = [];
+    await run('4\n', local);
+    expect(local).toEqual(['start:/tmp/web-app:local']);
   });
 });

@@ -97,7 +97,7 @@ describe('CLI', () => {
     expect(configured.stdout).not.toContain(fakeToken);
     const configText = fs.readFileSync(path.join(cfg, 'config.json'), 'utf8');
     expect(configText).not.toContain(fakeToken);
-    expect(JSON.parse(configText).tunnel).toEqual({ mode: 'managed', credentialRef: { provider: 'env', name: 'FIXTURE_TUNNEL_TOKEN' }, metricsPort: 32173, maxRestarts: 1 });
+    expect(JSON.parse(configText).tunnel).toEqual({ mode: 'managed', startWithDodo: true, credentialRef: { provider: 'env', name: 'FIXTURE_TUNNEL_TOKEN' }, metricsPort: 32173, maxRestarts: 1 });
     const refused = runCli(['tunnel', 'start'], { cwd: proj, configDir: cfg, expectFail: true, env: { FIXTURE_TUNNEL_TOKEN: fakeToken } });
     expect(refused.code).not.toBe(0); expect(refused.stderr).toContain('--yes');
     expect(refused.stderr).not.toContain(fakeToken);

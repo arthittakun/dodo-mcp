@@ -27,6 +27,7 @@ import { attachOptionalServices } from './optionalServices.js';
 import { createWorkspaceHost, type WorkspaceHost, type WorkspaceResources, type SwitchInput, type SwitchResult } from './workspaceHost.js';
 import { startLocalConfig, type LocalConfigServer } from './localConfig.js';
 import { DODO_VERSION } from './version.js';
+import type { TunnelRuntime } from '../tunnel/runtime.js';
 
 export { DODO_VERSION };
 
@@ -49,6 +50,8 @@ export interface StartOptions {
   onLog?: (line: string) => void;
   /** CLI process exit notification, after graceful shutdown has completed. */
   onStopped?: () => void;
+  /** Process-owned temporary Cloudflare Tunnel lifecycle for Local Config. */
+  tunnelRuntime?: TunnelRuntime;
 }
 
 export interface RunningServer {
@@ -412,6 +415,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         transport: transportInfo(),
         runMode: runMode ?? null,
         workspaceSelected: () => workspaceSelected,
+        ...(opts.tunnelRuntime ? { tunnelRuntime: opts.tunnelRuntime } : {}),
         log,
       });
     }

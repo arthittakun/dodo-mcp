@@ -25,8 +25,8 @@ dodo --version
 - multimodal, browser, game, workflow และ schedule tools ตาม prerequisite
 - setup แบบ plan-first: installer ที่ยังขาดต้องยืนยันด้วย `--yes`
 - existing-state import ที่นำเข้าเฉพาะ non-authority preferences และสร้าง security identity ใหม่
-- Cloudflare Tunnel แบบ external หรือ managed foreground พร้อม OS credential references, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
-- Local Config ตั้ง Tunnel token ผ่าน OS credential store ได้โดยไม่ echo/persist ค่า raw
+- Cloudflare Tunnel แบบ process-owned พร้อม run-scoped token จาก hidden terminal prompt หรือ Local Config, authenticated control IPC, bounded retry/readiness และ redacted diagnostics
+- `dodo start` เปิด tunnel พร้อม MCP ในรอบเดียว; `--no-tunnel` เปิด local-only และ token ไม่ถูกบันทึกลงเครื่อง
 - owner-curated multi-project read federation สำหรับ overview/list/read/search สูงสุด 8 โปรเจกต์ พร้อม target ACL, readiness, source hash และ target-scoped audit
 - Universal Resource Layer + private SHA-256 CAS พร้อม bounded range/resume,
   deterministic extraction และ MCP image/audio preview
@@ -74,11 +74,11 @@ dodo setup --yes --components git,ripgrep,ffmpeg
 ```bash
 dodo setup --check --components cloudflared
 dodo init --public-url https://mcp.example.com
-dodo tunnel configure --managed --os-credential
-dodo tunnel start --yes
+dodo start
+# กรอก token แบบชั่วคราว หรือกด Enter เพื่อใช้ local-only
 ```
 
-DODO ไม่สร้าง Tunnel/DNS และไม่ใช้ Cloudflare API Token ค่า Tunnel token ไม่ถูกบันทึกใน config หรือส่งเป็น process argument
+DODO ไม่สร้าง Tunnel/DNS และไม่ใช้ Cloudflare API Token ค่า Tunnel token ไม่ถูกบันทึกใน config/credential store หรือส่งเป็น process argument หน้า Local Config เริ่ม/หยุด tunnel ของ process ปัจจุบันได้โดยตอบกลับ `tokenStored:false`
 
 ## Security
 

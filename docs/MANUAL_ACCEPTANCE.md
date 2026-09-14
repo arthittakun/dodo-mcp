@@ -11,13 +11,15 @@
 1. สร้าง remotely-managed Tunnel และ public hostname ใน Cloudflare ด้วยบัญชีเจ้าของ
 2. route ทุก path ของ hostname ไป `http://127.0.0.1:21730` และยืนยันว่าไม่มี route ไป `21731`/`21732`
 3. รัน `dodo setup --check --components cloudflared`
-4. รัน `dodo tunnel configure --managed --os-credential` และตรวจว่า config มีเพียง credential reference
-5. รัน `dodo tunnel start --yes` ใน foreground
-6. ตรวจ `dodo tunnel status` ว่า connected หลัง `/ready` ตอบจริง
-7. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
-8. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs` ไม่มี token
-9. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop ด้วย `dodo tunnel stop`
-10. บันทึก macOS และ Linux Docker แยก environment; Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
+4. รัน `dodo start` แล้วกรอก token ที่ hidden prompt; ตรวจว่า config/Keychain ไม่มี token
+5. หยุดแล้วเริ่มใหม่ กด Enter ที่ prompt และยืนยันว่าเปิดเฉพาะ local MCP
+6. เปิด Local Config กรอก token ใน Temporary Tunnel token แล้วกดเปิด; ตรวจช่องถูกล้างและ response/state ไม่มี token
+7. ตรวจ `dodo tunnel status` ว่า `credentialSource=temporary` และ connected หลัง `/ready` ตอบจริง
+8. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
+9. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs` ไม่มี token
+10. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop จาก Local Config; ยืนยัน child หยุดแต่ local MCP ยังอยู่
+11. เริ่ม tunnel ใหม่แล้วหยุด DODO; ยืนยัน child หยุดตาม
+12. บันทึก macOS และ Linux Docker แยก environment; Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
 
 ## Setup foundation
 
@@ -54,7 +56,7 @@
 2. เลือก project เดิมและเพิ่ม fixture ใหม่ด้วย absolute path
 3. ตรวจว่า server ใช้ root ที่เลือก ไม่ใช่ CWD
 4. เลือก setup check และตรวจว่ารายการมี cloudflared
-5. เลือกตั้ง Tunnel token ด้วย fixture credential แล้วตรวจ process list/config/log/audit
+5. เลือกเปิด Tunnel แบบ temporary แล้วตรวจ process list/config/log/audit ว่าไม่มี token
    ไม่มี token จากนั้นลบ credential ผ่าน Local Config
 
 สถานะ owner-browser/terminal สำหรับ launcher และเมนูใหม่: `MANUAL_NOT_RUN`

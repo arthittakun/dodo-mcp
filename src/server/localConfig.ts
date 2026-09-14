@@ -12,13 +12,7 @@ import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSche
 import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
 import { ProjectRegistry } from '../projects/registry.js';
-import {
-  deleteOsTunnelCredential,
-  osCredentialAvailability,
-  osTunnelCredentialRef,
-  storeOsTunnelCredentialValue,
-} from '../tunnel/credentials.js';
-import type { TunnelCredentialRef } from '../config/tunnelConfig.js';
+import type { TunnelRuntime } from '../tunnel/runtime.js';
 
 /**
  * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
@@ -40,13 +34,8 @@ export interface LocalConfigInfo {
   runMode?: 'allow-all' | 'bypass' | null;
   /** Dynamic because the launcher can activate its first real workspace. */
   workspaceSelected?: () => boolean;
-  /** Test seam for the OS credential boundary; production uses the reviewed providers above. */
-  tunnelCredentials?: {
-    availability(): { available: boolean; provider: string; reason?: string };
-    ref(configDir: string): TunnelCredentialRef;
-    store(ref: TunnelCredentialRef, token: string): Promise<void>;
-    remove(ref: TunnelCredentialRef): void;
-  };
+  /** Process-owned runtime; accepts only run-scoped credentials. */
+  tunnelRuntime?: Pick<TunnelRuntime, 'status' | 'start' | 'stop'>;
   log?: (line: string) => void;
 }
 
@@ -106,12 +95,6 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   const host: WorkspaceHost = isHost(target) ? target : staticHost(target);
   const switchSupported = isHost(target);
   const hasWorkspace = () => info.workspaceSelected?.() ?? true;
-  const tunnelCredentials = info.tunnelCredentials ?? {
-    availability: osCredentialAvailability,
-    ref: osTunnelCredentialRef,
-    store: storeOsTunnelCredentialValue,
-    remove: deleteOsTunnelCredential,
-  };
   const token = randomBytes(32).toString('hex');
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
@@ -224,12 +207,13 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       },
       tunnel: {
         mode: cfg.tunnel.mode,
-        credentialConfigured: Boolean(cfg.tunnel.credentialRef),
-        credentialProvider: cfg.tunnel.credentialRef?.provider ?? null,
-        osCredential: tunnelCredentials.availability(),
+        startWithDodo: cfg.tunnel.startWithDodo,
+        tokenStorage: 'none',
+        legacyCredentialConfigured: Boolean(cfg.tunnel.credentialRef),
         cloudflared: cfg.tunnel.executable ? 'owner-selected' : 'trusted-PATH',
         metricsPort: cfg.tunnel.metricsPort,
         maxRestarts: cfg.tunnel.maxRestarts,
+        runtime: info.tunnelRuntime?.status() ?? { available: false, running: false, current: null, lastKnown: null },
       },
       clients: selected ? localClients(ws).filter((c) => c.scopes.length > 0) : [],
     });
@@ -327,64 +311,82 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   });
 
   // ---- Cloudflare Tunnel settings --------------------------------------
-  // A raw token is accepted only on this authenticated loopback control
-  // plane and handed directly to the OS credential provider over stdin.
-  app.post('/api/tunnel/config', async (req, res) => {
+  // This route accepts only non-secret process preferences. The separate
+  // authenticated session/start route accepts a run-scoped token and passes
+  // it directly to the process-owned supervisor without persisting it.
+  app.post('/api/tunnel/config', (req, res) => {
     const input = z.object({
-      mode: z.enum(['external', 'managed']).optional(),
-      token: z.string().min(20).max(8192).optional(),
-      removeCredential: z.boolean().optional(),
-      confirm: z.literal('remove-tunnel-credential').optional(),
+      startWithDodo: z.boolean().optional(),
       metricsPort: z.number().int().min(1024).max(65535).optional(),
       maxRestarts: z.number().int().min(0).max(5).optional(),
     }).strict().safeParse(req.body);
-    if (!input.success || (input.data.token !== undefined && input.data.removeCredential)) {
+    if (!input.success) {
       res.status(400).json({ error: 'Invalid tunnel configuration.', code: 'INVALID_INPUT' }); return;
-    }
-    if (input.data.removeCredential && input.data.confirm !== 'remove-tunnel-credential') {
-      res.status(400).json({ error: 'Removing the tunnel credential requires exact confirmation.', code: 'INVALID_INPUT' }); return;
     }
     const ws = host.current();
     try {
       const current = loadGlobalConfig(ws.paths.configFile);
-      let credentialRef = current.tunnel.credentialRef;
-      if (input.data.token !== undefined) {
-        const availability = tunnelCredentials.availability();
-        if (!availability.available) throw new DodoError('NOT_SUPPORTED', availability.reason ?? 'OS credential storage is unavailable');
-        const ref = tunnelCredentials.ref(ws.configDir);
-        await tunnelCredentials.store(ref, input.data.token);
-        credentialRef = ref;
-        // Best effort: do not retain the submitted value in the parsed body.
-        req.body.token = '';
-      } else if (input.data.removeCredential) {
-        if (credentialRef) tunnelCredentials.remove(credentialRef);
-        credentialRef = undefined;
-      }
       const tunnelInput: Record<string, unknown> = {
         ...current.tunnel,
-        ...(input.data.mode ? { mode: input.data.mode } : {}),
+        ...(input.data.startWithDodo !== undefined ? { startWithDodo: input.data.startWithDodo } : {}),
         ...(input.data.metricsPort !== undefined ? { metricsPort: input.data.metricsPort } : {}),
         ...(input.data.maxRestarts !== undefined ? { maxRestarts: input.data.maxRestarts } : {}),
-        ...(credentialRef ? { credentialRef } : {}),
       };
-      if (!credentialRef) delete tunnelInput['credentialRef'];
       const next = GlobalConfigSchema.parse({ ...current, tunnel: tunnelInput });
-      if (next.tunnel.mode === 'managed' && !next.tunnel.credentialRef) {
-        throw new DodoError('INVALID_INPUT', 'Managed tunnel mode requires a stored credential.');
-      }
       saveGlobalConfig(ws.paths.configFile, next);
-      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.config', result: input.data.removeCredential ? 'credential-removed' : input.data.token !== undefined ? 'credential-stored' : 'saved' });
+      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.config', result: 'saved-non-secret-settings' });
       res.json({
         ok: true,
-        mode: next.tunnel.mode,
-        credentialConfigured: Boolean(next.tunnel.credentialRef),
-        credentialProvider: next.tunnel.credentialRef?.provider ?? null,
+        startWithDodo: next.tunnel.startWithDodo,
+        tokenStorage: 'none',
         metricsPort: next.tunnel.metricsPort,
         maxRestarts: next.tunnel.maxRestarts,
-        started: false,
+        restartRequired: true,
       });
     } catch (error) {
+      const { status, body } = switchError(error);
+      res.status(status).json(body);
+    }
+  });
+
+  app.post('/api/tunnel/session/start', async (req, res) => {
+    const input = z.object({ token: z.string().min(20).max(8192) }).strict().safeParse(req.body);
+    if (!input.success) {
+      if (req.body && typeof req.body === 'object' && 'token' in req.body) req.body.token = '';
+      res.status(400).json({ error: 'A valid temporary Tunnel token is required.', code: 'INVALID_INPUT' }); return;
+    }
+    const ws = host.current();
+    try {
+      if (!info.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'This DODO entry cannot own a Cloudflare Tunnel process.');
+      const current = loadGlobalConfig(ws.paths.configFile);
+      if (!info.transport || info.transport.locked || !info.transport.publicUrl || current.publicUrl !== info.transport.publicUrl) {
+        throw new DodoError('CONFLICT', 'Restart DODO after configuring the public HTTPS origin before starting Tunnel.');
+      }
+      const transient = GlobalConfigSchema.parse({ ...current, tunnel: { ...current.tunnel, mode: 'managed' } });
+      const status = await info.tunnelRuntime.start(transient, input.data.token);
       req.body.token = '';
+      try {
+        ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.session.start', result: 'started-with-temporary-token' });
+      } catch (error) {
+        await info.tunnelRuntime.stop();
+        throw error;
+      }
+      res.json({ ok: true, tokenStored: false, status });
+    } catch (error) {
+      req.body.token = '';
+      const { status, body } = switchError(error);
+      res.status(status).json(body);
+    }
+  });
+
+  app.post('/api/tunnel/session/stop', async (_req, res) => {
+    const ws = host.current();
+    try {
+      if (!info.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'This DODO entry cannot own a Cloudflare Tunnel process.');
+      const status = await info.tunnelRuntime.stop();
+      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.session.stop', result: 'stopped-owned-process' });
+      res.json({ ok: true, status });
+    } catch (error) {
       const { status, body } = switchError(error);
       res.status(status).json(body);
     }

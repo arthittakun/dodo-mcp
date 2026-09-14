@@ -348,6 +348,7 @@
     "tunnel": {
       "default": {
         "mode": "external",
+        "startWithDodo": true,
         "metricsPort": 21732,
         "maxRestarts": 2
       },
@@ -360,6 +361,10 @@
             "external",
             "managed"
           ]
+        },
+        "startWithDodo": {
+          "default": true,
+          "type": "boolean"
         },
         "credentialRef": {
           "oneOf": [
@@ -440,6 +445,7 @@
       },
       "required": [
         "mode",
+        "startWithDodo",
         "metricsPort",
         "maxRestarts"
       ],

@@ -73,7 +73,9 @@ export async function tunnelDoctor(configDir: string, config: GlobalConfig): Pro
   const status = await tunnelStatus(configDir, config);
   let executable: 'available' | 'missing' = 'missing';
   try { resolveCloudflared(config); executable = 'available'; } catch { /* reported as missing */ }
-  let credential: 'configured' | 'missing' | 'invalid' = config.tunnel.credentialRef ? 'invalid' : 'missing';
+  let credential: 'temporary' | 'configured' | 'missing' | 'invalid' = status.supervisor?.credentialSource === 'temporary'
+    ? 'temporary'
+    : config.tunnel.credentialRef ? 'invalid' : 'missing';
   if (config.tunnel.credentialRef) {
     try { await readTunnelCredential(config.tunnel.credentialRef); credential = 'configured'; } catch { credential = 'invalid'; }
   }

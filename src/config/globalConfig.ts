@@ -61,7 +61,7 @@ export const GlobalConfigSchema = z
      */
     toolSurface: z.enum(['compact', 'full', 'hybrid']).optional(),
     /** Local-owner Cloudflare Tunnel process configuration; contains no token. */
-    tunnel: TunnelConfigSchema.default({ mode: 'external', metricsPort: 21732, maxRestarts: 2 }),
+    tunnel: TunnelConfigSchema.default({ mode: 'external', startWithDodo: true, metricsPort: 21732, maxRestarts: 2 }),
     /** Last owner-selected registry entry. This is a startup preference, never authority. */
     startupProjectId: z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional(),
     /**

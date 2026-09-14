@@ -9,6 +9,7 @@ import { ensurePrivateDirectory } from '../../src/platform/privateFs.js';
 import { credentialPath } from '../../src/ipc/authentication.js';
 import { startManagedTunnel, tunnelIpcPath } from '../../src/tunnel/supervisor.js';
 import { stopTunnel, tunnelDoctor, tunnelLogs, tunnelStatus } from '../../src/tunnel/control.js';
+import { TunnelRuntime } from '../../src/tunnel/runtime.js';
 
 const owned: string[] = [];
 const token = 'fixture-cloudflare-tunnel-token-123456789';
@@ -41,11 +42,26 @@ const stop=()=>server.close(()=>process.exit(0));process.on('SIGTERM',stop);proc
 }
 
 describe.skipIf(process.platform === 'win32')('DODO-managed tunnel supervisor with a local fake cloudflared', () => {
-  it('uses env-only credentials, authenticated IPC, real readiness, redacted logs and owned stop', async () => {
+  it('binds a temporary tunnel to one DODO runtime and stops its owned child on close', async () => {
+    const dir = fixture(), proof = path.join(dir, 'runtime-proof.json'), port = await freePort();
+    const executable = fakeCloudflared(dir, proof, token);
+    const config = GlobalConfigSchema.parse({ publicUrl: 'https://dodo.fixture.invalid', tunnel: { mode: 'managed', executable, metricsPort: port, maxRestarts: 0 } });
+    const runtime = new TunnelRuntime(dir);
+    await runtime.start(config, token);
+    await until(() => runtime.status().current?.connected === true);
+    expect(runtime.status()).toMatchObject({ available: true, running: true, current: { credentialSource: 'temporary', connected: true } });
+    await runtime.close();
+    expect(runtime.status()).toMatchObject({ available: true, running: false, current: null, lastKnown: { phase: 'stopped', running: false } });
+    expect(JSON.stringify(runtime.status())).not.toContain(token);
+  });
+
+  it('uses a run-scoped credential, authenticated IPC, real readiness, redacted logs and owned stop', async () => {
     const dir = fixture(), proof = path.join(dir, 'proof.json'), port = await freePort();
     const executable = fakeCloudflared(dir, proof, token);
-    const config = GlobalConfigSchema.parse({ publicUrl: 'https://dodo.fixture.invalid', tunnel: { mode: 'managed', credentialRef: { provider: 'env', name: 'FIXTURE_TUNNEL_TOKEN' }, executable, metricsPort: port, maxRestarts: 1 } });
-    const supervisor = await startManagedTunnel({ configDir: dir, config, env: { ...process.env, FIXTURE_TUNNEL_TOKEN: token }, retryDelayMs: 10 });
+    const config = GlobalConfigSchema.parse({ publicUrl: 'https://dodo.fixture.invalid', tunnel: { mode: 'managed', executable, metricsPort: port, maxRestarts: 1 } });
+    expect(JSON.stringify(config)).not.toContain(token);
+    expect(config.tunnel.credentialRef).toBeUndefined();
+    const supervisor = await startManagedTunnel({ configDir: dir, config, temporaryToken: token, retryDelayMs: 10 });
     try {
       await until(() => supervisor.status().connected);
       const live = await tunnelStatus(dir, config);
@@ -54,7 +70,7 @@ describe.skipIf(process.platform === 'win32')('DODO-managed tunnel supervisor wi
       const childProof = JSON.parse(fs.readFileSync(proof, 'utf8')) as { args: string[]; tokenInArg: boolean; tokenPresent: boolean };
       expect(childProof.tokenPresent).toBe(true); expect(childProof.tokenInArg).toBe(false);
       expect(childProof.args).toEqual(['tunnel', '--no-autoupdate', '--loglevel', 'info', '--output', 'json', '--metrics', `127.0.0.1:${port}`, 'run']);
-      await expect(startManagedTunnel({ configDir: dir, config, env: { ...process.env, FIXTURE_TUNNEL_TOKEN: token }, retryDelayMs: 10 })).rejects.toThrow(/already running/);
+      await expect(startManagedTunnel({ configDir: dir, config, temporaryToken: token, retryDelayMs: 10 })).rejects.toThrow(/already running/);
       expect(await stopTunnel(dir)).toEqual({ stopping: true });
       expect(await supervisor.wait()).toBe(0);
       expect(fs.existsSync(credentialPath(tunnelIpcPath(dir)))).toBe(false);
@@ -78,8 +94,8 @@ describe.skipIf(process.platform === 'win32')('DODO-managed tunnel supervisor wi
   it('rejects an invalid credential before opening IPC or spawning cloudflared', async () => {
     const dir = fixture(), proof = path.join(dir, 'proof.json'), port = await freePort();
     const executable = fakeCloudflared(dir, proof, token);
-    const config = GlobalConfigSchema.parse({ publicUrl: 'https://dodo.fixture.invalid', tunnel: { mode: 'managed', credentialRef: { provider: 'env', name: 'FIXTURE_TUNNEL_TOKEN' }, executable, metricsPort: port, maxRestarts: 1 } });
-    await expect(startManagedTunnel({ configDir: dir, config, env: { ...process.env, FIXTURE_TUNNEL_TOKEN: 'invalid' } })).rejects.toThrow(/invalid format/);
+    const config = GlobalConfigSchema.parse({ publicUrl: 'https://dodo.fixture.invalid', tunnel: { mode: 'managed', executable, metricsPort: port, maxRestarts: 1 } });
+    await expect(startManagedTunnel({ configDir: dir, config, temporaryToken: 'invalid' })).rejects.toThrow(/invalid format/);
     expect(fs.existsSync(proof)).toBe(false);
     expect(fs.existsSync(credentialPath(tunnelIpcPath(dir)))).toBe(false);
   });

@@ -296,23 +296,32 @@
     $('conn-restart').hidden = !c.restartRequired;
     cardState('conn', 'ready');
 
-    // tunnel (token is deliberately never returned by the server)
+    // Tunnel state contains no credential. The password input is submitted
+    // only to the run-scoped start endpoint and is cleared after the request.
     const tunnel = s.tunnel || {};
-    const serverFormSig = JSON.stringify([tunnel.mode || 'external', Number(tunnel.metricsPort || 21732), Number(tunnel.maxRestarts ?? 2)]);
-    const browserFormSig = JSON.stringify([$('tunnel-mode').value, Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
-    const tunnelDirty = !force && lastTunnelFormSig !== null && ($('tunnel-token').value.length > 0 || browserFormSig !== lastTunnelFormSig);
+    const serverFormSig = JSON.stringify([Boolean(tunnel.startWithDodo), Number(tunnel.metricsPort || 21732), Number(tunnel.maxRestarts ?? 2)]);
+    const browserFormSig = JSON.stringify([$('tunnel-auto').checked, Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
+    const tunnelDirty = !force && lastTunnelFormSig !== null && browserFormSig !== lastTunnelFormSig;
     if (!tunnelDirty) {
-      $('tunnel-mode').value = tunnel.mode || 'external';
+      $('tunnel-auto').checked = Boolean(tunnel.startWithDodo);
       $('tunnel-metrics').value = String(tunnel.metricsPort || 21732);
       $('tunnel-restarts').value = String(tunnel.maxRestarts ?? 2);
-      $('tunnel-token').value = '';
     }
     lastTunnelFormSig = serverFormSig;
-    $('tunnel-badge').className = tunnel.credentialConfigured ? 'badge ok' : 'badge warn';
-    $('tunnel-badge').textContent = tunnel.credentialConfigured
-      ? `● token อยู่ใน ${tunnel.credentialProvider === 'os' ? tunnel.osCredential.provider : tunnel.credentialProvider}`
-      : '⚠ ยังไม่มี token';
-    $('tunnel-remove').disabled = !tunnel.credentialConfigured;
+    const tunnelRuntime = tunnel.runtime || {};
+    const currentTunnel = tunnelRuntime.current;
+    if (currentTunnel && currentTunnel.connected) {
+      $('tunnel-badge').className = 'badge ok';
+      $('tunnel-badge').textContent = '● Tunnel เชื่อมต่อแล้ว';
+    } else if (currentTunnel && currentTunnel.running) {
+      $('tunnel-badge').className = 'badge warn';
+      $('tunnel-badge').textContent = `◌ Tunnel ${currentTunnel.phase || 'กำลังเริ่ม'}`;
+    } else {
+      $('tunnel-badge').className = tunnel.startWithDodo ? 'badge' : 'badge';
+      $('tunnel-badge').textContent = tunnel.startWithDodo ? '○ ยังไม่รัน · จะถาม token ตอนเริ่ม' : '○ Tunnel ไม่ได้รัน';
+    }
+    $('tunnel-session-start').disabled = tunnelRuntime.available !== true || Boolean(currentTunnel && currentTunnel.running);
+    $('tunnel-session-stop').disabled = tunnelRuntime.available !== true || !Boolean(currentTunnel && currentTunnel.running);
 
     // clients
     $('clients-root').textContent = w ? w.root : 'ยังไม่ได้เลือกโปรเจกต์';
@@ -830,57 +839,74 @@
   });
 
   // ---- Cloudflare Tunnel ----
-  $('tunnel-form').addEventListener('submit', (ev) => {
+  $('tunnel-session-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
-    const errorElement = $('tunnel-error');
-    const tokenInput = $('tunnel-token');
+    const tokenInput = $('tunnel-session-token');
+    const errorElement = $('tunnel-session-error');
+    const tokenValue = tokenInput.value.trim();
     errorElement.hidden = true;
     tokenInput.removeAttribute('aria-invalid');
-    const metricsPort = Number($('tunnel-metrics').value);
-    const maxRestarts = Number($('tunnel-restarts').value);
-    const tokenValue = tokenInput.value.trim();
-    if (!Number.isSafeInteger(metricsPort) || metricsPort < 1024 || metricsPort > 65535 || !Number.isSafeInteger(maxRestarts) || maxRestarts < 0 || maxRestarts > 5) {
-      errorElement.textContent = '✕ Metrics port ต้องอยู่ระหว่าง 1024–65535 และ restart ต้องอยู่ระหว่าง 0–5';
-      errorElement.hidden = false;
-      return;
-    }
-    if ($('tunnel-mode').value === 'managed' && !tokenValue && !(state && state.tunnel && state.tunnel.credentialConfigured)) {
-      errorElement.textContent = '✕ managed mode ต้องมี Tunnel token';
+    if (tokenValue.length < 20) {
+      errorElement.textContent = '✕ กรอก Cloudflare Tunnel token ที่ถูกต้อง';
       errorElement.hidden = false;
       tokenInput.setAttribute('aria-invalid', 'true');
       tokenInput.focus();
       return;
     }
-    withBusy($('tunnel-save'), 'กำลังบันทึก…', async () => {
+    withBusy($('tunnel-session-start'), 'กำลังเปิด…', async () => {
       try {
-        const body = { mode: $('tunnel-mode').value, metricsPort, maxRestarts };
-        if (tokenValue) body.token = tokenValue;
-        const result = await api('tunnel/config', body);
+        const result = await api('tunnel/session/start', { token: tokenValue });
         tokenInput.value = '';
-        notify('success', result.credentialConfigured
-          ? 'บันทึก Tunnel แล้ว token อยู่ใน OS credential store และยังไม่ได้เริ่ม tunnel'
-          : 'บันทึกค่า Tunnel แล้ว และยังไม่ได้เริ่ม tunnel');
+        notify('success', result.status && result.status.connected
+          ? 'Tunnel เชื่อมต่อแล้วสำหรับ DODO process นี้'
+          : 'เริ่ม Tunnel แล้ว กำลังตรวจ readiness');
         await refresh(true);
       } catch (error) {
         tokenInput.value = '';
+        errorElement.textContent = `✕ ${error.message}`;
+        errorElement.hidden = false;
+        notify('error', 'เปิด Tunnel ไม่สำเร็จ');
+      }
+    });
+  });
+
+  $('tunnel-session-stop').addEventListener('click', () => withBusy($('tunnel-session-stop'), 'กำลังหยุด…', async () => {
+    try {
+      await api('tunnel/session/stop', {});
+      $('tunnel-session-token').value = '';
+      notify('success', 'หยุด Tunnel ที่ DODO process นี้เป็นเจ้าของแล้ว');
+      await refresh(true);
+    } catch (error) {
+      notify('error', `หยุด Tunnel ไม่สำเร็จ: ${error.message}`);
+    }
+  }));
+
+  $('tunnel-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const errorElement = $('tunnel-error');
+    errorElement.hidden = true;
+    const metricsPort = Number($('tunnel-metrics').value);
+    const maxRestarts = Number($('tunnel-restarts').value);
+    if (!Number.isSafeInteger(metricsPort) || metricsPort < 1024 || metricsPort > 65535 || !Number.isSafeInteger(maxRestarts) || maxRestarts < 0 || maxRestarts > 5) {
+      errorElement.textContent = '✕ Metrics port ต้องอยู่ระหว่าง 1024–65535 และ restart ต้องอยู่ระหว่าง 0–5';
+      errorElement.hidden = false;
+      return;
+    }
+    withBusy($('tunnel-save'), 'กำลังบันทึก…', async () => {
+      try {
+        const body = { startWithDodo: $('tunnel-auto').checked, metricsPort, maxRestarts };
+        const result = await api('tunnel/config', body);
+        notify('info', result.startWithDodo
+          ? 'บันทึกแล้ว — DODO จะถาม token ชั่วคราวใน terminal เมื่อเริ่มรอบถัดไป'
+          : 'บันทึกแล้ว — รอบถัดไปจะเปิด local MCP โดยไม่ถาม Tunnel token');
+        await refresh(true);
+      } catch (error) {
         errorElement.textContent = `✕ ${error.message}`;
         errorElement.hidden = false;
         notify('error', 'บันทึก Tunnel ไม่สำเร็จ');
       }
     });
   });
-
-  $('tunnel-remove').addEventListener('click', () => withBusy($('tunnel-remove'), 'กำลังลบ…', async () => {
-    if (!(await confirmAction('ลบ Cloudflare Tunnel token?', 'DODO จะลบ token จาก OS credential store และเปลี่ยนเป็น external mode โดยไม่หยุด process อื่น', 'ลบ token'))) return;
-    try {
-      await api('tunnel/config', { mode: 'external', removeCredential: true, confirm: 'remove-tunnel-credential' });
-      $('tunnel-token').value = '';
-      notify('success', 'ลบ Tunnel token แล้ว');
-      await refresh(true);
-    } catch (error) {
-      notify('error', `ลบ Tunnel token ไม่สำเร็จ: ${error.message}`);
-    }
-  }));
 
   // ---- misc ----
   $('refresh').addEventListener('click', (ev) => withBusy(ev.currentTarget, '⟳ …', () => refresh(true)));

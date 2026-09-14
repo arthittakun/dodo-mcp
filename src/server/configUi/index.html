@@ -208,26 +208,32 @@
 
   <section class="card" id="card-tunnel" aria-labelledby="h-tunnel">
     <div class="card-head"><h2 id="h-tunnel">Cloudflare Tunnel</h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
-    <p class="muted">DODO เก็บ token ใน Keychain / Credential Manager / Secret Service ของระบบเท่านั้น ไม่แสดง token เดิมและไม่บันทึกลง config, log หรือ command arguments</p>
+    <p class="muted">Token ใช้เฉพาะรอบที่กำลังเปิด: <code>dodo start</code> จะถามแบบซ่อนใน terminal แล้วส่งให้ process <code>cloudflared</code> โดยไม่บันทึกลง config, Keychain, Credential Manager หรือ Secret Service</p>
+    <form id="tunnel-session-form" class="form" novalidate>
+      <label for="tunnel-session-token">Temporary Tunnel token</label>
+      <input id="tunnel-session-token" name="token" type="password" autocomplete="off" spellcheck="false" maxlength="8192" placeholder="ใช้กับ DODO process นี้เท่านั้น" aria-describedby="tunnel-session-help tunnel-session-error">
+      <p class="help" id="tunnel-session-help">กด “เปิด Tunnel รอบนี้” เพื่อเริ่มทันที ค่าในช่องจะถูกล้างหลังส่ง ไม่บันทึกลงเครื่อง และ tunnel จะหยุดพร้อม DODO</p>
+      <p class="error" id="tunnel-session-error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="submit" class="btn primary" id="tunnel-session-start">เปิด Tunnel รอบนี้</button>
+        <button type="button" class="btn danger-outline" id="tunnel-session-stop">หยุด Tunnel รอบนี้</button>
+      </div>
+    </form>
+    <details class="details">
+      <summary>การเริ่มอัตโนมัติและค่าขั้นสูง</summary>
     <form id="tunnel-form" class="form" novalidate>
-      <label for="tunnel-mode">โหมดการทำงาน</label>
-      <select id="tunnel-mode" name="mode">
-        <option value="external">external — คุณรัน cloudflared เอง</option>
-        <option value="managed">managed — DODO ดูแล process cloudflared</option>
-      </select>
-      <label for="tunnel-token">Cloudflare Tunnel token</label>
-      <input id="tunnel-token" name="token" type="password" autocomplete="new-password" spellcheck="false" maxlength="8192" placeholder="วาง token ใหม่เพื่อบันทึกใน OS credential store" aria-describedby="tunnel-help tunnel-error">
-      <p class="help" id="tunnel-help">เว้นว่างไว้เพื่อคง token เดิม การบันทึกไม่เริ่ม tunnel อัตโนมัติ ใช้ <code>dodo tunnel start --yes</code> เมื่อพร้อมเชื่อมต่อ</p>
+      <label class="check"><input id="tunnel-auto" name="startWithDodo" type="checkbox"><span><b>ถาม token และเปิด Tunnel พร้อม DODO</b><small>มีผลเมื่อเริ่มรอบถัดไป กด Enter โดยไม่กรอก token เพื่อเปิดเฉพาะ local MCP ได้</small></span></label>
+      <p class="help" id="tunnel-help">สำหรับรอบที่ไม่ต้องการ Tunnel ใช้ <code>dodo start --no-tunnel</code> Token ไม่ถูกส่งมาหรือแสดงบนหน้าเว็บนี้</p>
       <div class="two-col">
         <label>Metrics port<input id="tunnel-metrics" type="number" min="1024" max="65535" inputmode="numeric"></label>
         <label>จำนวน restart สูงสุด<input id="tunnel-restarts" type="number" min="0" max="5" inputmode="numeric"></label>
       </div>
       <p class="error" id="tunnel-error" role="alert" hidden></p>
       <div class="actions">
-        <button type="submit" class="btn primary" id="tunnel-save">บันทึก Tunnel</button>
-        <button type="button" class="btn danger-outline" id="tunnel-remove">ลบ token ที่บันทึก</button>
+        <button type="submit" class="btn primary" id="tunnel-save">บันทึกการเริ่ม Tunnel</button>
       </div>
     </form>
+    </details>
   </section>
 
   <section class="card" aria-labelledby="h-schedules">

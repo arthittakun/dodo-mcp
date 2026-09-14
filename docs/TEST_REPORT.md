@@ -20,7 +20,7 @@ npm pack
 - build: PASS — full 121, compact 19, hybrid 49 และ config schemas ถูกสร้างสำเร็จ
 - typecheck: PASS
 - lint: PASS
-- core/integration/security/compatibility: 84 files PASS, 2 files platform-skipped; 601 tests PASS, 31 tests platform/prerequisite-skipped
+- core/integration/security/compatibility: 84 files PASS, 2 files platform-skipped; 605 tests PASS, 31 tests platform/prerequisite-skipped
 - packaging: 16 tests PASS
 - `npm audit --omit=dev`: 0 vulnerabilities (0 low/moderate/high/critical)
 - `npm pack`: PASS — required runtime/schemas/docs present and forbidden private state/development artifacts absent; exact final artifact metadata is reported separately so the packaged report does not contain a self-referential checksum
@@ -28,6 +28,18 @@ npm pack
   Compact = 19 และ installed Compact `dodo_assist_read → memory_status`,
   `dodo_assist_change → runtime_session_open` และ `agent_run_open` คืน schemaVersion 1
   จาก fresh state สำเร็จ โดย agent run มี `authority=coordination_only`
+
+macOS owner-flow verification เพิ่มเติมหลังเปลี่ยน Tunnel lifecycle:
+
+- headless Chromium แสดง Local Config จริงที่ 1440px และ 390px; temporary token
+  เป็น masked input, ไม่มี external asset และ state มาจาก runtime
+- pseudo-terminal fixture เรียก CLI จริงและพิสูจน์ hidden prompt → child environment,
+  token ไม่อยู่ใน terminal output/argv/config และ `SIGINT` ปิด owned child พร้อม DODO
+- exact tarball fresh install และ global reinstall รายงาน `dodo 1.0.0`; package 408 files
+  ไม่มี development docs, state DB, `.env`, model หรือ release evidence
+- `dodo setup --check --components all` บน macOS arm64: Git, ripgrep,
+  cloudflared, ffmpeg, Whisper/model, Chromium, LSP, speech และ sandbox พร้อม;
+  Desktop permission และ outbound web consent ยังไม่เปิดตาม security default
 
 ชุดทดสอบครอบคลุม transport, OAuth, Local Config, workspace switching, ACL, stale context, path/secret guards, changes, jobs, Git, semantic tools, assistance, multimodal, browser, workflow, surface catalog และ packaging
 
@@ -47,14 +59,15 @@ Fresh-install smoke รัน installed package ใน process ลูก แล�
 
 Setup foundation tests เพิ่มหลักฐานว่า setup plan/check ไม่เขียน state, installer ไม่เริ่มหากไม่มี `--yes`, setup receipt มี schema/kind ที่กำหนด, state import ใช้ allowlist, ตรวจ source hash ซ้ำ, ไม่ merge target เดิม และไม่คัดลอก DB/keys/OAuth/ACL/trust/permission state รวมถึง fail closed ต่อ malformed/unknown config, links และ live IPC markers
 
-Tunnel tests ใช้ fake `cloudflared` และ loopback readiness fixture พิสูจน์ว่า token ไม่อยู่ใน config/argv/log, job environment ไม่ inherit tunnel variables, private file/link policy fail closed, owner IPC เป็น singleton ที่ authenticated, readiness มาจาก `/ready`, restart มีเพดาน และ stop ใช้ live owned child เท่านั้น ไม่มีการใช้ Cloudflare credential, API, DNS หรือ public network จริง
+Tunnel tests ใช้ fake `cloudflared` และ loopback readiness fixture พิสูจน์ว่า run-scoped token จาก runtime ไม่อยู่ใน config/argv/log/status, child รับผ่าน dedicated environment, job environment ไม่ inherit tunnel variables, owner IPC เป็น singleton ที่ authenticated, readiness มาจาก `/ready`, restart มีเพดาน และ runtime close หยุดเฉพาะ live owned child ไม่มีการใช้ Cloudflare credential, API, DNS หรือ public network จริง
 
 Global launcher และ interactive CLI tests พิสูจน์ว่า `dodo --cli` แสดง/เลือก/เพิ่ม
 โปรเจกต์ได้, setup menu ระบุ cloudflared, launcher ไม่ใช้ invocation CWD หรือเผย
 private inert root, MCP ถูกปิดด้วย `workspace_required` ก่อนเลือก target, invalid target
 ไม่เปิด data plane และ successful switch ใช้ real canonical root พร้อมบันทึก registry
 preference Local Config Tunnel fixture พิสูจน์ซ้ำว่า unauthenticated request ถูกปฏิเสธ,
-raw token ไม่อยู่ใน response/config/audit และการลบต้องยืนยัน exact value
+config endpoint ปฏิเสธ raw token, session endpoint ตอบ `tokenStored:false`, raw token
+ไม่อยู่ใน response/config/audit และ owner เริ่ม/หยุด process-owned runtime ได้
 
 Project Registry tests ครอบคลุม schema migration, Unicode/spaced canonical paths,
 duplicate และ concurrent add, stable project ID, directory relocation, missing/

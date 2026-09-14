@@ -22,7 +22,7 @@
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
 - มี owner-only Project Registry พร้อม stable project ID และ readiness โดยไม่คัดลอก trust/ACL
 - อ่าน overview/list/files และค้นหาพร้อมกันได้สูงสุด 8 โปรเจกต์ที่เจ้าของลงทะเบียนและให้ ACL แล้ว โดยไม่สลับ active workspace
-- ตรวจและเลือกใช้ Cloudflare Tunnel แบบ external หรือ DODO-managed โดย token อยู่ใน OS credential store/secure reference และการ start ต้องยืนยันทุกครั้ง
+- เปิด Cloudflare Tunnel พร้อม `dodo start` ด้วย token ชั่วคราวจาก terminal หรือ Local Config โดยไม่บันทึก token ลงเครื่อง
 - ไม่ส่ง token, secret หรือ state DB ไปที่ repository และไม่ให้ repository config เพิ่มสิทธิ์
 
 ## เริ่มใช้งาน
@@ -33,8 +33,8 @@ dodo setup --check
 dodo --cli
 ```
 
-`dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config,
-ตั้ง Cloudflare Tunnel token และรัน setup รวม `cloudflared` โดยไม่ต้อง `cd` เข้าโปรเจกต์
+`dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config +
+Tunnel และรัน setup รวม `cloudflared` โดยไม่ต้อง `cd` เข้าโปรเจกต์
 ก่อน หากเรียก `dodo` หรือ `dodo start` จากโฟลเดอร์ใดก็ตาม ระบบจะเปิดโปรเจกต์ที่
 เจ้าของเลือกล่าสุด หากยังไม่เลือกจะเปิดเฉพาะ control plane และปฏิเสธ MCP/OAuth ด้วย
 `workspace_required` จนกว่าจะเลือก absolute path จาก Local Config หรือเมนู CLI
@@ -225,23 +225,31 @@ command sandbox, idempotency และ audit เดิม `agent_exec` ใช้
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
-DODO ไม่สร้าง Tunnel, DNS หรือ Cloudflare account ให้ ผู้ใช้สร้าง remotely-managed Tunnel และตั้ง public hostname ให้ route **ทุก path** มาที่ `http://127.0.0.1:21730` ก่อน จากนั้นเลือกได้สองโหมด:
+DODO ไม่สร้าง Tunnel, DNS หรือ Cloudflare account ให้ ผู้ใช้สร้าง remotely-managed Tunnel และตั้ง public hostname ให้ route **ทุก path** มาที่ `http://127.0.0.1:21730` ก่อน จากนั้นตั้ง public origin ครั้งเดียว:
 
 ```bash
-# ให้ system service/เจ้าของรัน cloudflared เอง
-dodo tunnel configure --external
-
-# หรือให้ DODO ดูแลเฉพาะ process cloudflared ใน foreground
 dodo setup --check --components cloudflared
-dodo tunnel configure --managed --os-credential
-dodo tunnel start --yes
+dodo init --public-url https://mcp.example.com
+dodo start
+# Cloudflare Tunnel token (temporary; Enter = local only):
 ```
 
-บน macOS `dodo setup --yes` เลือก component `cloudflared` อยู่ในชุด `all` แล้ว
-หน้า Local Config และ `dodo --cli` รับ token ผ่าน owner-only flow เดียวกัน โดยค่า token
-ไปยัง OS credential store และไม่ถูกแสดงกลับ การบันทึก token ไม่เริ่ม tunnel อัตโนมัติ
+เมื่อกรอก token DODO จะเริ่ม `cloudflared` เป็น child process ของรอบนั้นและหยุดพร้อม
+DODO Token อยู่ในหน่วยความจำระหว่างรอบและ environment ของ child เท่านั้น ไม่อยู่ใน
+argv, config, Keychain, Credential Manager, Secret Service, tunnel log, MCP response
+หรือ environment ของ MCP jobs กด Enter หรือใช้ `dodo start --no-tunnel` เพื่อเปิด
+เฉพาะ local MCP
 
-`--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret Service และ config เก็บเพียง opaque reference สำหรับ headless environment ใช้ `--token-env NAME` หรือ `--token-file /absolute/private/path` ค่า token ไม่อยู่ใน argv, config, tunnel log หรือ MCP response ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย `dodo tunnel doctor` และดู log ที่ redacted ด้วย `dodo tunnel logs`
+หน้า Local Config ที่ `127.0.0.1:21731` มีช่อง **Temporary Tunnel token** สำหรับเริ่ม
+และหยุด tunnel ของ DODO process ปัจจุบันได้จริง ช่องจะถูกล้างหลังส่งและ backend ไม่
+persist ค่า ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย
+`dodo tunnel doctor` และดู log ที่ redacted ด้วย `dodo tunnel logs` คำสั่ง
+`dodo tunnel configure` เดิมยังมีสำหรับ advanced/headless compatibility และต้องเรียก
+โดยเจ้าของอย่างชัดเจน; เส้นทาง `dodo start` และหน้าเว็บไม่ใช้ credential store
+
+บน macOS `dodo setup --yes` เลือก component `cloudflared` อยู่ในชุด `all` แล้ว
+Tunnel route ต้องชี้เฉพาะ MCP/OAuth listener `21730` ห้ามชี้ Local Config `21731`
+หรือ metrics `21732` ออก public
 
 สำหรับ local MCP client เช่น Codex, Cursor หรือ Claude Desktop:
 

@@ -28,8 +28,9 @@ in-flight drain, running-job refusal, resource teardown และ fresh workspac
 data plane หากล้มเหลว launcher ยังคงปิด data plane ไม่มี half-switched state
 
 `dodo --cli` เป็น terminal menu ที่เรียก owner operations เดิม ไม่ใช่ MCP tool
-เมนูไม่เปลี่ยน trust, ACL, OAuth grant หรือ OS permission และ Tunnel token ใช้ OS
-credential provider prompt ไม่รับค่าใน CLI argv
+เมนูไม่เปลี่ยน trust, ACL, OAuth grant หรือ OS permission เมนูเริ่มปกติเรียก hidden
+run-scoped Tunnel prompt เดียวกับ `dodo start` ส่วนเมนู local-only ส่ง override สำหรับ
+รอบนั้น Token ไม่ผ่าน readline menu, argv, config หรือ OS credential provider
 
 STDIO คง contract `dodo stdio --root PATH` เพราะ client เป็นเจ้าของ subprocess
 lifecycle และต้องกำหนด root อย่างชัดเจน

@@ -4,6 +4,8 @@ import { bootstrapWorkspace } from '../../src/server/bootstrap.js';
 import { startLocalConfig, type LocalConfigInfo } from '../../src/server/localConfig.js';
 import { addStaticClient } from '../../src/auth/clients.js';
 import { mkTmpDir, rawHttp, type TestContext } from '../helpers/testServer.js';
+import { GlobalConfigSchema, saveGlobalConfig } from '../../src/config/globalConfig.js';
+import type { TunnelStatus } from '../../src/tunnel/supervisor.js';
 
 async function setup(runMode?: 'allow-all' | 'bypass', info: LocalConfigInfo = {}) {
   const old = process.env['DODO_CONFIG_DIR'];
@@ -137,49 +139,77 @@ describe('local config boundary', () => {
     } finally { await s.close(); }
   });
 
-  it('stores a submitted Tunnel token only through the OS credential boundary and never echoes or persists it', async () => {
-    let stored = '';
-    let removed = false;
-    const ref = { provider: 'os' as const, key: 'a'.repeat(24) };
-    const s = await setup(undefined, {
-      tunnelCredentials: {
-        availability: () => ({ available: true, provider: 'fixture credential store' }),
-        ref: () => ref,
-        store: async (_ref, token) => { stored = token; },
-        remove: () => { removed = true; stored = ''; },
-      },
-    });
+  it('accepts only non-secret Tunnel startup settings and rejects raw token input', async () => {
+    const s = await setup();
     const submitted = 'fixture-cloudflare-tunnel-token-1234567890';
     try {
       const context = { 'x-dodo-workspace': s.ws.workspaceId, 'x-dodo-epoch': s.ws.epoch, 'content-type': 'application/json' };
-      const unauthenticated = await fetch(`${s.url.origin}/api/tunnel/config`, { method: 'POST', headers: context, body: JSON.stringify({ mode: 'managed', token: submitted }) });
+      const unauthenticated = await fetch(`${s.url.origin}/api/tunnel/config`, { method: 'POST', headers: context, body: JSON.stringify({ startWithDodo: false }) });
       expect(unauthenticated.status).toBe(401);
-      expect(stored).toBe('');
 
-      const saved = await fetch(`${s.url.origin}/api/tunnel/config`, {
+      const refused = await fetch(`${s.url.origin}/api/tunnel/config`, {
         method: 'POST',
         headers: { ...context, authorization: `Bearer ${s.token}` },
-        body: JSON.stringify({ mode: 'managed', token: submitted, metricsPort: 32174, maxRestarts: 1 }),
+        body: JSON.stringify({ token: submitted }),
+      });
+      expect(refused.status).toBe(400);
+      expect(await refused.text()).not.toContain(submitted);
+
+      const saved = await fetch(`${s.url.origin}/api/tunnel/config`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` },
+        body: JSON.stringify({ startWithDodo: false, metricsPort: 32174, maxRestarts: 1 }),
       });
       expect(saved.status).toBe(200);
       const responseText = await saved.text();
       expect(responseText).not.toContain(submitted);
-      expect(JSON.parse(responseText)).toMatchObject({ ok: true, mode: 'managed', credentialConfigured: true, credentialProvider: 'os', started: false });
-      expect(stored).toBe(submitted);
+      expect(JSON.parse(responseText)).toMatchObject({ ok: true, startWithDodo: false, tokenStorage: 'none', restartRequired: true });
       expect(fs.readFileSync(s.ws.paths.configFile, 'utf8')).not.toContain(submitted);
       expect(JSON.stringify(s.ws.store.recentAudit(s.ws.workspaceId, 20))).not.toContain(submitted);
-
-      const unconfirmed = await fetch(`${s.url.origin}/api/tunnel/config`, {
-        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ removeCredential: true }),
-      });
-      expect(unconfirmed.status).toBe(400);
-      expect(removed).toBe(false);
-      const deleted = await fetch(`${s.url.origin}/api/tunnel/config`, {
-        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ mode: 'external', removeCredential: true, confirm: 'remove-tunnel-credential' }),
-      });
-      expect(deleted.status).toBe(200);
-      expect(removed).toBe(true);
+      expect(JSON.parse(fs.readFileSync(s.ws.paths.configFile, 'utf8')).tunnel).toMatchObject({ startWithDodo: false, metricsPort: 32174, maxRestarts: 1 });
     } finally { await s.close(); }
+  });
+
+  it('starts and stops a run-scoped Tunnel from the authenticated web UI without persisting its token', async () => {
+    let receivedToken = '';
+    let running = false;
+    const timestamp = new Date().toISOString();
+    const status = (): TunnelStatus => ({
+      mode: 'managed', running, phase: running ? 'connecting' : 'stopped', connected: false,
+      startedAt: timestamp, updatedAt: timestamp, restarts: 0, maxRestarts: 2,
+      metricsUrl: 'http://127.0.0.1:21732/ready', publicOrigin: 'https://dodo.example.com',
+      credentialSource: 'temporary',
+      lastExitCode: null, lastError: null,
+    });
+    const runtime = {
+      status: () => ({ available: true as const, running, current: running ? status() : null, lastKnown: null }),
+      start: async (_config: unknown, token: string) => { receivedToken = token; running = true; return status(); },
+      stop: async () => { running = false; return status(); },
+    };
+    const s = await setup(undefined, {
+      transport: { port: 21730, locked: false, publicUrl: 'https://dodo.example.com' },
+      tunnelRuntime: runtime,
+    });
+    const submitted = 'temporary-cloudflare-tunnel-token-1234567890';
+    try {
+      saveGlobalConfig(s.ws.paths.configFile, GlobalConfigSchema.parse({ ...s.ws.config, publicUrl: 'https://dodo.example.com' }));
+      const context = { 'x-dodo-workspace': s.ws.workspaceId, 'x-dodo-epoch': s.ws.epoch, 'content-type': 'application/json' };
+      expect((await fetch(`${s.url.origin}/api/tunnel/session/start`, { method: 'POST', headers: context, body: JSON.stringify({ token: submitted }) })).status).toBe(401);
+      const started = await fetch(`${s.url.origin}/api/tunnel/session/start`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ token: submitted }),
+      });
+      const startedText = await started.text();
+      expect(started.status).toBe(200);
+      expect(startedText).not.toContain(submitted);
+      expect(JSON.parse(startedText)).toMatchObject({ ok: true, tokenStored: false, status: { running: true, phase: 'connecting' } });
+      expect(receivedToken).toBe(submitted);
+      expect(fs.readFileSync(s.ws.paths.configFile, 'utf8')).not.toContain(submitted);
+      expect(JSON.stringify(s.ws.store.recentAudit(s.ws.workspaceId, 20))).not.toContain(submitted);
+      const stopped = await fetch(`${s.url.origin}/api/tunnel/session/stop`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: '{}',
+      });
+      expect(stopped.status).toBe(200);
+      expect(running).toBe(false);
+    } finally { receivedToken = ''; await s.close(); }
   });
 
   it.each(['allow-all','bypass'] as const)('%s overrides are temporary and do not authorize remote clients', async runMode => {

@@ -185,14 +185,15 @@ production dependency findings แต่ไม่ publish package หรือ�
 
 ## Cloudflare Tunnel
 
-เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO มีโหมด external และ managed โดย managed mode supervise เฉพาะ live `cloudflared` child ที่เริ่มจากคำสั่ง `dodo tunnel start --yes` และไม่ใช้ Cloudflare API
+เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare API เมื่อรัน `dodo start` ใน terminal ระบบถาม Tunnel token แบบซ่อนและ supervise เฉพาะ live `cloudflared` child ของ process นั้น หรือเจ้าของเริ่ม/หยุดรอบเดียวกันจาก Local Config ที่ผ่าน owner authentication
 
-Tunnel token อยู่ใน macOS Keychain, Windows Credential Manager, Linux Secret Service หรือ owner-selected secure environment/file config เก็บเพียง credential reference และ executable path ที่เจ้าของเลือก Token ไม่อยู่ใน CLI argv, child arguments, logs, MCP catalog/response, audit หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูกปฏิเสธจาก environment ของ MCP jobs เสมอ
+เส้นทางหลักใช้ token แบบ run-scoped เท่านั้น: token อยู่ในหน่วยความจำของ DODO และ environment ของ child `cloudflared` ระหว่างรอบ ไม่ถูกบันทึกใน config, Keychain, Credential Manager, Secret Service, CLI argv, child arguments, logs, MCP catalog/response, audit หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูกปฏิเสธจาก environment ของ MCP jobs เสมอ Local Config รับ token ผ่าน private loopback capability, ล้าง request field หลังส่ง และตอบกลับเพียง `tokenStored:false`
 
 Local Config รับ token เฉพาะ POST ที่ผ่าน private capability, Host/Origin/proxy checks,
-rate limit และ control-context headers แล้วส่งค่าไป OS credential provider ผ่าน stdin
-Response/config/audit เก็บเฉพาะ provider reference และสถานะ การบันทึกไม่อนุญาตให้ AI
-ตั้ง token และไม่เริ่ม network process; `dodo tunnel start --yes` ยังคงเป็น owner action แยก
+rate limit และ control-context headers แล้วส่งให้ process-owned runtime โดยตรง
+Response/config/audit เก็บเฉพาะสถานะที่ไม่มี secret ไม่มี MCP tool สำหรับส่ง token หรือ
+ควบคุม tunnel หน้าเว็บเริ่ม network process เฉพาะเมื่อ owner กด “เปิด Tunnel รอบนี้”
+และการตั้ง startup preference ไม่เริ่ม network process
 
 Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose readiness บอกสถานะ Cloudflare connection เท่านั้น ไม่ใช่หลักฐานว่า AI client กำลังเชื่อมต่อ
 

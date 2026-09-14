@@ -4,7 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { GlobalConfigSchema } from '../../src/config/globalConfig.js';
 import { TunnelConfigSchema, TunnelCredentialRefSchema } from '../../src/config/tunnelConfig.js';
-import { envTunnelCredentialRef, fileTunnelCredentialRef, osTunnelCredentialRef, readTunnelCredential, validateTunnelToken } from '../../src/tunnel/credentials.js';
+import { envTunnelCredentialRef, fileTunnelCredentialRef, osTunnelCredentialRef, parseTemporaryTunnelToken, readTunnelCredential, validateTunnelToken } from '../../src/tunnel/credentials.js';
 import { TunnelLog } from '../../src/tunnel/log.js';
 import { buildChildEnv } from '../../src/security/env.js';
 import { ensurePrivateDirectory } from '../../src/platform/privateFs.js';
@@ -20,11 +20,19 @@ afterEach(() => { for (const dir of owned.splice(0)) fs.rmSync(dir, { recursive:
 describe('Cloudflare Tunnel credential boundaries', () => {
   it('stores only strict locators and never accepts a token field in global config', () => {
     expect(TunnelConfigSchema.parse({}).mode).toBe('external');
+    expect(TunnelConfigSchema.parse({}).startWithDodo).toBe(true);
     expect(TunnelConfigSchema.parse({}).metricsPort).toBe(21732);
     expect(() => TunnelCredentialRefSchema.parse({ provider: 'env', name: 'TUNNEL_TOKEN', token })).toThrow();
     expect(() => GlobalConfigSchema.parse({ tunnel: { mode: 'managed', token } })).toThrow();
     const serialized = JSON.stringify(GlobalConfigSchema.parse({ tunnel: { mode: 'managed', credentialRef: { provider: 'env', name: 'MY_TUNNEL_TOKEN' } } }));
     expect(serialized).not.toContain(token);
+  });
+
+  it('accepts an empty temporary entry as local-only and validates non-empty tokens', () => {
+    expect(parseTemporaryTunnelToken('')).toBeUndefined();
+    expect(parseTemporaryTunnelToken('   ')).toBeUndefined();
+    expect(parseTemporaryTunnelToken(token)).toBe(token);
+    expect(() => parseTemporaryTunnelToken('short')).toThrow(/invalid format/);
   });
 
   it('validates environment and private-file references without copying the secret', async () => {

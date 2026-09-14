@@ -4,12 +4,12 @@
 
 ### Global launcher และ interactive CLI
 
-- เพิ่ม `dodo --cli` เป็นเมนู owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด server ตั้ง Tunnel
-  token และ setup dependencies รวม cloudflared
+- เพิ่ม `dodo --cli` เป็นเมนู owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด server + Tunnel
+  ด้วย token ชั่วคราว และ setup dependencies รวม cloudflared
 - `dodo`/`dodo start` ใช้โปรเจกต์ที่ owner เลือกล่าสุด หรือเปิด launcher mode ที่ไม่มี
   active AI workspace แทนการใช้ CWD โดยอัตโนมัติ; `--root` เลือกและจำ root แบบ explicit
 - Local Config เพิ่มโปรเจกต์แล้วเปิดได้ทันที และรองรับสถานะก่อนเลือก workspace
-- Local Config ตั้ง Cloudflare token ผ่าน OS credential store โดยไม่ echo/persist raw token
+- `dodo start` และ Local Config รับ Cloudflare token แบบ run-scoped ไม่บันทึกลงเครื่อง และหยุด child พร้อม DODO
 - การเลือก startup project ไม่เพิ่ม authority และ MCP/OAuth ถูกปิดด้วย
   `workspace_required` จนกว่า real workspace จะพร้อม
 
@@ -31,7 +31,7 @@
 - เปิดตัว package `dodo-mcp` และ CLI `dodo`
 - เพิ่ม config foundation ที่ใช้ `DODO_CONFIG_DIR` และ safe existing-state preference import แบบ explicit
 - เพิ่ม `dodo tunnel configure/status/start/stop/restart/doctor/logs` สำหรับ external และ managed Cloudflare Tunnel โดยไม่จัดการ Cloudflare account/DNS
-- Tunnel token ใช้ OS credential store หรือ secure env/file reference และไม่อยู่ใน config/argv/logs/MCP jobs
+- เส้นทางหลักใช้ temporary Tunnel token ที่ไม่อยู่ใน config/credential store/argv/logs/MCP jobs; secure references คงไว้เฉพาะ advanced compatibility commands
 - `dodo setup --check/--plan` เป็น read-only และ dependency installer ต้องได้รับ `--yes` ก่อนเริ่ม
 - state import ไม่คัดลอก OAuth material, database, client/workspace authority หรือ permission-bearing config
 - เพิ่ม Compact, Full และ Hybrid MCP tool surfaces

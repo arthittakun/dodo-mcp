@@ -26,6 +26,7 @@ import { DesktopPolicyInputSchema, saveDesktopPolicy } from '../services/desktop
 import { INPUT_LIMIT_PROFILES } from '../config/limits.js';
 import { ProjectRegistry, type RegisteredProject } from '../projects/registry.js';
 import { runCliMenu } from './menu.js';
+import { TunnelRuntime } from '../tunnel/runtime.js';
 
 const program = new Command();
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
@@ -134,6 +135,8 @@ interface HttpLaunchOptions {
   all?: boolean;
   bypass?: boolean;
   tools?: string;
+  /** Commander sets this false for --no-tunnel. */
+  tunnel?: boolean;
 }
 
 async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
@@ -147,45 +150,72 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
     if (remembered?.available) root = remembered.root;
   }
 
-  const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+  const configDir = resolveConfigDir(process.env).dir;
+  const configFile = statePaths(configDir).configFile;
+  const config = loadGlobalConfig(configFile);
+  const publicUrl = opts.publicUrl ?? config.publicUrl;
+  let temporaryTunnelToken: string | undefined;
+  const interactiveTerminal = process.stdin.isTTY === true && process.stdout.isTTY === true;
+  if (opts.tunnel !== false && config.tunnel.startWithDodo && publicUrl && interactiveTerminal) {
+    const { readTemporaryTunnelToken } = await import('../tunnel/credentials.js');
+    temporaryTunnelToken = await readTemporaryTunnelToken();
+  }
   const startOpts: Parameters<typeof startServer>[0] = {
-    configPort: loadGlobalConfig(configFile).configPort,
+    configPort: config.configPort,
     ...(opts.bypass ? { runMode: 'bypass' as const } : opts.allow ? { runMode: 'allow-all' as const } : {}),
     invokedCwd,
     ...(root === undefined ? { deferWorkspace: true } : { rootOverride: root }),
     allowUnsafeRoot: opts.allowUnsafeRoot ?? false,
     quiet: opts.quiet ?? false,
     onLog: (line) => console.log(formatTerminalLine(line)),
-    onStopped: () => process.exit(0),
   };
   if (opts.port !== undefined && !Number.isNaN(opts.port)) startOpts.portOverride = opts.port;
   if (opts.publicUrl !== undefined) startOpts.publicUrlOverride = opts.publicUrl;
   if (opts.tools !== undefined) startOpts.toolSurface = opts.tools as 'compact' | 'full' | 'hybrid';
-  const server = await startServer(startOpts);
-  const stop = async (signal: string) => {
+  const tunnelRuntime = new TunnelRuntime(configDir, line => console.log(`[dodo:tunnel] ${line}`));
+  let shutdownPromise: Promise<void> | undefined;
+  let suppressOnStopped = false;
+  const server = await startServer({
+    ...startOpts,
+    tunnelRuntime,
+    onStopped: () => {
+      if (!shutdownPromise && !suppressOnStopped) void stop('server stop');
+    },
+  });
+
+  if (temporaryTunnelToken) {
+    try {
+      const transientConfig = GlobalConfigSchema.parse({
+        ...config,
+        ...(publicUrl ? { publicUrl } : {}),
+        tunnel: { ...config.tunnel, mode: 'managed' },
+      });
+      const status = await tunnelRuntime.start(transientConfig, temporaryTunnelToken);
+      console.log(`[dodo] Cloudflare Tunnel attached for this run: ${status.publicOrigin}/mcp`);
+    } catch (error) {
+      suppressOnStopped = true;
+      await server.close();
+      throw error;
+    } finally {
+      temporaryTunnelToken = undefined;
+    }
+  } else if (!opts.quiet && opts.tunnel !== false && config.tunnel.startWithDodo) {
+    if (!publicUrl) console.log('[dodo] Tunnel skipped: configure the public HTTPS origin, then restart DODO.');
+    else if (!interactiveTerminal) console.log('[dodo] Tunnel skipped: temporary token entry requires an interactive terminal.');
+    else console.log('[dodo] Tunnel skipped for this run; local MCP remains available.');
+  }
+
+  async function stop(signal: string): Promise<void> {
+    if (shutdownPromise) return shutdownPromise;
+    shutdownPromise = (async () => {
     console.log(`\n[dodo] ${signal} received — shutting down (finishing journal safe point, closing jobs)…`);
-    await server.close();
+    await Promise.allSettled([server.close(), tunnelRuntime.close()]);
     process.exit(0);
-  };
+    })();
+    return shutdownPromise;
+  }
   process.on('SIGINT', () => void stop('SIGINT'));
   process.on('SIGTERM', () => void stop('SIGTERM'));
-}
-
-async function configureTunnelFromMenu(): Promise<void> {
-  const credentials = await import('../tunnel/credentials.js');
-  const { dir } = resolveConfigDir(process.env);
-  ensureConfigDir(dir);
-  const configFile = statePaths(dir).configFile;
-  const current = loadGlobalConfig(configFile);
-  const ref = credentials.osTunnelCredentialRef(dir);
-  const candidate = GlobalConfigSchema.parse({ ...current, tunnel: { ...current.tunnel, mode: 'managed', credentialRef: ref } });
-  await credentials.storeOsTunnelCredentialInteractive(ref);
-  try {
-    saveGlobalConfig(configFile, candidate);
-  } catch (error) {
-    try { credentials.deleteOsTunnelCredential(ref); } catch { /* keep the config-write error authoritative */ }
-    throw error;
-  }
 }
 
 async function setupFromMenu(check: boolean): Promise<void> {
@@ -479,8 +509,7 @@ program.command('cli')
         startupProject,
         selectProject: selectStartupProject,
         addProject: addAndSelectProject,
-        start: async (root) => launchHttp(root === undefined ? {} : { root }),
-        configureTunnel: configureTunnelFromMenu,
+        start: async (root, tunnel = true) => launchHttp({ ...(root === undefined ? {} : { root }), tunnel }),
         setupAll: () => setupFromMenu(false),
         checkSetup: () => setupFromMenu(true),
       }, { input: process.stdin, output: process.stdout });
@@ -502,8 +531,9 @@ program
   .option('--all', 'all local action classes (requires --allow)', false)
   .option('--bypass', 'trusted actions and no default job sandbox for this run; OAuth and file guards remain', false)
   .option('--tools <surface>', 'tool exposure for this run: compact (HTTP default), full, or hybrid (49 tools: gateways + common direct tools); permissions are unchanged')
+  .option('--no-tunnel', 'start local MCP only; do not ask for a temporary Cloudflare Tunnel token')
   .option('--quiet', 'suppress the startup banner', false)
-  .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string }) => {
+  .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string; tunnel: boolean }) => {
     try {
       await launchHttp(opts);
     } catch (err) {
@@ -1269,7 +1299,7 @@ program.addHelpText(
   'after',
   `
 Local HTTP + private config:
-  dodo                               start this folder; config on 127.0.0.1:21731
+  dodo                               start the saved project; config on 127.0.0.1:21731
   dodo kill                          stop DODO across folders, keep OAuth login
   dodo limits --profile large        larger command/file budgets; restart to apply
   dodo start --allow --all            trusted tasks for this run
@@ -1281,8 +1311,8 @@ Desktop (platform helper and explicit app permission required):
   dodo desktop disable               revoke desktop access
 Remote setup:
   dodo init --public-url https://...   configure public origin once
-  dodo tunnel configure --external    observe an owner/system-managed tunnel
-  dodo tunnel start --yes              run configured cloudflared in foreground`,
+  dodo start                           prompt for a temporary Tunnel token
+  dodo start --no-tunnel               run local MCP only`,
 );
 
 function effectiveArgv(): string[] {
