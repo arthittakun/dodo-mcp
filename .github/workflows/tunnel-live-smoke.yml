@@ -1,0 +1,103 @@
+name: tunnel-live-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Trusted self-hosted runner to test
+        type: choice
+        required: true
+        default: all
+        options: [windows, linux, all]
+
+# This workflow deliberately has no push or pull_request trigger. It handles a
+# temporary Cloudflare Tunnel credential and may run only from trusted main.
+permissions:
+  contents: read
+
+concurrency:
+  group: tunnel-live-smoke
+  cancel-in-progress: false
+
+env:
+  CLOUDFLARED_VERSION: 2026.8.2
+
+jobs:
+  linux:
+    name: Linux live tunnel smoke
+    if: github.ref == 'refs/heads/main' && (inputs.platform == 'linux' || inputs.platform == 'all')
+    runs-on: [self-hosted, Linux, X64, linux-ci]
+    timeout-minutes: 12
+    steps:
+      - name: Checkout trusted main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          clean: true
+          persist-credentials: false
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Build DODO
+        shell: bash
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm run build
+      - name: Download verified job-local cloudflared
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_dir="$RUNNER_TEMP/dodo-cloudflared-live"
+          mkdir -p "$install_dir"
+          executable="$install_dir/cloudflared"
+          curl --fail --location --silent --show-error \
+            "https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64" \
+            --output "$executable"
+          printf '%s  %s\n' 'fcfb02b575a52ca1af2e3267af4e1517bcdeb30ac48c834c69abaed3c0576ad2' "$executable" | sha256sum --check --status
+          chmod 700 "$executable"
+          echo "DODO_CLOUDFLARED_PATH=$executable" >> "$GITHUB_ENV"
+      - name: Test real Cloudflare connection through DODO
+        shell: bash
+        env:
+          DODO_LIVE_TUNNEL_TOKEN: ${{ secrets.DODO_LIVE_TUNNEL_TOKEN_TEST }}
+        run: node scripts/live-tunnel-smoke.mjs
+
+  windows:
+    name: Windows live tunnel smoke
+    if: github.ref == 'refs/heads/main' && (inputs.platform == 'windows' || inputs.platform == 'all')
+    runs-on: [self-hosted, Windows, X64, "windows-ci 02"]
+    timeout-minutes: 12
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}"
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
+      DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
+    steps:
+      - name: Checkout trusted main revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          clean: true
+          persist-credentials: false
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Build DODO
+        shell: cmd
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm run build
+      - name: Download verified job-local cloudflared
+        run: |
+          $installDir = Join-Path $env:RUNNER_TEMP 'dodo-cloudflared-live'
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          $executable = Join-Path $installDir 'cloudflared.exe'
+          Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/cloudflare/cloudflared/releases/download/$env:CLOUDFLARED_VERSION/cloudflared-windows-amd64.exe" -OutFile $executable
+          $actual = (Get-FileHash -LiteralPath $executable -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne 'c29eee2b121f5436a642eed69fd9767da7e7b8c510fa50aaa130337f931357b5') { throw 'cloudflared checksum mismatch' }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "DODO_CLOUDFLARED_PATH=$executable"
+      - name: Test real Cloudflare connection through DODO
+        env:
+          DODO_LIVE_TUNNEL_TOKEN: ${{ secrets.DODO_LIVE_TUNNEL_TOKEN_TEST }}
+        run: node scripts/live-tunnel-smoke.mjs
