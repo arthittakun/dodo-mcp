@@ -43,15 +43,70 @@ export interface LaunchOptions {
   deferWorkspace?: boolean; // installation control plane with no selected project
 }
 
+const PORT_CLAIM_DIR = path.join(os.tmpdir(), 'dodo-test-port-claims');
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/**
+ * Claim the chosen port across Vitest worker processes. Keeping the claim for
+ * the worker lifetime also prevents immediate port reuse, which can race with
+ * HTTP keep-alive sockets and parallel fixture startup on Linux.
+ */
+function claimTestPort(port: number): boolean {
+  fs.mkdirSync(PORT_CLAIM_DIR, { recursive: true });
+  const claim = path.join(PORT_CLAIM_DIR, String(port));
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const fd = fs.openSync(claim, 'wx', 0o600);
+      try {
+        fs.writeFileSync(fd, `${process.pid}\n`);
+      } finally {
+        fs.closeSync(fd);
+      }
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+      let owner = 0;
+      try {
+        owner = Number.parseInt(fs.readFileSync(claim, 'utf8'), 10);
+      } catch {
+        // A concurrent writer may still be publishing its PID; treat it as live.
+        return false;
+      }
+      if (!Number.isInteger(owner) || owner <= 0 || processExists(owner)) return false;
+      try {
+        fs.unlinkSync(claim);
+      } catch {
+        return false;
+      }
+    }
+  }
+  return false;
+}
+
 export async function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const srv = net.createServer();
-    srv.listen(0, '127.0.0.1', () => {
-      const port = (srv.address() as net.AddressInfo).port;
-      srv.close(() => resolve(port));
+  for (;;) {
+    const candidate = await new Promise<{ port: number; server: net.Server }>((resolve, reject) => {
+      const server = net.createServer();
+      server.once('error', reject);
+      server.listen(0, '127.0.0.1', () => {
+        server.removeListener('error', reject);
+        resolve({ port: (server.address() as net.AddressInfo).port, server });
+      });
     });
-    srv.on('error', reject);
-  });
+    const claimed = claimTestPort(candidate.port);
+    await new Promise<void>((resolve, reject) => {
+      candidate.server.close(err => err ? reject(err) : resolve());
+    });
+    if (claimed) return candidate.port;
+  }
 }
 
 export function mkTmpDir(prefix: string): string {
