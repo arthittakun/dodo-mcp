@@ -24,7 +24,7 @@ export function sourceFingerprint(root) {
     }
   }
   for (const entry of ['src', 'tests', 'scripts', 'native', 'benchmarks', 'docker', '.github',
-    'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'eslint.config.js', '.gitignore', '.npmignore', '.dockerignore']) visit(entry);
+    'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'eslint.config.js', '.gitattributes', '.gitignore', '.npmignore', '.dockerignore']) visit(entry);
   entries.sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
   return `sha256:${createHash('sha256').update(JSON.stringify(entries)).digest('hex')}`;
 }

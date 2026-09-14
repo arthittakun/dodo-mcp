@@ -37,7 +37,7 @@ describe('allowlisted release evidence', () => {
   it('fingerprints copied gate inputs and untracked code, excluding private documentation', () => {
     const dir = directory();
     const inputs = ['src', 'tests', 'scripts', 'native', 'benchmarks', 'docker', '.github',
-      'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'eslint.config.js', '.gitignore', '.npmignore', '.dockerignore'];
+      'package.json', 'package-lock.json', 'tsconfig.json', 'tsconfig.build.json', 'vitest.config.ts', 'eslint.config.js', '.gitattributes', '.gitignore', '.npmignore', '.dockerignore'];
     for (const input of inputs) fs.cpSync(path.resolve(input), path.join(dir, input), { recursive: true });
     const original = sourceFingerprint(dir);
     expect(original).toBe(sourceFingerprint(process.cwd()));

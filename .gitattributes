@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Release artifacts and test fixtures that must never be line-normalized.
+*.7z binary
+*.aiff binary
+*.bin binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.mp3 binary
+*.mp4 binary
+*.node binary
+*.pdf binary
+*.png binary
+*.tgz binary
+*.wav binary
+*.webp binary
+*.zip binary
