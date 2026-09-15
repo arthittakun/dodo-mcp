@@ -96,7 +96,7 @@
     "playwright": "1.63.0",
     "sharp": "0.35.4",
     "typescript": "5.9.3",
-    "zod": "^4.2.0"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
