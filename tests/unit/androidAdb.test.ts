@@ -31,4 +31,3 @@ describe('Android ADB parsing and path boundaries', () => {
     for (const value of ['sdcard/a', '/sdcard/../data/a', '/x\ny']) expect(() => __androidTest.devicePath(value)).toThrow();
   });
 });
-

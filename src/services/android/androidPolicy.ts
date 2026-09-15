@@ -58,4 +58,3 @@ export function saveAndroidPolicy(store: Store, workspaceId: string, epoch: stri
   })();
   return policy;
 }
-

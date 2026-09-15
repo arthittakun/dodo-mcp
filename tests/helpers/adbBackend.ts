@@ -37,4 +37,3 @@ export class FakeAdb implements AdbBackend {
     return { code, stdout, stderr: code === 0 ? Buffer.alloc(0) : Buffer.from('fixture adb error') };
   }
 }
-
