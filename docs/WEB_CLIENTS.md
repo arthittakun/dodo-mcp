@@ -1,15 +1,126 @@
-# DODO MCP — Web Clients
+# DODO MCP — เชื่อม ChatGPT และ Web Clients
 
-## Connection checklist
+## สิ่งที่ต้องแยกให้ออกก่อน
 
-1. รัน DODO และตั้ง public HTTPS origin
-2. ตรวจว่า URL ลงท้ายด้วย `/mcp`
-3. เพิ่ม static OAuth client ด้วย exact callback URL
-4. เลือก OAuth ใน web client
-5. ทำ authorization ใน browser
-6. approve interaction ผ่าน `dodo auth pending` และ `dodo auth approve ID`
-7. scan tools
-8. เรียก `project_overview` และตรวจ `toolSurface`
+| ค่า | ใช้ตรงไหน | ตัวอย่าง |
+|---|---|---|
+| Public origin | โดเมน HTTPS ที่ Cloudflare Tunnel ของเจ้าของให้บริการ | `https://dodo.example.com` |
+| MCP Server URL | กรอกในหน้าเพิ่ม MCP ของ ChatGPT | `https://dodo.example.com/mcp` |
+| OAuth callback | ลงทะเบียนกับ DODO ผ่าน `auth add-client` | `https://chatgpt.com/connector_platform_oauth_redirect` |
+
+OAuth callback ไม่ใช่ URL สำหรับเปิดหรือติดตั้ง MCP และต้องคัดลอกเป็น URL ธรรมดา
+ห้ามใส่ `[https://...](https://...)` เพราะนั่นเป็น Markdown ไม่ใช่ URI
+
+## เชื่อม ChatGPT แบบครบขั้นตอน
+
+### 1. อัปเดตและตรวจ DODO
+
+```bash
+npm install -g dodo-mcp@latest
+dodo --version
+dodo setup --check
+```
+
+### 2. ตั้ง Public MCP ผ่าน DODO Tunnel
+
+เจ้าของต้องสร้าง Cloudflare Tunnel, public hostname และ DNS ไว้ก่อน โดย route
+**ทุก path** ไปที่ `http://127.0.0.1:21730` ห้าม route Local Config `21731` หรือ
+metrics `21732` ออกสาธารณะ
+
+```bash
+dodo tunnel configure \
+  --tunnel \
+  --public-url https://dodo.example.com \
+  --os-credential
+```
+
+แทน `https://dodo.example.com` ด้วย hostname จริงของคุณ Prompt จะรับ Tunnel token
+ผ่าน OS credential store; token ไม่ควรอยู่ใน command line, chat หรือ repository
+
+### 3. ลงทะเบียน ChatGPT OAuth client
+
+คัดลอกคำสั่งนี้ตรง ๆ อย่าเติม `\` หน้า `--` และอย่าวาง Markdown link แทน URL:
+
+```bash
+dodo auth add-client \
+  --name "ChatGPT" \
+  --redirect-uri "https://chatgpt.com/connector_platform_oauth_redirect"
+```
+
+DODO รองรับ RFC 9207 issuer identification จึงใช้ stable callback นี้ได้ คำสั่งจะ
+แสดง `client_id` และ `client_secret` เพียงครั้งเดียว เก็บทั้งสองค่าใน client config
+ของ ChatGPT และห้ามส่งให้ผู้อื่น หากทำหายให้สร้าง client ใหม่แทนการค้น secret เดิม
+
+### 4. เปิด DODO
+
+```bash
+dodo start
+```
+
+ให้ terminal นี้เปิดค้างไว้ ใน Tunnel mode DODO จะเริ่มและดูแล `cloudflared` ของตัวเอง
+ตรวจสถานะได้โดยไม่เปิดเผย credential:
+
+```bash
+dodo tunnel status
+dodo tunnel doctor
+```
+
+### 5. เพิ่ม MCP ใน ChatGPT
+
+1. เปิด ChatGPT web แล้วไปที่ **Settings → Security and login**
+2. เปิด **Developer mode**
+3. ไปที่ <https://chatgpt.com/plugins> แล้วกด `+`
+4. ตั้งชื่อ เช่น `DODO MCP`
+5. กรอก **MCP Server URL** เป็น `https://dodo.example.com/mcp`
+6. เลือก Authentication เป็น **OAuth**
+7. กรอก OAuth Client ID และ Client Secret ที่ได้จากขั้นตอน 3
+8. กด Connect, Create หรือ Scan Tools ตามข้อความที่หน้า ChatGPT แสดง
+
+ชื่อเมนูย่อยอาจเปลี่ยนตามแผนบัญชีหรือ workspace policy แต่ MCP URL ต้องเป็น public
+HTTPS URL ที่ลงท้ายด้วย `/mcp` และ Authentication ต้องเป็น OAuth เสมอ
+
+### 6. อนุมัติ OAuth จากเครื่องเจ้าของ
+
+หลัง ChatGPT เริ่ม authorization และหน้า browser กำลังรอ เปิด terminal อีกหน้าต่าง:
+
+```bash
+dodo auth pending
+```
+
+ตรวจ request ID และวลีเทียบกับหน้า browser แล้วอนุมัติเฉพาะรายการที่ตรงกัน:
+
+```bash
+dodo auth approve REQUEST_ID
+```
+
+ไม่ต้องใส่ `--` หน้า ID หาก `pending` ไม่พบรายการ แปลว่า ChatGPT ยังไม่ได้เริ่ม
+authorization, DODO ไม่ได้รัน หรือ public OAuth routes เข้าไม่ถึง
+
+### 7. ทดสอบใน ChatGPT
+
+กลับไปให้ tool scan เสร็จ เริ่ม conversation ใหม่ เลือก DODO จาก Developer mode แล้วส่ง:
+
+```text
+ใช้ DODO MCP เรียก project_overview แล้วรายงานชื่อโปรเจกต์ toolSurface และจำนวน tools
+```
+
+หากยังไม่มี project ให้เปิด `dodo --cli` หรือ Local Config URL ที่ startup แสดง แล้ว
+เพิ่ม absolute path ภายหลังได้ OAuth client ไม่ผูกกับ CWD ที่ใช้รัน `auth add-client`
+
+## แก้ปัญหาที่พบบ่อย
+
+| อาการ | วิธีตรวจและแก้ |
+|---|---|
+| ChatGPT ต่อไม่ได้ | รัน `dodo tunnel doctor` และตรวจว่า hostname route ทุก path ไป `127.0.0.1:21730` |
+| Redirect URI mismatch | ลบ client ที่ลงทะเบียนผิดแล้วสร้างใหม่ด้วย callback แบบ exact string ตาม code block |
+| `dodo auth pending` ว่าง | กด Connect/Scan Tools ใน ChatGPT ก่อน และให้ `dodo start` ยังรันอยู่ |
+| ได้ 404 จาก OAuth หรือ discovery | Tunnel route มาเฉพาะ `/mcp`; แก้ให้ route ทุก path เพราะ OAuth ใช้ `/.well-known/...`, `/auth`, `/interaction`, `/token` และ `/jwks` ด้วย |
+| เห็น tools เก่า/เรียกแล้ว not found | เปิด connection ใน ChatGPT แล้ว Refresh; หาก cache ยังไม่เปลี่ยนให้ลบและสร้าง connection ใหม่ |
+| ยังไม่เห็น Sub-agent operations | เปิด **Settings → Sub-agent tools ใน MCP** ใน Local Config แล้ว restart DODO และ rescan/recreate connection |
+
+ห้ามส่ง `client_secret`, access token, refresh token, Cloudflare Tunnel token หรือ URL
+ของ Local Config ให้ผู้ช่วย AI เพื่อแก้ปัญหา ใช้เฉพาะสถานะและ redacted logs จาก
+`dodo tunnel status`, `dodo tunnel doctor` และ `dodo tunnel logs`
 
 ## Compact behavior
 

@@ -1,6 +1,6 @@
 # DODO MCP
 
-**DODO MCP 1.0.4** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.5** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
@@ -34,6 +34,62 @@ npm install -g dodo-mcp
 dodo setup --check
 dodo --cli
 ```
+
+## เชื่อม ChatGPT ภายในไม่กี่นาที
+
+ChatGPT ต้องเชื่อมผ่าน **Public MCP URL** ของ DODO ซึ่งลงท้ายด้วย `/mcp` ส่วน
+`https://chatgpt.com/connector_platform_oauth_redirect` เป็น **OAuth callback**
+สำหรับลงทะเบียน client เท่านั้น ไม่ใช่ MCP Server URL
+
+ก่อนเริ่มให้อัปเดต CLI แล้วตั้ง Cloudflare Tunnel ของ DODO โดยแทน
+`https://dodo.example.com` ด้วย public hostname ของคุณ Tunnel ต้อง route ทุก path
+ไปที่ `http://127.0.0.1:21730`
+
+```bash
+npm install -g dodo-mcp@latest
+dodo --version
+dodo tunnel configure \
+  --tunnel \
+  --public-url https://dodo.example.com \
+  --os-credential
+```
+
+ลงทะเบียน static OAuth client ด้วยคำสั่งด้านล่าง คัดลอกคำสั่งตรงจาก code block
+โดยไม่เติม `\` หน้า `--` และไม่ครอบ URL ด้วยรูปแบบ Markdown `[ข้อความ](URL)`:
+
+```bash
+dodo auth add-client \
+  --name "ChatGPT" \
+  --redirect-uri "https://chatgpt.com/connector_platform_oauth_redirect"
+```
+
+คำสั่งจะแสดง `client_id` และ `client_secret` ครั้งเดียว ให้เก็บไว้ในหน้าตั้งค่า
+ChatGPT เท่านั้น ห้ามส่งลงแชต, issue หรือ Git จากนั้นเปิด DODO ค้างไว้:
+
+```bash
+dodo start
+```
+
+ใน ChatGPT web ให้เปิด **Settings → Security and login → Developer mode** แล้วไปที่
+[ChatGPT Plugins](https://chatgpt.com/plugins) กด `+` และกรอก:
+
+- **MCP Server URL:** `https://dodo.example.com/mcp`
+- **Authentication:** `OAuth`
+- **OAuth Client ID / Secret:** ค่าที่ได้จาก `dodo auth add-client`
+
+เมื่อกด Connect/Create/Scan Tools และหน้า authorization กำลังรอ ให้เปิด terminal
+อีกหน้าต่างเพื่อตรวจ request แล้วอนุมัติ ID ที่ตรงกับหน้า browser:
+
+```bash
+dodo auth pending
+dodo auth approve REQUEST_ID
+```
+
+กลับไปที่ ChatGPT รอให้ scan เสร็จ เริ่มแชตใหม่ เลือก DODO ใน Developer mode แล้ว
+ทดสอบด้วย `ใช้ DODO เรียก project_overview` HTTP จะแสดง Compact surface ประมาณ 19
+tools และเข้าถึง operations ที่เหลือผ่าน `dodo_discover` กับ gateway ตามสิทธิ์เดิม
+
+ดูขั้นตอนเต็มและวิธีแก้ OAuth/Tunnel ที่ [เชื่อม Web clients](docs/WEB_CLIENTS.md)
 
 `dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config +
 Tunnel, เปิด Remote Config ชั่วคราว 1 ชั่วโมง และรัน setup รวม `cloudflared` โดยไม่ต้อง

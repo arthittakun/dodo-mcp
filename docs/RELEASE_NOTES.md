@@ -1,5 +1,18 @@
 # DODO MCP — Release Notes
 
+## 1.0.5 — ChatGPT connection guide
+
+- เพิ่มขั้นตอนเชื่อม ChatGPT ไว้บนหน้าแรก ตั้งแต่ Public MCP URL, Cloudflare Tunnel,
+  static OAuth client, Developer mode, tool scan และ owner approval
+- แยกความหมายของ MCP Server URL (`https://HOST/mcp`) ออกจาก OAuth callback
+  (`https://chatgpt.com/connector_platform_oauth_redirect`) อย่างชัดเจน
+- เพิ่มคำสั่ง `dodo auth add-client` ที่คัดลอกไปรันได้โดยไม่มี Markdown ปน พร้อม
+  troubleshooting สำหรับ empty pending request, redirect mismatch, OAuth 404 และ cache
+- ไม่มีการเปลี่ยน runtime, tool surface, OAuth policy หรือ permission model
+
+ติดตั้งหรืออัปเดตด้วย `npm install -g dodo-mcp@1.0.5` แล้ว restart DODO process
+ก่อน Refresh หรือสร้าง ChatGPT MCP connection ใหม่
+
 ## 1.0.4 — Windows setup guidance and actionable recovery
 
 - เพิ่มคู่มือ Windows Setup สำหรับติดตั้ง components, `cloudflared`, Desktop/Web
