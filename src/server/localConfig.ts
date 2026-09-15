@@ -14,6 +14,7 @@ import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
 import { ProjectRegistry } from '../projects/registry.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
+import type { TunnelCredentialRef } from '../config/tunnelConfig.js';
 import { accessMode } from '../security/accessMode.js';
 
 /**
@@ -32,12 +33,18 @@ import { accessMode } from '../security/accessMode.js';
 export interface LocalConfigInfo {
   version?: string;
   /** What the MCP listener of this process looks like (absent for entries without one). */
-  transport?: { port: number; locked: boolean; publicUrl: string | null };
+  transport?: { port: number; locked: boolean; publicUrl: string | null; connectionMode?: 'local' | 'tunnel' };
   runMode?: 'allow-all' | 'bypass' | null;
   /** Dynamic because the launcher can activate its first real workspace. */
   workspaceSelected?: () => boolean;
-  /** Process-owned runtime; accepts only run-scoped credentials. */
+  /** Process-owned runtime for the selected persistent connection mode. */
   tunnelRuntime?: Pick<TunnelRuntime, 'status' | 'start' | 'stop'>;
+  /** OS-backed owner credential boundary; raw values are write-only. */
+  tunnelCredentialStore?: {
+    available: boolean;
+    provider: string;
+    store(token: string): Promise<TunnelCredentialRef>;
+  };
   log?: (line: string) => void;
 }
 
@@ -200,6 +207,8 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     const cfg = loadGlobalConfig(ws.paths.configFile);
     const transport = info.transport;
     const selected = hasWorkspace();
+    const activeConnectionMode: 'local' | 'tunnel' = transport?.connectionMode
+      ?? (transport?.publicUrl ? 'tunnel' : cfg.tunnel.connectionMode);
     res.json({
       version: info.version ?? ws.services.version,
       state: host.state(),
@@ -227,20 +236,31 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       } : null,
       connection: {
         workspaceSelected: selected,
+        connectionMode: activeConnectionMode,
         mcpLocalUrl: transport ? `http://127.0.0.1:${transport.port}/mcp` : null,
         publicUrl: cfg.publicUrl ?? '',
-        mcpPublicUrl: transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
+        mcpPublicUrl: activeConnectionMode === 'tunnel' && transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
+        activeMcpUrl: transport
+          ? activeConnectionMode === 'tunnel' && transport.publicUrl
+            ? `${transport.publicUrl}/mcp`
+            : `http://127.0.0.1:${transport.port}/mcp`
+          : null,
         oauthConfigured: transport ? !transport.locked : null,
-        activePublicUrl: transport?.publicUrl ?? null,
-        restartRequired: transport !== undefined && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null),
+        activePublicUrl: activeConnectionMode === 'tunnel' ? transport?.publicUrl ?? null : null,
+        restartRequired: transport !== undefined && (
+          cfg.tunnel.connectionMode !== activeConnectionMode
+          || (cfg.tunnel.connectionMode === 'tunnel' && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null))
+        ),
         localConfigOrigin: `http://127.0.0.1:${actualPort}`,
         expiresAt,
       },
       tunnel: {
-        mode: cfg.tunnel.mode,
-        startWithDodo: cfg.tunnel.startWithDodo,
-        tokenStorage: 'none',
-        legacyCredentialConfigured: Boolean(cfg.tunnel.credentialRef),
+        connectionMode: cfg.tunnel.connectionMode,
+        credentialConfigured: Boolean(cfg.tunnel.credentialRef),
+        credentialStorage: cfg.tunnel.credentialRef?.provider ?? 'none',
+        credentialStore: info.tunnelCredentialStore
+          ? { available: info.tunnelCredentialStore.available, provider: info.tunnelCredentialStore.provider }
+          : { available: false, provider: 'unavailable' },
         cloudflared: cfg.tunnel.executable ? 'owner-selected' : 'trusted-PATH',
         metricsPort: cfg.tunnel.metricsPort,
         maxRestarts: cfg.tunnel.maxRestarts,
@@ -343,34 +363,54 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   });
 
   // ---- Cloudflare Tunnel settings --------------------------------------
-  // This route accepts only non-secret process preferences. The separate
-  // authenticated session/start route accepts a run-scoped token and passes
-  // it directly to the process-owned supervisor without persisting it.
-  app.post('/api/tunnel/config', (req, res) => {
+  // The token is write-only and goes straight to the reviewed OS credential
+  // provider. Config stores only an opaque reference and one selected mode.
+  app.post('/api/tunnel/config', async (req, res) => {
     const input = z.object({
-      startWithDodo: z.boolean().optional(),
+      connectionMode: z.enum(['local', 'tunnel']),
+      token: z.string().min(20).max(8192).optional(),
       metricsPort: z.number().int().min(1024).max(65535).optional(),
       maxRestarts: z.number().int().min(0).max(5).optional(),
     }).strict().safeParse(req.body);
+    if (req.body && typeof req.body === 'object' && 'token' in req.body) req.body.token = '';
     if (!input.success) {
       res.status(400).json({ error: 'Invalid tunnel configuration.', code: 'INVALID_INPUT' }); return;
     }
     const ws = host.current();
+    let rawToken = input.data.token;
     try {
       const current = loadGlobalConfig(ws.paths.configFile);
+      let credentialRef = current.tunnel.credentialRef;
+      if (input.data.connectionMode === 'tunnel') {
+        if (!current.publicUrl) {
+          throw new DodoError('CONFLICT', 'Set the public HTTPS origin before selecting Tunnel mode.');
+        }
+        validatePublicUrl(current.publicUrl, false);
+        if (rawToken) {
+          if (!info.tunnelCredentialStore?.available) {
+            throw new DodoError('NOT_SUPPORTED', 'The reviewed OS credential store is unavailable on this machine.');
+          }
+          credentialRef = await info.tunnelCredentialStore.store(rawToken);
+        }
+        if (!credentialRef) {
+          throw new DodoError('NOT_FOUND', 'Tunnel mode requires a saved Cloudflare Tunnel credential.');
+        }
+      }
       const tunnelInput: Record<string, unknown> = {
         ...current.tunnel,
-        ...(input.data.startWithDodo !== undefined ? { startWithDodo: input.data.startWithDodo } : {}),
+        connectionMode: input.data.connectionMode,
+        ...(credentialRef ? { credentialRef } : {}),
         ...(input.data.metricsPort !== undefined ? { metricsPort: input.data.metricsPort } : {}),
         ...(input.data.maxRestarts !== undefined ? { maxRestarts: input.data.maxRestarts } : {}),
       };
       const next = GlobalConfigSchema.parse({ ...current, tunnel: tunnelInput });
       saveGlobalConfig(ws.paths.configFile, next);
-      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.config', result: 'saved-non-secret-settings' });
+      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.config', result: `selected-${next.tunnel.connectionMode}` });
       res.json({
         ok: true,
-        startWithDodo: next.tunnel.startWithDodo,
-        tokenStorage: 'none',
+        connectionMode: next.tunnel.connectionMode,
+        credentialConfigured: Boolean(next.tunnel.credentialRef),
+        credentialStorage: next.tunnel.credentialRef?.provider ?? 'none',
         metricsPort: next.tunnel.metricsPort,
         maxRestarts: next.tunnel.maxRestarts,
         restartRequired: true,
@@ -378,49 +418,8 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     } catch (error) {
       const { status, body } = switchError(error);
       res.status(status).json(body);
-    }
-  });
-
-  app.post('/api/tunnel/session/start', async (req, res) => {
-    const input = z.object({ token: z.string().min(20).max(8192) }).strict().safeParse(req.body);
-    if (!input.success) {
-      if (req.body && typeof req.body === 'object' && 'token' in req.body) req.body.token = '';
-      res.status(400).json({ error: 'A valid temporary Tunnel token is required.', code: 'INVALID_INPUT' }); return;
-    }
-    const ws = host.current();
-    try {
-      if (!info.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'This DODO entry cannot own a Cloudflare Tunnel process.');
-      const current = loadGlobalConfig(ws.paths.configFile);
-      if (!info.transport || info.transport.locked || !info.transport.publicUrl || current.publicUrl !== info.transport.publicUrl) {
-        throw new DodoError('CONFLICT', 'Restart DODO after configuring the public HTTPS origin before starting Tunnel.');
-      }
-      const transient = GlobalConfigSchema.parse({ ...current, tunnel: { ...current.tunnel, mode: 'managed' } });
-      const status = await info.tunnelRuntime.start(transient, input.data.token);
-      req.body.token = '';
-      try {
-        ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.session.start', result: 'started-with-temporary-token' });
-      } catch (error) {
-        await info.tunnelRuntime.stop();
-        throw error;
-      }
-      res.json({ ok: true, tokenStored: false, status });
-    } catch (error) {
-      req.body.token = '';
-      const { status, body } = switchError(error);
-      res.status(status).json(body);
-    }
-  });
-
-  app.post('/api/tunnel/session/stop', async (_req, res) => {
-    const ws = host.current();
-    try {
-      if (!info.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'This DODO entry cannot own a Cloudflare Tunnel process.');
-      const status = await info.tunnelRuntime.stop();
-      ws.store.audit({ principal: 'local-config-owner', workspaceId: ws.workspaceId, tool: 'local.tunnel.session.stop', result: 'stopped-owned-process' });
-      res.json({ ok: true, status });
-    } catch (error) {
-      const { status, body } = switchError(error);
-      res.status(status).json(body);
+    } finally {
+      rawToken = undefined;
     }
   });
 

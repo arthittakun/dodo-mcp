@@ -61,7 +61,7 @@ function assertNoCredentialPersisted(directory, credential) {
       if (entry.isDirectory()) pending.push(target);
       else if (entry.isFile() && fs.statSync(target).size <= 2 * 1024 * 1024) {
         if (fs.readFileSync(target).includes(Buffer.from(credential))) {
-          throw new Error('run-scoped tunnel credential was persisted');
+          throw new Error('tunnel credential was persisted outside its configured store');
         }
       }
     }
@@ -96,13 +96,14 @@ try {
   const config = GlobalConfigSchema.parse({
     publicUrl: 'https://tunnel-smoke.invalid',
     tunnel: {
-      mode: 'managed',
+      connectionMode: 'tunnel',
+      credentialRef: { provider: 'env', name: 'DODO_LIVE_TUNNEL_TOKEN' },
       executable,
       metricsPort,
       maxRestarts: 0,
     },
   });
-  supervisor = await startManagedTunnel({ configDir, config, temporaryToken: credential });
+  supervisor = await startManagedTunnel({ configDir, config, env: { ...process.env, [TOKEN_ENV]: credential } });
 
   const deadline = Date.now() + CONNECT_TIMEOUT_MS;
   while (Date.now() < deadline && supervisor.status().running && !supervisor.status().connected) {

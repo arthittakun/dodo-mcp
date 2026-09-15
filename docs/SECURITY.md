@@ -222,15 +222,24 @@ workspace context ทุก call ที่เปิดให้เห็นย�
 
 ## Cloudflare Tunnel
 
-เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare API เมื่อรัน `dodo start` ใน terminal ระบบถาม Tunnel token แบบซ่อนและ supervise เฉพาะ live `cloudflared` child ของ process นั้น หรือเจ้าของเริ่ม/หยุดรอบเดียวกันจาก Local Config ที่ผ่าน owner authentication
+เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare
+API DODO บันทึกการเลือกแบบ exclusive เป็น `local` หรือ `tunnel` ใน private global
+config หากเลือก Tunnel ทุก `dodo start` จะเริ่มเฉพาะ live `cloudflared` child ของ
+process นั้นและหยุด child พร้อม DODO หาก credential/readiness ไม่พร้อม startup จะ
+fail closed และไม่ fallback ไป Local
 
-เส้นทางหลักใช้ token แบบ run-scoped เท่านั้น: token อยู่ในหน่วยความจำของ DODO และ environment ของ child `cloudflared` ระหว่างรอบ ไม่ถูกบันทึกใน config, Keychain, Credential Manager, Secret Service, CLI argv, child arguments, logs, MCP catalog/response, audit หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูกปฏิเสธจาก environment ของ MCP jobs เสมอ Local Config รับ token ผ่าน private loopback capability, ล้าง request field หลังส่ง และตอบกลับเพียง `tokenStored:false`
+Token ถูกเก็บใน macOS Keychain, Windows Credential Manager หรือ Linux Secret Service
+เมื่อใช้ `--os-credential`; config เก็บ opaque locator เท่านั้น Owner-controlled
+headless deployment อาจเลือก env/private-file reference โดย DODO ไม่คัดลอกค่า Token
+ไม่อยู่ใน CLI argv, child arguments, config JSON, logs, MCP catalog/response, audit,
+browser storage หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูก
+ปฏิเสธจาก environment ของ MCP jobs เสมอ
 
-Local Config รับ token เฉพาะ POST ที่ผ่าน private capability, Host/Origin/proxy checks,
-rate limit และ control-context headers แล้วส่งให้ process-owned runtime โดยตรง
-Response/config/audit เก็บเฉพาะสถานะที่ไม่มี secret ไม่มี MCP tool สำหรับส่ง token หรือ
-ควบคุม tunnel หน้าเว็บเริ่ม network process เฉพาะเมื่อ owner กด “เปิด Tunnel รอบนี้”
-และการตั้ง startup preference ไม่เริ่ม network process
+Local Config รับ token แบบ write-only เฉพาะ POST ที่ผ่าน private capability,
+Host/Origin/proxy checks, rate limit และ control-context headers จากนั้นส่งตรงไปยัง
+reviewed OS credential provider และล้าง request field Response/config/audit ส่งกลับ
+เฉพาะ credential presence/provider ไม่มี MCP tool สำหรับส่ง token, เปลี่ยน connection
+mode หรือควบคุม owner Tunnel
 
 Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น
 Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose `/config` ที่
@@ -275,4 +284,5 @@ Unknown outcomes ไม่ auto-retry Queue ไม่แทน expected hash ห
 Local Config ยังคง loopback, token expiry, Host/Origin/proxy-header/rate checks และ CSP
 Admin API ไม่อยู่บน public MCP Events ใช้ authenticated fetch/cursor ไม่ใส่ token ใน URL
 ใช้ textContent แสดง path/model/error และไม่ render HTML จากโมเดล Tunnel credential
-ยัง run-scoped ตามเดิม การเริ่ม DODO/Keychain/macOS permissions ต้องผ่านเจ้าของ
+อยู่ใน reviewed OS store/reference และไม่ถูกส่งกลับให้ browser การเริ่ม DODO,
+ปลดล็อก Keychain และให้ macOS permissions ต้องผ่านเจ้าของ

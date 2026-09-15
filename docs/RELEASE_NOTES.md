@@ -1,6 +1,25 @@
 # DODO MCP — Release Notes
 
+## 1.0.3 — Persistent connection mode
+
+- เพิ่ม installation setting `connectionMode=local|tunnel` เป็นแหล่งความจริงเดียว
+- `dodo start` ใช้โหมดที่บันทึกไว้ทุกครั้ง: Local ไม่เริ่ม `cloudflared`; Tunnel เริ่ม
+  และหยุด DODO-owned `cloudflared` พร้อม process และ fail closed เมื่อไม่พร้อม
+- Tunnel token บันทึกแบบ write-only ใน reviewed OS credential store หรืออ้างอิง
+  owner-controlled env/private file; ไม่รับ token ชั่วคราวผ่าน startup/IPC อีกต่อไป
+- Local Config เลือกโหมดและบันทึก token ได้โดยไม่ส่งค่ากลับ หน้า Connection แสดง
+  Active MCP URL จาก runtime จริง ค่าใหม่มีผลหลัง restart
+- Remote Config หนึ่งชั่วโมงใช้ได้เฉพาะเมื่อ persistent Tunnel mode กำลังทำงาน
+- เพิ่ม integration/security regression สำหรับ Local OAuth/MCP, endpoint selection,
+  config migration, credential non-disclosure และ no-fallback supervisor behavior
+
+ติดตั้งหรืออัปเดตด้วย `npm install -g dodo-mcp@1.0.3` แล้ว restart DODO
+process ที่กำลังรันอยู่
+
 ## 1.0.2
+
+> พฤติกรรม token ชั่วคราวของรุ่นนี้ถูกแทนที่ใน source ปัจจุบันด้วย persistent
+> connection mode ดูหัวข้อ 1.0.3 และ ADR-048
 
 ### Temporary Remote Config
 

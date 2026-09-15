@@ -1,8 +1,40 @@
 # DODO MCP — Test Report
 
+## Release 1.0.3 — Persistent connection mode
+
+- `tests/integration/connectionMode.test.ts`: Local ใช้ loopback เป็น OAuth issuer/MCP
+  resource และเรียก `project_overview` ผ่าน OAuth จริง; Tunnel advertise public URL
+  แต่คง upstream ที่ loopback
+- `tests/security/tunnelCredentials.test.ts`: migration จาก config เดิมและ credential
+  locator ที่ไม่มี token
+- `tests/security/localConfig.test.ts`: owner authentication, write-only OS credential
+  boundary, exclusive mode และไม่มี endpoint เริ่ม tunnel ด้วย token ชั่วคราว
+- `tests/integration/tunnelSupervisor.test.ts`: configured credential, argv/log/state
+  non-disclosure, readiness, bounded restart และ owned stop
+- `tests/security/remoteConfig.test.ts` กับ `tests/integration/remoteConfigUi.test.ts`:
+  Remote Config เปิดได้เฉพาะ Tunnel ที่ทำงานและไม่รับ credential ทาง IPC
+- `tests/integration/configUiComponents.test.ts`: Chromium จริงแสดง Active MCP URL
+  ตาม runtime, บังคับ Local/Tunnel เป็นตัวเลือกเดียว และไม่บันทึก Tunnel เมื่อ HTTPS
+  origin หรือ credential ยังไม่พร้อม
+
+Targeted gate ล่าสุด: **AUTOMATED_PASS** — 9 files, 61 tests passed, 1 skipped ตาม
+dependency/platform; Chromium UI 5/5 ผ่าน; typecheck และ lint ผ่าน
+
+Full gate ล่าสุด: **AUTOMATED_PASS** — `npm run build` สร้าง Full 125 / Compact 19 /
+Hybrid 49 tools; `npm run test:all` ผ่าน core/security/compatibility 99 files,
+679 tests passed, 34 skipped, 0 failed และ packaging 16/16
+
+- `npm audit --omit=dev`: **AUTOMATED_PASS** — production vulnerabilities 0
+- `npm pack --dry-run`: **AUTOMATED_PASS** — มี CLI, Local Config assets และ schema
+  ทั้งสาม surfaces; ไม่พบ `.env`, state DB, model/media, release evidence หรือ
+  `docs/development` ใน manifest
+
+Live Cloudflare hostname และ OS credential store ด้วย credential ของเจ้าของสำหรับ source
+นี้: **MANUAL_NOT_RUN** — ไม่ถือว่า fixture cloudflared เป็นหลักฐานของ public network จริง
+
 ## Scope
 
-รายงานนี้ใช้กับ DODO MCP 1.0.2 source และแยกผล automated กับ manual อย่างชัดเจน
+รายงานนี้ใช้กับ DODO MCP 1.0.3 source และแยกผล automated กับ manual อย่างชัดเจน
 
 ## Release 1.0.2 — Temporary Remote Config
 

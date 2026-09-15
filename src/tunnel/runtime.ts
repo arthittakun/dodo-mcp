@@ -4,8 +4,8 @@ import { startManagedTunnel, type RunningTunnelSupervisor, type TunnelStatus } f
 
 /**
  * Owns at most one cloudflared supervisor for the lifetime of one DODO HTTP
- * process. It stores no credential: callers provide a run-scoped token for
- * each start, and the value is forwarded directly to the supervisor.
+ * process. Credentials remain in the configured OS/provider store and are
+ * read only while starting the owned supervisor.
  */
 export class TunnelRuntime {
   private supervisor: RunningTunnelSupervisor | undefined;
@@ -21,14 +21,13 @@ export class TunnelRuntime {
     return { available: true, running: current?.running === true, current, lastKnown: current ?? this.lastStatus };
   }
 
-  async start(config: GlobalConfig, temporaryToken: string): Promise<TunnelStatus> {
+  async start(config: GlobalConfig): Promise<TunnelStatus> {
     if (this.supervisor?.status().running) {
       throw new DodoError('CONFLICT', 'Cloudflare Tunnel is already attached to this DODO process');
     }
     const supervisor = await startManagedTunnel({
       configDir: this.configDir,
       config,
-      temporaryToken,
       ...(this.onLog ? { onLog: this.onLog } : {}),
     });
     this.supervisor = supervisor;

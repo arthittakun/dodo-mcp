@@ -1,5 +1,8 @@
 # DODO MCP 1.0.0
 
+> เอกสารนี้บันทึกพฤติกรรม release 1.0.0 เท่านั้น สำหรับคำสั่ง Tunnel ของ source
+> ปัจจุบันใช้ [TUNNEL.md](TUNNEL.md); `--no-tunnel` และ token ชั่วคราวถูกแทนที่แล้ว
+
 นี่คือ release แรกของ DODO MCP ในชื่อ package `dodo-mcp` และ CLI `dodo`
 
 ## การติดตั้ง

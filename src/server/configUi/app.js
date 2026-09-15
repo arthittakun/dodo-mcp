@@ -217,9 +217,9 @@
     // chips
     const c = s.connection || {};
     if (c.workspaceSelected === false) setChip('chip-mcp', 'warn', '⚠', 'เปิดอยู่ แต่รอเจ้าของเลือก workspace');
-    else if (c.mcpLocalUrl) setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `เปิดที่ ${c.mcpLocalUrl.replace(/^http:\/\//, '')}`);
+    else if (c.activeMcpUrl) setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `${c.connectionMode === 'tunnel' ? 'Tunnel' : 'Local'} · ${c.activeMcpUrl.replace(/^https?:\/\//, '')}`);
     else setChip('chip-mcp', 'warn', '○', 'ไม่มี HTTP listener ใน entry นี้');
-    if (c.oauthConfigured === true) setChip('chip-oauth', 'ok', '●', `เปิดใช้ · ${c.activePublicUrl}`);
+    if (c.oauthConfigured === true) setChip('chip-oauth', 'ok', '●', `เปิดใช้ · ${c.activePublicUrl || c.activeMcpUrl}`);
     else if (c.oauthConfigured === false) setChip('chip-oauth', 'warn', '⚠', 'LOCKED — ยังไม่ตั้ง public URL');
     else setChip('chip-oauth', 'idle', '○', 'ไม่เกี่ยวกับ entry นี้');
     const remaining = (c.expiresAt || 0) - Date.now();
@@ -322,6 +322,8 @@
     }
 
     // connection
+    $('conn-active').textContent = c.activeMcpUrl || 'ไม่มีใน entry นี้';
+    $('conn-active-copy').disabled = !c.activeMcpUrl;
     $('conn-local').textContent = c.mcpLocalUrl || 'ไม่มีใน entry นี้';
     $('conn-local-copy').disabled = !c.mcpLocalUrl;
     $('conn-public').textContent = c.mcpPublicUrl || (c.publicUrl ? `${c.publicUrl}/mcp (หลัง restart)` : 'ยังไม่ตั้งค่า');
@@ -330,7 +332,7 @@
     const oauth = $('conn-oauth');
     oauth.replaceChildren();
     const ob = document.createElement('span');
-    if (c.oauthConfigured === true) { ob.className = 'badge ok'; ob.textContent = '● เปิดใช้'; oauth.append(ob, document.createTextNode(` issuer ${c.activePublicUrl}`)); }
+    if (c.oauthConfigured === true) { ob.className = 'badge ok'; ob.textContent = '● เปิดใช้'; oauth.append(ob, document.createTextNode(` issuer ${(c.activeMcpUrl || '').replace(/\/mcp$/, '')}`)); }
     else if (c.oauthConfigured === false) { ob.className = 'badge warn'; ob.textContent = '⚠ LOCKED'; oauth.append(ob, document.createTextNode(' ยังไม่มี public URL — MCP ปฏิเสธทุก tool call จนกว่าจะตั้งค่าและ restart')); }
     else { ob.className = 'badge'; ob.textContent = '○ ไม่เกี่ยวกับ entry นี้'; oauth.append(ob); }
     const originInput = $('conn-origin');
@@ -340,17 +342,24 @@
     $('conn-restart').hidden = !c.restartRequired;
     cardState('conn', 'ready');
 
-    // Tunnel state contains no credential. The password input is submitted
-    // only to the run-scoped start endpoint and is cleared after the request.
+    // Tunnel state contains only a credential-presence flag. The password
+    // input is write-only and cleared after every save attempt.
     const tunnel = s.tunnel || {};
-    const serverFormSig = JSON.stringify([Boolean(tunnel.startWithDodo), Number(tunnel.metricsPort || 21732), Number(tunnel.maxRestarts ?? 2)]);
-    const browserFormSig = JSON.stringify([$('tunnel-auto').checked, Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
+    const serverFormSig = JSON.stringify([tunnel.connectionMode || 'local', Number(tunnel.metricsPort || 21732), Number(tunnel.maxRestarts ?? 2)]);
+    const browserMode = document.querySelector('input[name="connectionMode"]:checked');
+    const browserFormSig = JSON.stringify([browserMode ? browserMode.value : 'local', Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
     const tunnelDirty = !force && lastTunnelFormSig !== null && browserFormSig !== lastTunnelFormSig;
     if (!tunnelDirty) {
-      $('tunnel-auto').checked = Boolean(tunnel.startWithDodo);
+      $('tunnel-mode-local').checked = tunnel.connectionMode !== 'tunnel';
+      $('tunnel-mode-tunnel').checked = tunnel.connectionMode === 'tunnel';
       $('tunnel-metrics').value = String(tunnel.metricsPort || 21732);
       $('tunnel-restarts').value = String(tunnel.maxRestarts ?? 2);
     }
+    $('tunnel-credential').textContent = tunnel.credentialConfigured
+      ? `● มี credential แล้ว (${tunnel.credentialStorage}; ไม่แสดงค่า)`
+      : tunnel.credentialStore && tunnel.credentialStore.available
+        ? `○ ยังไม่มี credential · พร้อมบันทึกใน ${tunnel.credentialStore.provider}`
+        : `✕ credential store ใช้ไม่ได้${tunnel.credentialStore && tunnel.credentialStore.provider ? ` (${tunnel.credentialStore.provider})` : ''}`;
     lastTunnelFormSig = serverFormSig;
     const tunnelRuntime = tunnel.runtime || {};
     const currentTunnel = tunnelRuntime.current;
@@ -361,11 +370,9 @@
       $('tunnel-badge').className = 'badge warn';
       $('tunnel-badge').textContent = `◌ Tunnel ${currentTunnel.phase || 'กำลังเริ่ม'}`;
     } else {
-      $('tunnel-badge').className = tunnel.startWithDodo ? 'badge' : 'badge';
-      $('tunnel-badge').textContent = tunnel.startWithDodo ? '○ ยังไม่รัน · จะถาม token ตอนเริ่ม' : '○ Tunnel ไม่ได้รัน';
+      $('tunnel-badge').className = tunnel.connectionMode === 'tunnel' ? 'badge warn' : 'badge';
+      $('tunnel-badge').textContent = tunnel.connectionMode === 'tunnel' ? '◌ เลือก Tunnel · ต้อง restart' : '● ใช้ Local';
     }
-    $('tunnel-session-start').disabled = tunnelRuntime.available !== true || Boolean(currentTunnel && currentTunnel.running);
-    $('tunnel-session-stop').disabled = tunnelRuntime.available !== true || !Boolean(currentTunnel && currentTunnel.running);
 
     // clients
     $('clients-root').textContent = w ? w.root : 'ยังไม่ได้เลือกโปรเจกต์';
@@ -877,74 +884,44 @@
     });
   });
   $('conn-local-copy').addEventListener('click', (ev) => copyText(state && state.connection ? state.connection.mcpLocalUrl : '', ev.currentTarget));
+  $('conn-active-copy').addEventListener('click', (ev) => copyText(state && state.connection ? state.connection.activeMcpUrl : '', ev.currentTarget));
   $('conn-public-copy').addEventListener('click', (ev) => {
     const c = state && state.connection;
     copyText(c ? (c.mcpPublicUrl || (c.publicUrl ? `${c.publicUrl}/mcp` : '')) : '', ev.currentTarget);
   });
 
   // ---- Cloudflare Tunnel ----
-  $('tunnel-session-form').addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    const tokenInput = $('tunnel-session-token');
-    const errorElement = $('tunnel-session-error');
-    const tokenValue = tokenInput.value.trim();
-    errorElement.hidden = true;
-    tokenInput.removeAttribute('aria-invalid');
-    if (tokenValue.length < 20) {
-      errorElement.textContent = '✕ กรอก Cloudflare Tunnel token ที่ถูกต้อง';
-      errorElement.hidden = false;
-      tokenInput.setAttribute('aria-invalid', 'true');
-      tokenInput.focus();
-      return;
-    }
-    withBusy($('tunnel-session-start'), 'กำลังเปิด…', async () => {
-      try {
-        const result = await api('tunnel/session/start', { token: tokenValue });
-        tokenInput.value = '';
-        notify('success', result.status && result.status.connected
-          ? 'Tunnel เชื่อมต่อแล้วสำหรับ DODO process นี้'
-          : 'เริ่ม Tunnel แล้ว กำลังตรวจ readiness');
-        await refresh(true);
-      } catch (error) {
-        tokenInput.value = '';
-        errorElement.textContent = `✕ ${error.message}`;
-        errorElement.hidden = false;
-        notify('error', 'เปิด Tunnel ไม่สำเร็จ');
-      }
-    });
-  });
-
-  $('tunnel-session-stop').addEventListener('click', () => withBusy($('tunnel-session-stop'), 'กำลังหยุด…', async () => {
-    try {
-      await api('tunnel/session/stop', {});
-      $('tunnel-session-token').value = '';
-      notify('success', 'หยุด Tunnel ที่ DODO process นี้เป็นเจ้าของแล้ว');
-      await refresh(true);
-    } catch (error) {
-      notify('error', `หยุด Tunnel ไม่สำเร็จ: ${error.message}`);
-    }
-  }));
-
   $('tunnel-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const errorElement = $('tunnel-error');
     errorElement.hidden = true;
     const metricsPort = Number($('tunnel-metrics').value);
     const maxRestarts = Number($('tunnel-restarts').value);
+    const connectionMode = document.querySelector('input[name="connectionMode"]:checked')?.value || 'local';
+    const tokenInput = $('tunnel-token');
+    const token = tokenInput.value.trim();
     if (!Number.isSafeInteger(metricsPort) || metricsPort < 1024 || metricsPort > 65535 || !Number.isSafeInteger(maxRestarts) || maxRestarts < 0 || maxRestarts > 5) {
       errorElement.textContent = '✕ Metrics port ต้องอยู่ระหว่าง 1024–65535 และ restart ต้องอยู่ระหว่าง 0–5';
       errorElement.hidden = false;
       return;
     }
+    if (token && token.length < 20) {
+      errorElement.textContent = '✕ Tunnel token สั้นเกินไป';
+      errorElement.hidden = false;
+      tokenInput.focus();
+      return;
+    }
     withBusy($('tunnel-save'), 'กำลังบันทึก…', async () => {
       try {
-        const body = { startWithDodo: $('tunnel-auto').checked, metricsPort, maxRestarts };
+        const body = { connectionMode, metricsPort, maxRestarts, ...(token ? { token } : {}) };
         const result = await api('tunnel/config', body);
-        notify('info', result.startWithDodo
-          ? 'บันทึกแล้ว — DODO จะถาม token ชั่วคราวใน terminal เมื่อเริ่มรอบถัดไป'
-          : 'บันทึกแล้ว — รอบถัดไปจะเปิด local MCP โดยไม่ถาม Tunnel token');
+        tokenInput.value = '';
+        notify('info', result.connectionMode === 'tunnel'
+          ? 'บันทึกแล้ว — restart DODO เพื่อใช้ Tunnel เป็น MCP endpoint หลัก'
+          : 'บันทึกแล้ว — restart DODO เพื่อใช้ Local MCP เท่านั้น');
         await refresh(true);
       } catch (error) {
+        tokenInput.value = '';
         errorElement.textContent = `✕ ${error.message}`;
         errorElement.hidden = false;
         notify('error', 'บันทึก Tunnel ไม่สำเร็จ');

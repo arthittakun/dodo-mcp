@@ -75,7 +75,7 @@ export const GlobalConfigSchema = z
      */
     exposeSubagentsToMcp: z.boolean().default(false),
     /** Local-owner Cloudflare Tunnel process configuration; contains no token. */
-    tunnel: TunnelConfigSchema.default({ mode: 'external', startWithDodo: true, metricsPort: 21732, maxRestarts: 2 }),
+    tunnel: TunnelConfigSchema.default({ connectionMode: 'local', metricsPort: 21732, maxRestarts: 2 }),
     /** Last owner-selected registry entry. This is a startup preference, never authority. */
     startupProjectId: z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional(),
     /**
@@ -89,6 +89,23 @@ export const GlobalConfigSchema = z
 export type GlobalConfig = z.infer<typeof GlobalConfigSchema>;
 
 export const DEFAULT_GLOBAL_CONFIG: GlobalConfig = GlobalConfigSchema.parse({});
+
+/** Normalize only known pre-connectionMode Tunnel fields before strict parsing. */
+export function migrateLegacyGlobalConfig(parsed: unknown): unknown {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return parsed;
+  const owner: Record<string, unknown> = { ...(parsed as Record<string, unknown>) };
+  const tunnel = owner['tunnel'];
+  if (!tunnel || typeof tunnel !== 'object' || Array.isArray(tunnel)) return owner;
+  const old = tunnel as Record<string, unknown>;
+  const connectionMode = old['connectionMode'] === 'local' || old['connectionMode'] === 'tunnel'
+    ? old['connectionMode']
+    : old['mode'] === 'managed' && old['credentialRef'] !== undefined ? 'tunnel' : 'local';
+  const migrated: Record<string, unknown> = { ...old, connectionMode };
+  delete migrated['mode'];
+  delete migrated['startWithDodo'];
+  owner['tunnel'] = migrated;
+  return owner;
+}
 
 export function loadGlobalConfig(configFile: string): GlobalConfig {
   let raw: string;
@@ -108,6 +125,10 @@ export function loadGlobalConfig(configFile: string): GlobalConfig {
       recovery: `inspect ${configFile}`,
     });
   }
+  // 1.0.2 used run-scoped Tunnel tokens. Migrate an old configured managed
+  // credential to the persistent Tunnel selection; every other old config is
+  // local so an upgrade can never expose the machine by surprise.
+  parsed = migrateLegacyGlobalConfig(parsed);
   const result = GlobalConfigSchema.safeParse(parsed);
   if (!result.success) {
     throw new DodoError('INTERNAL_ERROR', `global config invalid: ${result.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`);

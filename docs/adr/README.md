@@ -63,3 +63,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [045 — Explicit project runtimes and provider-backed sub-agents](045-ai-providers-multiproject.md)
 - [046 — Personal add-and-use mode](046-personal-access-mode.md)
 - [047 — Temporary Remote Config on the tunneled listener](047-temporary-remote-config.md)
+- [048 — Persistent exclusive Local/Tunnel connection mode](048-persistent-connection-mode.md)

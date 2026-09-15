@@ -3,11 +3,15 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { describe, expect, it } from 'vitest';
 import { installationIpcCall } from '../../src/ipc/installationClient.js';
+import type { TunnelRuntime } from '../../src/tunnel/runtime.js';
 import { launch } from '../helpers/testServer.js';
 
 describe.skipIf(!fs.existsSync(chromium.executablePath()))('temporary Remote Config in Chromium', () => {
   it('pairs in the browser, loads the real dashboard at desktop/mobile widths, then closes immediately', async () => {
-    const ctx = await launch({ trust: 'trusted', configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 30_000 });
+    const tunnelRuntime = {
+      status: () => ({ available: true as const, running: true, current: null, lastKnown: null }),
+    } as unknown as TunnelRuntime;
+    const ctx = await launch({ trust: 'trusted', configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 30_000, tunnelRuntime, connectionMode: 'tunnel' });
     const lease = ctx.server.remoteConfig;
     if (!lease) throw new Error('missing Remote Config lease');
     const browser = await chromium.launch({ headless: true });

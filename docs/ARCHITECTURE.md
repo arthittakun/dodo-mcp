@@ -300,26 +300,26 @@ Repo config เป็น hints-only และไม่สามารถ widen p
 
 ## Tunnel lifecycle
 
-Tunnel config อยู่ใน global owner config และมีเฉพาะ non-secret startup preference,
-legacy mode/reference, canonical executable selection, loopback metrics port และ bounded
-restart count เส้นทางหลักไม่เขียน credential reference; token ถูก resolve จาก owner
-input เฉพาะรอบและส่งผ่าน child environment โดยไม่เข้า argv
+Tunnel config อยู่ใน global owner config และมี `connectionMode` เป็นแหล่งความจริงเดียว:
+`local` หรือ `tunnel` พร้อม opaque credential reference, canonical executable selection,
+loopback metrics port และ bounded restart count Token ถูก resolve จาก reviewed OS
+store หรือ owner-controlled env/private-file reference เมื่อเริ่ม process และส่งผ่าน
+child environment โดยไม่เข้า argv
 
-managed supervisor เป็น foreground process มี state machine `starting → connecting → connected/backoff → stopped/failed`, private bounded/redacted log และ authenticated singleton IPC `status/logs/stop` การ stop อ้างอิง live `ChildProcess` ที่ supervisor ถืออยู่เท่านั้น External mode ไม่ spawn process และ `doctor` ตรวจ local/public health โดยไม่จัดการ Cloudflare account หรือ DNS
+managed supervisor เป็น foreground process มี state machine `starting → connecting → connected/backoff → stopped/failed`, private bounded/redacted log และ authenticated singleton IPC `status/logs/stop` การ stop อ้างอิง live `ChildProcess` ที่ supervisor ถืออยู่เท่านั้น Local mode ไม่ spawn process และ `doctor` ตรวจ local/public health โดยไม่จัดการ Cloudflare account หรือ DNS
 
-`TunnelRuntime` ผูก supervisor หนึ่งตัวกับ DODO HTTP process เจ้าของส่ง run-scoped
-token ได้จาก hidden terminal prompt ระหว่าง `dodo start` หรือ owner-authenticated Local
-Config endpoint Token ไม่เข้า trusted config หรือ OS credential provider Runtime ส่งค่า
-ผ่าน `TUNNEL_TOKEN` ให้ child โดยตรง เก็บเพียงสถานะที่ไม่มี secret และปิด child ก่อน
-DODO process จบ การเปลี่ยน workspace ไม่ย้ายหรือเพิ่มสิทธิ์ใด ๆ และ Local Config port
-21731 ยังคงไม่รับ traffic จาก Tunnel
+`TunnelRuntime` ผูก supervisor หนึ่งตัวกับ DODO HTTP process และยอมเริ่มเฉพาะเมื่อ
+saved mode เป็น Tunnel พร้อม credential reference Runtime ส่งค่าผ่าน `TUNNEL_TOKEN`
+ให้ child โดยตรง เก็บเพียงสถานะที่ไม่มี secret และปิด child ก่อน DODO process จบ
+การเปลี่ยน workspace ไม่ย้ายหรือเพิ่มสิทธิ์ใด ๆ และ Local Config port 21731 ยังคง
+ไม่รับ traffic จาก Tunnel
 
 Remote Config ไม่เปลี่ยน bind ของ Local Config และไม่ copy admin handlers มาที่ public
 app `RemoteConfigGateway` ถือ pairing/session digest กับ expiry ใน memory, proxy เฉพาะ
 `/config`, `/config/assets/*`, `/config/api/*` และส่ง request ไป loopback owner server
-ด้วย internal capability เดิม CLI เปิด/ต่ออายุผ่าน authenticated installation IPC;
-หาก process เริ่มแบบ local-only IPC callback เริ่ม `TunnelRuntime` ด้วย run-scoped token
-ก่อนออก lease การหมดอายุล้าง code/session และทำให้ namespace กลับเป็น 404 โดยไม่หยุด
+ด้วย internal capability เดิม CLI เปิด/ต่ออายุผ่าน authenticated installation IPC
+เฉพาะเมื่อ persistent Tunnel mode ทำงานอยู่ IPC ไม่รับ credential หรือสลับ connection
+mode การหมดอายุล้าง code/session และทำให้ namespace กลับเป็น 404 โดยไม่หยุด
 MCP/OAuth/Tunnel
 
 ## Optional services

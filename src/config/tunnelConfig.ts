@@ -11,9 +11,8 @@ export const TunnelCredentialRefSchema = z.discriminatedUnion('provider', [
 
 export const TunnelConfigSchema = z
   .object({
-    mode: z.enum(['external', 'managed']).default('external'),
-    /** Prompt for a run-scoped token and attach cloudflared to `dodo start`. */
-    startWithDodo: z.boolean().default(true),
+    /** Exactly one advertised connection path is active for a DODO process. */
+    connectionMode: z.enum(['local', 'tunnel']).default('local'),
     credentialRef: TunnelCredentialRefSchema.optional(),
     /** Canonical cloudflared path selected by the local owner, never by repo config. */
     executable: z.string().min(1).max(4096).optional(),

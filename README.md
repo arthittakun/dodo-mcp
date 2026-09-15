@@ -1,6 +1,6 @@
 # DODO MCP
 
-**DODO MCP 1.0.2** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.3** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
@@ -250,20 +250,34 @@ command sandbox, idempotency และ audit เดิม `agent_exec` ใช้
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
-DODO ไม่สร้าง Tunnel, DNS หรือ Cloudflare account ให้ ผู้ใช้สร้าง remotely-managed Tunnel และตั้ง public hostname ให้ route **ทุก path** มาที่ `http://127.0.0.1:21730` ก่อน จากนั้นตั้ง public origin ครั้งเดียว:
+DODO เลือกวิธีเชื่อมต่อระดับ installation ได้หนึ่งแบบ: `local` หรือ `tunnel` ค่าที่เลือก
+มีผลกับทุก `dodo start` และไม่มี fallback อัตโนมัติ หากเลือก Tunnel แล้ว credential หรือ
+readiness ไม่พร้อม DODO จะหยุด startup แทนการเปิด local โดยไม่แจ้ง
+
+Local mode:
+
+```bash
+dodo tunnel configure --local
+dodo start
+```
+
+DODO Tunnel mode:
 
 ```bash
 dodo setup --check --components cloudflared
-dodo init --public-url https://mcp.example.com
+dodo tunnel configure \
+  --tunnel \
+  --public-url https://mcp.example.com \
+  --os-credential
 dodo start
-# Cloudflare Tunnel token (temporary; Enter = local only):
 ```
 
-เมื่อกรอก token DODO จะเริ่ม `cloudflared` เป็น child process ของรอบนั้นและหยุดพร้อม
-DODO Token อยู่ในหน่วยความจำระหว่างรอบและ environment ของ child เท่านั้น ไม่อยู่ใน
-argv, config, Keychain, Credential Manager, Secret Service, tunnel log, MCP response
-หรือ environment ของ MCP jobs กด Enter หรือใช้ `dodo start --no-tunnel` เพื่อเปิด
-เฉพาะ local MCP
+เจ้าของสร้าง remotely-managed Tunnel, public hostname และ DNS ใน Cloudflare และ route
+**ทุก path** มาที่ `http://127.0.0.1:21730` DODO ไม่จัดการ Cloudflare account/DNS
+Token ถูกบันทึกใน macOS Keychain, Windows Credential Manager หรือ Linux Secret Service;
+global config เก็บเพียง opaque reference ทุกครั้งที่เปิด DODO ระบบจะเริ่ม
+`cloudflared` เป็น child และหยุด child พร้อม DODO Token ไม่อยู่ใน argv, config, log,
+audit, browser storage, MCP response หรือ environment ของ MCP jobs
 
 หากต้องตั้งค่าจากอุปกรณ์อื่น ให้เปิดหน้าเจ้าของแบบชั่วคราวผ่าน public listener เดียวกัน:
 
@@ -277,15 +291,14 @@ dodo web --close    # ปิดหน้า Remote Config แต่ MCP/Tunnel �
 terminal หลังจับคู่ browser จะใช้ cookie ที่เป็น `Secure`, `HttpOnly`,
 `SameSite=Strict` และจำกัด path ที่ `/config` หน้า Remote Config ปิดอัตโนมัติภายใน
 1 ชั่วโมง การเปิดใหม่ออก code/session ใหม่และไม่ต้อง restart MCP ไม่มี token หรือ
-credential อยู่ใน URL หาก process เดิมเริ่มแบบ local-only `dodo --web` จะถาม Tunnel
-token แบบซ่อนและเปิด `cloudflared` ของ process นั้นก่อน
+credential อยู่ใน URL คำสั่งนี้ใช้ได้เฉพาะเมื่อ persistent mode เป็น `tunnel` และ
+DODO-owned Tunnel กำลังทำงาน; มันไม่รับ token ใหม่ผ่าน IPC และไม่เปลี่ยนจาก Local เอง
 
-หน้า Local Config ที่ `127.0.0.1:21731` มีช่อง **Temporary Tunnel token** สำหรับเริ่ม
-และหยุด tunnel ของ DODO process ปัจจุบันได้จริง ช่องจะถูกล้างหลังส่งและ backend ไม่
-persist ค่า ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย
-`dodo tunnel doctor` และดู log ที่ redacted ด้วย `dodo tunnel logs` คำสั่ง
-`dodo tunnel configure` เดิมยังมีสำหรับ advanced/headless compatibility และต้องเรียก
-โดยเจ้าของอย่างชัดเจน; เส้นทาง `dodo start` และหน้าเว็บไม่ใช้ credential store
+หน้า Local Config ที่ `127.0.0.1:21731` เลือก Local/Tunnel, ตั้ง public origin และบันทึก
+token แบบ write-only เข้า OS credential store ได้ ค่าใหม่มีผลหลัง restart หน้าเว็บแสดง
+Active MCP URL จาก runtime จริงและไม่กล่าวว่า Tunnel หรือ AI client เชื่อมแล้วหากไม่มี
+หลักฐาน ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย `dodo tunnel doctor`
+และดู log ที่ redacted ด้วย `dodo tunnel logs`
 
 บน macOS `dodo setup --yes` เลือก component `cloudflared` อยู่ในชุด `all` แล้ว
 Tunnel route ต้องชี้เฉพาะ MCP/OAuth listener `21730` ห้ามชี้ Local Config `21731`

@@ -11,7 +11,7 @@
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control ที่ 21731; เปิด bounded Remote Config `/config` ผ่าน 21730 ได้ครั้งละไม่เกิน 1 ชั่วโมง |
-| Cloudflare Tunnel | `dodo start`/Local Config ใช้ run-scoped token และ child `cloudflared`; Tunnel จริงยังเป็น manual gate |
+| Cloudflare Tunnel | เลือก persistent `local` หรือ DODO-owned `tunnel`; credential อยู่ใน OS store/reference และ child `cloudflared` หยุดพร้อม DODO |
 | Package | `dodo-mcp` |
 | CLI | `dodo` |
 
@@ -60,7 +60,11 @@ Desktop, browser, media, speech, LSP และ OS sandbox ต้องตรว�
 
 `dodo setup --plan` ใช้ตรวจขั้นตอนติดตั้งแบบ read-only ส่วน installer ต้องมี `--yes` การใช้ `--import-state` รองรับเฉพาะ config ตำแหน่งมาตรฐานและนำเข้า non-authority preferences เท่านั้น custom `DODO_CONFIG_DIR` ไม่ถูกค้นหรือ merge อัตโนมัติ
 
-`dodo setup --components cloudflared` ตรวจ executable ได้ทุก OS การติดตั้งอัตโนมัติในรุ่นนี้รองรับ Homebrew บน macOS ส่วน Linux/Windows ใช้ signed official package ที่เจ้าของติดตั้งเอง เส้นทางหลักรับ run-scoped token จาก hidden terminal prompt หรือ owner-only Local Config และไม่ใช้ credential store; env/file/OS references คงอยู่เฉพาะ advanced compatibility commands
+`dodo setup --components cloudflared` ตรวจ executable ได้ทุก OS การติดตั้งอัตโนมัติ
+รองรับ Homebrew บน macOS ส่วน Linux/Windows ใช้ signed official package ที่เจ้าของติดตั้งเอง
+โหมด Tunnel ต้องมี public origin และ credential reference ที่ผ่านการตรวจแล้ว ค่า
+`--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret
+Service ส่วน env/file references มีไว้สำหรับ owner-controlled headless environment
 
 ## Client behavior
 

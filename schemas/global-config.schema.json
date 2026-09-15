@@ -359,24 +359,19 @@
     },
     "tunnel": {
       "default": {
-        "mode": "external",
-        "startWithDodo": true,
+        "connectionMode": "local",
         "metricsPort": 21732,
         "maxRestarts": 2
       },
       "type": "object",
       "properties": {
-        "mode": {
-          "default": "external",
+        "connectionMode": {
+          "default": "local",
           "type": "string",
           "enum": [
-            "external",
-            "managed"
+            "local",
+            "tunnel"
           ]
-        },
-        "startWithDodo": {
-          "default": true,
-          "type": "boolean"
         },
         "credentialRef": {
           "oneOf": [
@@ -456,8 +451,7 @@
         }
       },
       "required": [
-        "mode",
-        "startWithDodo",
+        "connectionMode",
         "metricsPort",
         "maxRestarts"
       ],

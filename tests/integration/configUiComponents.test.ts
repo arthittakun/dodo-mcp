@@ -220,4 +220,39 @@ describe.skipIf(!fs.existsSync(chromium.executablePath()))('local config UI comp
       await ctx.cleanup();
     }
   }, 45000);
+
+  it('UI-05: connection mode is exclusive, reports the active endpoint, and refuses an unready Tunnel selection', async () => {
+    const ctx = await launch({ trust: 'trusted', configPort: 0, connectionMode: 'local' });
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+    const problems = await collectProblems(page);
+    try {
+      await page.goto(ctx.configUrl!);
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+
+      expect(await page.locator('#conn-active').textContent()).toBe(`http://127.0.0.1:${ctx.port}/mcp`);
+      expect(await page.locator('#conn-local').textContent()).toBe(`http://127.0.0.1:${ctx.port}/mcp`);
+      expect(await page.locator('#tunnel-mode-local').isChecked()).toBe(true);
+      expect(await page.locator('#tunnel-mode-tunnel').isChecked()).toBe(false);
+
+      // The fixture has only an intentionally insecure loopback origin and no
+      // stored credential. Selecting Tunnel must fail without changing the
+      // saved mode or displaying a canned success message.
+      await page.locator('#tunnel-mode-tunnel').check();
+      await page.locator('#tunnel-save').click();
+      await expect.poll(() => page.locator('#tunnel-error').textContent()).toContain('publicUrl must be https://');
+      expect(JSON.parse(fs.readFileSync(path.join(ctx.configDir, 'config.json'), 'utf8')).tunnel.connectionMode).toBe('local');
+
+      // A refresh restores the authoritative persisted selection.
+      await page.locator('#refresh').click();
+      await expect.poll(() => page.locator('#tunnel-mode-local').isChecked()).toBe(true);
+      expect(await page.locator('#tunnel-mode-tunnel').isChecked()).toBe(false);
+      const expectedHttpErrors = problems.filter((problem) => problem.includes('status of 400'));
+      expect(expectedHttpErrors).toHaveLength(1);
+      expect(problems.filter((problem) => !problem.includes('status of 400'))).toEqual([]);
+    } finally {
+      await browser.close();
+      await ctx.cleanup();
+    }
+  }, 45000);
 });

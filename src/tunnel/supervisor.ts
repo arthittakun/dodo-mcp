@@ -14,7 +14,7 @@ import { renameWithRetry } from '../platform/fsRetry.js';
 import { ensurePrivateDirectory } from '../platform/privateFs.js';
 import { signalOwnedProcess } from '../platform/processTree.js';
 import { buildChildEnv } from '../security/env.js';
-import { readTunnelCredential, validateTunnelToken } from './credentials.js';
+import { readTunnelCredential } from './credentials.js';
 import { TunnelLog } from './log.js';
 
 export const TunnelStatusSchema = z.object({
@@ -28,7 +28,7 @@ export const TunnelStatusSchema = z.object({
   maxRestarts: z.number().int().min(0).max(5),
   metricsUrl: z.string().url().max(2048),
   publicOrigin: z.string().url().max(2048),
-  credentialSource: z.enum(['temporary', 'configured']),
+  credentialSource: z.literal('configured'),
   lastExitCode: z.number().int().nullable(),
   lastError: z.string().max(500).nullable(),
 }).strict();
@@ -96,22 +96,18 @@ function assertMetricsPortAvailable(port: number): Promise<void> {
 export async function startManagedTunnel(options: {
   configDir: string;
   config: GlobalConfig;
-  /** Run-scoped token. It is retained only for this supervisor lifetime. */
-  temporaryToken?: string;
   env?: NodeJS.ProcessEnv;
   retryDelayMs?: number;
   onLog?: (line: string) => void;
 }): Promise<RunningTunnelSupervisor> {
   const configDir = path.resolve(options.configDir);
   const config = options.config;
-  if (config.tunnel.mode !== 'managed') throw new DodoError('CONFLICT', 'tunnel mode is external', { recovery: 'run dodo tunnel configure --managed first' });
-  if (!options.temporaryToken && !config.tunnel.credentialRef) throw new DodoError('NOT_FOUND', 'no temporary or configured Cloudflare Tunnel credential is available');
+  if (config.tunnel.connectionMode !== 'tunnel') throw new DodoError('CONFLICT', 'DODO is configured for local connection mode', { recovery: 'run dodo tunnel configure --tunnel first' });
+  if (!config.tunnel.credentialRef) throw new DodoError('NOT_FOUND', 'no saved Cloudflare Tunnel credential is available', { recovery: 'run dodo tunnel configure --tunnel --os-credential --public-url https://your-host' });
   if (!config.publicUrl) throw new DodoError('NOT_FOUND', 'public origin is not configured', { recovery: 'run dodo init --public-url https://your-host first' });
   const publicOrigin = validatePublicUrl(config.publicUrl, config.dangerouslyAllowInsecurePublicUrl).origin;
   const executable = resolveCloudflared(config);
-  const credential = options.temporaryToken
-    ? validateTunnelToken(options.temporaryToken)
-    : await readTunnelCredential(config.tunnel.credentialRef!, options.env ?? process.env);
+  const credential = await readTunnelCredential(config.tunnel.credentialRef, options.env ?? process.env);
   const paths = statePaths(configDir);
   ensurePrivateDirectory(paths.tunnelDir);
   const log = new TunnelLog(paths.tunnelDir, credential);
@@ -120,7 +116,7 @@ export async function startManagedTunnel(options: {
     mode: 'managed', running: true, phase: 'starting', connected: false,
     startedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), restarts: 0,
     maxRestarts: config.tunnel.maxRestarts, metricsUrl, publicOrigin,
-    credentialSource: options.temporaryToken ? 'temporary' : 'configured',
+    credentialSource: 'configured',
     lastExitCode: null, lastError: null,
   };
   let child: ChildProcess | undefined;

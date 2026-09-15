@@ -16,7 +16,7 @@ import { accessMode } from '../security/accessMode.js';
  */
 export interface IpcContext {
   ws: BootstrappedWorkspace;
-  transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null };
+  transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null; connectionMode?: 'local' | 'tunnel' };
   requestStop: () => void;
   remoteConfig?: {
     open(args: Record<string, unknown>): Promise<{ url: string; pairingCode: string; expiresAt: number }>;

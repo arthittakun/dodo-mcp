@@ -14,7 +14,7 @@ export interface CliMenuActions {
   startupProject(): CliMenuProject | undefined;
   selectProject(projectId: string): CliMenuProject;
   addProject(path: string, displayName?: string): CliMenuProject;
-  start(root?: string, tunnel?: boolean): Promise<void>;
+  start(root?: string): Promise<void>;
   openRemoteConfig(): Promise<void>;
   setupAll(): Promise<void>;
   checkSetup(): Promise<void>;
@@ -38,13 +38,12 @@ export function menuText(startup: CliMenuProject | undefined): string {
     'DODO Control Center',
     `โปรเจกต์เริ่มต้น: ${selected}`,
     '',
-    '  1) เปิด MCP + Local Config + Tunnel (ถาม token ชั่วคราว)',
-    '  2) เลือกโปรเจกต์ที่บันทึกไว้ แล้วเปิด MCP + Tunnel',
-    '  3) เพิ่มโปรเจกต์จาก absolute path แล้วเปิด MCP + Tunnel',
-    '  4) เปิด MCP แบบ local เท่านั้น (ไม่เปิด Tunnel)',
-    '  5) เปิด Remote Config ผ่าน Tunnel ชั่วคราว 1 ชั่วโมง',
-    '  6) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared',
-    '  7) ตรวจ dependencies แบบไม่ติดตั้ง',
+    '  1) เปิด MCP ตามโหมด Local/Tunnel ที่บันทึกไว้',
+    '  2) เลือกโปรเจกต์ที่บันทึกไว้ แล้วเปิด MCP',
+    '  3) เพิ่มโปรเจกต์จาก absolute path แล้วเปิด MCP',
+    '  4) เปิด Remote Config ผ่าน DODO Tunnel ชั่วคราว 1 ชั่วโมง',
+    '  5) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared',
+    '  6) ตรวจ dependencies แบบไม่ติดตั้ง',
     '  0) ออก',
     '',
   ].join('\n');
@@ -112,27 +111,21 @@ export async function runCliMenu(actions: CliMenuActions, streams: CliMenuStream
         continue;
       }
       if (choice === '4') {
-        const project = actions.startupProject();
-        rl.close();
-        await actions.start(project?.available ? project.root : undefined, false);
-        return;
-      }
-      if (choice === '5') {
         rl.close();
         await actions.openRemoteConfig();
         return;
       }
-      if (choice === '6') {
+      if (choice === '5') {
         const confirmed = (await rl.question('ติดตั้ง components ที่ขาด รวม cloudflared? พิมพ์ yes เพื่อดำเนินการ: ')).trim().toLowerCase();
         if (confirmed !== 'yes') { write(streams.output, 'ยกเลิกการติดตั้ง\n'); continue; }
         try { await actions.setupAll(); } catch (error) { write(streams.output, `setup ไม่สำเร็จ: ${(error as Error).message}\n`); }
         continue;
       }
-      if (choice === '7') {
+      if (choice === '6') {
         try { await actions.checkSetup(); } catch (error) { write(streams.output, `ตรวจ setup ไม่สำเร็จ: ${(error as Error).message}\n`); }
         continue;
       }
-      write(streams.output, 'กรุณาเลือก 0–7\n');
+      write(streams.output, 'กรุณาเลือก 0–6\n');
     }
   } finally {
     rl.close();

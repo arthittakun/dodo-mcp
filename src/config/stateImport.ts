@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { DodoError } from '../errors.js';
-import { GlobalConfigSchema, type GlobalConfig } from './globalConfig.js';
+import { GlobalConfigSchema, migrateLegacyGlobalConfig, type GlobalConfig } from './globalConfig.js';
 import { assertPrivatePath, ensurePrivateDirectory } from '../platform/privateFs.js';
 import { renameWithRetry } from '../platform/fsRetry.js';
 import { existingConfigDirs } from './paths.js';
@@ -115,7 +115,7 @@ function inspectConfig(file: string): InspectedConfig {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
     throw new DodoError('MIGRATION_REVIEW_REQUIRED', 'existing config must be a JSON object; source was preserved');
   }
-  const parsed = GlobalConfigSchema.safeParse(raw);
+  const parsed = GlobalConfigSchema.safeParse(migrateLegacyGlobalConfig(raw));
   if (!parsed.success) {
     throw new DodoError('MIGRATION_REVIEW_REQUIRED', 'existing config does not match the Dodo config schema; source was preserved', {
       detail: { issueCount: parsed.error.issues.length },

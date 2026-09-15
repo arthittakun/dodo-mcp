@@ -249,7 +249,9 @@
     <div class="card-state" id="conn-loading">กำลังโหลด…</div>
     <div class="card-body" id="conn-body" hidden>
       <div class="kv">
-        <div class="k">Local MCP URL</div>
+        <div class="k">Active MCP URL</div>
+        <div class="v path-row"><code id="conn-active" class="path">…</code><button type="button" class="btn small" id="conn-active-copy" aria-label="คัดลอก Active MCP URL">คัดลอก</button></div>
+        <div class="k">Local upstream</div>
         <div class="v path-row"><code id="conn-local" class="path">…</code><button type="button" class="btn small" id="conn-local-copy" aria-label="คัดลอก Local MCP URL">คัดลอก</button></div>
         <div class="k">Public MCP URL <button type="button" class="help-tip" data-tip="URL ที่ AI ฝั่งเว็บใช้เชื่อมต่อผ่าน tunnel ของคุณ ต้องเป็น HTTPS origin ที่ชี้มาที่พอร์ต MCP เท่านั้น ห้ามชี้มาที่หน้า Local Config" aria-label="คำอธิบาย: public URL">?</button></div>
         <div class="v path-row"><code id="conn-public" class="path">…</code><button type="button" class="btn small" id="conn-public-copy" aria-label="คัดลอก Public MCP URL">คัดลอก</button></div>
@@ -277,32 +279,29 @@
   </section>
 
   <section class="card" id="card-tunnel" aria-labelledby="h-tunnel">
-    <div class="card-head"><h2 id="h-tunnel">Cloudflare Tunnel <button type="button" class="help-tip" data-tip="สถานะนี้มาจาก process ของ DODO เอง token ใช้เฉพาะรอบที่เปิดและไม่ถูกบันทึกลงเครื่อง ช่องกรอกจะถูกล้างหลังส่งเสมอ" aria-label="คำอธิบาย: tunnel status และ token">?</button></h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
-    <form id="tunnel-session-form" class="form" novalidate>
-      <label for="tunnel-session-token">Temporary Tunnel token</label>
-      <input id="tunnel-session-token" name="token" type="password" autocomplete="off" spellcheck="false" maxlength="8192" placeholder="ใช้กับ DODO process นี้เท่านั้น" aria-describedby="tunnel-session-help tunnel-session-error">
-      <p class="help" id="tunnel-session-help">เริ่มทันที ไม่บันทึกลงเครื่อง และ tunnel หยุดพร้อม DODO</p>
-      <p class="error" id="tunnel-session-error" role="alert" hidden></p>
-      <div class="actions">
-        <button type="submit" class="btn primary" id="tunnel-session-start">เปิด Tunnel รอบนี้</button>
-        <button type="button" class="btn danger-outline" id="tunnel-session-stop">หยุด Tunnel รอบนี้</button>
-      </div>
-    </form>
-    <details class="details">
-      <summary>การเริ่มอัตโนมัติและค่าขั้นสูง</summary>
+    <div class="card-head"><h2 id="h-tunnel">การเชื่อมต่อ MCP <button type="button" class="help-tip" data-tip="เลือกได้หนึ่งโหมดต่อ DODO installation: Local หรือ DODO Tunnel เมื่อเลือก Tunnel ระบบจะเริ่มและหยุด cloudflared พร้อม DODO ทุกครั้ง" aria-label="คำอธิบาย: connection mode">?</button></h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
     <form id="tunnel-form" class="form" novalidate>
-      <label class="check"><input id="tunnel-auto" name="startWithDodo" type="checkbox"><span><b>ถาม token และเปิด Tunnel พร้อม DODO</b><small>มีผลเมื่อเริ่มรอบถัดไป กด Enter โดยไม่กรอก token เพื่อเปิดเฉพาะ local MCP ได้</small></span></label>
-      <p class="help" id="tunnel-help">สำหรับรอบที่ไม่ต้องการ Tunnel ใช้ <code>dodo start --no-tunnel</code> Token ไม่ถูกส่งมาหรือแสดงบนหน้าเว็บนี้</p>
-      <div class="two-col">
-        <label>Metrics port<input id="tunnel-metrics" type="number" min="1024" max="65535" inputmode="numeric"></label>
-        <label>จำนวน restart สูงสุด<input id="tunnel-restarts" type="number" min="0" max="5" inputmode="numeric"></label>
-      </div>
+      <fieldset>
+        <legend>โหมดที่ใช้เมื่อเปิด DODO</legend>
+        <label class="check"><input id="tunnel-mode-local" name="connectionMode" type="radio" value="local"><span><b>Local</b><small>AI ในเครื่องใช้ <code>127.0.0.1:21730/mcp</code> และ DODO ไม่เปิด Tunnel</small></span></label>
+        <label class="check"><input id="tunnel-mode-tunnel" name="connectionMode" type="radio" value="tunnel"><span><b>DODO Tunnel</b><small>ใช้ public origin เป็น MCP URL หลัก และเริ่ม cloudflared พร้อม DODO ทุกครั้ง</small></span></label>
+      </fieldset>
+      <label for="tunnel-token">Cloudflare Tunnel token</label>
+      <input id="tunnel-token" name="token" type="password" autocomplete="new-password" spellcheck="false" maxlength="8192" placeholder="เว้นว่างเพื่อใช้ credential ที่บันทึกไว้" aria-describedby="tunnel-credential tunnel-error">
+      <p class="help" id="tunnel-credential">กำลังตรวจ credential store…</p>
+      <p class="help">Token เป็น write-only และเก็บใน Keychain/Credential Manager/Secret Service เท่านั้น หน้าเว็บจะไม่อ่านค่ากลับมา</p>
+      <details class="details">
+        <summary>ค่าขั้นสูง</summary>
+        <div class="two-col">
+          <label>Metrics port<input id="tunnel-metrics" type="number" min="1024" max="65535" inputmode="numeric"></label>
+          <label>จำนวน restart สูงสุด<input id="tunnel-restarts" type="number" min="0" max="5" inputmode="numeric"></label>
+        </div>
+      </details>
       <p class="error" id="tunnel-error" role="alert" hidden></p>
       <div class="actions">
-        <button type="submit" class="btn primary" id="tunnel-save">บันทึกการเริ่ม Tunnel</button>
+        <button type="submit" class="btn primary" id="tunnel-save">บันทึกโหมดการเชื่อมต่อ</button>
       </div>
     </form>
-    </details>
   </section>
 
   <section class="card" id="card-desktop" aria-labelledby="h-desktop">

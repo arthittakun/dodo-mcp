@@ -4,27 +4,31 @@
 
 สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-14) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
 
-สถานะ live Cloudflare connection smoke: `MANUAL_PASS` (2026-09-15) บน macOS arm64,
-Linux x64 และ Windows x64 โดยใช้ run-scoped secret ชั่วคราว; ทั้งสาม platform รายงาน
+สถานะ live Cloudflare connection smoke ของรุ่น 1.0.2: `MANUAL_PASS` (2026-09-15) บน
+macOS arm64, Linux x64 และ Windows x64 โดยใช้ secret fixture แบบชั่วคราว; ทั้งสาม platform รายงาน
 connected, stability 3 วินาที, clean stop และ credentialPersisted=false ใน
 [GitHub run 34908481066](https://github.com/arthittakun/dodo-mcp/actions/runs/34908481066)
 การตรวจ public DNS → MCP/OAuth และ Remote Config ผ่าน hostname จริงยัง
-`MANUAL_NOT_RUN`; connection smoke ไม่ได้อ้างว่า AI client เชื่อมต่อแล้ว
+`MANUAL_NOT_RUN` และ persistent credential flow ของรุ่น 1.0.3 ยังต้องรันใหม่;
+connection smoke เดิมไม่ได้อ้างว่า AI client เชื่อมต่อแล้ว
 
 ## Cloudflare Tunnel
 
 1. สร้าง remotely-managed Tunnel และ public hostname ใน Cloudflare ด้วยบัญชีเจ้าของ
 2. route ทุก path ของ hostname ไป `http://127.0.0.1:21730` และยืนยันว่าไม่มี route ไป `21731`/`21732`
 3. รัน `dodo setup --check --components cloudflared`
-4. รัน `dodo start` แล้วกรอก token ที่ hidden prompt; ตรวจว่า config/Keychain ไม่มี token
-5. หยุดแล้วเริ่มใหม่ กด Enter ที่ prompt และยืนยันว่าเปิดเฉพาะ local MCP
-6. เปิด Local Config กรอก token ใน Temporary Tunnel token แล้วกดเปิด; ตรวจช่องถูกล้างและ response/state ไม่มี token
-7. ตรวจ `dodo tunnel status` ว่า `credentialSource=temporary` และ connected หลัง `/ready` ตอบจริง
-8. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
-9. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs` ไม่มี token
-10. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop จาก Local Config; ยืนยัน child หยุดแต่ local MCP ยังอยู่
-11. เริ่ม tunnel ใหม่แล้วหยุด DODO; ยืนยัน child หยุดตาม
-12. บันทึก macOS และ Linux Docker แยก environment; Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
+4. รัน `dodo tunnel configure --tunnel --public-url https://... --os-credential` และกรอก token ใน hidden prompt
+5. ตรวจ config JSON มีเพียง `connectionMode=tunnel` และ opaque credential ref ไม่มี token
+6. รัน `dodo start`; ตรวจว่ารอ readiness สำเร็จและ Active MCP URL เป็น public HTTPS
+7. หยุดแล้วเริ่มใหม่โดยไม่กรอก token ซ้ำ; ตรวจว่าอ่านจาก OS store และ Tunnel เริ่มตาม
+8. ทำ credential ให้ใช้ไม่ได้ใน fixture แล้วเริ่มใหม่; ต้อง fail closed และไม่เปิด Local fallback
+9. ตรวจ `dodo tunnel status` ว่า `credentialSource=configured` และ connected หลัง `/ready` ตอบจริง
+10. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
+11. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs`/audit/config ไม่มี token
+12. ทดสอบ OAuth + MCP ผ่าน public origin แล้วหยุด DODO; ยืนยัน owned child หยุดตาม
+13. เปิด Local Config เลือก Local แล้ว restart; ตรวจว่าไม่เริ่ม cloudflared และ Active MCP URL เป็น loopback
+14. เลือก Tunnel ผ่าน Local Config พร้อม write-only token แล้ว restart; ตรวจว่าช่องไม่ถูกเติมกลับและ endpoint เป็น public
+15. บันทึก macOS และ Linux Docker แยก environment; Windows manual result แยกตามเครื่องจริง
 
 ## Remote Config ผ่าน Tunnel
 
@@ -33,9 +37,9 @@ loopback public-origin fixture: จับคู่, dashboard/assets/API, worksp
 หมดอายุและปิดเป็น 404 ทำงานจริง การตรวจผ่าน public Cloudflare hostname จริงยัง
 `MANUAL_NOT_RUN`
 
-1. เริ่ม local-only ด้วย `dodo start --no-tunnel`
-2. จาก terminal อื่นรัน `dodo --web` และกรอก run-scoped Tunnel token แบบซ่อน
-3. ตรวจว่า process เดิมไม่ restart, MCP/OAuth ยังใช้ epoch เดิม และ cloudflared เริ่มใน process เดิม
+1. เลือก Tunnel แบบ persistent และรัน DODO จน `dodo tunnel status` รายงาน connected
+2. จาก terminal อื่นรัน `dodo --web`; คำสั่งต้องไม่ถามหรือส่ง Tunnel token ผ่าน IPC
+3. ตรวจว่า process ไม่ restart และ MCP/OAuth/workspace epoch เดิมไม่เปลี่ยน
 4. เปิด URL `/config` จากอีกอุปกรณ์ ตรวจว่า URL ไม่มี query/fragment secret
 5. กรอก pairing code ครั้งเดียว; ใช้ซ้ำต้องถูกปฏิเสธ
 6. ตรวจ browser cookie เป็น Secure/HttpOnly/SameSite=Strict และ Path `/config`
@@ -43,7 +47,8 @@ loopback public-origin fixture: จับคู่, dashboard/assets/API, worksp
 8. รัน `dodo --web` อีกครั้ง ตรวจ session เดิมถูกยกเลิกและได้ code ใหม่
 9. รัน `dodo web --close` ตรวจ `/config`, assets และ API เป็น 404 แต่ `/healthz`, OAuth และ `/mcp` ยังอยู่
 10. เปิดใหม่แล้วรอ 1 ชั่วโมง ตรวจ namespace ปิดเองโดยไม่หยุด MCP/Tunnel
-11. ตรวจ config, audit, tunnel log, browser local/session storage และ process argv ว่าไม่มี Tunnel token, pairing code หรือ session token
+11. เปลี่ยน persistent mode เป็น Local แล้ว restart; `dodo --web` ต้องถูกปฏิเสธและไม่เริ่ม Tunnel เอง
+12. ตรวจ config, audit, tunnel log, browser local/session storage และ process argv ว่าไม่มี Tunnel token, pairing code หรือ session token
 
 ## Setup foundation
 

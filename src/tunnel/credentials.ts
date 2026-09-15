@@ -294,19 +294,11 @@ export function deleteOsTunnelCredential(refInput: TunnelCredentialRef): void {
   if (result.error || result.status !== 0) throw new DodoError('INTERNAL_ERROR', 'OS credential store could not remove the tunnel credential');
 }
 
-export function parseTemporaryTunnelToken(raw: string): string | undefined {
-  return raw.trim() === '' ? undefined : validateTunnelToken(raw);
-}
-
-/**
- * Read a run-scoped token without echoing it. An empty submission explicitly
- * selects local-only startup. The value is returned to the current process and
- * is never written to config or an OS credential provider.
- */
-export function readTemporaryTunnelToken(prompt = 'Cloudflare Tunnel token (temporary; Enter = local only): '): Promise<string | undefined> {
+/** Read a credential without echoing it before writing it to the OS store. */
+function readHiddenToken(prompt: string): Promise<string> {
   if (!process.stdin.isTTY || !process.stdout.isTTY || typeof process.stdin.setRawMode !== 'function') {
-    throw new DodoError('NOT_SUPPORTED', 'an interactive terminal is required for temporary Tunnel token entry', {
-      recovery: 'run from a terminal, or use dodo start --no-tunnel for local-only startup',
+    throw new DodoError('NOT_SUPPORTED', 'an interactive terminal is required for secure Tunnel credential entry', {
+      recovery: 'run from an interactive terminal, or configure a reviewed --token-env / --token-file reference',
     });
   }
   return new Promise((resolve, reject) => {
@@ -325,19 +317,12 @@ export function readTemporaryTunnelToken(prompt = 'Cloudflare Tunnel token (temp
     const onData = (chunk: Buffer | string) => {
       for (const char of String(chunk)) {
         if (char === '\u0003') { if (restore()) reject(new DodoError('CONFLICT', 'credential entry canceled')); return; }
-        if (char === '\r' || char === '\n') { if (restore()) { try { resolve(parseTemporaryTunnelToken(value)); } catch (error) { reject(error); } } return; }
+        if (char === '\r' || char === '\n') { if (restore()) { try { resolve(validateTunnelToken(value)); } catch (error) { reject(error); } } return; }
         if (char === '\u007f' || char === '\b') value = value.slice(0, -1);
         else if (char >= '\u0021' && char <= '\u007e' && Buffer.byteLength(value, 'utf8') < MAX_TOKEN_BYTES) value += char;
       }
     };
     process.stdout.write(prompt);
     stdin.setRawMode(true); stdin.resume(); stdin.on('data', onData);
-  });
-}
-
-function readHiddenToken(prompt: string): Promise<string> {
-  return readTemporaryTunnelToken(prompt).then(token => {
-    if (!token) throw new DodoError('INVALID_INPUT', 'Cloudflare Tunnel token is required for credential storage');
-    return token;
   });
 }

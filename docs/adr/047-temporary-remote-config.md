@@ -25,10 +25,10 @@ and leaves Local Config's workspace/epoch checks, validation, policy and audit a
 authority. Pairing never grants MCP scopes, project access, trust or approvals. No MCP
 tool can open the lease.
 
-When an already-running local-only DODO process receives `dodo --web`, the CLI reads a
-temporary Tunnel token without echo, sends it once over authenticated owner IPC, and
-the owning process starts `cloudflared`. The token is not persisted or placed in argv.
-Closing or expiry affects only Remote Config; MCP, OAuth and Tunnel continue running.
+ADR-048 supersedes the temporary-token handoff: current source opens Remote Config only
+when the saved connection mode is Tunnel and the DODO-owned Tunnel is already running.
+Owner IPC cannot carry a Tunnel credential or switch the connection mode. Closing or
+expiry still affects only Remote Config; MCP, OAuth and Tunnel continue running.
 
 ## Consequences
 

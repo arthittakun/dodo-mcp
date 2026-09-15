@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { createHash } from 'node:crypto';
 import { launch, rawHttp } from '../helpers/testServer.js';
 import { installationIpcCall } from '../../src/ipc/installationClient.js';
 import type { TunnelRuntime } from '../../src/tunnel/runtime.js';
@@ -12,8 +11,11 @@ function sessionCookie(headers: import('node:http').IncomingHttpHeaders): string
 }
 
 describe('temporary Remote Config on the public MCP listener', () => {
+  const runningTunnel = {
+    status: () => ({ available: true as const, running: true, current: null, lastKnown: null }),
+  } as unknown as TunnelRuntime;
   it('is absent by default and exposes no owner API', async () => {
-    const ctx = await launch({ configPort: 0 });
+    const ctx = await launch({ configPort: 0, tunnelRuntime: runningTunnel, connectionMode: 'tunnel' });
     try {
       expect((await rawHttp(ctx, { method: 'GET', path: '/config' })).status).toBe(404);
       expect((await rawHttp(ctx, { method: 'GET', path: '/config/api/state' })).status).toBe(404);
@@ -22,7 +24,7 @@ describe('temporary Remote Config on the public MCP listener', () => {
   });
 
   it('pairs once, scopes the cookie to /config, proxies the original owner checks and expires closed', async () => {
-    const ctx = await launch({ configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 700 });
+    const ctx = await launch({ configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 700, tunnelRuntime: runningTunnel, connectionMode: 'tunnel' });
     const lease = ctx.server.remoteConfig;
     if (!lease) throw new Error('missing initial remote config lease');
     try {
@@ -118,7 +120,7 @@ describe('temporary Remote Config on the public MCP listener', () => {
   });
 
   it('can be opened again through private installation IPC without restarting MCP', async () => {
-    const ctx = await launch({ configPort: 0 });
+    const ctx = await launch({ configPort: 0, tunnelRuntime: runningTunnel, connectionMode: 'tunnel' });
     try {
       const opened = await installationIpcCall(ctx.configDir, 'remoteConfig.open') as { url: string; pairingCode: string; expiresAt: number };
       expect(opened.url).toBe(`${ctx.baseUrl}/config`);
@@ -131,37 +133,17 @@ describe('temporary Remote Config on the public MCP listener', () => {
     } finally { await ctx.cleanup(); }
   });
 
-  it('can attach a run-scoped Tunnel through authenticated IPC without persisting its credential', async () => {
-    const temporaryToken = 'fixture-cloudflare-token-that-is-never-persisted';
-    const expectedDigest = createHash('sha256').update(temporaryToken).digest('hex');
-    let receivedDigest = '';
-    let running = false;
+  it('never accepts a Tunnel credential through Remote Config IPC and refuses a stopped Tunnel', async () => {
+    let startCalls = 0;
     const tunnelRuntime = {
-      status: () => ({ available: true as const, running, current: null, lastKnown: null }),
-      start: async (config: { tunnel: { mode: string } }, token: string) => {
-        receivedDigest = createHash('sha256').update(token).digest('hex');
-        running = true;
-        const now = new Date().toISOString();
-        return {
-          mode: 'managed' as const, running: true, phase: 'connecting' as const, connected: false,
-          startedAt: now, updatedAt: now, restarts: 0, maxRestarts: 2,
-          metricsUrl: 'http://127.0.0.1:21732/ready', publicOrigin: 'http://127.0.0.1:1',
-          credentialSource: 'temporary' as const, lastExitCode: null, lastError: null,
-          fixtureMode: config.tunnel.mode,
-        };
-      },
+      status: () => ({ available: true as const, running: false, current: null, lastKnown: null }),
+      start: async () => { startCalls += 1; throw new Error('must not be reached'); },
     } as unknown as TunnelRuntime;
-    const ctx = await launch({ configPort: 0, tunnelRuntime });
+    const ctx = await launch({ configPort: 0, tunnelRuntime, connectionMode: 'tunnel' });
     try {
-      const before = await installationIpcCall(ctx.configDir, 'remoteConfig.status') as { tunnel: { running: boolean } };
-      expect(before.tunnel.running).toBe(false);
-      const opened = await installationIpcCall(ctx.configDir, 'remoteConfig.open', { tunnelToken: temporaryToken }) as { pairingCode: string };
-      expect(receivedDigest).toBe(expectedDigest);
-      expect(running).toBe(true);
-      const privateEvidence = JSON.stringify(ctx.server.services.store.recentAudit(ctx.server.workspaceId, 50));
-      expect(privateEvidence).not.toContain(temporaryToken);
-      expect(privateEvidence).not.toContain(opened.pairingCode);
-      expect(fsText(ctx.server.services.store.db.prepare("SELECT value FROM meta").all())).not.toContain(temporaryToken);
+      await expect(installationIpcCall(ctx.configDir, 'remoteConfig.open', { tunnelToken: 'never-accepted-through-ipc' })).rejects.toThrow(/unsupported field/);
+      await expect(installationIpcCall(ctx.configDir, 'remoteConfig.open')).rejects.toThrow(/Tunnel is not running/);
+      expect(startCalls).toBe(0);
     } finally { await ctx.cleanup(); }
   });
 
@@ -171,17 +153,11 @@ describe('temporary Remote Config on the public MCP listener', () => {
       status: () => ({ available: true as const, running: false, current: null, lastKnown: null }),
       start: async () => { startCalls += 1; throw new Error('must not be reached'); },
     } as unknown as TunnelRuntime;
-    const ctx = await launch({ tunnelRuntime });
+    const ctx = await launch({ tunnelRuntime, connectionMode: 'tunnel' });
     try {
-      await expect(installationIpcCall(ctx.configDir, 'remoteConfig.open', {
-        tunnelToken: 'fixture-cloudflare-token-that-is-never-persisted',
-      })).rejects.toThrow(/requires the loopback Local Config server/);
+      await expect(installationIpcCall(ctx.configDir, 'remoteConfig.open')).rejects.toThrow(/requires the loopback Local Config server/);
       expect(startCalls).toBe(0);
       expect(ctx.server.remoteConfigStatus()).toMatchObject({ active: false, paired: false });
     } finally { await ctx.cleanup(); }
   });
 });
-
-function fsText(value: unknown): string {
-  return JSON.stringify(value);
-}

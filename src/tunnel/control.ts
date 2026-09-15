@@ -12,7 +12,7 @@ import { readTunnelLog } from './log.js';
 import { resolveCloudflared, TunnelStatusSchema, tunnelIpcPath, type TunnelStatus } from './supervisor.js';
 
 export interface TunnelStatusReport {
-  configuredMode: 'external' | 'managed';
+  configuredMode: 'local' | 'tunnel';
   supervisor: TunnelStatus | null;
   lastKnown: TunnelStatus | null;
 }
@@ -32,10 +32,10 @@ export async function tunnelStatus(configDir: string, config: GlobalConfig): Pro
     const parsed = TunnelStatusSchema.safeParse(await ipcCall(tunnelIpcPath(configDir), 'status'));
     if (!parsed.success) throw new DodoError('INTERNAL_ERROR', 'authenticated tunnel supervisor returned an invalid status');
     const supervisor = parsed.data;
-    return { configuredMode: config.tunnel.mode, supervisor, lastKnown: supervisor };
+    return { configuredMode: config.tunnel.connectionMode, supervisor, lastKnown: supervisor };
   } catch (error) {
     if (!(error instanceof IpcError)) throw error;
-    return { configuredMode: config.tunnel.mode, supervisor: null, lastKnown: readLastKnown(configDir) };
+    return { configuredMode: config.tunnel.connectionMode, supervisor: null, lastKnown: readLastKnown(configDir) };
   }
 }
 
@@ -73,9 +73,7 @@ export async function tunnelDoctor(configDir: string, config: GlobalConfig): Pro
   const status = await tunnelStatus(configDir, config);
   let executable: 'available' | 'missing' = 'missing';
   try { resolveCloudflared(config); executable = 'available'; } catch { /* reported as missing */ }
-  let credential: 'temporary' | 'configured' | 'missing' | 'invalid' = status.supervisor?.credentialSource === 'temporary'
-    ? 'temporary'
-    : config.tunnel.credentialRef ? 'invalid' : 'missing';
+  let credential: 'configured' | 'missing' | 'invalid' = config.tunnel.credentialRef ? 'invalid' : 'missing';
   if (config.tunnel.credentialRef) {
     try { await readTunnelCredential(config.tunnel.credentialRef); credential = 'configured'; } catch { credential = 'invalid'; }
   }
@@ -86,7 +84,7 @@ export async function tunnelDoctor(configDir: string, config: GlobalConfig): Pro
     catch { /* invalid owner config is reported as unavailable, never contacted */ }
   }
   return {
-    mode: config.tunnel.mode,
+    mode: config.tunnel.connectionMode,
     cloudflared: executable,
     credential,
     credentialStore: osCredentialAvailability(),

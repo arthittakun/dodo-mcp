@@ -136,15 +136,12 @@ function addAndSelectProject(projectPath: string, displayName?: string): Registe
 interface HttpLaunchOptions {
   root?: string;
   port?: number;
-  publicUrl?: string;
   allowUnsafeRoot?: boolean;
   quiet?: boolean;
   allow?: boolean;
   all?: boolean;
   bypass?: boolean;
   tools?: string;
-  /** Commander sets this false for --no-tunnel. */
-  tunnel?: boolean;
   /** Open a one-hour Remote Config lease on the public MCP listener. */
   web?: boolean;
 }
@@ -163,20 +160,18 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
   const configDir = resolveConfigDir(process.env).dir;
   const configFile = statePaths(configDir).configFile;
   const config = loadGlobalConfig(configFile);
-  const publicUrl = opts.publicUrl ?? config.publicUrl;
-  if (opts.web && !publicUrl) fail('dodo --web requires a public HTTPS origin; run dodo init --public-url https://your-host first');
-  let temporaryTunnelToken: string | undefined;
-  const interactiveTerminal = process.stdin.isTTY === true && process.stdout.isTTY === true;
-  if (opts.web && opts.tunnel !== false && !interactiveTerminal) {
-    fail('dodo --web needs an interactive terminal for temporary Tunnel token entry; use dodo start --web --no-tunnel only with an already-running external tunnel');
+  const connectionMode = config.tunnel.connectionMode;
+  const publicUrl = config.publicUrl;
+  const selectedPort = opts.port ?? config.port;
+  if (connectionMode === 'tunnel') {
+    if (!publicUrl) fail('Tunnel mode requires a public HTTPS origin; run dodo tunnel configure --tunnel --os-credential --public-url https://your-host');
+    validatePublicUrl(publicUrl, false);
+    if (!config.tunnel.credentialRef) fail('Tunnel mode requires a saved credential; run dodo tunnel configure --tunnel --os-credential --public-url https://your-host');
+  } else {
+    if (opts.web) fail('Remote Config requires Tunnel mode; configure Tunnel, restart DODO, then run dodo --web');
+    if (selectedPort === 0) fail('local connection mode requires a concrete MCP port');
   }
-  if (opts.tunnel !== false && (config.tunnel.startWithDodo || opts.web) && publicUrl && interactiveTerminal) {
-    const { readTemporaryTunnelToken } = await import('../tunnel/credentials.js');
-    temporaryTunnelToken = await readTemporaryTunnelToken();
-    if (opts.web && !temporaryTunnelToken) {
-      fail('Remote Config was not opened because no temporary Tunnel token was entered');
-    }
-  }
+  const endpointOrigin = connectionMode === 'tunnel' ? publicUrl! : `http://127.0.0.1:${selectedPort}`;
   const startOpts: Parameters<typeof startServer>[0] = {
     configPort: config.configPort,
     ...(opts.bypass ? { runMode: 'bypass' as const } : opts.allow ? { runMode: 'allow-all' as const } : {}),
@@ -185,10 +180,10 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
     allowUnsafeRoot: opts.allowUnsafeRoot ?? false,
     quiet: opts.quiet ?? false,
     onLog: (line) => console.log(formatTerminalLine(line)),
-    ...(opts.web ? { remoteConfig: true } : {}),
+    connectionMode,
+    publicUrlOverride: endpointOrigin,
   };
   if (opts.port !== undefined && !Number.isNaN(opts.port)) startOpts.portOverride = opts.port;
-  if (opts.publicUrl !== undefined) startOpts.publicUrlOverride = opts.publicUrl;
   if (opts.tools !== undefined) startOpts.toolSurface = opts.tools as 'compact' | 'full' | 'hybrid';
   const tunnelRuntime = new TunnelRuntime(configDir, line => console.log(`[dodo:tunnel] ${line}`));
   let shutdownPromise: Promise<void> | undefined;
@@ -201,26 +196,23 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
     },
   });
 
-  if (temporaryTunnelToken) {
+  if (connectionMode === 'tunnel') {
     try {
-      const transientConfig = GlobalConfigSchema.parse({
+      const selectedConfig = GlobalConfigSchema.parse({
         ...config,
         ...(publicUrl ? { publicUrl } : {}),
-        tunnel: { ...config.tunnel, mode: 'managed' },
+        tunnel: { ...config.tunnel, connectionMode: 'tunnel' },
       });
-      const status = await tunnelRuntime.start(transientConfig, temporaryTunnelToken);
-      console.log(`[dodo] Cloudflare Tunnel attached for this run: ${status.publicOrigin}/mcp`);
+      const status = await tunnelRuntime.start(selectedConfig);
+      console.log(`[dodo] DODO Tunnel started: ${status.publicOrigin}/mcp`);
+      if (opts.web) printRemoteConfig(await ipcForInstallation('remoteConfig.open') as RemoteConfigCliResult);
     } catch (error) {
       suppressOnStopped = true;
       await server.close();
       throw error;
-    } finally {
-      temporaryTunnelToken = undefined;
     }
-  } else if (!opts.quiet && opts.tunnel !== false && config.tunnel.startWithDodo) {
-    if (!publicUrl) console.log('[dodo] Tunnel skipped: configure the public HTTPS origin, then restart DODO.');
-    else if (!interactiveTerminal) console.log('[dodo] Tunnel skipped: temporary token entry requires an interactive terminal.');
-    else console.log('[dodo] Tunnel skipped for this run; local MCP remains available.');
+  } else if (!opts.quiet) {
+    console.log(`[dodo] Local connection selected: ${endpointOrigin}/mcp`);
   }
 
   async function stop(signal: string): Promise<void> {
@@ -370,9 +362,12 @@ project.command('remove <projectId>')
 const tunnel = program.command('tunnel').description('manage or inspect a Cloudflare remotely-managed Tunnel without managing DNS or the Cloudflare account');
 
 tunnel.command('configure')
-  .description('save local tunnel mode and a credential reference; tokens are never written to config')
-  .option('--managed', 'DODO supervises cloudflared in the foreground', false)
-  .option('--external', 'an owner/system service manages the tunnel', false)
+  .description('select persistent local or DODO-owned Tunnel mode; tokens are never written to config')
+  .option('--tunnel', 'select the DODO-owned Tunnel for every dodo start', false)
+  .option('--local', 'select local-only MCP for every dodo start', false)
+  .option('--managed', 'deprecated alias for --tunnel', false)
+  .option('--external', 'deprecated alias for --local', false)
+  .option('--public-url <url>', 'public HTTPS origin used by the selected DODO Tunnel')
   .option('--os-credential', 'prompt through the reviewed OS credential provider', false)
   .option('--token-env <name>', 'reference an uppercase environment variable that already contains the token')
   .option('--token-file <absolute-path>', 'reference an owner-private absolute token file')
@@ -382,15 +377,24 @@ tunnel.command('configure')
   .option('--remove-credential', 'delete an OS-stored credential and clear the reference (requires --yes)', false)
   .option('--yes', 'confirm credential deletion; does not start cloudflared', false)
   .option('--json', 'machine-readable non-secret result', false)
-  .action(async (opts: { managed: boolean; external: boolean; osCredential: boolean; tokenEnv?: string; tokenFile?: string; cloudflared?: string; metricsPort?: number; maxRestarts?: number; removeCredential: boolean; yes: boolean; json: boolean }) => {
+  .action(async (opts: { tunnel: boolean; local: boolean; managed: boolean; external: boolean; publicUrl?: string; osCredential: boolean; tokenEnv?: string; tokenFile?: string; cloudflared?: string; metricsPort?: number; maxRestarts?: number; removeCredential: boolean; yes: boolean; json: boolean }) => {
     try {
-      if (opts.managed && opts.external) fail('choose --managed or --external');
+      const chooseTunnel = opts.tunnel || opts.managed;
+      const chooseLocal = opts.local || opts.external;
+      if (chooseTunnel && chooseLocal) fail('choose --tunnel or --local');
       const methods = [opts.osCredential, opts.tokenEnv !== undefined, opts.tokenFile !== undefined].filter(Boolean).length;
       if (methods > 1) fail('choose only one of --os-credential, --token-env or --token-file');
       if (opts.removeCredential && methods > 0) fail('--remove-credential cannot be combined with a credential source');
       if (opts.removeCredential && !opts.yes) fail('credential deletion requires --yes');
       const { dir } = resolveConfigDir(process.env); ensureConfigDir(dir);
       const paths = statePaths(dir), current = loadGlobalConfig(paths.configFile);
+      const connectionMode = chooseTunnel ? 'tunnel' : chooseLocal ? 'local' : methods > 0 ? 'tunnel' : current.tunnel.connectionMode;
+      const publicUrl = opts.publicUrl !== undefined
+        ? validatePublicUrl(opts.publicUrl, false).origin
+        : current.publicUrl;
+      if (connectionMode === 'tunnel' && !publicUrl) fail('Tunnel mode requires --public-url https://your-host (or a previously saved public origin)');
+      if (connectionMode === 'tunnel' && publicUrl) validatePublicUrl(publicUrl, false);
+      if (connectionMode === 'local' && opts.publicUrl !== undefined) fail('--public-url is used only with --tunnel');
       const credentials = await import('../tunnel/credentials.js');
       const { resolveCloudflared } = await import('../tunnel/supervisor.js');
       const previousCredentialRef = current.tunnel.credentialRef;
@@ -398,14 +402,14 @@ tunnel.command('configure')
       if (opts.removeCredential) credentialRef = undefined;
       const baseTunnelInput: Record<string, unknown> = {
         ...current.tunnel,
-        mode: opts.managed ? 'managed' : opts.external ? 'external' : current.tunnel.mode,
+        connectionMode,
         ...(credentialRef ? { credentialRef } : {}),
         ...(opts.metricsPort !== undefined ? { metricsPort: opts.metricsPort } : {}),
         ...(opts.maxRestarts !== undefined ? { maxRestarts: opts.maxRestarts } : {}),
         ...(opts.cloudflared !== undefined ? { executable: opts.cloudflared } : {}),
       };
       if (!credentialRef) delete baseTunnelInput['credentialRef'];
-      let next = GlobalConfigSchema.parse({ ...current, tunnel: baseTunnelInput });
+      let next = GlobalConfigSchema.parse({ ...current, ...(publicUrl ? { publicUrl } : {}), tunnel: baseTunnelInput });
       if (opts.cloudflared !== undefined) {
         const canonical = resolveCloudflared(next);
         next = GlobalConfigSchema.parse({ ...next, tunnel: { ...next.tunnel, executable: canonical } });
@@ -419,16 +423,16 @@ tunnel.command('configure')
       const withCredential: Record<string, unknown> = { ...next.tunnel, ...(credentialRef ? { credentialRef } : {}) };
       if (!credentialRef) delete withCredential['credentialRef'];
       next = GlobalConfigSchema.parse({ ...next, tunnel: withCredential });
-      if (next.tunnel.mode === 'managed' && !next.tunnel.credentialRef) fail('managed mode requires --os-credential, --token-env or --token-file');
+      if (next.tunnel.connectionMode === 'tunnel' && !next.tunnel.credentialRef) fail('Tunnel mode requires --os-credential, --token-env or --token-file');
       saveGlobalConfig(paths.configFile, next);
       if (opts.removeCredential && previousCredentialRef) credentials.deleteOsTunnelCredential(previousCredentialRef);
-      const result = { mode: next.tunnel.mode, credential: next.tunnel.credentialRef ? 'configured' : 'not-configured', metricsPort: next.tunnel.metricsPort, maxRestarts: next.tunnel.maxRestarts, cloudflared: next.tunnel.executable ? 'owner-selected' : 'trusted-PATH', started: false };
+      const result = { connectionMode: next.tunnel.connectionMode, publicOrigin: next.tunnel.connectionMode === 'tunnel' ? next.publicUrl : null, credential: next.tunnel.credentialRef ? 'configured' : 'not-configured', metricsPort: next.tunnel.metricsPort, maxRestarts: next.tunnel.maxRestarts, cloudflared: next.tunnel.executable ? 'owner-selected' : 'trusted-PATH', started: false };
       if (opts.json) console.log(JSON.stringify(result, null, 2));
       else {
-        console.log(`Tunnel mode: ${result.mode}`);
+        console.log(`Connection mode: ${result.connectionMode}`);
         console.log(`Credential: ${result.credential} (value is not stored in config or displayed)`);
         console.log(`Readiness: 127.0.0.1:${result.metricsPort}   Restarts: ${result.maxRestarts}`);
-        console.log(result.mode === 'managed' ? 'Configuration saved. Start explicitly with: dodo tunnel start --yes' : 'External mode saved. DODO will observe health but will not start cloudflared.');
+        console.log(result.connectionMode === 'tunnel' ? 'Saved. Every dodo start now owns this Tunnel and fails closed if it cannot start.' : 'Saved. Every dodo start now uses only the local MCP endpoint.');
       }
     } catch (error) {
       if (error instanceof DodoError) fail(`${error.code}: ${error.message}${error.recovery ? `\n  → ${error.recovery}` : ''}`);
@@ -527,7 +531,7 @@ program.command('cli')
         startupProject,
         selectProject: selectStartupProject,
         addProject: addAndSelectProject,
-        start: async (root, tunnel = true) => launchHttp({ ...(root === undefined ? {} : { root }), tunnel }),
+        start: async (root) => launchHttp({ ...(root === undefined ? {} : { root }) }),
         openRemoteConfig: openRemoteConfigFromCli,
         setupAll: () => setupFromMenu(false),
         checkSetup: () => setupFromMenu(true),
@@ -550,18 +554,7 @@ function printRemoteConfig(result: RemoteConfigCliResult): void {
 
 async function openRemoteConfigFromCli(): Promise<void> {
   try {
-    const status = await ipcForInstallation('remoteConfig.status') as { tunnel?: { available?: boolean; running?: boolean } };
-    let tunnelToken: string | undefined;
-    if (status.tunnel?.available === true && status.tunnel.running !== true) {
-      const { readTemporaryTunnelToken } = await import('../tunnel/credentials.js');
-      tunnelToken = await readTemporaryTunnelToken('Cloudflare Tunnel token (temporary; required for Remote Config): ');
-      if (!tunnelToken) fail('Remote Config needs a temporary Tunnel token; use dodo start --no-tunnel for local-only MCP');
-    }
-    try {
-      printRemoteConfig(await ipcForInstallation('remoteConfig.open', tunnelToken ? { tunnelToken } : {}) as RemoteConfigCliResult);
-    } finally {
-      tunnelToken = undefined;
-    }
+    printRemoteConfig(await ipcForInstallation('remoteConfig.open') as RemoteConfigCliResult);
   } catch (error) {
     if (!(error instanceof IpcError) || !error.message.includes('no running DODO installation')) throw error;
     await launchHttp({ web: true });
@@ -596,16 +589,14 @@ program
   .description('start the MCP server for the saved project, or wait for a project selection (foreground)')
   .option('--root <path>', 'select and remember an explicit workspace root (local CLI only)')
   .option('--port <n>', 'listen port (default from config, initially 21730)', (v) => Number.parseInt(v, 10))
-  .option('--public-url <url>', 'public origin override for this run (local CLI only)')
   .option('--allow-unsafe-root', 'permit filesystem root / home / other unusually broad workspace roots', false)
   .option('--allow', 'allow task execution for this run (requires --all)', false)
   .option('--all', 'all local action classes (requires --allow)', false)
   .option('--bypass', 'trusted actions and no default job sandbox for this run; OAuth and file guards remain', false)
   .option('--tools <surface>', 'tool exposure for this run: compact (HTTP default), full, or hybrid (49 tools: gateways + common direct tools); permissions are unchanged')
-  .option('--no-tunnel', 'start local MCP only; do not ask for a temporary Cloudflare Tunnel token')
   .option('--web', 'open Remote Config through the public tunnel for at most one hour', false)
   .option('--quiet', 'suppress the startup banner', false)
-  .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string; tunnel: boolean; web: boolean }) => {
+  .action(async (opts: { root?: string; port?: number; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string; web: boolean }) => {
     try {
       await launchHttp(opts);
     } catch (err) {
@@ -727,8 +718,8 @@ program
       console.log('');
       console.log('Next steps:');
       console.log(`  1. Point your own tunnel at 127.0.0.1:${next.port} for host ${url.hostname} (see docs/TUNNEL.md — route ALL paths, not just /mcp)`);
-      console.log('  2. Register your client callback: dodo auth add-client --redirect-uri <exact callback URL from your client UI>');
-      console.log('  3. cd into a project, set trust: dodo trust --mode edit');
+      console.log(`  2. Select it persistently: dodo tunnel configure --tunnel --public-url ${url.origin} --os-credential`);
+      console.log('  3. Register your client callback: dodo auth add-client --redirect-uri <exact callback URL from your client UI>');
       console.log('  4. dodo start');
     } catch (err) {
       if (err instanceof DodoError) fail(err.message);
@@ -1387,10 +1378,12 @@ Desktop (platform helper and explicit app permission required):
   dodo desktop disable               revoke desktop access
 Remote setup:
   dodo init --public-url https://...   configure public origin once
-  dodo start                           prompt for a temporary Tunnel token
+  dodo tunnel configure --tunnel --os-credential --public-url https://...
+                                       select the persistent DODO Tunnel
+  dodo tunnel configure --local        select local-only MCP
+  dodo start                            use exactly the saved connection mode
   dodo --web                           start/renew Remote Config through that tunnel for 1 hour
-  dodo web --close                     close Remote Config; keep MCP/Tunnel running
-  dodo start --no-tunnel               run local MCP only`,
+  dodo web --close                     close Remote Config; keep MCP/Tunnel running`,
 );
 
 function effectiveArgv(): string[] {

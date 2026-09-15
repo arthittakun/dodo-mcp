@@ -10,7 +10,7 @@ import type net from 'node:net';
 
 import { DodoError } from '../errors.js';
 import { ensureConfigDir, ipcSocketPath, resolveConfigDir, statePaths } from '../config/paths.js';
-import { GlobalConfigSchema, loadGlobalConfig, validatePublicUrl } from '../config/globalConfig.js';
+import { validatePublicUrl } from '../config/globalConfig.js';
 import { loadOrCreateJwks, loadOrCreateCookieKeys } from '../auth/keys.js';
 import { buildProvider } from '../auth/provider.js';
 import { buildTokenVerifier } from '../auth/verifier.js';
@@ -29,6 +29,7 @@ import { createWorkspaceHost, type WorkspaceHost, type WorkspaceResources, type 
 import { startLocalConfig, type LocalConfigServer } from './localConfig.js';
 import { DODO_VERSION } from './version.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
+import { osCredentialAvailability, osTunnelCredentialRef, storeOsTunnelCredentialValue } from '../tunnel/credentials.js';
 import { RemoteConfigGateway, type RemoteConfigLease, type RemoteConfigStatus } from './remoteConfig.js';
 
 export { DODO_VERSION };
@@ -41,6 +42,8 @@ export interface StartOptions {
   deferWorkspace?: boolean;
   portOverride?: number;
   publicUrlOverride?: string;
+  /** One active endpoint family for this process. CLI always supplies this. */
+  connectionMode?: 'local' | 'tunnel';
   allowUnsafeRoot?: boolean;
   quiet?: boolean;
   configPort?: number;
@@ -52,7 +55,7 @@ export interface StartOptions {
   onLog?: (line: string) => void;
   /** CLI process exit notification, after graceful shutdown has completed. */
   onStopped?: () => void;
-  /** Process-owned temporary Cloudflare Tunnel lifecycle for Local Config. */
+  /** Process-owned persistent Cloudflare Tunnel lifecycle. */
   tunnelRuntime?: TunnelRuntime;
   /** Open the owner-only Remote Config bridge for at most one hour. */
   remoteConfig?: boolean;
@@ -69,6 +72,7 @@ export interface RunningServer {
   port: number;
   locked: boolean;
   publicUrl: string | null;
+  connectionMode: 'local' | 'tunnel';
   ipcPath: string;
   configDir: string;
   services: AppServices;
@@ -157,16 +161,30 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const hostRef: { host: WorkspaceHost | undefined } = { host: undefined };
   const active = (): BootstrappedWorkspace => (hostRef.host ? hostRef.host.current() : ws0);
 
-  // ---- public URL / auth mode -------------------------------------------
-  const publicUrlRaw = opts.publicUrlOverride ?? config.publicUrl;
+  // ---- selected endpoint / auth mode ------------------------------------
+  const port = opts.portOverride ?? config.port;
+  const connectionMode: 'local' | 'tunnel' = opts.connectionMode ?? config.tunnel.connectionMode;
+  const publicUrlRaw = connectionMode === 'local'
+    // A dynamic port is useful for internal fixtures but cannot be a stable
+    // OAuth issuer before listen completes, so that low-level mode stays locked.
+    // The product CLI rejects port 0 for Local mode before reaching this layer.
+    ? port === 0 ? undefined : `http://127.0.0.1:${port}`
+    : opts.publicUrlOverride ?? config.publicUrl;
   let locked = true;
   let issuer: string | null = null;
   let resourceUrl: string | null = null;
   if (publicUrlRaw !== undefined) {
-    const url = validatePublicUrl(publicUrlRaw, config.dangerouslyAllowInsecurePublicUrl);
+    const url = validatePublicUrl(publicUrlRaw, config.dangerouslyAllowInsecurePublicUrl || connectionMode === 'local');
     issuer = url.origin;
     resourceUrl = `${issuer}/mcp`;
     locked = false;
+  }
+  if (opts.remoteConfig && connectionMode !== 'tunnel') {
+    await ws0.shutdownServices();
+    installDb.close();
+    throw new DodoError('CONFLICT', 'Remote Config is available only while DODO connection mode is tunnel', {
+      recovery: 'run dodo tunnel configure --tunnel --os-credential --public-url https://your-host, restart DODO, then run dodo --web',
+    });
   }
   if (opts.remoteConfig && !issuer) {
     await ws0.shutdownServices();
@@ -193,7 +211,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // This router is inert (404) until the local owner explicitly opens a
   // bounded lease. It is mounted before OAuth's provider callback so the
   // temporary /config namespace can be reached through the same tunnel.
-  const remoteConfigGateway = issuer
+  const remoteConfigGateway = issuer && connectionMode === 'tunnel'
     ? new RemoteConfigGateway(issuer, opts.remoteConfigLeaseMs)
     : undefined;
   remoteConfigGateway?.mount(app);
@@ -350,7 +368,6 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   });
 
   // ---- listen ------------------------------------------------------------
-  const port = opts.portOverride ?? config.port;
   const httpServer = http.createServer(app);
   httpServer.requestTimeout = 120_000;
   httpServer.headersTimeout = 30_000;
@@ -382,29 +399,19 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   }
 
   // ---- private IPC (per workspace) ---------------------------------------
-  const transportInfo = () => ({ kind: 'http' as const, port: actualPort, locked, publicUrl: issuer });
+  const transportInfo = () => ({ kind: 'http' as const, port: actualPort, locked, publicUrl: issuer, connectionMode });
   let remoteConfigReady = false;
   const remoteConfigControl = remoteConfigGateway ? {
     open: async (args: Record<string, unknown>) => {
       if (!remoteConfigReady) throw new DodoError('NOT_SUPPORTED', 'Remote Config requires the loopback Local Config server');
       const keys = Object.keys(args);
-      if (keys.some(key => key !== 'tunnelToken')) {
+      if (keys.length > 0) {
         throw new DodoError('INVALID_INPUT', 'Remote Config open request contains an unsupported field');
       }
-      const token = args['tunnelToken'];
-      if (token !== undefined && typeof token !== 'string') {
-        throw new DodoError('INVALID_INPUT', 'temporary Tunnel token must be a string');
-      }
-      if (typeof token === 'string' && token.length > 0) {
-        if (!opts.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'this DODO process cannot own a Cloudflare Tunnel');
-        if (!opts.tunnelRuntime.status().running) {
-          const latest = loadGlobalConfig(paths.configFile);
-          if (!issuer || latest.publicUrl !== issuer) {
-            throw new DodoError('CONFLICT', 'restart DODO after configuring the public HTTPS origin before opening Remote Config');
-          }
-          const transient = GlobalConfigSchema.parse({ ...latest, tunnel: { ...latest.tunnel, mode: 'managed' } });
-          await opts.tunnelRuntime.start(transient, token);
-        }
+      if (!opts.tunnelRuntime?.status().running) {
+        throw new DodoError('CONFLICT', 'the configured DODO Tunnel is not running', {
+          recovery: 'restart DODO in tunnel mode and inspect dodo tunnel doctor if startup fails',
+        });
       }
       return remoteConfigGateway.open();
     },
@@ -483,6 +490,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         runMode: runMode ?? null,
         workspaceSelected: () => workspaceSelected,
         ...(opts.tunnelRuntime ? { tunnelRuntime: opts.tunnelRuntime } : {}),
+        tunnelCredentialStore: {
+          ...osCredentialAvailability(),
+          store: async (token: string) => {
+            const ref = osTunnelCredentialRef(configDir);
+            await storeOsTunnelCredentialValue(ref, token);
+            return ref;
+          },
+        },
         log,
       });
       installation.ai.settings.ports.push(Number(new URL(localConfig.url).port));
@@ -534,11 +549,11 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     `DODO ${DODO_VERSION}  |  foreground`,
     workspaceSelected ? `Workspace: ${rootInfo.root}` : 'Workspace: (ยังไม่ได้เลือก — เพิ่มหรือเลือกใน Local Config / dodo --cli)',
     workspaceSelected ? `Workspace ID: ${workspaceId}  |  epoch: ${epoch}` : 'Workspace ID: (ยังไม่สร้าง context สำหรับ AI)',
-    `MCP: http://127.0.0.1:${actualPort}/mcp`,
-    locked ? `Public: (not configured — server is LOCKED; run: dodo init --public-url https://your-host)` : `Public: ${issuer}/mcp`,
+    `MCP: ${issuer}/mcp (${connectionMode})`,
+    connectionMode === 'tunnel' ? `Local upstream: http://127.0.0.1:${actualPort}/mcp` : 'Tunnel: disabled by owner selection',
     !workspaceSelected ? 'Auth: OAuth installation login available; project access remains denied until owner ACL assignment' : locked ? 'Auth: LOCKED / setup required — all tool access refused' : `Auth: OAuth enabled  |  Policy: ${services.trustMode()}`,
     workspaceSelected ? `Exec: ${services.trustMode() === 'trusted' ? 'allowed by trusted mode (OS-user privileges!)' : 'local approval required'}  |  OS sandbox: ${config.commandSandbox === 'off' ? 'NOT enabled' : `${config.commandSandbox} (adapter: ${services.jobs ? 'configured' : 'n/a'})`}` : 'Exec: disabled until a workspace is selected',
-    'Tunnel: external / managed by you',
+    connectionMode === 'tunnel' ? 'Tunnel: DODO-owned; starts and stops with this process' : 'Connection: local only',
     `State: ${configDir}${configDirEnvVar ? ` (from ${configDirEnvVar})` : configDirSource === 'env' ? ' (from explicit environment override)' : ''}`,
   ];
   if (localConfig) log(`[dodo] Private config (expires in 8h): ${localConfig.url}`);
@@ -563,6 +578,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     port: actualPort,
     locked,
     publicUrl: issuer,
+    connectionMode,
     get ipcPath() {
       return ipcSocketPath(configDir, theHost.current().workspaceId);
     },
