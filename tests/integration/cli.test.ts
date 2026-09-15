@@ -54,6 +54,25 @@ describe('CLI', () => {
     expect(doc.stdout).toContain('config-dir');
   });
 
+  it('CLI: exposes the bounded Remote Config entry points', () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'web-help-cfg-'));
+    const proj = fs.mkdtempSync(path.join(base, 'web-help-proj-'));
+    const start = runCli(['start', '--help'], { cwd: proj, configDir: cfg });
+    expect(start.code).toBe(0);
+    expect(start.stdout).toContain('--web');
+    expect(start.stdout).toMatch(/at most\s+one hour/i);
+    const web = runCli(['web', '--help'], { cwd: proj, configDir: cfg });
+    expect(web.code).toBe(0);
+    expect(web.stdout).toContain('--close');
+    expect(web.stdout).toContain('--status');
+
+    const init = runCli(['init', '--public-url', 'https://dodo.example.test'], { cwd: proj, configDir: cfg });
+    expect(init.code).toBe(0);
+    const nonInteractive = runCli(['start', '--web'], { cwd: proj, configDir: cfg, expectFail: true });
+    expect(nonInteractive.code).not.toBe(0);
+    expect(nonInteractive.stderr).toMatch(/interactive terminal/i);
+  });
+
   it('CLI: init writes a global config and does not touch the repo', () => {
     const cfg = fs.mkdtempSync(path.join(base, 'cfg-'));
     const proj = fs.mkdtempSync(path.join(base, 'proj-'));

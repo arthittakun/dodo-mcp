@@ -1,5 +1,23 @@
 # DODO MCP — Release Notes
 
+## 1.0.2
+
+### Temporary Remote Config
+
+- เพิ่ม `dodo --web`, `dodo web --status` และ `dodo web --close` สำหรับเปิดหน้า Config
+  ผ่าน public Tunnel ที่พอร์ต 21730 ครั้งละไม่เกิน 1 ชั่วโมง โดยพอร์ต 21731 ยังคง bind
+  loopback เท่านั้น
+- ใช้ pairing code แบบครั้งเดียวและ Secure/HttpOnly/SameSite cookie ที่จำกัด path
+  `/config`; route ปิดเป็น 404 ก่อนเปิด หลังปิด และเมื่อหมดอายุ
+- process ที่เริ่ม local-only สามารถรับ run-scoped Tunnel token ผ่าน authenticated
+  installation IPC โดยไม่ restart MCP และไม่บันทึก credential
+- เพิ่มเมนู Remote Config ใน `dodo --cli`, security/integration/Chromium tests และ
+  ADR-047 โดยไม่เปลี่ยน OAuth, project authority, workspace context หรือ owner policy
+
+ติดตั้งหรืออัปเดตด้วย `npm install -g dodo-mcp@1.0.2` จากนั้น restart process ที่กำลัง
+รันอยู่ การเปิด Remote Config ผ่าน public hostname จริงยังต้องตรวจด้วย tunnel/DNS ของ
+เจ้าของและไม่ถือว่าผ่านจาก automated fixture เพียงอย่างเดียว
+
 ## 1.0.1
 
 ### Platform และ release hardening

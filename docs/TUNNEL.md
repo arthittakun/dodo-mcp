@@ -9,7 +9,10 @@ DODO เปิด MCP และ OAuth บน local loopback ผู้ใช้�
 - Local Config: `http://127.0.0.1:21731`
 - managed readiness/metrics: `http://127.0.0.1:21732` โดยค่าเริ่มต้น
 
-Tunnel ต้อง route health, discovery, OAuth และ MCP ทุก path ไปยัง listener `21730` เดียวกัน ห้าม route Local Config `21731`, metrics `21732`, private IPC หรือ debug endpoint ออก public
+Tunnel ต้อง route public hostname ทุก path ไปยัง listener `21730` เดียวกันเพื่อให้
+health, discovery, OAuth และ MCP ทำงานครบ ห้าม route Local Config `21731`, metrics
+`21732`, private IPC หรือ debug endpoint ออก public Namespace `/config` บน `21730`
+ตอบ 404 ตามค่าเริ่มต้นและเปิดได้ชั่วคราวเฉพาะเมื่อเจ้าของสั่งตามหัวข้อถัดไป
 
 ## Public origin
 
@@ -41,6 +44,37 @@ dodo start --no-tunnel
 หน้า Local Config มีช่อง **Temporary Tunnel token** สำหรับเริ่ม tunnel ใน process ที่
 เปิดอยู่ได้ทันที และมีปุ่มหยุดเฉพาะ child ที่ process นี้เป็นเจ้าของ ช่องถูกล้างหลังส่ง
 Backend ตอบ `tokenStored:false` และไม่เขียนค่าลง config หรือ credential store
+
+## เปิด Remote Config ผ่าน Tunnel ชั่วคราว
+
+```bash
+dodo --web
+# Remote Config: https://mcp.example.com/config
+# Pairing code (shown once): XXXX-XXXX-XXXX-XXXX
+
+dodo web --status
+dodo web --close
+```
+
+`dodo --web` ทำงานได้สองกรณี: ถ้ายังไม่มี DODO process จะเริ่ม MCP ที่พอร์ต 21730,
+Local Config ที่ 21731 และ Tunnel แล้วเปิด Remote Config; ถ้า process กำลังรันอยู่จะ
+ใช้ authenticated private IPC เพื่อเปิดหรือต่ออายุ lease โดยไม่ restart MCP หาก
+process เดิมเริ่มแบบ local-only คำสั่งจะถาม run-scoped Tunnel token แบบซ่อนและส่งให้
+process ที่รันอยู่ครั้งเดียว Token ไม่ถูกบันทึกและไม่อยู่ใน argv หรือ audit
+
+URL ไม่มี query/fragment secret ผู้ใช้ต้องกรอก pairing code ที่ terminal แสดง Code
+มีอายุไม่เกิน 10 นาทีและใช้ได้ครั้งเดียว จากนั้น server ออก session cookie ที่เป็น
+`Secure`, `HttpOnly`, `SameSite=Strict` และ `Path=/config` ตัว lease ปิดอัตโนมัติ
+ภายใน 1 ชั่วโมง เมื่อหมดอายุ `/config`, assets และ owner API ใต้ namespace นี้กลับ
+เป็น 404 การรัน `dodo --web` อีกครั้งยกเลิก code/session เดิมและออกชุดใหม่
+
+Remote Config เป็น authenticated bridge ไปยัง Local Config เดิม การเขียนทุกครั้งยัง
+ตรวจ workspace ID/epoch, owner validation และ policy ของ Local Config ไม่มี MCP tool
+สำหรับเปิด lease และ `dodo web --close` ปิดเฉพาะหน้าเว็บ โดยไม่หยุด MCP หรือ Tunnel
+
+ถ้ามี external tunnel ที่เจ้าของรันอยู่แล้วและไม่ต้องการให้ DODO เริ่ม cloudflared ใช้
+`dodo start --web --no-tunnel` จาก interactive terminal การเลือกนี้บอกเพียงว่า route
+ภายนอกมีอยู่แล้ว; DODO ไม่กล่าวอ้างหรือสร้าง route/DNS ให้เอง
 
 คำสั่งตรวจสถานะที่ไม่มี secret:
 
@@ -79,8 +113,13 @@ runtime ใช้ bounded restart หลัง `cloudflared` จบ retry ขอ
 
 ## หลายโปรเจกต์
 
-หนึ่ง DODO process มี active workspace เดียว ถ้าต้องการทำงานพร้อมกันหลายโปรเจกต์ ให้เปิดหลาย DODO processes ด้วย port, public origin และ config directory ที่แยกกัน แต่ละ managed tunnel ต้องใช้ metrics port ที่ไม่ซ้ำ ระบบจะไม่ให้ process หนึ่ง takeover root ที่อีก process กำลัง serve
+หนึ่ง DODO process มี default workspace หนึ่งตัว แต่ Installation Runtime Manager เปิด
+explicit target runtimes หลายโปรเจกต์พร้อมกันได้ภายใต้ project registry และ target
+authority เดียวกัน จึงไม่ต้องสร้าง Tunnel แยกต่อโปรเจกต์ งานแต่ละ target ใช้
+workspace identity/epoch, jobs และ mutation queue ของตัวเอง
 
 ## Security
 
-ห้ามปิด OAuth, ใช้ Tunnel token แทน MCP OAuth, ส่ง token ใน URL หรือเปิด CORS กว้าง Tunnel provider ไม่ได้แทน owner consent ของ DODO และ DODO ไม่เรียก Cloudflare API, ไม่จัดการ DNS, ไม่สร้าง/ลบ Tunnel และไม่เปิด firewall
+ห้ามปิด OAuth, ใช้ Tunnel token แทน MCP OAuth, ส่ง token/pairing/session ใน URL หรือ
+เปิด CORS กว้าง Tunnel provider ไม่ได้แทน owner consent ของ DODO และ DODO ไม่เรียก
+Cloudflare API, ไม่จัดการ DNS, ไม่สร้าง/ลบ Tunnel และไม่เปิด firewall

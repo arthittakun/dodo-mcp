@@ -1,11 +1,11 @@
 # DODO MCP
 
-**DODO MCP 1.0.1** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.2** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
-- Local Config แบบ loopback ที่ `127.0.0.1:21731`
+- Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
 - STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 125 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 121 tools
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
@@ -36,7 +36,8 @@ dodo --cli
 ```
 
 `dodo --cli` เปิดเมนู local owner สำหรับเลือก/เพิ่มโปรเจกต์ เปิด MCP + Local Config +
-Tunnel และรัน setup รวม `cloudflared` โดยไม่ต้อง `cd` เข้าโปรเจกต์
+Tunnel, เปิด Remote Config ชั่วคราว 1 ชั่วโมง และรัน setup รวม `cloudflared` โดยไม่ต้อง
+`cd` เข้าโปรเจกต์
 ก่อน หากเรียก `dodo` หรือ `dodo start` จากโฟลเดอร์ใดก็ตาม ระบบจะเปิดโปรเจกต์ที่
 เจ้าของเลือกล่าสุด หากยังไม่มีโปรเจกต์ใน registry จะเปิด control plane, OAuth และ
 authenticated tool catalog ได้โดยไม่ใช้ CWD เป็น workspace เมื่อเจ้าของเพิ่มโปรเจกต์
@@ -264,6 +265,21 @@ argv, config, Keychain, Credential Manager, Secret Service, tunnel log, MCP resp
 หรือ environment ของ MCP jobs กด Enter หรือใช้ `dodo start --no-tunnel` เพื่อเปิด
 เฉพาะ local MCP
 
+หากต้องตั้งค่าจากอุปกรณ์อื่น ให้เปิดหน้าเจ้าของแบบชั่วคราวผ่าน public listener เดียวกัน:
+
+```bash
+dodo --web          # เริ่ม DODO/Tunnel หรือเปิด lease ใหม่ให้ process ที่รันอยู่
+dodo web --status   # ดูสถานะแบบไม่มี secret
+dodo web --close    # ปิดหน้า Remote Config แต่ MCP/Tunnel ยังทำงาน
+```
+
+คำสั่งจะแสดง `https://mcp.example.com/config` กับ pairing code แบบใช้ครั้งเดียวใน
+terminal หลังจับคู่ browser จะใช้ cookie ที่เป็น `Secure`, `HttpOnly`,
+`SameSite=Strict` และจำกัด path ที่ `/config` หน้า Remote Config ปิดอัตโนมัติภายใน
+1 ชั่วโมง การเปิดใหม่ออก code/session ใหม่และไม่ต้อง restart MCP ไม่มี token หรือ
+credential อยู่ใน URL หาก process เดิมเริ่มแบบ local-only `dodo --web` จะถาม Tunnel
+token แบบซ่อนและเปิด `cloudflared` ของ process นั้นก่อน
+
 หน้า Local Config ที่ `127.0.0.1:21731` มีช่อง **Temporary Tunnel token** สำหรับเริ่ม
 และหยุด tunnel ของ DODO process ปัจจุบันได้จริง ช่องจะถูกล้างหลังส่งและ backend ไม่
 persist ค่า ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย
@@ -326,7 +342,8 @@ dodo_read(operation="read_files", args={...})
 
 - **Local MCP:** `http://127.0.0.1:21730/mcp` สำหรับ process ในเครื่อง
 - **Public MCP:** origin HTTPS ของ tunnel ที่เจ้าของสร้างและกำหนด route เอง; DODO อาจ supervise เฉพาะ `cloudflared` process ที่เจ้าของสั่ง
-- **Local Config:** loopback เท่านั้น ใช้ owner capability token และ Host/Origin checks
+- **Local Config:** `127.0.0.1:21731` เท่านั้น ใช้ owner capability token และ Host/Origin checks
+- **Remote Config:** ปิดเป็น 404 โดยค่าเริ่มต้น; เจ้าของเปิด `/config` บน public origin ได้ครั้งละไม่เกิน 1 ชั่วโมงด้วย `dodo --web`
 
 DODO รายงาน `connected` เฉพาะเมื่อ managed `cloudflared` ตอบ readiness จริง และ `doctor` แยก local/public health ออกจากกัน สถานะนี้ไม่ใช่หลักฐานว่า ChatGPT หรือ AI client เชื่อมต่อแล้ว
 
@@ -354,7 +371,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 ## ความปลอดภัย
 
 - public MCP ใช้ OAuth เสมอ ไม่มี NoAuth fallback
-- Local Config bind loopback และมี capability token, expiration, Host/Origin checks และ rate limit
+- Local Config bind loopback และมี capability token, expiration, Host/Origin checks และ rate limit; Remote Config ต้องจับคู่ด้วย code ใช้ครั้งเดียวและหมดอายุภายใน 1 ชั่วโมง
 - client secret/access token ไม่แสดงใน UI หรือ audit
 - path traversal, symlink/hardlink, secret paths และ stale hashes ถูกปฏิเสธ
 - command environment ใช้ allowlist และไม่ส่ง local auth state ให้ child process

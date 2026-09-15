@@ -73,7 +73,7 @@ describe('PACK: npm tarball', () => {
 
   it('PACK-07: ships the Local Config UI assets next to the compiled server', () => {
     for (const asset of [
-      'dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js',
+      'dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js', 'dist/server/remoteConfig.js',
       'dist/server/configUi/workbench.js', 'dist/server/configUi/workbench.css',
       'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
       'dist/server/configUi/vendor/sweetalert2.min.js', 'dist/server/configUi/vendor/sweetalert2.min.css',

@@ -18,7 +18,10 @@ Whisper/interactive desktop remain explicitly separate gates.
 
 ## Overview
 
-DODO แบ่งเป็น data plane สำหรับ MCP tools และ owner control plane สำหรับ Local Config/CLI ทั้งสอง plane ใช้ state และ workspace lifecycle เดียวกัน แต่ public MCP ไม่มี admin endpoint
+DODO แบ่งเป็น data plane สำหรับ MCP tools และ owner control plane สำหรับ Local
+Config/CLI ทั้งสอง plane ใช้ state และ workspace lifecycle เดียวกัน Public listener
+ไม่มี owner route ที่ active ตามค่าเริ่มต้น; ADR-047 เพิ่ม bounded `/config` bridge ที่
+เจ้าของเปิดชั่วคราวและปิดเป็น 404 เมื่อ lease หมด
 
 ```text
 AI client
@@ -41,6 +44,10 @@ Owner browser/CLI
    │ loopback + capability token / IPC
    ▼
 Local Config 127.0.0.1:21731 ──► WorkspaceHost ──► active workspace lifecycle
+
+Tunnel ──► 127.0.0.1:21730/config ──► one-time pairing/session gate
+                                      └──────────► Local Config 127.0.0.1:21731
+                                                    (lease ไม่เกิน 1 ชั่วโมง)
 
 Local owner CLI ──► authenticated tunnel IPC ──► bounded cloudflared supervisor
 
@@ -305,7 +312,15 @@ token ได้จาก hidden terminal prompt ระหว่าง `dodo star
 Config endpoint Token ไม่เข้า trusted config หรือ OS credential provider Runtime ส่งค่า
 ผ่าน `TUNNEL_TOKEN` ให้ child โดยตรง เก็บเพียงสถานะที่ไม่มี secret และปิด child ก่อน
 DODO process จบ การเปลี่ยน workspace ไม่ย้ายหรือเพิ่มสิทธิ์ใด ๆ และ Local Config port
-ยังไม่ถูก mount บน MCP/public listener
+21731 ยังคงไม่รับ traffic จาก Tunnel
+
+Remote Config ไม่เปลี่ยน bind ของ Local Config และไม่ copy admin handlers มาที่ public
+app `RemoteConfigGateway` ถือ pairing/session digest กับ expiry ใน memory, proxy เฉพาะ
+`/config`, `/config/assets/*`, `/config/api/*` และส่ง request ไป loopback owner server
+ด้วย internal capability เดิม CLI เปิด/ต่ออายุผ่าน authenticated installation IPC;
+หาก process เริ่มแบบ local-only IPC callback เริ่ม `TunnelRuntime` ด้วย run-scoped token
+ก่อนออก lease การหมดอายุล้าง code/session และทำให้ namespace กลับเป็น 404 โดยไม่หยุด
+MCP/OAuth/Tunnel
 
 ## Optional services
 

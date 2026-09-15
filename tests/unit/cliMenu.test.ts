@@ -17,6 +17,7 @@ function actions(events: string[]): CliMenuActions {
     selectProject: (id) => { events.push(`select:${id}`); return project; },
     addProject: (root, name) => { events.push(`add:${root}:${name ?? ''}`); return { ...project, root, displayName: name ?? project.displayName }; },
     start: async (root, tunnel = true) => { events.push(`start:${root ?? 'none'}:${tunnel ? 'tunnel' : 'local'}`); },
+    openRemoteConfig: async () => { events.push('web'); },
     setupAll: async () => { events.push('setup'); },
     checkSetup: async () => { events.push('check'); },
   };
@@ -69,5 +70,11 @@ describe('interactive CLI menu', () => {
     const local: string[] = [];
     await run('4\n', local);
     expect(local).toEqual(['start:/tmp/web-app:local']);
+  });
+
+  it('can open the temporary Remote Config flow from the owner menu', async () => {
+    const events: string[] = [];
+    await run('5\n', events);
+    expect(events).toEqual(['web']);
   });
 });

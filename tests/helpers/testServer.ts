@@ -9,6 +9,7 @@ import { statePaths } from '../../src/config/paths.js';
 import { addStaticClient } from '../../src/auth/clients.js';
 import { ALL_SCOPES } from '../../src/security/policy.js';
 import type { TrustMode } from '../../src/store/store.js';
+import type { TunnelRuntime } from '../../src/tunnel/runtime.js';
 
 /**
  * Test harness: boots a REAL DODO server (real HTTP, real OAuth provider,
@@ -41,6 +42,9 @@ export interface LaunchOptions {
   toolSurface?: 'compact' | 'full' | 'hybrid'; // explicit surface override for this run
   drainTimeoutMs?: number; // workspace-switch drain wait (tests use a short one)
   deferWorkspace?: boolean; // installation control plane with no selected project
+  remoteConfig?: boolean; // expose the one-hour owner page on the public listener
+  remoteConfigLeaseMs?: number; // short expiry for security fixtures
+  tunnelRuntime?: TunnelRuntime; // process-owned tunnel fixture
 }
 
 const PORT_CLAIM_DIR = path.join(os.tmpdir(), 'dodo-test-port-claims');
@@ -184,6 +188,9 @@ export async function launch(opts: LaunchOptions = {}): Promise<TestContext> {
       ...(opts.configPort !== undefined ? { configPort: opts.configPort } : {}),
       ...(opts.toolSurface !== undefined ? { toolSurface: opts.toolSurface } : {}),
       ...(opts.drainTimeoutMs !== undefined ? { drainTimeoutMs: opts.drainTimeoutMs } : {}),
+      ...(opts.remoteConfig ? { remoteConfig: true } : {}),
+      ...(opts.remoteConfigLeaseMs !== undefined ? { remoteConfigLeaseMs: opts.remoteConfigLeaseMs } : {}),
+      ...(opts.tunnelRuntime ? { tunnelRuntime: opts.tunnelRuntime } : {}),
     });
   } finally {
     if (prevEnv === undefined) delete process.env[ENV_KEY];
@@ -447,7 +454,7 @@ export function wsArgs(ctx: TestContext): { workspaceId: string; workspaceEpoch:
 export async function rawHttp(
   ctx: TestContext,
   opts: { method?: string; path?: string; host?: string; headers?: Record<string, string>; body?: string },
-): Promise<{ status: number; body: string }> {
+): Promise<{ status: number; body: string; headers: import('node:http').IncomingHttpHeaders }> {
   const http = await import('node:http');
   return new Promise((resolve, reject) => {
     const req = http.request(
@@ -466,7 +473,7 @@ export async function rawHttp(
       (res) => {
         let data = '';
         res.on('data', (c) => (data += c));
-        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data }));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: data, headers: res.headers }));
       },
     );
     req.on('error', reject);

@@ -10,7 +10,7 @@ import type net from 'node:net';
 
 import { DodoError } from '../errors.js';
 import { ensureConfigDir, ipcSocketPath, resolveConfigDir, statePaths } from '../config/paths.js';
-import { validatePublicUrl } from '../config/globalConfig.js';
+import { GlobalConfigSchema, loadGlobalConfig, validatePublicUrl } from '../config/globalConfig.js';
 import { loadOrCreateJwks, loadOrCreateCookieKeys } from '../auth/keys.js';
 import { buildProvider } from '../auth/provider.js';
 import { buildTokenVerifier } from '../auth/verifier.js';
@@ -29,6 +29,7 @@ import { createWorkspaceHost, type WorkspaceHost, type WorkspaceResources, type 
 import { startLocalConfig, type LocalConfigServer } from './localConfig.js';
 import { DODO_VERSION } from './version.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
+import { RemoteConfigGateway, type RemoteConfigLease, type RemoteConfigStatus } from './remoteConfig.js';
 
 export { DODO_VERSION };
 
@@ -53,6 +54,10 @@ export interface StartOptions {
   onStopped?: () => void;
   /** Process-owned temporary Cloudflare Tunnel lifecycle for Local Config. */
   tunnelRuntime?: TunnelRuntime;
+  /** Open the owner-only Remote Config bridge for at most one hour. */
+  remoteConfig?: boolean;
+  /** Test-only shorter lease; production callers omit this and receive one hour. */
+  remoteConfigLeaseMs?: number;
 }
 
 export interface RunningServer {
@@ -69,6 +74,9 @@ export interface RunningServer {
   services: AppServices;
   /** Private Local Config URL (contains the capability in the fragment) or null when not started. */
   configUrl: string | null;
+  /** Initial Remote Config lease; pairing code is returned once and never persisted. */
+  remoteConfig: RemoteConfigLease | null;
+  remoteConfigStatus(): RemoteConfigStatus | null;
   host: WorkspaceHost;
   /** False only for the owner launcher before a real project is selected. */
   readonly workspaceSelected: boolean;
@@ -160,6 +168,13 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     resourceUrl = `${issuer}/mcp`;
     locked = false;
   }
+  if (opts.remoteConfig && !issuer) {
+    await ws0.shutdownServices();
+    installDb.close();
+    throw new DodoError('CONFLICT', 'dodo --web requires a configured public HTTPS origin', {
+      recovery: 'run dodo init --public-url https://your-host, then run dodo --web again',
+    });
+  }
 
   // ---- express app -------------------------------------------------------
   const app = express();
@@ -174,6 +189,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const originAllowlist = ['127.0.0.1', 'localhost', '[::1]', ...config.allowedOrigins];
   if (issuer) originAllowlist.push(new URL(issuer).hostname);
   app.use(originValidation(originAllowlist));
+
+  // This router is inert (404) until the local owner explicitly opens a
+  // bounded lease. It is mounted before OAuth's provider callback so the
+  // temporary /config namespace can be reached through the same tunnel.
+  const remoteConfigGateway = issuer
+    ? new RemoteConfigGateway(issuer, opts.remoteConfigLeaseMs)
+    : undefined;
+  remoteConfigGateway?.mount(app);
 
   app.get('/healthz', (_req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, authConfigured: !locked, workspaceSelected });
@@ -360,8 +383,44 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
 
   // ---- private IPC (per workspace) ---------------------------------------
   const transportInfo = () => ({ kind: 'http' as const, port: actualPort, locked, publicUrl: issuer });
+  let remoteConfigReady = false;
+  const remoteConfigControl = remoteConfigGateway ? {
+    open: async (args: Record<string, unknown>) => {
+      if (!remoteConfigReady) throw new DodoError('NOT_SUPPORTED', 'Remote Config requires the loopback Local Config server');
+      const keys = Object.keys(args);
+      if (keys.some(key => key !== 'tunnelToken')) {
+        throw new DodoError('INVALID_INPUT', 'Remote Config open request contains an unsupported field');
+      }
+      const token = args['tunnelToken'];
+      if (token !== undefined && typeof token !== 'string') {
+        throw new DodoError('INVALID_INPUT', 'temporary Tunnel token must be a string');
+      }
+      if (typeof token === 'string' && token.length > 0) {
+        if (!opts.tunnelRuntime) throw new DodoError('NOT_SUPPORTED', 'this DODO process cannot own a Cloudflare Tunnel');
+        if (!opts.tunnelRuntime.status().running) {
+          const latest = loadGlobalConfig(paths.configFile);
+          if (!issuer || latest.publicUrl !== issuer) {
+            throw new DodoError('CONFLICT', 'restart DODO after configuring the public HTTPS origin before opening Remote Config');
+          }
+          const transient = GlobalConfigSchema.parse({ ...latest, tunnel: { ...latest.tunnel, mode: 'managed' } });
+          await opts.tunnelRuntime.start(transient, token);
+        }
+      }
+      return remoteConfigGateway.open();
+    },
+    close: () => remoteConfigGateway.close(),
+    status: () => ({
+      ...remoteConfigGateway.status(),
+      tunnel: opts.tunnelRuntime?.status() ?? { available: false, running: false, current: null, lastKnown: null },
+    }),
+  } : undefined;
   const resourcesFor = async (ws: BootstrappedWorkspace): Promise<WorkspaceResources> => {
-    return startOwnerControl(ws, createIpcDispatcher({ ws, transport: transportInfo(), requestStop: () => void shutdown() }));
+    return startOwnerControl(ws, createIpcDispatcher({
+      ws,
+      transport: transportInfo(),
+      requestStop: () => void shutdown(),
+      ...(remoteConfigControl ? { remoteConfig: remoteConfigControl } : {}),
+    }));
   };
   // A live process for the target root would be clobbered by our IPC bind
   // (startIpcServer removes an existing socket file): probe it first.
@@ -415,6 +474,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
 
   // ---- owner-only Local Config plane ------------------------------------
   let localConfig: LocalConfigServer | undefined;
+  let initialRemoteConfig: RemoteConfigLease | null = null;
   try {
     if (opts.configPort !== undefined) {
       localConfig = await startLocalConfig(theHost, opts.configPort, {
@@ -426,6 +486,12 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         log,
       });
       installation.ai.settings.ports.push(Number(new URL(localConfig.url).port));
+      remoteConfigGateway?.attachLocal(localConfig.url);
+      remoteConfigReady = Boolean(remoteConfigGateway);
+      if (opts.remoteConfig) initialRemoteConfig = remoteConfigGateway?.open(opts.remoteConfigLeaseMs) ?? null;
+    }
+    if (opts.remoteConfig && !initialRemoteConfig) {
+      throw new DodoError('NOT_SUPPORTED', 'Remote Config requires the loopback Local Config server');
     }
   } catch (err) {
     await closeHttp();
@@ -449,6 +515,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       shutdownPromise = (async () => {
         try {
           await localConfig?.close();
+          remoteConfigGateway?.close();
           await closeHttp();
           await jobsClosed;
           await mcpHandlerClose?.();
@@ -475,6 +542,10 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     `State: ${configDir}${configDirEnvVar ? ` (from ${configDirEnvVar})` : configDirSource === 'env' ? ' (from explicit environment override)' : ''}`,
   ];
   if (localConfig) log(`[dodo] Private config (expires in 8h): ${localConfig.url}`);
+  if (initialRemoteConfig) {
+    log(`[dodo] Remote Config (expires in 1h): ${initialRemoteConfig.url}`);
+    log(`[dodo] Remote Config pairing code (shown once): ${initialRemoteConfig.pairingCode}`);
+  }
   if (runMode) log(`[dodo] ${runMode}: trusted OS-user execution for this run; OAuth, client/path access and file guards remain required.`);
   if (!opts.quiet) banner.forEach((l) => log(l));
 
@@ -500,6 +571,8 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       return theHost.current().services;
     },
     configUrl: localConfig?.url ?? null,
+    remoteConfig: initialRemoteConfig,
+    remoteConfigStatus: () => remoteConfigGateway?.status() ?? null,
     host: theHost,
     get workspaceSelected() {
       return workspaceSelected;

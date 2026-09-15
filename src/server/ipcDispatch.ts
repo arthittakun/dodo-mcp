@@ -18,6 +18,11 @@ export interface IpcContext {
   ws: BootstrappedWorkspace;
   transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null };
   requestStop: () => void;
+  remoteConfig?: {
+    open(args: Record<string, unknown>): Promise<{ url: string; pairingCode: string; expiresAt: number }>;
+    close(): void;
+    status(): unknown;
+  };
 }
 
 export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
@@ -48,6 +53,27 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         }
         setTimeout(() => ctx.requestStop(), 50);
         return { stopping: true };
+      }
+      case 'remoteConfig.open': {
+        if (!ctx.remoteConfig) throw new Error('Remote Config requires a configured public HTTPS origin');
+        const result = await ctx.remoteConfig.open(args);
+        try {
+          store.audit({ principal: 'local-cli-owner', workspaceId, tool: 'local.remote-config.open', result: 'opened-one-hour-lease' });
+        } catch (error) {
+          ctx.remoteConfig.close();
+          throw error;
+        }
+        return result;
+      }
+      case 'remoteConfig.close': {
+        if (!ctx.remoteConfig) throw new Error('Remote Config is unavailable');
+        ctx.remoteConfig.close();
+        store.audit({ principal: 'local-cli-owner', workspaceId, tool: 'local.remote-config.close', result: 'closed' });
+        return { closed: true };
+      }
+      case 'remoteConfig.status': {
+        if (!ctx.remoteConfig) return { active: false, paired: false, url: null, expiresAt: null };
+        return ctx.remoteConfig.status();
       }
       case 'schedule.list': return services.schedules.list();
       case 'schedule.propose': return services.schedules.propose(args);

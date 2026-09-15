@@ -6,6 +6,8 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const TOKEN_KEY = 'dodo-config-token';
+  const REMOTE_CONFIG = location.pathname === '/config' || location.pathname.startsWith('/config/');
+  const API_PREFIX = REMOTE_CONFIG ? '/config' : '';
   const THEME_KEY = 'dodo-theme';
   const MODE_LABEL = { inspect: 'inspect', edit: 'edit', trusted: 'trusted' };
   const MODE_TEXT = {
@@ -16,12 +18,22 @@
 
   // ---- token (fragment → sessionStorage, fragment stripped from the URL) ----
   let token = '';
-  if (location.hash.length > 1) {
+  if (!REMOTE_CONFIG && location.hash.length > 1) {
     token = location.hash.slice(1);
     try { sessionStorage.setItem(TOKEN_KEY, token); } catch (_e) { /* private mode */ }
     history.replaceState(null, '', location.pathname);
   } else {
-    try { token = sessionStorage.getItem(TOKEN_KEY) || ''; } catch (_e) { token = ''; }
+    try { token = REMOTE_CONFIG ? '' : (sessionStorage.getItem(TOKEN_KEY) || ''); } catch (_e) { token = ''; }
+    if (REMOTE_CONFIG && location.hash) history.replaceState(null, '', location.pathname);
+  }
+  if (REMOTE_CONFIG) {
+    document.title = 'DODO Remote Config';
+    const subtitle = document.querySelector('.brand .sub');
+    if (subtitle) subtitle.textContent = 'Remote Config · เปิดชั่วคราวไม่เกิน 1 ชั่วโมง';
+    const configLabel = document.querySelector('#chip-config b');
+    if (configLabel) configLabel.textContent = 'Remote Config';
+    const footerLead = document.querySelector('.foot > span')?.firstChild;
+    if (footerLead) footerLead.nodeValue = 'DODO Remote Config · ผ่าน HTTPS tunnel · หมดอายุใน ';
   }
 
   // ---- theme: dark default, light, system; remembered per browser ----
@@ -99,11 +111,11 @@
     return context ? { 'x-dodo-workspace': context.workspaceId, 'x-dodo-epoch': context.epoch } : {};
   }
   async function api(path, body, context = workspaceContext()) {
-    const headers = { Authorization: `Bearer ${token}`, ...context };
+    const headers = { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...context };
     if (body !== undefined) Object.assign(headers, context, { 'Content-Type': 'application/json' });
     let res;
     try {
-      res = await fetch(`/api/${path}`, { method: body !== undefined ? 'POST' : 'GET', headers, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: 'omit', cache: 'no-store' });
+      res = await fetch(`${API_PREFIX}/api/${path}`, { method: body !== undefined ? 'POST' : 'GET', headers, body: body !== undefined ? JSON.stringify(body) : undefined, credentials: REMOTE_CONFIG ? 'same-origin' : 'omit', cache: 'no-store' });
     } catch (_e) {
       const err = new Error('ติดต่อ DODO ไม่ได้ — server อาจปิดอยู่ หรือกำลัง restart');
       err.status = 0;
@@ -112,7 +124,7 @@
     let data = null;
     try { data = await res.json(); } catch (_e) { data = null; }
     if (!res.ok) {
-      const err = new Error((data && data.error) || `HTTP ${res.status}`);
+      const err = new Error((data && data.error) || (REMOTE_CONFIG && res.status === 404 ? 'Remote Config หมดอายุแล้ว — รัน dodo --web เพื่อเปิดใหม่' : `HTTP ${res.status}`));
       err.status = res.status;
       err.code = data && data.code;
       err.data = data;
@@ -172,7 +184,7 @@
   }
   function fmtRemaining(ms) {
     if (!Number.isFinite(ms) || ms <= 0) return 'หมดอายุแล้ว';
-    const m = Math.floor(ms / 60000);
+    const m = Math.ceil(ms / 60000);
     const h = Math.floor(m / 60);
     return h > 0 ? `${h} ชม. ${m % 60} นาที` : `${m} นาที`;
   }
@@ -947,7 +959,7 @@
   });
   setInterval(() => { if (!document.hidden && !document.querySelector('.btn[aria-busy="true"]')) refresh(false); }, 30000);
 
-  if (!token) {
+  if (!token && !REMOTE_CONFIG) {
     $('card-auth').hidden = false;
     for (const p of ['ws', 'projects', 'perm', 'conn', 'clients']) cardState(p, 'error', 'ต้องเปิดจากลิงก์ส่วนตัวใน terminal');
     setChip('chip-config', 'error', '✕', 'ไม่มี token');

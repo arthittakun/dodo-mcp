@@ -2,7 +2,32 @@
 
 ## Scope
 
-รายงานนี้ใช้กับ DODO MCP 1.0.1 source และแยกผล automated กับ manual อย่างชัดเจน
+รายงานนี้ใช้กับ DODO MCP 1.0.2 source และแยกผล automated กับ manual อย่างชัดเจน
+
+## Release 1.0.2 — Temporary Remote Config
+
+เพิ่ม owner-paired `/config` bridge บน listener 21730 ที่ปิดเป็น 404 ตามค่าเริ่มต้น
+และเปิดได้ครั้งละไม่เกินหนึ่งชั่วโมงด้วย `dodo --web` โดย Local Config 21731 ยังคง
+bind loopback เท่านั้น `dodo --web` ต่ออายุผ่าน authenticated installation IPC โดย
+ไม่ restart MCP และเริ่ม process-owned Tunnel ด้วย token ชั่วคราวเมื่อ process เดิม
+เริ่มแบบ local-only
+
+- typecheck และ targeted lint: **AUTOMATED_PASS**
+- `tests/security/remoteConfig.test.ts`: **AUTOMATED_PASS** — absent-by-default,
+  one-time pairing, strict cookie/CSP, unauthorized asset/API, cross-site denial,
+  workspace/epoch binding, expiry/close, IPC renewal, token/pairing non-persistence
+  และ run-scoped Tunnel handoff
+- `tests/integration/remoteConfigUi.test.ts`: **AUTOMATED_PASS** ใน Chromium จริง —
+  pairing และ dashboard จริงที่ 1440×900/390×844, no console errors, no horizontal
+  overflow, close → 404; screenshots อยู่ใน ignored local release evidence
+- `tests/integration/cli.test.ts`: bounded `--web`, `web --status`, `web --close`
+  contract ผ่าน
+- `npm run test:all`: **AUTOMATED_PASS** — 98 files ผ่าน, 3 files ข้ามตาม platform;
+  677 tests ผ่าน, 34 skipped, 0 failed และ packaging 16/16
+- `npm audit --omit=dev`: **AUTOMATED_PASS** — 0 vulnerabilities
+- npm pack manifest: **AUTOMATED_PASS** — รวม `dist/server/remoteConfig.js`, Local
+  Config UI, ADR-047 และ release note; release evidence/state/credentials ไม่อยู่ใน manifest
+- public Cloudflare hostname → Remote Config บนอุปกรณ์ภายนอก: **MANUAL_NOT_RUN**
 
 ## Release 1.0.1 platform gate — 2026-09-15
 
@@ -322,7 +347,9 @@ candidate บน Node 22/24 โดยไม่รับ untrusted pull requests 
 
 สถานะ manual setup/import บน owner state จริง: `MANUAL_NOT_RUN` การตรวจรับใช้ isolated fixtures และ temporary package เท่านั้น ไม่มีการเปลี่ยน owner config, OAuth state, tunnel, DNS หรือ global installation
 
-สถานะ real Cloudflare Tunnel บน macOS/Windows/Linux: `MANUAL_NOT_RUN`
+สถานะ live Cloudflare connection/clean-stop smoke บน macOS/Windows/Linux:
+`MANUAL_PASS` (2026-09-15, run 34908481066); public DNS → MCP/OAuth/Remote Config
+end-to-end บนอุปกรณ์ภายนอก: `MANUAL_NOT_RUN`
 
 สถานะ multi-project federation ผ่าน external AI และ owner project จริง: `MANUAL_NOT_RUN`
 

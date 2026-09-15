@@ -6,6 +6,8 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id);
+  const REMOTE_CONFIG = location.pathname === '/config' || location.pathname.startsWith('/config/');
+  const API_PREFIX = REMOTE_CONFIG ? '/config' : '';
   const UI = window.DodoUI || {};
   const alerts = () => (UI.alerts && UI.alerts.available() ? UI.alerts : null);
   const panel = $('workbench');
@@ -21,10 +23,11 @@
 
   const headers = (target = false) => {
     const c = target ? selected : state?.controlContext;
-    return { Authorization: `Bearer ${sessionStorage.getItem('dodo-config-token') || ''}`, 'Content-Type':'application/json', ...(c ? { 'x-dodo-workspace':c.workspaceId, 'x-dodo-epoch':c.workspaceEpoch } : {}) };
+    const token = REMOTE_CONFIG ? '' : (sessionStorage.getItem('dodo-config-token') || '');
+    return { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type':'application/json', ...(c ? { 'x-dodo-workspace':c.workspaceId, 'x-dodo-epoch':c.workspaceEpoch } : {}) };
   };
   async function api(path, body, target = false) {
-    const response = await fetch(`/api/${path}`, { method:body === undefined ? 'GET':'POST', headers:headers(target), ...(body !== undefined ? { body:JSON.stringify(body) } : {}), cache:'no-store', credentials:'omit' });
+    const response = await fetch(`${API_PREFIX}/api/${path}`, { method:body === undefined ? 'GET':'POST', headers:headers(target), ...(body !== undefined ? { body:JSON.stringify(body) } : {}), cache:'no-store', credentials:REMOTE_CONFIG?'same-origin':'omit' });
     const result = await response.json(); if (!response.ok || result.ok === false) throw new Error(result.error || `HTTP ${response.status}`); return result.data ?? result;
   }
   function notice(text, error = false) {
@@ -318,7 +321,7 @@
     void (async()=>{
       while(!signal.aborted && failures<5){
         try {
-          const res=await fetch(`/api/ai/runs/${encodeURIComponent(id)}/events?after=${cursor}`,{headers:headers(),signal,cache:'no-store'});
+          const res=await fetch(`${API_PREFIX}/api/ai/runs/${encodeURIComponent(id)}/events?after=${cursor}`,{headers:headers(),signal,cache:'no-store',credentials:REMOTE_CONFIG?'same-origin':'omit'});
           if(!res.ok)throw new Error(`เปิด events ไม่สำเร็จ (${res.status})`);
           const reader=res.body.getReader(),decoder=new TextDecoder();let pending='';
           statusLine.textContent='เชื่อมต่อแล้ว · กำลังรับผลจริง';failures=0;
@@ -390,5 +393,5 @@
 
   let hasToken = false;
   try { hasToken = Boolean(sessionStorage.getItem('dodo-config-token')); } catch { hasToken = false; }
-  if (hasToken) void show('overview');
+  if (hasToken || REMOTE_CONFIG) void show('overview');
 })();

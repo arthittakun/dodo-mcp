@@ -4,7 +4,12 @@
 
 สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-14) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
 
-สถานะ Cloudflare Tunnel จริง: `MANUAL_NOT_RUN` (2026-09-14) automated tests ใช้ fake executable และ loopback readiness fixture เท่านั้น ไม่มี Tunnel token, Cloudflare connection, DNS หรือ firewall ใดถูกใช้
+สถานะ live Cloudflare connection smoke: `MANUAL_PASS` (2026-09-15) บน macOS arm64,
+Linux x64 และ Windows x64 โดยใช้ run-scoped secret ชั่วคราว; ทั้งสาม platform รายงาน
+connected, stability 3 วินาที, clean stop และ credentialPersisted=false ใน
+[GitHub run 34908481066](https://github.com/arthittakun/dodo-mcp/actions/runs/34908481066)
+การตรวจ public DNS → MCP/OAuth และ Remote Config ผ่าน hostname จริงยัง
+`MANUAL_NOT_RUN`; connection smoke ไม่ได้อ้างว่า AI client เชื่อมต่อแล้ว
 
 ## Cloudflare Tunnel
 
@@ -20,6 +25,25 @@
 10. ทดสอบ OAuth + MCP ผ่าน public origin แล้ว stop จาก Local Config; ยืนยัน child หยุดแต่ local MCP ยังอยู่
 11. เริ่ม tunnel ใหม่แล้วหยุด DODO; ยืนยัน child หยุดตาม
 12. บันทึก macOS และ Linux Docker แยก environment; Windows คง `MANUAL_NOT_RUN` จนถึง phase สุดท้าย
+
+## Remote Config ผ่าน Tunnel
+
+Automated Chromium fixture ผ่านแล้วทั้ง 1440×900 และ 390×844 โดยใช้ isolated
+loopback public-origin fixture: จับคู่, dashboard/assets/API, workspace-bound mutation,
+หมดอายุและปิดเป็น 404 ทำงานจริง การตรวจผ่าน public Cloudflare hostname จริงยัง
+`MANUAL_NOT_RUN`
+
+1. เริ่ม local-only ด้วย `dodo start --no-tunnel`
+2. จาก terminal อื่นรัน `dodo --web` และกรอก run-scoped Tunnel token แบบซ่อน
+3. ตรวจว่า process เดิมไม่ restart, MCP/OAuth ยังใช้ epoch เดิม และ cloudflared เริ่มใน process เดิม
+4. เปิด URL `/config` จากอีกอุปกรณ์ ตรวจว่า URL ไม่มี query/fragment secret
+5. กรอก pairing code ครั้งเดียว; ใช้ซ้ำต้องถูกปฏิเสธ
+6. ตรวจ browser cookie เป็น Secure/HttpOnly/SameSite=Strict และ Path `/config`
+7. เปลี่ยนค่าที่ไม่กระทบข้อมูลจริงใน fixture แล้วตรวจ workspace ID/epoch binding
+8. รัน `dodo --web` อีกครั้ง ตรวจ session เดิมถูกยกเลิกและได้ code ใหม่
+9. รัน `dodo web --close` ตรวจ `/config`, assets และ API เป็น 404 แต่ `/healthz`, OAuth และ `/mcp` ยังอยู่
+10. เปิดใหม่แล้วรอ 1 ชั่วโมง ตรวจ namespace ปิดเองโดยไม่หยุด MCP/Tunnel
+11. ตรวจ config, audit, tunnel log, browser local/session storage และ process argv ว่าไม่มี Tunnel token, pairing code หรือ session token
 
 ## Setup foundation
 

@@ -47,7 +47,19 @@ request ที่อ้าง target ไม่มี ACL ถูกปฏิเ�
 
 MCP และ public route ต้องผ่าน OAuth เสมอ ห้ามใช้ localhost เป็น authentication, ห้ามเปิด CORS เป็น `*`, ห้ามส่ง token ใน query string และห้าม trust proxy headers จากภายนอก
 
-Local Config bind loopback ใช้ private capability token, expiration, Host/Origin checks, forwarded-header rejection และ rate limit ไม่มี Local Config/admin endpoint บน public MCP plane
+Local Config bind loopback ใช้ private capability token, expiration, Host/Origin checks,
+forwarded-header rejection และ rate limit Public listener ไม่มี owner route ที่ active
+ตามค่าเริ่มต้น เมื่อเจ้าของสั่ง `dodo --web` จะเปิดเฉพาะ namespace `/config` แบบ
+process-memory lease ไม่เกิน 1 ชั่วโมง และกลับเป็น 404 เมื่อปิดหรือหมดอายุ
+
+Remote Config ใช้ pairing code สุ่มแบบใช้ครั้งเดียว เก็บใน server เฉพาะ SHA-256 digest
+และแลกเป็น session token ที่ server เก็บเฉพาะ digest Cookie เป็น `Secure`, `HttpOnly`,
+`SameSite=Strict`, `Path=/config`; code/session ไม่อยู่ใน URL, config, browser storage,
+log หรือ audit Proxy ส่งต่อไป Local Config ด้วย capability ภายใน และลอก client
+Authorization/Cookie/Origin/Cloudflare/forwarded headers ออกก่อน ทุก mutation จึงยัง
+ต้องผ่าน workspace/epoch binding และ owner API validation เดิม มี rate limit ที่
+pairing endpoint และ CSP/no-store/frame denial บนทุก response ไม่มี MCP operation เปิด
+หรือยืด lease ได้; เฉพาะ authenticated private IPC/CLI ของเจ้าของเท่านั้น
 
 UI assets เสิร์ฟจากแพ็กเกจเองทั้งหมดรวมถึง SweetAlert2 ที่ vendor แบบ pin version (ไม่มี CDN; CSP ยังเป็น `script-src 'self'; style-src 'self'` โดยไม่มี `unsafe-inline`/`unsafe-eval`) เส้นทาง `/assets` เป็น fail-closed: path ที่ decode แล้วต้องตรงรูปแบบเข้มงวด (ลึกได้หนึ่งระดับเฉพาะ `ui/`, `vendor/`), นามสกุลอยู่ใน allowlist (`.css/.js/.svg`), ปฏิเสธ `..`, backslash, NUL และไฟล์ที่ resolve ออกนอก UI directory ทั้งหมดตอบ 404 ข้อความจาก server/paths/client/provider ทุกตัว render ผ่าน `textContent` (SweetAlert ใช้ `titleText`/`text` เท่านั้น ไม่ใช้ `html`) กล่องยืนยันของ UI เป็นชั้น UX เพิ่มเติม ไม่แทนที่ approval/validation ฝั่ง server
 
@@ -220,7 +232,11 @@ Response/config/audit เก็บเฉพาะสถานะที่ไม�
 ควบคุม tunnel หน้าเว็บเริ่ม network process เฉพาะเมื่อ owner กด “เปิด Tunnel รอบนี้”
 และการตั้ง startup preference ไม่เริ่ม network process
 
-Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose readiness บอกสถานะ Cloudflare connection เท่านั้น ไม่ใช่หลักฐานว่า AI client กำลังเชื่อมต่อ
+Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น
+Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose `/config` ที่
+listener 21730 เป็น bounded bridge ที่ปิดเป็น 404 โดยค่าเริ่มต้นและไม่ทำให้พอร์ต 21731
+รับ network ภายนอก readiness บอกสถานะ Cloudflare connection เท่านั้น ไม่ใช่หลักฐานว่า
+AI client กำลังเชื่อมต่อ
 
 ## Setup and existing-state import
 

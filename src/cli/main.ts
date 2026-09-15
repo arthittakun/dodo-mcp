@@ -145,6 +145,8 @@ interface HttpLaunchOptions {
   tools?: string;
   /** Commander sets this false for --no-tunnel. */
   tunnel?: boolean;
+  /** Open a one-hour Remote Config lease on the public MCP listener. */
+  web?: boolean;
 }
 
 async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
@@ -162,11 +164,18 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
   const configFile = statePaths(configDir).configFile;
   const config = loadGlobalConfig(configFile);
   const publicUrl = opts.publicUrl ?? config.publicUrl;
+  if (opts.web && !publicUrl) fail('dodo --web requires a public HTTPS origin; run dodo init --public-url https://your-host first');
   let temporaryTunnelToken: string | undefined;
   const interactiveTerminal = process.stdin.isTTY === true && process.stdout.isTTY === true;
-  if (opts.tunnel !== false && config.tunnel.startWithDodo && publicUrl && interactiveTerminal) {
+  if (opts.web && opts.tunnel !== false && !interactiveTerminal) {
+    fail('dodo --web needs an interactive terminal for temporary Tunnel token entry; use dodo start --web --no-tunnel only with an already-running external tunnel');
+  }
+  if (opts.tunnel !== false && (config.tunnel.startWithDodo || opts.web) && publicUrl && interactiveTerminal) {
     const { readTemporaryTunnelToken } = await import('../tunnel/credentials.js');
     temporaryTunnelToken = await readTemporaryTunnelToken();
+    if (opts.web && !temporaryTunnelToken) {
+      fail('Remote Config was not opened because no temporary Tunnel token was entered');
+    }
   }
   const startOpts: Parameters<typeof startServer>[0] = {
     configPort: config.configPort,
@@ -176,6 +185,7 @@ async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
     allowUnsafeRoot: opts.allowUnsafeRoot ?? false,
     quiet: opts.quiet ?? false,
     onLog: (line) => console.log(formatTerminalLine(line)),
+    ...(opts.web ? { remoteConfig: true } : {}),
   };
   if (opts.port !== undefined && !Number.isNaN(opts.port)) startOpts.portOverride = opts.port;
   if (opts.publicUrl !== undefined) startOpts.publicUrlOverride = opts.publicUrl;
@@ -518,6 +528,7 @@ program.command('cli')
         selectProject: selectStartupProject,
         addProject: addAndSelectProject,
         start: async (root, tunnel = true) => launchHttp({ ...(root === undefined ? {} : { root }), tunnel }),
+        openRemoteConfig: openRemoteConfigFromCli,
         setupAll: () => setupFromMenu(false),
         checkSetup: () => setupFromMenu(true),
       }, { input: process.stdin, output: process.stdout });
@@ -528,6 +539,58 @@ program.command('cli')
   });
 
 // ---------------------------------------------------------------- start ----
+type RemoteConfigCliResult = { url: string; pairingCode: string; expiresAt: number };
+
+function printRemoteConfig(result: RemoteConfigCliResult): void {
+  console.log(`Remote Config: ${result.url}`);
+  console.log(`Pairing code (shown once): ${result.pairingCode}`);
+  console.log(`Expires: ${new Date(result.expiresAt).toISOString()} (ไม่เกิน 1 ชั่วโมง)`);
+  console.log('เปิด URL แล้วกรอก code นี้ ระบบจะแลกเป็น Secure/HttpOnly cookie; ไม่มี secret อยู่ใน URL');
+}
+
+async function openRemoteConfigFromCli(): Promise<void> {
+  try {
+    const status = await ipcForInstallation('remoteConfig.status') as { tunnel?: { available?: boolean; running?: boolean } };
+    let tunnelToken: string | undefined;
+    if (status.tunnel?.available === true && status.tunnel.running !== true) {
+      const { readTemporaryTunnelToken } = await import('../tunnel/credentials.js');
+      tunnelToken = await readTemporaryTunnelToken('Cloudflare Tunnel token (temporary; required for Remote Config): ');
+      if (!tunnelToken) fail('Remote Config needs a temporary Tunnel token; use dodo start --no-tunnel for local-only MCP');
+    }
+    try {
+      printRemoteConfig(await ipcForInstallation('remoteConfig.open', tunnelToken ? { tunnelToken } : {}) as RemoteConfigCliResult);
+    } finally {
+      tunnelToken = undefined;
+    }
+  } catch (error) {
+    if (!(error instanceof IpcError) || !error.message.includes('no running DODO installation')) throw error;
+    await launchHttp({ web: true });
+  }
+}
+
+const web = program.command('web')
+  .description('open or renew the one-hour Remote Config page through the public MCP tunnel')
+  .option('--close', 'close the Remote Config lease without stopping MCP or Tunnel', false)
+  .option('--status', 'show the current non-secret Remote Config lease status', false)
+  .action(async (opts: { close: boolean; status: boolean }) => {
+    if (opts.close && opts.status) fail('choose --close or --status');
+    try {
+      if (opts.close) {
+        console.log(JSON.stringify(await ipcForInstallation('remoteConfig.close'), null, 2));
+        return;
+      }
+      if (opts.status) {
+        console.log(JSON.stringify(await ipcForInstallation('remoteConfig.status'), null, 2));
+        return;
+      }
+      await openRemoteConfigFromCli();
+    } catch (error) {
+      if (error instanceof DodoError || error instanceof IpcError) fail(error.message);
+      throw error;
+    }
+  });
+void web;
+
 program
   .command('start')
   .description('start the MCP server for the saved project, or wait for a project selection (foreground)')
@@ -540,8 +603,9 @@ program
   .option('--bypass', 'trusted actions and no default job sandbox for this run; OAuth and file guards remain', false)
   .option('--tools <surface>', 'tool exposure for this run: compact (HTTP default), full, or hybrid (49 tools: gateways + common direct tools); permissions are unchanged')
   .option('--no-tunnel', 'start local MCP only; do not ask for a temporary Cloudflare Tunnel token')
+  .option('--web', 'open Remote Config through the public tunnel for at most one hour', false)
   .option('--quiet', 'suppress the startup banner', false)
-  .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string; tunnel: boolean }) => {
+  .action(async (opts: { root?: string; port?: number; publicUrl?: string; allowUnsafeRoot: boolean; quiet: boolean; allow: boolean; all: boolean; bypass: boolean; tools?: string; tunnel: boolean; web: boolean }) => {
     try {
       await launchHttp(opts);
     } catch (err) {
@@ -1324,12 +1388,15 @@ Desktop (platform helper and explicit app permission required):
 Remote setup:
   dodo init --public-url https://...   configure public origin once
   dodo start                           prompt for a temporary Tunnel token
+  dodo --web                           start/renew Remote Config through that tunnel for 1 hour
+  dodo web --close                     close Remote Config; keep MCP/Tunnel running
   dodo start --no-tunnel               run local MCP only`,
 );
 
 function effectiveArgv(): string[] {
   if (process.argv.length <= 2) return [...process.argv, 'start'];
   if (process.argv.length === 3 && process.argv[2] === '--cli') return [...process.argv.slice(0, 2), 'cli'];
+  if (process.argv.length === 3 && process.argv[2] === '--web') return [...process.argv.slice(0, 2), 'web'];
   if (process.argv[2] === '--bypass') return [...process.argv.slice(0, 2), 'start', ...process.argv.slice(2)];
   return process.argv;
 }

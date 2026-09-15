@@ -10,7 +10,7 @@
 | Windows | Deferred — มี candidate code/tests แต่ยังไม่ประกาศ native support จนกว่าจะผ่าน Windows 11 จริง |
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
-| Local Config | loopback owner control เท่านั้น |
+| Local Config | loopback owner control ที่ 21731; เปิด bounded Remote Config `/config` ผ่าน 21730 ได้ครั้งละไม่เกิน 1 ชั่วโมง |
 | Cloudflare Tunnel | `dodo start`/Local Config ใช้ run-scoped token และ child `cloudflared`; Tunnel จริงยังเป็น manual gate |
 | Package | `dodo-mcp` |
 | CLI | `dodo` |
