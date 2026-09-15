@@ -58,6 +58,25 @@ loopback public-origin fixture: จับคู่, dashboard/assets/API, worksp
 4. ตรวจว่า installer ไม่เริ่มและไม่มี state ถูกเขียน
 5. รันใหม่ด้วย `--yes` เฉพาะใน fixture ที่อนุญาต แล้วตรวจ receipt schema/version และ readiness probe
 
+### Windows private state และ setup recovery
+
+สถานะสำหรับ release 1.0.4: **MANUAL_NOT_RUN**
+
+1. เปิด terminal ด้วย Windows account ปกติที่ใช้ DODO ประจำ และตรวจว่า default
+   `%LOCALAPPDATA%\dodo` บน local NTFS ผ่าน `dodo setup --yes --components speech`
+2. สร้าง fixture state ที่ owner เป็น SID อื่นหรือเป็น junction แล้วตรวจว่า setup
+   ปฏิเสธด้วย `PATH_DENIED` พร้อม recovery โดยไม่แก้ owner/DACL และไม่ลบ fixture
+3. ตั้ง `DODO_CONFIG_DIR=%LOCALAPPDATA%\dodo-private` แล้วตรวจว่า fresh state ผ่าน,
+   directory เดิมไม่เปลี่ยน และ installation identity ใหม่ไม่รับ OAuth/project/tunnel
+   authority จาก state เดิม
+4. ตรวจ `dodo --cli` เมนู 5 แสดง recovery เดียวกับ command mode และ JSON output มี
+   field `recovery` โดยไม่มี path content, credential หรือ stack trace ที่ไม่จำเป็น
+5. เมื่อ `cloudflared` ไม่มีใน PATH ให้ตรวจว่า DODO ไม่ติดตั้ง service/ไม่เปิด Tunnel
+   และแนะนำ signed official package; หลังติดตั้งเองให้ `where cloudflared`,
+   `cloudflared --version` และ `dodo setup --check --components cloudflared` ผ่าน
+6. ทดสอบ Desktop/UAC/sandbox จาก interactive session แยกจาก runner service และบันทึก
+   `MANUAL_PASS` เฉพาะ component ที่ readiness/confinement probe ผ่านจริง
+
 ## Existing-state import
 
 1. สร้าง fixture source ที่มี config preferences, OAuth/key fixture และ state DB fixture

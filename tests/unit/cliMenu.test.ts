@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PassThrough } from 'node:stream';
 import { menuText, runCliMenu, type CliMenuActions, type CliMenuProject } from '../../src/cli/menu.js';
+import { DodoError } from '../../src/errors.js';
 
 const project: CliMenuProject = {
   projectId: 'prj_abcdefgh',
@@ -44,6 +45,7 @@ describe('interactive CLI menu', () => {
     expect(text).toContain('Web app (/tmp/web-app)');
     expect(text).toContain('DODO');
     expect(text).toContain('cloudflared');
+    expect(menuText(project, 'win32')).toContain('cloudflared ต้องติดตั้งจาก Cloudflare ก่อน');
   });
 
   it('starts the remembered project and can select a different registered entry', async () => {
@@ -70,5 +72,27 @@ describe('interactive CLI menu', () => {
     const events: string[] = [];
     await run('4\n', events);
     expect(events).toEqual(['web']);
+  });
+
+  it('shows typed setup recovery without hiding the original failure', async () => {
+    const output = new PassThrough();
+    const source = new PassThrough();
+    let text = '';
+    output.on('data', (chunk) => { text += String(chunk); });
+    const menuActions = actions([]);
+    menuActions.setupAll = async () => {
+      throw new DodoError('PATH_DENIED', 'private Windows state ACL could not be established or verified', {
+        recovery: 'use a fresh local NTFS state directory',
+      });
+    };
+    const pending = runCliMenu(menuActions, { input: source, output });
+    for (const line of ['5', 'yes', '0']) {
+      source.write(`${line}\n`);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    source.end();
+    await pending;
+    expect(text).toContain('setup ไม่สำเร็จ: private Windows state ACL could not be established or verified');
+    expect(text).toContain('วิธีแก้: use a fresh local NTFS state directory');
   });
 });

@@ -1,6 +1,6 @@
 # DODO MCP
 
-**DODO MCP 1.0.3** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.4** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
@@ -56,6 +56,12 @@ expected hash, workspace context และ OAuth scopes หากต้องแ
 โปรเจกต์ ให้เปลี่ยนเป็นโหมด managed ที่หน้า Settings
 
 `dodo setup --check` และ `dodo setup --plan` เป็น read-only หากแผนมี dependency ที่ต้องติดตั้ง ให้ตรวจรายการก่อนแล้วจึงรัน `dodo setup --yes --components <list>` ระบบจะไม่เริ่ม installer หากไม่มี `--yes` และ `--yes` ไม่ข้าม sudo, OS permission หรือ owner consent
+
+บน Windows ให้รัน DODO ด้วย account เดียวกับที่จะใช้งานประจำและเก็บ state บน local
+NTFS หากพบ `private Windows state ACL could not be established or verified` ห้ามลด
+ACL หรือลบ state เดิม ดูวิธีใช้ `DODO_CONFIG_DIR` เพื่อเริ่ม installation ใหม่อย่าง
+ปลอดภัยและรายการ component ที่ต้องติดตั้งเองใน [Windows Setup](docs/WINDOWS_SETUP.md)
+โดยเฉพาะ `cloudflared` ซึ่ง Windows ต้องติดตั้ง signed package จาก Cloudflare ก่อน
 
 เมื่อ DODO ตรวจพบ config เดิมในตำแหน่งมาตรฐาน สามารถใช้ `dodo setup --import-state` เพื่อนำเข้าเฉพาะ preference ที่ปลอดภัย เช่น port, search backend, retention และ tool surface ระบบจะสร้าง installation identity ใหม่เสมอและไม่คัดลอก OAuth keys/tokens, client grants, workspace ACL, trust, approvals, schedules, public origin, web/desktop permission, executable registration หรือฐานข้อมูลเดิม ต้นฉบับจะไม่ถูกแก้ไข
 
@@ -407,6 +413,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Tunnel](docs/TUNNEL.md)
 - [Web clients](docs/WEB_CLIENTS.md)
 - [Windows compatibility](docs/WINDOWS.md)
+- [Windows setup และ ACL troubleshooting](docs/WINDOWS_SETUP.md)
 - [Task assistance](docs/ASSISTANCE.md)
 - [Multimodal](docs/MULTIMODAL.md)
 - [Project Registry](docs/PROJECTS.md)

@@ -1,6 +1,6 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.0.3 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
+DODO MCP 1.0.4 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
 
 ## เริ่มใช้งานผ่านเว็บ
 

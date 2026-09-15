@@ -66,6 +66,10 @@ Desktop, browser, media, speech, LSP และ OS sandbox ต้องตรว�
 `--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret
 Service ส่วน env/file references มีไว้สำหรับ owner-controlled headless environment
 
+Windows state ค่าเริ่มต้นอยู่ที่ `%LOCALAPPDATA%\dodo` และต้องผ่าน owner/DACL/reparse
+checks บน local NTFS การปฏิเสธ ACL ไม่ใช่ dependency failure และห้ามแก้ด้วย permissive
+ACL ดูขั้นตอน diagnosis และ fresh-state fallback ที่ [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
+
 ## Client behavior
 
 Remote clients อาจ cache tool catalog ต้องใช้ refresh หรือ recreate connection ตามพฤติกรรมของ client หลังเปลี่ยน surface หรือ schema

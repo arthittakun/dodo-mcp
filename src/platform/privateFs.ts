@@ -83,7 +83,9 @@ function windowsAcl(target: string, protect: boolean): void {
     const output = execFileSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'), ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ACL_SCRIPT, 'utf16le').toString('base64')], { env, shell: false, windowsHide: true, timeout: 10000, maxBuffer: 4096, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     if (output.trim() !== 'private') throw new Error('ACL not verified');
   } catch {
-    throw new DodoError('PATH_DENIED', 'private Windows state ACL could not be established or verified; use a local NTFS directory owned by your user');
+    throw new DodoError('PATH_DENIED', 'private Windows state ACL could not be established or verified', {
+      recovery: 'Run DODO from the same Windows account that owns its state on a local NTFS path. Keep the old directory; if needed, set DODO_CONFIG_DIR to a fresh directory under %LOCALAPPDATA%. See docs/WINDOWS_SETUP.md.',
+    });
   }
 }
 

@@ -1,5 +1,23 @@
 # DODO MCP — Test Report
 
+## Release 1.0.4 — Windows setup guidance
+
+ผล candidate gate บน macOS วันที่ 2026-09-16:
+
+- build: **AUTOMATED_PASS** — Full 125, Compact 19, Hybrid 49 และ config schemas 2 ชุด
+- typecheck และ lint: **AUTOMATED_PASS**
+- core/integration/security/compatibility: **AUTOMATED_PASS** — 680 passed / 34 skipped / 0 failed ใน 99 ไฟล์ที่ผ่านและ 3 ไฟล์ที่ skip ตาม platform/capability
+- packaging: **AUTOMATED_PASS** — 16/16 รวม assertion ว่า tarball มี `docs/WINDOWS_SETUP.md`
+- production dependency audit: **AUTOMATED_PASS** — 0 vulnerabilities
+- npm pack dry-run: **AUTOMATED_PASS** — package 1.0.4, 456 files, มีคู่มือและ release document ใหม่
+- native Windows interactive ACL recovery และ Cloudflare executable ของผู้ใช้:
+  **MANUAL_NOT_RUN** — automated tests ไม่เปลี่ยนสถานะนี้
+
+CLI เพิ่มการแสดง typed recovery ใน command/JSON/interactive menu และยังคงปฏิเสธ
+foreign owner, reparse point หรือ permissive state DACL แบบ fail closed คู่มือแนะนำ
+fresh local NTFS state โดยเก็บ directory เดิมไว้; ไม่มี test หรือเอกสารส่วนใดลด ACL
+เป็น `Everyone` หรือ takeover state ของ account อื่น
+
 ## Release 1.0.3 — Persistent connection mode
 
 - `tests/integration/connectionMode.test.ts`: Local ใช้ loopback เป็น OAuth issuer/MCP

@@ -1,5 +1,6 @@
 import { createInterface, type Interface } from 'node:readline/promises';
 import type { Readable, Writable } from 'node:stream';
+import { DodoError } from '../errors.js';
 
 export interface CliMenuProject {
   projectId: string;
@@ -29,10 +30,19 @@ function write(output: Writable, text: string): void {
   output.write(text);
 }
 
-export function menuText(startup: CliMenuProject | undefined): string {
+function failureText(prefix: string, error: unknown): string {
+  const message = error instanceof Error ? error.message : 'unknown error';
+  const recovery = error instanceof DodoError ? error.recovery : undefined;
+  return `${prefix}: ${message}\n${recovery ? `วิธีแก้: ${recovery}\n` : ''}`;
+}
+
+export function menuText(startup: CliMenuProject | undefined, platform: NodeJS.Platform = process.platform): string {
   const selected = startup?.available
     ? `${startup.displayName} (${startup.root})`
     : 'ยังไม่ได้เลือก — server จะรอให้เลือกจาก Local Config';
+  const setupLabel = platform === 'win32'
+    ? '  5) ติดตั้ง/ตรวจ dependencies (cloudflared ต้องติดตั้งจาก Cloudflare ก่อน)'
+    : '  5) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared';
   return [
     '',
     'DODO Control Center',
@@ -42,7 +52,7 @@ export function menuText(startup: CliMenuProject | undefined): string {
     '  2) เลือกโปรเจกต์ที่บันทึกไว้ แล้วเปิด MCP',
     '  3) เพิ่มโปรเจกต์จาก absolute path แล้วเปิด MCP',
     '  4) เปิด Remote Config ผ่าน DODO Tunnel ชั่วคราว 1 ชั่วโมง',
-    '  5) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared',
+    setupLabel,
     '  6) ตรวจ dependencies แบบไม่ติดตั้ง',
     '  0) ออก',
     '',
@@ -116,13 +126,16 @@ export async function runCliMenu(actions: CliMenuActions, streams: CliMenuStream
         return;
       }
       if (choice === '5') {
-        const confirmed = (await rl.question('ติดตั้ง components ที่ขาด รวม cloudflared? พิมพ์ yes เพื่อดำเนินการ: ')).trim().toLowerCase();
+        const prompt = process.platform === 'win32'
+          ? 'ติดตั้ง components ที่ DODO รองรับ และตรวจ cloudflared? พิมพ์ yes เพื่อดำเนินการ: '
+          : 'ติดตั้ง components ที่ขาด รวม cloudflared? พิมพ์ yes เพื่อดำเนินการ: ';
+        const confirmed = (await rl.question(prompt)).trim().toLowerCase();
         if (confirmed !== 'yes') { write(streams.output, 'ยกเลิกการติดตั้ง\n'); continue; }
-        try { await actions.setupAll(); } catch (error) { write(streams.output, `setup ไม่สำเร็จ: ${(error as Error).message}\n`); }
+        try { await actions.setupAll(); } catch (error) { write(streams.output, failureText('setup ไม่สำเร็จ', error)); }
         continue;
       }
       if (choice === '6') {
-        try { await actions.checkSetup(); } catch (error) { write(streams.output, `ตรวจ setup ไม่สำเร็จ: ${(error as Error).message}\n`); }
+        try { await actions.checkSetup(); } catch (error) { write(streams.output, failureText('ตรวจ setup ไม่สำเร็จ', error)); }
         continue;
       }
       write(streams.output, 'กรุณาเลือก 0–6\n');

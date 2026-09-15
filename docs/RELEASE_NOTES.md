@@ -1,5 +1,18 @@
 # DODO MCP — Release Notes
 
+## 1.0.4 — Windows setup guidance and actionable recovery
+
+- เพิ่มคู่มือ Windows Setup สำหรับติดตั้ง components, `cloudflared`, Desktop/Web
+  permission และตรวจผลแบบแยก `missing`/`needs-permission`/`ready`
+- อธิบาย private state ACL, default `%LOCALAPPDATA%\dodo`, สาเหตุที่พบบ่อย และวิธี
+  ใช้ `DODO_CONFIG_DIR` กับ fresh local NTFS path โดยไม่ลบหรือทำ ACL เดิมให้อ่อนลง
+- CLI และเมนูแสดง recovery ของ typed setup error แทนการทิ้งคำแนะนำที่ปลอดภัย
+- แก้ข้อความเมนูให้ชัดว่า Windows ต้องติดตั้ง signed `cloudflared` package จาก
+  Cloudflare ก่อน; DODO ไม่ติดตั้งเป็น Windows service เพราะ supervise child เอง
+
+ติดตั้งหรืออัปเดตด้วย `npm install -g dodo-mcp@1.0.4` แล้วเปิด terminal ใหม่และ
+restart DODO process ที่กำลังรันอยู่
+
 ## 1.0.3 — Persistent connection mode
 
 - เพิ่ม installation setting `connectionMode=local|tunnel` เป็นแหล่งความจริงเดียว

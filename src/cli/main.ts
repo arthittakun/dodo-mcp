@@ -275,8 +275,11 @@ program.command('setup')
       }
       process.exitCode = report.exitCode;
     } catch (error) {
-      if (opts.json) console.log(JSON.stringify({ error: error instanceof DodoError ? error.code : 'SETUP_FAILED', message: (error as Error).message }));
-      else console.error(`dodo setup: ${(error as Error).message}`);
+      if (opts.json) console.log(JSON.stringify({ error: error instanceof DodoError ? error.code : 'SETUP_FAILED', message: (error as Error).message, ...(error instanceof DodoError && error.recovery ? { recovery: error.recovery } : {}) }));
+      else {
+        console.error(`dodo setup: ${(error as Error).message}`);
+        if (error instanceof DodoError && error.recovery) console.error(`Recovery: ${error.recovery}`);
+      }
       process.exitCode = 1;
     }
   });

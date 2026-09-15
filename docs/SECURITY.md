@@ -251,6 +251,12 @@ AI client กำลังเชื่อมต่อ
 
 `dodo setup --check` และ `dodo setup --plan` เป็น read-only การติดตั้ง dependency ที่ยังขาดต้องมี `--yes` จาก local owner ก่อนเริ่ม installer โดย flag นี้ไม่ข้าม OS elevation, Desktop consent หรือ policy อื่น
 
+บน Windows private state ต้องอยู่ใน dedicated local path ที่ไม่ใช่ reparse point และ
+ผ่าน owner/DACL verification DODO ไม่ใช้ permissive ACL หรือ takeover directory ของ
+account อื่นเมื่อ setup ล้มเหลว Recovery ที่รองรับคือแก้ ownership หลังตรวจ provenance
+โดยผู้ดูแลเครื่อง หรือเลือก fresh local NTFS directory ผ่าน `DODO_CONFIG_DIR` โดยเก็บ
+state เดิมไว้ ดู [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
+
 `dodo setup --import-state` นำเข้าได้เฉพาะ preference allowlist จาก private `config.json`: config version, MCP/config ports, bounded limits, search backend, log retention และ tool surface เท่านั้น ระบบไม่ copy database, OAuth signing keys, cookies, clients, grants, authorization codes, tokens, workspace ACL, trust, approvals, schedules, public URL/Host/Origin allowlists, web/desktop permissions, LSP commands, environment allowlist หรือ sandbox writable paths
 
 ก่อน commit ระบบตรวจ file type, ownership/ACL, link count, symlink, runtime markers, size และ SHA-256 ซ้ำ หาก source เปลี่ยน, schema ไม่ตรง, มี unknown field หรือมี DODO process ใช้งาน state นั้นอยู่ การนำเข้าจะ fail closed และรักษา source/target เดิมไว้
