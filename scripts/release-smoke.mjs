@@ -30,7 +30,14 @@ try {
     throw new Error(`installed-package smoke worker failed: ${worker.error?.message ?? worker.status ?? worker.signal}`);
   }
   report = JSON.parse(fs.readFileSync(workerOutput, 'utf8'));
-  if (report.status !== 'PASS' || report.stdio?.toolCount !== 125 || report.http?.toolCount !== 19 || report.http?.writeEditReadBack !== true) {
+  if (
+    report.status !== 'PASS' ||
+    !Number.isSafeInteger(report.catalog?.fullToolCount) ||
+    !Number.isSafeInteger(report.catalog?.compactToolCount) ||
+    report.stdio?.toolCount !== report.catalog.fullToolCount ||
+    report.http?.toolCount !== report.catalog.compactToolCount ||
+    report.http?.writeEditReadBack !== true
+  ) {
     throw new Error('installed-package smoke worker returned an invalid result');
   }
 } finally {

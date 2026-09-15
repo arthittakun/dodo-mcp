@@ -91,6 +91,8 @@ try {
   if (installed.error || installed.status !== 0) throw new Error(`fresh npm install failed (${installed.status}): ${installed.stderr}`);
   const packageRoot = path.join(install, 'node_modules', 'dodo-mcp');
   const packageJson = JSON.parse(fs.readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
+  const packagedSurfaces = JSON.parse(fs.readFileSync(path.join(packageRoot, 'schemas', 'tools.compact.json'), 'utf8'));
+  if (!Number.isSafeInteger(packagedSurfaces.fullToolCount) || !Number.isSafeInteger(packagedSurfaces.toolCount)) throw new Error('installed surface metadata is invalid');
   const cli = path.join(packageRoot, 'dist', 'cli', 'main.js');
   const versionRun = spawnSync(process.execPath, [cli, '--version'], { encoding: 'utf8', timeout: 30_000, windowsHide: true });
   if (versionRun.status !== 0 || versionRun.stdout.trim() !== packageJson.version) throw new Error('installed CLI version smoke failed');
@@ -164,11 +166,12 @@ try {
   if(finished.status!=='completed'||modelCalls!==2||!finished.events.some(e=>e.kind==='tool'&&e.payload.operation==='write_file'&&e.payload.ok)||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.existsSync(path.join(workspace,'agent.txt'))) throw new Error('installed agent target/receipt smoke failed');
   for(const name of ['index.html','app.js','app.css','workbench.js','workbench.css'])if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
   const report = { schemaVersion: 1, status: 'PASS', package: { name: packageJson.name, version: packageJson.version },
+    catalog: { fullToolCount: packagedSurfaces.fullToolCount, compactToolCount: packagedSurfaces.toolCount },
     cliVersion: versionRun.stdout.trim(), stdio: { surface: 'full', toolCount: fullCount, overviewOk: stdioOverview.ok === true },
     http: { transport: 'streamable-http', oauth: true, surface: 'compact', toolCount: compactCount, writeEditReadBack: true, targetRouting:true, subagentWriteReceipt:true },
     ui: {assets:5}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
     installation: { source: 'exact-tarball', freshPrefix: true, freshConfig: true }, generatedAt: new Date().toISOString() };
-  if (fullCount !== 125 || compactCount !== 19) throw new Error(`surface count mismatch: full=${fullCount} compact=${compactCount}`);
+  if (fullCount !== packagedSurfaces.fullToolCount || compactCount !== packagedSurfaces.toolCount) throw new Error(`surface count mismatch: full=${fullCount}/${packagedSurfaces.fullToolCount} compact=${compactCount}/${packagedSurfaces.toolCount}`);
   fs.mkdirSync(path.dirname(args.output), { recursive: true }); fs.writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
 } finally {
   if (httpClient) await httpClient.close().catch(() => undefined);
