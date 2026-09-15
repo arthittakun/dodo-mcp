@@ -8,6 +8,7 @@
 | macOS | รองรับ coding, HTTP, STDIO, Local Config และ optional native integrations ตาม permission |
 | Linux | รองรับ coding, HTTP, STDIO, Local Config และ optional integrations ตาม desktop/runtime environment |
 | Windows | Deferred — มี candidate code/tests แต่ยังไม่ประกาศ native support จนกว่าจะผ่าน Windows 11 จริง |
+| Android / Termux | Experimental — core CLI และ text/code MCP เริ่มได้โดยไม่บังคับ Sharp; optional integrations ต้องตรวจแยก |
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control ที่ 21731; เปิด bounded Remote Config `/config` ผ่าน 21730 ได้ครั้งละไม่เกิน 1 ชั่วโมง |
@@ -57,6 +58,12 @@ media/workflow ขึ้นกับ optional capability ของ platform เ�
 ## Optional capabilities
 
 Desktop, browser, media, speech, LSP และ OS sandbox ต้องตรวจ dependency และ OS permission ด้วย `dodo setup --check` หรือ `dodo doctor` ระบบจะรายงาน `NOT_SUPPORTED` เมื่อ environment ยังไม่พร้อม และจะไม่เปิด permission หรือดาวน์โหลด model โดยอัตโนมัติ
+
+บน Android/Termux แพ็กเกจ Sharp ไม่มี native prebuild โดยตรง DODO จึงโหลด raster
+backend เฉพาะเมื่อเรียก image operation และมี `@img/sharp-wasm32` เป็น optional
+dependency หาก optional install ไม่สำเร็จ CLI/text/code ยังคงทำงาน ส่วน image
+operation ตอบ `NOT_SUPPORTED` Android installer, secure credential store, sandbox,
+desktop และ browser ยังไม่ถือว่ารองรับจนกว่าจะมี platform acceptance แยก
 
 `dodo setup --plan` ใช้ตรวจขั้นตอนติดตั้งแบบ read-only ส่วน installer ต้องมี `--yes` การใช้ `--import-state` รองรับเฉพาะ config ตำแหน่งมาตรฐานและนำเข้า non-authority preferences เท่านั้น custom `DODO_CONFIG_DIR` ไม่ถูกค้นหรือ merge อัตโนมัติ
 

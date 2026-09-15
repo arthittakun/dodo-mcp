@@ -1,6 +1,6 @@
 # DODO MCP
 
-**DODO MCP 1.0.5** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP 1.0.6** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
@@ -34,6 +34,22 @@ npm install -g dodo-mcp
 dodo setup --check
 dodo --cli
 ```
+
+### Android / Termux (ทดลองใช้)
+
+DODO 1.0.6 ไม่โหลด Sharp ตั้งแต่เริ่ม CLI อีกต่อไป จึงใช้คำสั่งพื้นฐานและ MCP
+สำหรับ text/code ได้แม้เครื่องไม่มี native Sharp build แพ็กเกจมี WebAssembly image backend
+เป็น optional dependency; หาก npm ข้าม optional dependency ให้ติดตั้งเพิ่มแล้วเปิด DODO ใหม่:
+
+```bash
+npm install -g dodo-mcp@latest @img/sharp-wasm32@0.35.4
+dodo --version
+```
+
+หาก image backend ยังไม่พร้อม เฉพาะเครื่องมือภาพจะตอบ `NOT_SUPPORTED` โดย CLI และ
+เครื่องมือ coding ส่วนอื่นยังเริ่มได้ Android/Termux ยังเป็นสถานะทดลองใช้: installer,
+OS credential store, sandbox, desktop control และ browser automation ยังไม่ได้ผ่าน
+Android acceptance ครบ ดูข้อจำกัดและวิธีตรวจรับที่ [Android / Termux](docs/ANDROID.md)
 
 ## เชื่อม ChatGPT ภายในไม่กี่นาที
 

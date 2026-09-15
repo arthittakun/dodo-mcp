@@ -1,13 +1,14 @@
-import sharp from 'sharp';
 import { DodoError } from '../../errors.js';
 import { digestOf, newId } from '../../util/hash.js';
 import { MediaStorage, actorKey, type Actor } from './storage.js';
 import { ScreenFrame, type CropRect, type AssetMetadata } from './contracts.js';
+import { loadSharpBackend } from './sharpBackend.js';
 import type { z } from 'zod';
 
 const OPTIONS = { limitInputPixels: 40_000_000, failOn: 'warning' as const };
 export async function imageView(bytes: Buffer, maxEdge: number, crop?: CropRect) {
   if (bytes.length > 16 * 1024 * 1024) throw new DodoError('FILE_TOO_LARGE', 'image input exceeds 16 MiB');
+  const sharp = await loadSharpBackend();
   const image = sharp(bytes, OPTIONS); const metadata = await image.metadata();
   if (!['jpeg', 'png', 'webp', 'gif'].includes(metadata.format ?? '') || !metadata.width || !metadata.height) throw new DodoError('UNSUPPORTED_ENCODING', 'use PNG/JPEG/WebP/GIF; animated files use the first frame');
   const width = metadata.width, height = metadata.height;
@@ -19,6 +20,7 @@ export async function imageView(bytes: Buffer, maxEdge: number, crop?: CropRect)
     scaleX: (crop?.width ?? width) / converted.info.width, scaleY: (crop?.height ?? height) / converted.info.height, sourceOffsetX: crop?.left ?? 0, sourceOffsetY: crop?.top ?? 0 } };
 }
 export async function imageDifference(before: Buffer, after: Buffer): Promise<number> {
+  const sharp = await loadSharpBackend();
   const normalize = (b: Buffer) => sharp(b, OPTIONS).resize(64, 64, { fit: 'fill' }).removeAlpha().toColourspace('srgb').raw().toBuffer();
   const [a, b] = await Promise.all([normalize(before), normalize(after)]); let changed = 0;
   for (let i = 0; i < Math.min(a.length, b.length); i += 3) if (Math.max(Math.abs(a[i]! - b[i]!), Math.abs(a[i + 1]! - b[i + 1]!), Math.abs(a[i + 2]! - b[i + 2]!)) > 24) changed++;

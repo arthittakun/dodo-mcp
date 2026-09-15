@@ -1,5 +1,16 @@
 # DODO MCP — Release Notes
 
+## 1.0.6 — Android-safe CLI startup
+
+- เปลี่ยน raster image backend เป็น lazy load เพื่อให้ core CLI, transport และ
+  text/code tools เริ่มได้บน platform ที่ไม่มี native Sharp build
+- เพิ่ม `@img/sharp-wasm32` เวอร์ชันตรงกับ Sharp เป็น optional dependency
+- image/resource operations ตอบ typed `NOT_SUPPORTED` เมื่อ backend ไม่พร้อม โดยไม่
+  ทำให้ `dodo --version` หรือทั้ง process ล้ม
+- เพิ่มคู่มือ Android/Termux พร้อมระบุสถานะ experimental และ manual gates ตามจริง
+
+ติดตั้งด้วย `npm install -g dodo-mcp@1.0.6 @img/sharp-wasm32@0.35.4`
+
 ## 1.0.5 — ChatGPT connection guide
 
 - เพิ่มขั้นตอนเชื่อม ChatGPT ไว้บนหน้าแรก ตั้งแต่ Public MCP URL, Cloudflare Tunnel,

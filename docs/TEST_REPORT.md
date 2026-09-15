@@ -1,5 +1,29 @@
 # DODO MCP — Test Report
 
+## Release 1.0.6 — Android-safe Sharp loading
+
+ผล macOS วันที่ 2026-09-16:
+
+- build/typecheck/lint: **AUTOMATED_PASS**
+- core/integration/security/compatibility: **AUTOMATED_PASS** — 682 passed / 35 skipped /
+  0 failed ใน 100 ไฟล์ที่ผ่านและ 3 ไฟล์ที่ skip ตาม platform/capability
+- packaging: **AUTOMATED_PASS** — 16/16
+- optional-backend regression: **AUTOMATED_PASS** — mock ให้ `sharp` load ไม่ได้แล้ว
+  import image/resource modules ยังผ่าน; เมื่อเรียก image operation จึงตอบ typed
+  `NOT_SUPPORTED`
+- no-Sharp compiled smoke: **AUTOMATED_PASS** — ย้าย `node_modules/sharp` ออกจาก
+  fixture ชั่วคราวแล้ว `node dist/cli/main.js --version` แสดง 1.0.6; image operation
+  ปฏิเสธแบบ bounded ตาม contract
+- WebAssembly fallback smoke: **AUTOMATED_PASS** — ปิด native Darwin Sharp packages
+  ชั่วคราว, บังคับไม่ใช้ global libvips แล้ว `@img/sharp-wasm32` 0.35.4 สร้าง PNG
+  2×2 สำเร็จ 95 bytes
+- production dependency audit: **AUTOMATED_PASS** — 0 vulnerabilities
+- Android/Termux device install และ MCP workflow: **MANUAL_NOT_RUN**
+- Android setup, credential store, sandbox, desktop และ browser: **MANUAL_NOT_RUN**
+
+ผล macOS/Wasm พิสูจน์ startup/fallback contract แต่ไม่แทน Android device acceptance
+จึงยังระบุ Android เป็น experimental
+
 ## Release 1.0.4 — Windows setup guidance
 
 ผล candidate gate บน macOS วันที่ 2026-09-16:
