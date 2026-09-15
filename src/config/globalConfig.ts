@@ -62,7 +62,7 @@ export const GlobalConfigSchema = z
     /**
      * MCP tool exposure override. Unset = transport default (HTTP serves the
      * COMPACT gateway surface, STDIO serves the FULL per-tool catalog).
-     * 'hybrid' = 49 tools: the compact coverage core plus 30 direct coding tools.
+     * 'hybrid' = 49 tools: the compact coverage core plus 29 direct coding tools.
      * Changes only which tool definitions are listed — never permissions,
      * scopes, trust, approvals or guards.
      */

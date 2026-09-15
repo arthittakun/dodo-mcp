@@ -220,6 +220,24 @@ Full จะไม่ register สี่ Sub-agent definitions และ Compact/
 ไม่เปลี่ยน trust/profile policy และไม่ข้าม approvals, sandbox, path/secret guards หรือ
 workspace context ทุก call ที่เปิดให้เห็นยังผ่าน invocation pipeline เดิมทั้งหมด
 
+## Android / ADB access
+
+ADB ปิดโดยค่าเริ่มต้น การมี `adb` หรืออุปกรณ์ที่เชื่อมอยู่ไม่ใช่ permission เจ้าของต้อง
+เลือก `view` หรือ `control` พร้อม exact serial ผ่าน private Local Config/CLI ก่อน
+temporary policy ผูก workspace/epoch ส่วน persistent policy ผูก installation และถอนได้
+ด้วย `dodo android disable` ทุก MCP operation ยังตรวจ live OAuth grant, `dodo:exec`,
+target project/workspace context, trust/approval, idempotency และ audit ตามปกติ
+
+การจับภาพสร้าง snapshot อายุสั้นที่ผูก caller, serial และ policy; input action ใช้และ
+invalidate snapshot ก่อน dispatch UI hierarchy ปิดบัง password field แต่ข้อมูลจาก
+อุปกรณ์ทั้งหมดถือเป็น private untrusted content และไม่ถูกเขียนลง audit log
+
+`android_install`/`android_push` ตรวจ source ผ่าน shared workspace/secret/link policy,
+บังคับ expected SHA-256 และส่ง private staging copy ให้ ADB Pair/connect/root, server
+management และ port forwarding เป็น owner action นอก MCP `android_adb` รับเฉพาะ
+device-side command families แบบ bounded และใช้ `shell:false` ที่ฝั่ง host อย่างไรก็ตาม
+device-side shell สามารถเปลี่ยนข้อมูลด้วยสิทธิ์ Android shell user ได้และไม่ใช่ sandbox
+
 ## Cloudflare Tunnel
 
 เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare

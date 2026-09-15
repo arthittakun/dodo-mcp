@@ -8,7 +8,8 @@
 | macOS | รองรับ coding, HTTP, STDIO, Local Config และ optional native integrations ตาม permission |
 | Linux | รองรับ coding, HTTP, STDIO, Local Config และ optional integrations ตาม desktop/runtime environment |
 | Windows | Deferred — มี candidate code/tests แต่ยังไม่ประกาศ native support จนกว่าจะผ่าน Windows 11 จริง |
-| Android / Termux | Experimental — core CLI และ text/code MCP เริ่มได้โดยไม่บังคับ Sharp; optional integrations ต้องตรวจแยก |
+| Android / ADB | ควบคุม physical device/emulator จาก macOS/Linux/Windows/Termux ได้เมื่อ Platform-Tools พร้อมและเจ้าของอนุญาต exact serial |
+| Android / Termux host | Experimental — core CLI และ text/code MCP เริ่มได้โดยไม่บังคับ Sharp; optional integrations ต้องตรวจแยก |
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control ที่ 21731; เปิด bounded Remote Config `/config` ผ่าน 21730 ได้ครั้งละไม่เกิน 1 ชั่วโมง |
@@ -27,13 +28,13 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 
 ## Tool surfaces
 
-- HTTP default: Compact 19 tools
-- STDIO default: Full 121 tools; เปิด Sub-agent MCP exposure แล้วเป็น 125
+- HTTP default: Compact 20 tools
+- STDIO default: Full 134 tools; เปิด Sub-agent MCP exposure แล้วเป็น 138
 - explicit Hybrid: 49 tools
 
-Complete capability schema มี 125 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
+Complete capability schema มี 138 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
 ซ่อน `subagent_spawn/status/result/control` จาก MCP เท่านั้น หน้าเว็บ Chat & Tasks ยัง
-ใช้ได้ Compact/Hybrid คงจำนวน 19/49 tool names แต่กรอง operation enum, instructions
+ใช้ได้ Compact/Hybrid คงจำนวน 20/49 tool names แต่กรอง operation enum, instructions
 และ discover index ให้ตรงกับ live runtime หลังเปลี่ยนค่าต้อง restart และให้ client
 โหลด catalog ใหม่
 - explicit override: `--tools compact|full|hybrid`
@@ -54,6 +55,11 @@ owned browser session เดิม Compact/Hybrid ยังคง 19/49 tools
 Advanced Agent Runtime ใช้ SQLite และ invocation pipeline เดิมทุก platform Managed
 exec ต้องใช้ explicit argv และ executable ที่ JobManager รองรับ ส่วน browser/desktop/
 media/workflow ขึ้นกับ optional capability ของ platform เช่นเดิม
+
+Android ADB family มี 13 operations ใน Full และรวมอยู่ใน `dodo_mobile` ของ Compact
+owner ต้องอนุญาต exact serial แบบ view/control ผ่าน Local Config หรือ `dodo android`
+ก่อน Pair/connect/root และ ADB server management ไม่อยู่ใน MCP catalog ส่วน install/push
+ใช้ expected SHA-256 และ private staging ตาม shared workspace guards
 
 ## Optional capabilities
 

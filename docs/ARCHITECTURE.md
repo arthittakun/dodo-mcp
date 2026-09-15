@@ -33,6 +33,7 @@ HTTP MCP 127.0.0.1:21730 ──► surface registry ──► policy/invocation 
                                       ├─ changes and jobs
                                       ├─ Git/intelligence/LSP
                                       ├─ assistance/multimodal/workflow
+                                      ├─ Android ADB ──► exact-device view/control policy
                                       ├─ Context Engine ──► evidence + L0–L6 cache
                                       ├─ Memory ──► reviewed evidence + stale lifecycle
                                       ├─ Runtime Intelligence ──► durable tasks + bounded evidence
@@ -260,9 +261,9 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 
 ## Tool surfaces
 
-- Complete capability catalog 125 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4)
-- Full live catalog ค่าเริ่มต้น 121 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 125
-- Compact catalog 19 definitions: overview, discover และ gateways
+- Complete capability catalog 138 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13)
+- Full live catalog ค่าเริ่มต้น 134 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 138
+- Compact catalog 20 definitions: overview, discover และ gateways รวม `dodo_mobile`
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 
 `schemas/tools.json` เป็น complete full schema ส่วน compact และ hybrid เป็น schema แยก

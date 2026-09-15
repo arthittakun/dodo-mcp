@@ -1,5 +1,27 @@
 # DODO MCP — Test Report
 
+## Release 1.1.0 — Android ADB tool family
+
+ผล candidate บน macOS วันที่ 2026-09-16:
+
+- build: **AUTOMATED_PASS** — Complete Full 138, live Full default 134, Compact 20,
+  Hybrid 49 และ config schemas 2 ชุด
+- typecheck/lint: **AUTOMATED_PASS**
+- core/integration/security/compatibility: **AUTOMATED_PASS** — 698 passed /
+  35 skipped / 0 failed ใน 103 ไฟล์ที่ผ่านและ 3 ไฟล์ที่ skip
+- packaging: **AUTOMATED_PASS** — 16/16
+- Android focused: **AUTOMATED_PASS** — parser/PNG/UI redaction, exact serial,
+  OAuth scope, compact image passthrough, approval binding, idempotency, secret/path
+  guards, expected-hash conflict, private staging cleanup, Local Config owner auth,
+  real HTTP+OAuth dispatch ของทั้ง 13 operation families และ Chromium UI
+- production dependency audit: **AUTOMATED_PASS** — 0 vulnerabilities
+- physical Android hardware/emulator: **MANUAL_NOT_RUN**
+- Android/Termux host acceptance: **MANUAL_NOT_RUN**
+
+Automated ADB ใช้ backend fixture ที่บันทึก argv/ผลลัพธ์จริงของ invocation pipeline
+โดยไม่แตะอุปกรณ์เจ้าของ จึงพิสูจน์ routing/security/content-block contract แต่ไม่แทน
+USB/Wireless debugging, RSA prompt, OEM Android behavior หรือ real device permission
+
 ## Release 1.0.6 — Android-safe Sharp loading
 
 ผล macOS วันที่ 2026-09-16:

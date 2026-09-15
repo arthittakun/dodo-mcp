@@ -1,10 +1,10 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete Compact capability contract; the default live surface filters optional operation enums according to optionalMcpFeatures.",
   "version": 1,
-  "toolCount": 19,
-  "defaultLiveToolCount": 19,
-  "fullToolCount": 125,
-  "defaultLiveFullToolCount": 121,
+  "toolCount": 20,
+  "defaultLiveToolCount": 20,
+  "fullToolCount": 138,
+  "defaultLiveFullToolCount": 134,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -20,16 +20,16 @@
   },
   "stats": {
     "compact": {
-      "toolCount": 19,
-      "schemaBytes": 52317
+      "toolCount": 20,
+      "schemaBytes": 55373
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 124657
+      "schemaBytes": 125901
     },
     "full": {
-      "toolCount": 125,
-      "schemaBytes": 443030
+      "toolCount": 138,
+      "schemaBytes": 475008
     }
   },
   "tools": [
@@ -203,6 +203,7 @@
               "exec",
               "git",
               "desktop",
+              "mobile",
               "media",
               "browser",
               "game",
@@ -3114,6 +3115,188 @@
             "type": "string",
             "enum": [
               "fetch_url"
+            ],
+            "description": "Target operation to invoke"
+          },
+          "args": {
+            "default": {},
+            "description": "The selected operation's own arguments, exactly as its schema defines (dodo_discover returns it). Never include workspaceId/workspaceEpoch here.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "operation",
+          "args"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "dodo_mobile",
+      "title": "Inspect and control Android devices",
+      "description": "Gateway: owner-approved ADB devices: status, screenshots, UI, logs, packages, files, input, apps, APK install and bounded advanced device commands. Set operation to one of: android_status, android_devices, android_device_info, android_capture, android_ui, android_logcat, android_packages, android_file_read, android_action, android_app, android_install, android_push, android_adb. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "domain": "mobile",
+      "operations": [
+        "android_status",
+        "android_devices",
+        "android_device_info",
+        "android_capture",
+        "android_ui",
+        "android_logcat",
+        "android_packages",
+        "android_file_read",
+        "android_action",
+        "android_app",
+        "android_install",
+        "android_push",
+        "android_adb"
+      ],
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "android_status",
+              "android_devices",
+              "android_device_info",
+              "android_capture",
+              "android_ui",
+              "android_logcat",
+              "android_packages",
+              "android_file_read",
+              "android_action",
+              "android_app",
+              "android_install",
+              "android_push",
+              "android_adb"
             ],
             "description": "Target operation to invoke"
           },

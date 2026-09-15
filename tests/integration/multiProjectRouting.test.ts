@@ -14,7 +14,7 @@ describe('concurrent project routing on modern HTTP + OAuth',()=>{
       s.store.setClientAccess(project.workspaceId,bToken.clientId,['dodo:read','dodo:write','dodo:exec']);s.store.setClientAccess(s.workspaceId,bToken.clientId,[]);
       for(const t of [aToken,bToken]){const c=new Client({name:'target-fixture',version:'1.0.0'});clients.push(c);await c.connect(new StreamableHTTPClientTransport(new URL(`${ctx.baseUrl}/mcp`),{authProvider:{token:async()=>t.accessToken}}));}
       const call=async(c:Client,name:string,args:Record<string,unknown>)=>(await c.callTool({name,arguments:args})).structuredContent as unknown as Envelope;
-      expect((await clients[0]!.listTools()).tools.length).toBe(19);
+      expect((await clients[0]!.listTools()).tools.length).toBe(20);
       const selection=await call(clients[1]!,'project_overview',{});expect(selection.ok).toBe(true);expect(selection.workspaceId).toBeNull();expect(JSON.stringify(selection.data)).not.toContain(ctx.fixtureDir);expect(selection.data).toMatchObject({selectProjectRequired:true,projects:[expect.objectContaining({projectId:project.projectId})]});
       const [aOverview,bOverview]=await Promise.all([call(clients[0]!,'project_overview',{}),call(clients[1]!,'project_overview',{targetProjectId:project.projectId})]);
       expect(aOverview.ok).toBe(true);expect(bOverview.ok).toBe(true);s.store.setTrustMode(project.workspaceId,'trusted');

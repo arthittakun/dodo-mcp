@@ -70,7 +70,7 @@ describe('STDIO surfaces', () => {
       const env = ov.structuredContent as { ok: boolean; workspaceId: string; workspaceEpoch: string; data: Record<string, unknown> };
       expect(env.data['toolSurface']).toBe('compact');
       expect(env.data['mcpSubagentsEnabled']).toBe(false);
-      expect(env.data['fullToolCount']).toBe(121);
+      expect(env.data['fullToolCount']).toBe(134);
       const ws = { workspaceId: env.workspaceId, workspaceEpoch: env.workspaceEpoch };
       const w = await client.callTool({ name: 'dodo_write', arguments: { ...ws, operation: 'write_file', args: { path: 'compact.txt', content: 'alpha\n' } } });
       expect((w.structuredContent as { ok: boolean }).ok).toBe(true);
@@ -99,7 +99,8 @@ describe('STDIO surfaces', () => {
       try {
         const names = (await client.listTools()).tools.map((tool) => tool.name);
         expect(names).toEqual(TOOL_CATALOG.map((tool) => tool.name));
-        expect(names.slice(-4)).toEqual(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']);
+        const subagentIndex = names.indexOf('subagent_spawn');
+        expect(names.slice(subagentIndex, subagentIndex + 4)).toEqual(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']);
       } finally {
         await client.close();
       }

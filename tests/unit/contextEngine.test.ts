@@ -22,7 +22,7 @@ describe('Phase 06 Context Engine contracts', () => {
 
   it('adds three full tools through the existing read gateway without changing compact size', () => {
     expect(TOOL_CATALOG.filter((tool) => tool.name.startsWith('context_')).map((tool) => tool.name)).toEqual(['context_for_task', 'context_query', 'context_evidence', 'context_status']);
-    expect(COMPACT_CATALOG).toHaveLength(19);
+    expect(COMPACT_CATALOG).toHaveLength(20);
     for (const operation of ['context_query', 'context_evidence', 'context_status']) {
       expect(OPERATION_TO_GATEWAY.get(operation)).toBe('dodo_assist_read');
     }

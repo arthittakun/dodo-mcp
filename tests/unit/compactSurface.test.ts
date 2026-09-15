@@ -43,6 +43,9 @@ const FULL_NAMES = [
   'agent_snapshot_compare', 'agent_snapshot_rollback', 'agent_hypothesis_judge', 'agent_skill_search',
   'agent_skill_inspect', 'agent_skill_propose', 'agent_run_control',
   'subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control',
+  'android_status', 'android_devices', 'android_device_info', 'android_capture', 'android_ui',
+  'android_logcat', 'android_packages', 'android_file_read', 'android_action', 'android_app',
+  'android_install', 'android_push', 'android_adb',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -123,7 +126,7 @@ describe('compact surface catalog', () => {
     }
   });
 
-  it('hybrid surface: exactly 49 tools, coverage core FIRST, then 30 direct tools with unchanged contracts', () => {
+  it('hybrid surface: exactly 49 tools, coverage core FIRST, then 29 direct tools with unchanged contracts', () => {
     expect(HYBRID_CATALOG.length).toBe(49);
     expect(HYBRID_CATALOG.length).toBeLessThanOrEqual(49);
     // coverage core first: any client-side truncation can only drop direct duplicates
@@ -157,9 +160,9 @@ describe('compact surface catalog', () => {
     const compact = surfaceCatalog('compact', hidden);
     const hybrid = surfaceCatalog('hybrid', hidden);
 
-    expect(TOOL_CATALOG).toHaveLength(125); // the installed capability contract stays complete
-    expect(full).toHaveLength(121);
-    expect(compact).toHaveLength(19);
+    expect(TOOL_CATALOG).toHaveLength(138); // the installed capability contract stays complete
+    expect(full).toHaveLength(134);
+    expect(compact).toHaveLength(20);
     expect(hybrid).toHaveLength(49);
     for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
 
@@ -174,10 +177,10 @@ describe('compact surface catalog', () => {
     const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
     expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
 
-    expect(surfaceStats('full', hidden).toolCount).toBe(121);
-    expect(surfaceStats('compact', hidden).toolCount).toBe(19);
+    expect(surfaceStats('full', hidden).toolCount).toBe(134);
+    expect(surfaceStats('compact', hidden).toolCount).toBe(20);
     expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
-    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(125);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(138);
     expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
     expect(instructionsFor('compact', hidden)).toContain('not exposed');
     expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
@@ -243,8 +246,8 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(125);
-    expect(COMPACT_CATALOG).toHaveLength(19);
+    expect(TOOL_CATALOG).toHaveLength(138);
+    expect(COMPACT_CATALOG).toHaveLength(20);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });
 

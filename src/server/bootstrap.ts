@@ -11,6 +11,8 @@ import { AgentRuntimeService } from '../services/agent/agentService.js';
 import { ScheduleService } from '../services/schedules/scheduleService.js';
 import { DesktopService } from '../services/desktop/desktopService.js';
 import { NativeDesktopBackend } from '../services/desktop/nativeBackend.js';
+import { AndroidService } from '../services/android/androidService.js';
+import { NativeAdbBackend } from '../services/android/adbBackend.js';
 import type Database from 'better-sqlite3';
 import { resolveConfigDir, ensureConfigDir, statePaths, type ConfigDirResolution, type StatePaths } from '../config/paths.js';
 import { loadGlobalConfig, type GlobalConfig } from '../config/globalConfig.js';
@@ -159,6 +161,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     intel,
     overview: new OverviewService(wfs, limits, listService, git),
     desktop: new DesktopService(store, workspaceId, epoch, new NativeDesktopBackend(configDir)),
+    android: new AndroidService(store, wfs, workspaceId, epoch, new NativeAdbBackend(rootInfo.root), configDir),
     projectConfig,
     workspaceId,
     epoch,
@@ -199,6 +202,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
       await services.multimodal?.close();
       services.resources?.close();
       await services.desktop.close();
+      await services.android.close();
       try {
         await services.jobs.shutdown(3000);
         await services.intel.shutdown();

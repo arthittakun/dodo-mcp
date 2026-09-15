@@ -304,6 +304,34 @@
     </form>
   </section>
 
+  <section class="card" id="card-android" aria-labelledby="h-android">
+    <div class="card-head"><h2 id="h-android">Android / ADB <button type="button" class="help-tip" data-tip="DODO จะควบคุมเฉพาะ serial ที่เจ้าของเลือก และไม่ pair/connect/root เครื่องให้อัตโนมัติ มือถือต้องอนุญาต ADB ให้เครื่องนี้ก่อน" aria-label="คำอธิบาย: สิทธิ์ Android ADB">?</button></h2><span class="badge" id="android-mode">off</span></div>
+    <div class="card-body">
+      <p id="android-summary">การเข้าถึง Android ปิดอยู่</p>
+      <div class="actions">
+        <button type="button" class="btn" id="android-scan">ค้นหาอุปกรณ์ ADB</button>
+        <button type="button" class="btn danger" id="android-disable" disabled>ปิดและลืมสิทธิ์ Android</button>
+      </div>
+      <form id="android-form" hidden>
+        <fieldset id="android-devices"><legend>เลือกอุปกรณ์จาก serial จริง</legend></fieldset>
+        <div class="two-col">
+          <label>ระดับการเข้าถึง
+            <select id="android-policy-mode"><option value="view">ดูข้อมูลและหน้าจอ</option><option value="control">ดูและควบคุม</option></select>
+          </label>
+          <label class="check"><input id="android-persist" type="checkbox" checked> จำสิทธิ์จนกว่าจะกดปิด</label>
+        </div>
+        <p class="error" id="android-error" role="alert" hidden></p>
+        <div class="actions"><button type="submit" class="btn primary" id="android-save">บันทึกสิทธิ์อุปกรณ์</button></div>
+      </form>
+      <details class="details">
+        <summary>วิธีเชื่อมต่อและขอบเขต</summary>
+        <p class="help">ติดตั้ง Android SDK Platform-Tools เปิด USB debugging หรือ Wireless debugging แล้วกดยอมรับ RSA prompt บนมือถือ จากนั้นกด “ค้นหาอุปกรณ์ ADB”</p>
+        <p class="help">โหมดดูอนุญาต screenshot, UI hierarchy, logcat, package และไฟล์แบบ bounded ส่วนโหมดควบคุมเพิ่ม tap/swipe/text/key, app actions, ติดตั้ง APK, push file และ advanced device-only command ทุก action ยังต้องมี <code>dodo:exec</code> และผ่าน trust/approval เดิม</p>
+        <p class="help">DODO ไม่เปิด pairing, ไม่ใช้ pairing code, ไม่ root, ไม่จัดการ ADB server และไม่ถือว่า directory guard เป็น sandbox ของมือถือ</p>
+      </details>
+    </div>
+  </section>
+
   <section class="card" id="card-desktop" aria-labelledby="h-desktop">
     <div class="card-head"><h2 id="h-desktop">Desktop access <button type="button" class="help-tip" data-tip="สิทธิ์อ่าน/ควบคุมหน้าต่างเป็นระดับ installation เมื่อจำแบบ --persist และผูก workspace เมื่อเป็นแบบชั่วคราว แยกจาก OS permission (Screen Recording / Accessibility) ที่ต้องให้ผ่านหน้าต่างระบบ" aria-label="คำอธิบาย: desktop และ Chrome permission">?</button></h2><span class="badge" id="desktop-mode">off</span></div>
     <div class="card-body">

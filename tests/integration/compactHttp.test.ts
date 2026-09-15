@@ -142,13 +142,13 @@ describe('full surface over HTTP (explicit override)', () => {
 });
 
 describe('sub-agent MCP exposure switch', () => {
-  it('defaults off for a live compact server while preserving the 19-tool gateway surface', async () => {
+  it('defaults off for a live compact server while preserving the 20-tool gateway surface', async () => {
     const ctx = await launch({ configPatch: { exposeSubagentsToMcp: false }, trust: 'trusted' });
     try {
       const tokens = await obtainToken(ctx);
       const tools = await listTools(ctx, tokens.accessToken);
       expect(tools.map((tool) => tool.name)).toEqual(surfaceCatalog('compact', { subagents: false }).map((tool) => tool.name));
-      expect(tools).toHaveLength(19);
+      expect(tools).toHaveLength(20);
 
       const readGateway = tools.find((tool) => tool.name === 'dodo_assist_read');
       const changeGateway = tools.find((tool) => tool.name === 'dodo_assist_change');
@@ -158,7 +158,7 @@ describe('sub-agent MCP exposure switch', () => {
 
       const overview = await callToolLegacy(ctx, tokens.accessToken, 'project_overview', {});
       expect(overview.envelope['data']).toMatchObject({
-        toolSurface: 'compact', compactToolCount: 19, fullToolCount: 121, mcpSubagentsEnabled: false,
+        toolSurface: 'compact', compactToolCount: 20, fullToolCount: 134, mcpSubagentsEnabled: false,
       });
       const hidden = await callToolLegacy(ctx, tokens.accessToken, 'dodo_discover', { ...wsArgs(ctx), operation: 'subagent_spawn' });
       expect(hidden.isError).toBe(true);
@@ -174,7 +174,7 @@ describe('sub-agent MCP exposure switch', () => {
       const tokens = await obtainToken(ctx);
       const names = (await listTools(ctx, tokens.accessToken)).map((tool) => tool.name);
       expect(names).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
-      expect(names).toHaveLength(121);
+      expect(names).toHaveLength(134);
       expect(names).not.toEqual(expect.arrayContaining(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']));
     } finally {
       await ctx.cleanup();

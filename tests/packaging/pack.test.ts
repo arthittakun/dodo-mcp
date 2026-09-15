@@ -58,7 +58,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
-    for (const file of ['dist/cli/menu.js', 'dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/RELEASE_1.0.4.md', 'docs/RELEASE_1.0.5.md', 'docs/WINDOWS.md', 'docs/WINDOWS_SETUP.md', 'docs/WEB_CLIENTS.md', 'docs/adr/044-global-launcher-and-cli-menu.md']) expect(fileList).toContain(file);
+    for (const file of ['dist/cli/menu.js', 'dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/services/android/androidService.js', 'dist/services/android/adbBackend.js', 'dist/tools/androidTools.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/ANDROID.md', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/RELEASE_1.0.4.md', 'docs/RELEASE_1.0.5.md', 'docs/RELEASE_1.1.0.md', 'docs/WINDOWS.md', 'docs/WINDOWS_SETUP.md', 'docs/WEB_CLIENTS.md', 'docs/adr/044-global-launcher-and-cli-menu.md', 'docs/adr/049-android-adb-control.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
       /^docs\/(DEVELOPMENT_ROADMAP|WINDOWS_PLAN|WINDOWS_DEV_PROPOSAL_TH)\.md$/,
@@ -245,13 +245,18 @@ describe('PACK: npm tarball', () => {
     expect(compact.toolCount).toBe(COMPACT_CATALOG.length);
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
-    expect(compact.defaultLiveToolCount).toBe(19);
-    expect(compact.defaultLiveFullToolCount).toBe(121);
+    expect(compact.defaultLiveToolCount).toBe(20);
+    expect(compact.defaultLiveFullToolCount).toBe(134);
     expect(compact.optionalMcpFeatures.subagents).toMatchObject({
       default: false,
       operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
     });
     expect(compact.tools.map((t) => t.name)).toEqual(COMPACT_CATALOG.map((t) => t.name));
+    expect(compact.tools.find((t) => t.name === 'dodo_mobile')?.operations).toEqual([
+      'android_status', 'android_devices', 'android_device_info', 'android_capture', 'android_ui',
+      'android_logcat', 'android_packages', 'android_file_read', 'android_action', 'android_app',
+      'android_install', 'android_push', 'android_adb',
+    ]);
     for (const t of compact.tools) expect(t.inputSchema.additionalProperties, t.name).toBe(false);
     expect(compact.stats.compact.schemaBytes).toBeLessThan(compact.stats.full.schemaBytes * 0.5);
     // the installed tarball can actually serve the compact surface over STDIO
@@ -269,6 +274,11 @@ describe('PACK: npm tarball', () => {
         operation: 'memory_status', args: {},
       } });
       expect(memory.structuredContent).toMatchObject({ ok: true, data: { schemaVersion: 1, memories: { current: 0, stale: 0 } } });
+      const mobile = await client.callTool({ name: 'dodo_mobile', arguments: {
+        workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
+        operation: 'android_status', args: {},
+      } });
+      expect(mobile.structuredContent).toMatchObject({ ok: true, data: { policy: { mode: 'off' } } });
       const runtime = await client.callTool({ name: 'dodo_assist_change', arguments: {
         workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
         operation: 'runtime_session_open', args: { label: 'packed runtime' },

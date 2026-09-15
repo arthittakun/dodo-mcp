@@ -226,6 +226,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       } : null,
       schedules: selected ? ws.services.schedules.list() : [],
       desktop: selected ? { policy: ws.services.desktop.policy() } : null,
+      android: selected ? { policy: ws.services.android.policy() } : null,
       permissions: selected ? {
         accessMode: accessMode(ws.store),
         savedMode: ws.store.trustMode(ws.workspaceId),
@@ -453,6 +454,18 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
     const policy = host.current().services.desktop.setPolicy({ mode: 'off' });
     res.json({ ok: true, policy });
+  });
+
+  app.get('/api/android/devices', async (_req, res) => {
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
+    try { res.json({ devices: await host.current().services.android.allDevices() }); }
+    catch (error) { res.status(400).json({ error: error instanceof DodoError ? error.message : 'ADB device scan failed' }); }
+  });
+
+  app.post('/api/android/policy', (req, res) => {
+    if (!hasWorkspace()) { res.status(409).json({ error: 'Select a workspace first.', code: 'WORKSPACE_REQUIRED' }); return; }
+    try { res.json({ ok: true, policy: host.current().services.android.setPolicy(req.body) }); }
+    catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid Android policy' }); }
   });
 
   // ---- per-workspace client ACL ----

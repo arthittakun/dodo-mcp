@@ -221,6 +221,26 @@ describe('CLI', () => {
     expect(fs.readdirSync(cfg)).toEqual([]);
   });
 
+  it('CLI Android: persistent exact-device permission works while stopped and from any directory', () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'android-cfg-'));
+    const unrelated = fs.mkdtempSync(path.join(base, 'android-cwd-'));
+    const noYes = runCli(['android', 'allow', '--device', 'SERIAL-1', '--mode', 'control', '--persist'], { cwd: unrelated, configDir: cfg });
+    expect(noYes.code).not.toBe(0);
+    expect(noYes.stderr).toContain('--yes');
+    expect(fs.readdirSync(cfg)).toEqual([]);
+
+    const saved = runCli(['android', 'allow', '--device', 'SERIAL-1', '--mode', 'control', '--persist', '--yes'], { cwd: unrelated, configDir: cfg });
+    expect(saved.code).toBe(0);
+    expect(saved.stdout).toContain('Remembered for this DODO installation');
+    expect(JSON.parse(saved.stdout.slice(0, saved.stdout.indexOf('\nRemembered')))).toMatchObject({ mode: 'control', allowedDevices: ['SERIAL-1'], persistent: true, expiresAt: null });
+    expect(fs.readdirSync(unrelated)).toEqual([]);
+
+    const disabled = runCli(['android', 'disable'], { cwd: base, configDir: cfg });
+    expect(disabled.code).toBe(0);
+    expect(disabled.stdout).toContain('disabled and forgotten');
+    expect(JSON.parse(disabled.stdout.slice(0, disabled.stdout.indexOf('\nAndroid')))).toMatchObject({ mode: 'off', allowedDevices: [], persistent: false });
+  });
+
   it.skipIf(process.platform !== 'linux')('CLI desktop on Linux fails closed when no native helper is installed', () => {
     const cfg = fs.mkdtempSync(path.join(base, 'desktop-linux-cfg-'));
     const proj = fs.mkdtempSync(path.join(base, 'desktop-linux-proj-'));

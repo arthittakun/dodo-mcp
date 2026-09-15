@@ -129,6 +129,9 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
       }
       case 'desktop.status': return services.desktop.status();
       case 'desktop.policy': return services.desktop.setPolicy(args);
+      case 'android.status': return services.android.status();
+      case 'android.devices': return services.android.allDevices();
+      case 'android.policy': return services.android.setPolicy(args);
       case 'trust.set': {
         const mode = String(args['mode']) as TrustMode;
         if (!['inspect', 'edit', 'trusted'].includes(mode)) throw new Error('invalid mode');

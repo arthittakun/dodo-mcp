@@ -1,17 +1,18 @@
 # DODO MCP
 
-**DODO MCP 1.0.6** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
+**DODO MCP** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
 ## จุดเด่น
 
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
-- HTTP ใช้ Compact Tool Surface 19 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 125 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 121 tools
+- HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
+- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 138 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 134 tools
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
+- ตรวจและควบคุมมือถือ Android ผ่าน ADB ได้ตั้งแต่ภาพหน้าจอ/UI/logcat ไปจนถึง input, apps, APK, file transfer และ device-side shell โดยจำกัดเฉพาะ serial ที่เจ้าของอนุญาต ([คู่มือ](docs/ANDROID.md))
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
 - มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
@@ -35,9 +36,9 @@ dodo setup --check
 dodo --cli
 ```
 
-### Android / Termux (ทดลองใช้)
+### Android / ADB และ Termux
 
-DODO 1.0.6 ไม่โหลด Sharp ตั้งแต่เริ่ม CLI อีกต่อไป จึงใช้คำสั่งพื้นฐานและ MCP
+DODO ไม่โหลด Sharp ตั้งแต่เริ่ม CLI จึงใช้คำสั่งพื้นฐานและ MCP
 สำหรับ text/code ได้แม้เครื่องไม่มี native Sharp build แพ็กเกจมี WebAssembly image backend
 เป็น optional dependency; หาก npm ข้าม optional dependency ให้ติดตั้งเพิ่มแล้วเปิด DODO ใหม่:
 
@@ -50,6 +51,18 @@ dodo --version
 เครื่องมือ coding ส่วนอื่นยังเริ่มได้ Android/Termux ยังเป็นสถานะทดลองใช้: installer,
 OS credential store, sandbox, desktop control และ browser automation ยังไม่ได้ผ่าน
 Android acceptance ครบ ดูข้อจำกัดและวิธีตรวจรับที่ [Android / Termux](docs/ANDROID.md)
+
+ถ้าต้องการให้ AI ตรวจหรือควบคุมมือถือที่เชื่อมกับเครื่องนี้ ให้ติดตั้ง Platform-Tools,
+เปิด USB/Wireless debugging และยอมรับ RSA prompt บนมือถือ จากนั้นอนุญาต exact serial:
+
+```bash
+dodo setup --check --components adb
+dodo android devices
+dodo android allow --device SERIAL --mode control --persist --yes
+```
+
+Full surface มี `android_*` 13 operations ส่วน HTTP Compact ใช้ `dodo_mobile` gateway
+สิทธิ์นี้ไม่ปิด OAuth, project context, trust/approval, expected hash หรือ audit
 
 ## เชื่อม ChatGPT ภายในไม่กี่นาที
 
@@ -102,7 +115,7 @@ dodo auth approve REQUEST_ID
 ```
 
 กลับไปที่ ChatGPT รอให้ scan เสร็จ เริ่มแชตใหม่ เลือก DODO ใน Developer mode แล้ว
-ทดสอบด้วย `ใช้ DODO เรียก project_overview` HTTP จะแสดง Compact surface ประมาณ 19
+ทดสอบด้วย `ใช้ DODO เรียก project_overview` HTTP จะแสดง Compact surface 20
 tools และเข้าถึง operations ที่เหลือผ่าน `dodo_discover` กับ gateway ตามสิทธิ์เดิม
 
 ดูขั้นตอนเต็มและวิธีแก้ OAuth/Tunnel ที่ [เชื่อม Web clients](docs/WEB_CLIENTS.md)

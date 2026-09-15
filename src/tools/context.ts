@@ -12,6 +12,7 @@ import type { AgentRuntimeService } from '../services/agent/agentService.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
+import type { AndroidService } from '../services/android/androidService.js';
 import type { McpServer, ServerContext, CallToolResult, ToolAnnotations } from '@modelcontextprotocol/server';
 import { DodoError, toDodoError } from '../errors.js';
 import type { GlobalConfig } from '../config/globalConfig.js';
@@ -78,6 +79,7 @@ export interface AppServices {
   intel: IntelService;
   overview: OverviewService;
   desktop: DesktopService;
+  android: AndroidService;
   projectConfig: ProjectConfigResult;
   workspaceId: string;
   epoch: string;

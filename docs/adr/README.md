@@ -64,3 +64,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [046 — Personal add-and-use mode](046-personal-access-mode.md)
 - [047 — Temporary Remote Config on the tunneled listener](047-temporary-remote-config.md)
 - [048 — Persistent exclusive Local/Tunnel connection mode](048-persistent-connection-mode.md)
+- [049 — Owner-approved Android control through ADB](049-android-adb-control.md)

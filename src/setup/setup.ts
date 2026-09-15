@@ -26,7 +26,7 @@ import { activateManagedTools, registerManagedPath } from './managedTools.js';
 import { downloadVerified, verifiedFile, MODEL_PIN, WINDOWS_PINS, extractWindowsZip } from './download.js';
 import { importState, planStateImport, type StateImportPlan, type StateImportResult } from '../config/stateImport.js';
 
-export const COMPONENTS = ['git', 'ripgrep', 'cloudflared', 'ffmpeg', 'whisper', 'model', 'chromium', 'lsp', 'speech', 'desktop', 'sandbox', 'web'] as const;
+export const COMPONENTS = ['git', 'ripgrep', 'adb', 'cloudflared', 'ffmpeg', 'whisper', 'model', 'chromium', 'lsp', 'speech', 'desktop', 'sandbox', 'web'] as const;
 export type Component = typeof COMPONENTS[number];
 export type SetupState = 'ready' | 'missing' | 'needs-permission' | 'needs-backend' | 'failed';
 export interface SetupItem { component: Component; state: SetupState; detail: string; action?: string }
@@ -87,6 +87,7 @@ export async function inspectSetup(options: SetupOptions): Promise<SetupReport> 
     let detail: string | undefined;
     if (component === 'git') detail = probe(root, 'git');
     if (component === 'ripgrep') detail = probe(root, 'rg');
+    if (component === 'adb') detail = probe(root, 'adb', ['version']);
     if (component === 'cloudflared') detail = probe(root, 'cloudflared');
     if (component === 'ffmpeg') { const a = probe(root, 'ffmpeg', ['-version']), b = probe(root, 'ffprobe', ['-version']); if (a && b) detail = `${a}; ffprobe probe passed`; }
     if (component === 'whisper') detail = probe(root, 'whisper-cli', ['--help']) ?? probe(root, 'whisper-cpp', ['--help']);
@@ -259,6 +260,10 @@ export async function runSetup(options: SetupOptions, log: (text: string) => voi
         if (['git', 'ripgrep', 'ffmpeg'].includes(component)) {
           if (process.platform === 'win32') await installPortable(component as 'git' | 'ripgrep' | 'ffmpeg');
           else packageInstall(component, { brew: [component], apt: [component], dnf: [component] });
+        } else if (component === 'adb') {
+          if (process.platform === 'darwin') packageInstall(component, { brew: ['android-platform-tools'], apt: [], dnf: [] });
+          else if (process.platform === 'linux') packageInstall(component, { brew: [], apt: ['adb'], dnf: ['android-tools'] });
+          else throw new Error('install the signed Android SDK Platform-Tools package from developer.android.com/tools/releases/platform-tools, then rerun dodo setup --check --components adb');
         } else if (component === 'cloudflared') {
           if (process.platform === 'darwin') packageInstall(component, { brew: ['cloudflared'], apt: [], dnf: [] });
           else throw new Error('automatic cloudflared installation is not enabled on this OS; install the signed official package from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/ then rerun dodo setup --check --components cloudflared');

@@ -100,7 +100,7 @@ describe('Phase 05 Project Brain over real HTTP + OAuth', () => {
 });
 
 describe('Project Brain through the compact gateway', () => {
-  it('discovers, queries and rebuilds without increasing the 19-tool compact surface', async () => {
+  it('discovers, queries and rebuilds without exceeding the 20-tool compact surface', async () => {
     const ctx = await launch({ toolSurface: 'compact', trust: 'trusted', fixtureFiles: { 'index.ts': 'export const compactBrain = 1;\n' } });
     try {
       await build(ctx, 'full');

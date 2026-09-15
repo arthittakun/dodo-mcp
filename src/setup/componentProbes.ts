@@ -85,7 +85,7 @@ function silence(file: string, seconds = 1): void {
 
 /** Explicit local setup only: fixtures are private and removed; no project code is executed. */
 export async function verifyInstalledComponent(component: string, root: string, configDir: string): Promise<string | undefined> {
-  if (!['git', 'ripgrep', 'cloudflared', 'speech', 'lsp', 'chromium', 'ffmpeg', 'whisper'].includes(component)) return undefined;
+  if (!['git', 'ripgrep', 'adb', 'cloudflared', 'speech', 'lsp', 'chromium', 'ffmpeg', 'whisper'].includes(component)) return undefined;
   const directory = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-setup-probe-'))); ensurePrivateDirectory(directory);
   try {
     if (component === 'git') {
@@ -107,6 +107,11 @@ export async function verifyInstalledComponent(component: string, root: string, 
       const output = run(root, binary(root, 'rg'), ['--no-config', '--fixed-strings', '--json', '--', 'DODO_RG_PROBE', file], directory);
       if (!output.split(/\r?\n/).filter(Boolean).some(line => (JSON.parse(line) as { type?: string }).type === 'match')) throw new Error('ripgrep did not return a real fixture match');
       return 'native ripgrep found the exact token in a Thai/spaced fixture path';
+    }
+    if (component === 'adb') {
+      const output = run(root, binary(root, 'adb'), ['version'], directory);
+      if (!/Android Debug Bridge version/i.test(output)) throw new Error('adb did not return its version identity');
+      return 'Android SDK Platform-Tools adb started and returned its version; no device connection, pairing or command was attempted';
     }
     if (component === 'cloudflared') {
       const output = run(root, binary(root, 'cloudflared'), ['--version'], directory);

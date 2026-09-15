@@ -46,6 +46,7 @@ export type DiscoverDomain =
   | 'exec'
   | 'git'
   | 'desktop'
+  | 'mobile'
   | 'media'
   | 'browser'
   | 'game'
@@ -240,6 +241,18 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     summary: 'SSRF-guarded outbound HTTPS fetch (only when the owner enabled allowWebFetch)',
     operations: ['fetch_url'],
   },
+  {
+    // Append new gateways so every pre-existing Compact name keeps its index.
+    name: 'dodo_mobile',
+    title: 'Inspect and control Android devices',
+    domain: 'mobile',
+    summary: 'owner-approved ADB devices: status, screenshots, UI, logs, packages, files, input, apps, APK install and bounded advanced device commands',
+    operations: [
+      'android_status', 'android_devices', 'android_device_info', 'android_capture', 'android_ui',
+      'android_logcat', 'android_packages', 'android_file_read', 'android_action', 'android_app',
+      'android_install', 'android_push', 'android_adb',
+    ],
+  },
 ] as const;
 
 const SCOPE_RANK: Record<OAuthScope, number> = { 'dodo:read': 0, 'dodo:write': 1, 'dodo:exec': 2 };
@@ -362,7 +375,7 @@ function buildGateway(spec: GatewaySpec): AnyToolDef {
 }
 
 // --------------------------------------------------------------- discover --
-const DISCOVER_DOMAINS = ['code', 'exec', 'git', 'desktop', 'media', 'browser', 'game', 'workflow', 'schedule', 'web'] as const;
+const DISCOVER_DOMAINS = ['code', 'exec', 'git', 'desktop', 'mobile', 'media', 'browser', 'game', 'workflow', 'schedule', 'web'] as const;
 
 interface OperationIndexEntry {
   operation: string;
@@ -602,7 +615,7 @@ function overviewFor(
 
 const ALL_FEATURES: SurfaceFeatures = { subagents: true };
 const DEFAULT_FEATURES: SurfaceFeatures = { subagents: false };
-const ALL_COUNTS = { compact: 2 + GATEWAY_SPECS.length, full: TOOL_CATALOG.length, hybrid: 2 + GATEWAY_SPECS.length + 30 };
+const ALL_COUNTS = { compact: 2 + GATEWAY_SPECS.length, full: TOOL_CATALOG.length, hybrid: 2 + GATEWAY_SPECS.length + 29 };
 const GATEWAYS: AnyToolDef[] = GATEWAY_SPECS.map(buildGateway);
 const discoverTool = buildDiscoverTool(GATEWAY_SPECS, TOOL_CATALOG);
 
@@ -611,9 +624,9 @@ export const COMPACT_CATALOG: AnyToolDef[] = [overviewFor('compact', ALL_COUNTS,
 
 /**
  * Hybrid surface (ADR-029 addendum): for clients that cap the tool
- * count near ~50, the coverage core comes FIRST (overview, discover, all 17
+ * count near ~50, the coverage core comes FIRST (overview, discover, all 18
  * gateways — identical to compact, so any client-side truncation can only
- * drop direct-tool duplicates, never capabilities), followed by the 30 most
+ * drop direct-tool duplicates, never capabilities), followed by the 29 most
  * used direct coding tools with their original names and schemas. 49 tools
  * total; permissions unchanged in every path.
  */
@@ -647,7 +660,6 @@ export const HYBRID_DIRECT_OPERATIONS: readonly string[] = [
   'job_output',
   'job_wait',
   'job_cancel',
-  'list_jobs',
 ] as const;
 
 export const HYBRID_CATALOG: AnyToolDef[] = [overviewFor('hybrid', ALL_COUNTS, true), discoverTool, ...GATEWAYS, ...HYBRID_DIRECT_OPERATIONS.map(targetOf)];

@@ -3,6 +3,8 @@ import path from 'node:path';
 import { chromium, type Page } from 'playwright';
 import { describe, it, expect } from 'vitest';
 import { launch } from '../helpers/testServer.js';
+import { AndroidService } from '../../src/services/android/androidService.js';
+import { FakeAdb } from '../helpers/adbBackend.js';
 
 /**
  * Local Config UI components in real Chromium (UI-01..):
@@ -250,6 +252,34 @@ describe.skipIf(!fs.existsSync(chromium.executablePath()))('local config UI comp
       const expectedHttpErrors = problems.filter((problem) => problem.includes('status of 400'));
       expect(expectedHttpErrors).toHaveLength(1);
       expect(problems.filter((problem) => !problem.includes('status of 400'))).toEqual([]);
+    } finally {
+      await browser.close();
+      await ctx.cleanup();
+    }
+  }, 45000);
+
+  it('UI-06: owner scans exact ADB serials and saves a persistent control policy', async () => {
+    const ctx = await launch({ trust: 'trusted', configPort: 0 });
+    const adb = new FakeAdb();
+    ctx.server.services.android = new AndroidService(ctx.server.services.store, ctx.server.services.wfs, ctx.server.workspaceId, ctx.server.epoch, adb, ctx.configDir);
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    const problems = await collectProblems(page);
+    try {
+      await page.goto(ctx.configUrl!);
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.getByRole('heading', { name: /Android \/ ADB/ }).waitFor();
+      await page.getByRole('button', { name: 'ค้นหาอุปกรณ์ ADB', exact: true }).click();
+      const device = page.locator('input[name="android-device"][value="SERIAL-1"]');
+      await device.waitFor();
+      expect(await device.isChecked()).toBe(true);
+      expect(await page.locator('input[name="android-device"][value="OTHER-2"]').isDisabled()).toBe(true);
+      await page.locator('#android-policy-mode').selectOption('control');
+      await page.locator('#android-save').click();
+      await expect.poll(() => page.locator('#android-mode').textContent()).toBe('control');
+      expect(ctx.server.services.android.policy()).toMatchObject({ mode: 'control', allowedDevices: ['SERIAL-1'], persistent: true });
+      expect(await page.evaluate('document.documentElement.scrollWidth<=innerWidth')).toBe(true);
+      expect(problems).toEqual([]);
     } finally {
       await browser.close();
       await ctx.cleanup();

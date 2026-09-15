@@ -301,6 +301,24 @@ Automated catalog/API/Chromium/fresh-package fixtures: **AUTOMATED_PASS**
 
 เพิ่ม MCP connection ใน client ที่ต้องการ ใช้ OAuth, scan tools และบันทึกจำนวน tools ที่ client แสดงจริง หาก catalog ถูก cache ให้ recreate connection ตาม client instructions
 
+## Android / ADB
+
+ใช้ fixture device/emulator ที่ไม่มีข้อมูลเจ้าของ แล้วบันทึก serial แบบ redact เมื่อเผยแพร่:
+
+1. ตรวจ `dodo setup --check --components adb` และ `dodo android devices`
+2. เปิด view ชั่วคราวให้ exact serial แล้วทดสอบ info, capture, UI, logcat, packages และ bounded file read
+3. ยืนยันว่า serial อื่นและ read-only OAuth token เข้าไม่ได้
+4. เปิด control แล้วทดสอบ tap/key/app launch บน fixture app โดย capture ใหม่หลังทุก action
+5. สร้าง APK/file fixture ใน workspace อ่าน SHA-256 แล้วทดสอบ install/push
+6. เปลี่ยน source หลังอ่าน hash และตรวจว่า `FILE_CHANGED` เกิดก่อน ADB effect
+7. ทดสอบ advanced device-side shell กับ harmless `echo` และยืนยันว่า pair/connect/root ถูกปฏิเสธ
+8. ถอนสิทธิ์ระหว่าง session แล้วตรวจ action ถัดไปถูกปฏิเสธ
+9. ตรวจ Local Config ที่ desktop และ 390px รวม keyboard/focus/error state
+10. ลบ fixture app/file และรัน `dodo android disable`
+
+Physical Android device/emulator: **MANUAL_NOT_RUN** จนกว่าจะทำรายการนี้บน hardware
+หรือ emulator จริง Automated FakeAdb ไม่เปลี่ยนสถานะ manual gate
+
 ## DodoBench และ release gate
 
 Automated fixtures: รัน `npm run bench`, `npm run release:gate` บน macOS และ

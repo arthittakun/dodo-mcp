@@ -24,6 +24,7 @@ import { DodoError } from '../errors.js';
 import type { StatusData } from '../ipc/protocol.js';
 import { sandboxAvailability } from '../services/jobs/sandbox.js';
 import { DesktopPolicyInputSchema, saveDesktopPolicy } from '../services/desktop/desktopPolicy.js';
+import { AndroidPolicyInputSchema, saveAndroidPolicy } from '../services/android/androidPolicy.js';
 import { INPUT_LIMIT_PROFILES } from '../config/limits.js';
 import { ProjectRegistry, type RegisteredProject } from '../projects/registry.js';
 import { runCliMenu } from './menu.js';
@@ -1362,6 +1363,55 @@ desktop.command('disable').description('revoke and forget installation-wide desk
     console.log('Desktop access disabled and forgotten for this DODO installation.');
   });
 
+function saveInstallationAndroidPolicy(input: unknown) {
+  const args = AndroidPolicyInputSchema.parse(input);
+  const { dir } = resolveConfigDir(process.env);
+  ensureConfigDir(dir);
+  const db = openDatabase(statePaths(dir).dbFile);
+  try {
+    const store = new Store(db);
+    store.installSecret();
+    return db.transaction(() => saveAndroidPolicy(store, INSTALLATION_AUTHORITY_ID, 'local-cli', args, Date.now()))();
+  } finally { db.close(); }
+}
+
+const android = program.command('android').description('inspect and authorize Android devices connected through ADB');
+android.command('devices').description('list devices visible to the local ADB host; does not grant AI access')
+  .action(async () => {
+    const { NativeAdbBackend, parseAdbDevices } = await import('../services/android/adbBackend.js');
+    const backend = new NativeAdbBackend(process.cwd());
+    const result = await backend.run(['devices', '-l'], { maxStdoutBytes: 128 * 1024 });
+    if (result.code !== 0) fail('ADB could not list devices. Install Platform-Tools and authorize this host on the phone.');
+    console.log(JSON.stringify(parseAdbDevices(result.stdout.toString('utf8')), null, 2));
+  });
+android.command('status').description('show Android policy and ADB status for the running workspace')
+  .action(async () => console.log(JSON.stringify(await ipcForCwd('android.status'), null, 2)));
+android.command('allow')
+  .description('allow exact connected ADB serials; --persist remembers once for this DODO installation')
+  .requiredOption('--device <serials...>', 'exact serials from dodo android devices')
+  .option('--mode <mode>', 'view | control', 'view')
+  .option('--minutes <n>', 'temporary permission lifetime 1..480 minutes; excludes --persist', (v: string) => Number(v))
+  .option('--persist', 'remember these device serials until dodo android disable', false)
+  .option('--yes', 'acknowledge that ADB can expose private data and control the selected devices', false)
+  .action(async (opts: { device: string[]; mode: string; minutes?: number; persist: boolean; yes: boolean }) => {
+    if (!['view', 'control'].includes(opts.mode)) fail('Android mode must be view or control');
+    if (!opts.yes) fail('ADB can read private device data and CONTROL can change apps/files with the Android shell user. Repeat with --yes to authorize exact serials.');
+    if (opts.persist && opts.minutes !== undefined) fail('use --persist or --minutes, not both');
+    const input = { mode: opts.mode, allowedDevices: opts.device, persistent: opts.persist, ...(opts.minutes !== undefined ? { minutes: opts.minutes } : {}) };
+    if (opts.persist) {
+      console.log(JSON.stringify(saveInstallationAndroidPolicy(input), null, 2));
+      console.log('Remembered for this DODO installation. OAuth dodo:exec, project access, trust/approval and exact serial checks still apply.');
+    } else {
+      console.log(JSON.stringify(await ipcForCwd('android.policy', input), null, 2));
+      console.log('Temporary Android grant: expires or resets on workspace epoch change.');
+    }
+  });
+android.command('disable').description('revoke and forget Android ADB access installation-wide')
+  .action(() => {
+    console.log(JSON.stringify(saveInstallationAndroidPolicy({ mode: 'off' }), null, 2));
+    console.log('Android ADB access disabled and forgotten for this DODO installation.');
+  });
+
 // Static-client helpers are imported lazily to keep CLI startup light.
 import { addStaticClient as addStaticClientLocal, listStaticClients as listStaticClientsLocal } from '../auth/clients.js';
 
@@ -1379,6 +1429,10 @@ MCP subprocess clients:
 Desktop (platform helper and explicit app permission required):
   dodo desktop setup                 prepare the platform desktop backend
   dodo desktop disable               revoke desktop access
+Android (ADB host authorization and exact-device permission):
+  dodo android devices               list connected/authorized device serials
+  dodo android allow --device SERIAL --mode control --persist --yes
+  dodo android disable               revoke DODO Android access
 Remote setup:
   dodo init --public-url https://...   configure public origin once
   dodo tunnel configure --tunnel --os-credential --public-url https://...

@@ -3,6 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import { registerTool, type AnyToolDef, type AppServices } from './context.js';
 import { CORE_TOOL_CATALOG } from './coreCatalog.js';
 import { AGENT_RUNTIME_TOOLS } from './agentRuntimeTools.js';
+import { ANDROID_TOOLS } from './androidTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -23,6 +24,8 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   // Durable plan/hypothesis/lock/snapshot/skill coordination. Existing 104 names stay an exact prefix.
   ...AGENT_RUNTIME_TOOLS,
   ...SUBAGENT_TOOLS,
+  // Append platform additions so the complete pre-Android catalog stays an exact prefix.
+  ...ANDROID_TOOLS,
 ];
 
 export function registerCatalog(server: McpServer, services: AppServices): void {

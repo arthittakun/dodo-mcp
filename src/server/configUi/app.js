@@ -260,6 +260,15 @@
       : 'การอ่านและควบคุมหน้าต่างปิดอยู่';
     $('desktop-disable').disabled = !desktop || desktop.mode === 'off';
 
+    const android = w && s.android && s.android.policy;
+    $('android-mode').textContent = android ? android.mode : 'off';
+    $('android-summary').textContent = android && android.mode !== 'off'
+      ? android.persistent
+        ? `อนุญาต ${android.allowedDevices.join(', ')} — จำสำหรับ DODO installation นี้จนกว่าจะปิด`
+        : `อนุญาต ${android.allowedDevices.join(', ')} ถึง ${new Date(android.expiresAt).toLocaleTimeString()}`
+      : 'การเข้าถึง Android ปิดอยู่';
+    $('android-disable').disabled = !android || android.mode === 'off';
+
     // permissions — personal mode hides the per-project ACL/trust ceremony
     // entirely (a short note with a tooltip replaces it); managed mode keeps
     // every original control. Pure presentation: no scope/guard changes.
@@ -830,6 +839,46 @@
       catch (e) { notify('error', `ปิด Desktop access ไม่สำเร็จ: ${e.message}`); }
     }).finally(() => { $('desktop-disable').disabled = !state || !state.desktop || state.desktop.policy.mode === 'off'; });
   });
+
+  $('android-scan').addEventListener('click', (ev) => withBusy(ev.currentTarget, 'กำลังค้นหา…', async () => {
+    const error = $('android-error'); error.hidden = true;
+    try {
+      const result = await api('android/devices');
+      const fieldset = $('android-devices');
+      fieldset.querySelectorAll('label').forEach((node) => node.remove());
+      if (!result.devices || result.devices.length === 0) {
+        error.textContent = 'ไม่พบอุปกรณ์ — ตรวจ adb devices และยอมรับ RSA prompt บนมือถือ'; error.hidden = false;
+        $('android-form').hidden = false; return;
+      }
+      for (const device of result.devices) {
+        const label = document.createElement('label'); label.className = 'check';
+        const input = document.createElement('input'); input.type = 'checkbox'; input.name = 'android-device'; input.value = device.serial;
+        input.disabled = device.state !== 'device'; input.checked = device.state === 'device';
+        label.append(input, document.createTextNode(` ${device.serial} — ${device.model || device.device || 'Android'} (${device.state})`));
+        fieldset.append(label);
+      }
+      $('android-form').hidden = false;
+      notify('success', `พบ ${result.devices.length} อุปกรณ์`);
+    } catch (e) { error.textContent = `✕ ${e.message}`; error.hidden = false; $('android-form').hidden = false; }
+  }));
+
+  $('android-form').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const devices = [...document.querySelectorAll('input[name="android-device"]:checked')].map((input) => input.value);
+    const error = $('android-error'); error.hidden = true;
+    if (devices.length === 0) { error.textContent = '✕ เลือกอุปกรณ์ online อย่างน้อยหนึ่งเครื่อง'; error.hidden = false; return; }
+    withBusy($('android-save'), 'กำลังบันทึก…', async () => {
+      try {
+        await api('android/policy', { mode: $('android-policy-mode').value, allowedDevices: devices, persistent: $('android-persist').checked });
+        notify('success', 'บันทึกสิทธิ์ Android แล้ว'); await refresh(true);
+      } catch (e) { error.textContent = `✕ ${e.message}`; error.hidden = false; notify('error', 'บันทึกสิทธิ์ Android ไม่สำเร็จ'); }
+    });
+  });
+
+  $('android-disable').addEventListener('click', () => withBusy($('android-disable'), 'กำลังปิด…', async () => {
+    try { await api('android/policy', { mode: 'off' }); await refresh(true); notify('success', 'ปิด Android access แล้ว'); }
+    catch (e) { notify('error', `ปิด Android access ไม่สำเร็จ: ${e.message}`); }
+  }));
 
   // ---- permissions ----
   $('perm-form').addEventListener('submit', (ev) => {

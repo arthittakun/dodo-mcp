@@ -1,5 +1,20 @@
 # DODO MCP — Release Notes
 
+## 1.1.0 — Android device tools through owner-approved ADB
+
+- เพิ่ม Full 13 `android_*` operations และ Compact `dodo_mobile` gateway สำหรับ
+  device info, screenshot/UI, logcat/packages/files, input/app actions, APK install,
+  file push และ bounded device-side ADB
+- เพิ่ม exact-serial `off|view|control` policy ผ่าน CLI และ Local Config โดย persistent
+  permission เป็นระดับ installation และ temporary permission ผูก workspace/epoch
+- screenshot คืน MCP image block พร้อม caller-bound snapshot; UI password ถูก redact
+- APK/push บังคับ expected SHA-256 และ private staging copy ภายใต้ shared file guards
+- เพิ่ม `adb` setup component, docs, unit/security/HTTP+OAuth/Chromium/packaging tests
+- Complete Full 138, live Full default 134, Compact 20 และ Hybrid คง 49 tools
+
+ติดตั้งด้วย `npm install -g dodo-mcp@1.1.0` แล้ว restart DODO และ refresh/recreate MCP
+connection เพื่อโหลด catalog ใหม่ การ pair/connect และยืนยัน RSA ยังเป็น owner action
+
 ## 1.0.6 — Android-safe CLI startup
 
 - เปลี่ยน raster image backend เป็น lazy load เพื่อให้ core CLI, transport และ
