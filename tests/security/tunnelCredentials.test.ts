@@ -27,12 +27,12 @@ describe('Cloudflare Tunnel credential boundaries', () => {
     expect(serialized).not.toContain(token);
   });
 
-  it('migrates old persistent managed config to Tunnel and old temporary defaults to Local', () => {
+  it('migrates old managed config to DODO Tunnel and old external config to Cloudflare Local', () => {
     const dir = fixture(), file = path.join(dir, 'config.json');
     fs.writeFileSync(file, JSON.stringify({ version: 1, tunnel: { mode: 'managed', startWithDodo: true, credentialRef: { provider: 'env', name: 'MY_TUNNEL_TOKEN' } } }), { mode: 0o600 });
     expect(loadGlobalConfig(file).tunnel.connectionMode).toBe('tunnel');
     fs.writeFileSync(file, JSON.stringify({ version: 1, tunnel: { mode: 'external', startWithDodo: true } }), { mode: 0o600 });
-    expect(loadGlobalConfig(file).tunnel.connectionMode).toBe('local');
+    expect(loadGlobalConfig(file).tunnel.connectionMode).toBe('external');
   });
 
   it('validates environment and private-file references without copying the secret', async () => {
@@ -83,6 +83,9 @@ describe('Cloudflare Tunnel credential boundaries', () => {
   it('redacts the exact tunnel credential before writing bounded private logs', () => {
     const dir = fixture(), log = new TunnelLog(dir, token);
     log.append('stderr', `cloudflared accidentally echoed ${token}`);
+    // Disk writes are coalesced so a busy cloudflared cannot stall the event
+    // loop; redaction still happens before the bytes ever leave `append`.
+    log.close();
     const content = fs.readFileSync(log.file, 'utf8');
     expect(content).toContain('[REDACTED_TUNNEL_TOKEN]');
     expect(content).not.toContain(token);

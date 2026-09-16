@@ -115,7 +115,7 @@
 
   <section class="card" id="card-projects" aria-labelledby="h-projects">
     <div class="card-head">
-      <h2 id="h-projects">Project Registry</h2>
+      <h2 id="h-projects">โปรเจกต์และสิทธิ์ของ AI <span class="muted">Project Registry</span></h2>
       <span class="badge" id="projects-count" hidden></span>
     </div>
     <div class="card-state" id="projects-loading">กำลังโหลด…</div>
@@ -128,9 +128,15 @@
       <form id="project-add-form" class="form" novalidate>
         <label for="project-add-path">เพิ่มโปรเจกต์ด้วย absolute path</label>
         <input id="project-add-path" name="path" type="text" autocomplete="off" spellcheck="false" placeholder="/Users/you/projects/app" aria-describedby="project-add-help project-add-error" required>
-        <label for="project-add-name">ชื่อที่แสดง <span class="muted">(ไม่บังคับ)</span></label>
+        <label for="project-add-name">ชื่อโปรเจกต์ <span class="muted">(ใช้เรียกโปรเจกต์นี้กับ AI)</span></label>
+        <input id="project-add-name" name="displayName" type="text" autocomplete="off" maxlength="120" placeholder="auto-upload">
+        <label for="project-add-access">ระดับการเข้าถึง <button type="button" class="help-tip" data-tip="กำหนดสิ่งที่ AI ทำได้ในโปรเจกต์นี้ และเป็นเพดานสูงสุด สิทธิ์จริงคือส่วนที่ทับกับ OAuth scope ของ client นั้น เช่น token ที่อ่านได้อย่างเดียวจะยังอ่านได้อย่างเดียวแม้เลือกทำงานเต็มรูปแบบ" aria-label="คำอธิบาย: ระดับการเข้าถึง">?</button></label>
         <div class="input-row">
-          <input id="project-add-name" name="displayName" type="text" autocomplete="off" maxlength="120" placeholder="Web application">
+          <select id="project-add-access" name="access">
+            <option value="read">อ่านอย่างเดียว — อ่าน ค้นหา วิเคราะห์</option>
+            <option value="edit" selected>แก้ไข — อ่านและแก้ไฟล์</option>
+            <option value="full">ทำงานเต็มรูปแบบ — อ่าน แก้ไฟล์ และรันคำสั่ง/ทดสอบ</option>
+          </select>
           <button type="submit" class="btn primary" id="project-add">เพิ่มโปรเจกต์</button>
         </div>
         <label class="check"><input type="checkbox" id="project-add-open" checked><span>เปิดโปรเจกต์นี้ทันทีหลังเพิ่ม</span></label>
@@ -145,9 +151,9 @@
     <div class="card-state error-state" id="projects-error" hidden></div>
   </section>
 
-  <p class="callout info" id="personal-note" hidden><span aria-hidden="true">ℹ</span><span>โหมดส่วนตัว: โปรเจกต์ที่เพิ่มแล้วพร้อมใช้ทันที ไม่ต้องตั้ง Client ACL หรือ Trust ต่อโปรเจกต์ <button type="button" class="help-tip" data-tip="ในโหมดส่วนตัว OAuth client ที่คุณอนุมัติใช้ได้ทุกโปรเจกต์ตาม scopes ของ token ส่วน sandbox, path/secret guards และ expected hash ยังทำงานครบ เปลี่ยนเป็นโหมดแยกสิทธิ์ได้ที่หน้า Settings" aria-label="คำอธิบาย: โหมดส่วนตัว">?</button></span></p>
+  <p class="callout info" id="personal-note" hidden><span aria-hidden="true">ℹ</span><span>โหมดส่วนตัว: ตั้งสิทธิ์ของแต่ละโปรเจกต์จากช่อง “ระดับการเข้าถึง” ในการ์ดด้านบนได้เลย ไม่ต้องตั้ง Client ACL หรือ Trust ซ้ำ <button type="button" class="help-tip" data-tip="ระดับ อ่าน/แก้ไข/ทำงานเต็มรูปแบบเป็นเพดานต่อโปรเจกต์ และยังถูกจำกัดด้วย OAuth scope, sandbox, path/secret guards และ expected hash เปลี่ยนเป็นโหมดแยกสิทธิ์ละเอียดได้ที่หน้า Settings" aria-label="คำอธิบาย: โหมดส่วนตัว">?</button></span></p>
 
-  <section class="card" id="card-perm" aria-labelledby="h-perm">
+  <section class="card" id="card-perm" hidden aria-labelledby="h-perm">
     <div class="card-head">
       <h2 id="h-perm">Trust ของโปรเจกต์นี้ <button type="button" class="help-tip" data-tip="ระดับสิทธิ์ที่บันทึกไว้ต่อโปรเจกต์ ส่วน 'สิทธิ์ที่มีผล' คือค่าที่ใช้จริงในรอบนี้ ซึ่งอาจต่างกันเมื่อรันด้วย override flag" aria-label="คำอธิบาย: trust และ effective trust">?</button></h2>
       <span class="badge" id="perm-effective-badge" hidden></span>
@@ -184,7 +190,7 @@
     <div class="card-state error-state" id="perm-error" hidden></div>
   </section>
 
-  <section class="card" id="card-clients" aria-labelledby="h-clients">
+  <section class="card" id="card-clients" hidden aria-labelledby="h-clients">
     <div class="card-head"><h2 id="h-clients">Client access <button type="button" class="help-tip" data-tip="OAuth scopes กำหนดขอบเขตสูงสุดของ token (อ่าน/แก้ไฟล์/รันคำสั่ง) การอนุญาตที่นี่มีผลเฉพาะโฟลเดอร์นี้ และไม่เพิ่ม scope ให้ token ที่ออกไปแล้ว" aria-label="คำอธิบาย: OAuth scopes">?</button></h2><span class="badge" id="clients-count" hidden></span></div>
     <div class="card-state" id="clients-loading">กำลังโหลด…</div>
     <div class="card-body" id="clients-body" hidden>
@@ -279,17 +285,20 @@
   </section>
 
   <section class="card" id="card-tunnel" aria-labelledby="h-tunnel">
-    <div class="card-head"><h2 id="h-tunnel">การเชื่อมต่อ MCP <button type="button" class="help-tip" data-tip="เลือกได้หนึ่งโหมดต่อ DODO installation: Local หรือ DODO Tunnel เมื่อเลือก Tunnel ระบบจะเริ่มและหยุด cloudflared พร้อม DODO ทุกครั้ง" aria-label="คำอธิบาย: connection mode">?</button></h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
+    <div class="card-head"><h2 id="h-tunnel">การเชื่อมต่อ MCP <button type="button" class="help-tip" data-tip="เลือกได้หนึ่งโหมดต่อ DODO installation: ใช้เฉพาะเครื่อง, ใช้ Cloudflare ที่คุณติดตั้งและรันเอง, หรือให้ DODO ดูแล cloudflared ด้วย Tunnel token" aria-label="คำอธิบาย: connection mode">?</button></h2><span class="badge" id="tunnel-badge">กำลังตรวจ…</span></div>
     <form id="tunnel-form" class="form" novalidate>
       <fieldset>
         <legend>โหมดที่ใช้เมื่อเปิด DODO</legend>
-        <label class="check"><input id="tunnel-mode-local" name="connectionMode" type="radio" value="local"><span><b>Local</b><small>AI ในเครื่องใช้ <code>127.0.0.1:21730/mcp</code> และ DODO ไม่เปิด Tunnel</small></span></label>
-        <label class="check"><input id="tunnel-mode-tunnel" name="connectionMode" type="radio" value="tunnel"><span><b>DODO Tunnel</b><small>ใช้ public origin เป็น MCP URL หลัก และเริ่ม cloudflared พร้อม DODO ทุกครั้ง</small></span></label>
+        <label class="check"><input id="tunnel-mode-local" name="connectionMode" type="radio" value="local"><span><b>เฉพาะเครื่อง (Loopback)</b><small>AI ในเครื่องใช้ <code>127.0.0.1:21730/mcp</code> โดยไม่มี Cloudflare</small></span></label>
+        <label class="check"><input id="tunnel-mode-external" name="connectionMode" type="radio" value="external"><span><b>Cloudflare Local (ติดตั้งในเครื่อง)</b><small>คุณติดตั้งและรัน <code>cloudflared</code> เอง DODO ใช้ Public MCP URL แต่ไม่อ่าน token และไม่ควบคุม process</small></span></label>
+        <label class="check"><input id="tunnel-mode-tunnel" name="connectionMode" type="radio" value="tunnel"><span><b>DODO Tunnel</b><small>DODO อ่าน token จาก credential store และเริ่ม/หยุด cloudflared พร้อม DODO</small></span></label>
       </fieldset>
-      <label for="tunnel-token">Cloudflare Tunnel token</label>
-      <input id="tunnel-token" name="token" type="password" autocomplete="new-password" spellcheck="false" maxlength="8192" placeholder="เว้นว่างเพื่อใช้ credential ที่บันทึกไว้" aria-describedby="tunnel-credential tunnel-error">
-      <p class="help" id="tunnel-credential">กำลังตรวจ credential store…</p>
-      <p class="help">Token เป็น write-only และเก็บใน Keychain/Credential Manager/Secret Service เท่านั้น หน้าเว็บจะไม่อ่านค่ากลับมา</p>
+      <div id="tunnel-credential-fields">
+        <label for="tunnel-token">Cloudflare Tunnel token</label>
+        <input id="tunnel-token" name="token" type="password" autocomplete="new-password" spellcheck="false" maxlength="8192" placeholder="เว้นว่างเพื่อใช้ credential ที่บันทึกไว้" aria-describedby="tunnel-credential tunnel-error">
+        <p class="help" id="tunnel-credential">ใช้เฉพาะโหมด DODO Tunnel · กำลังตรวจ credential store…</p>
+        <p class="help">Token เป็น write-only และเก็บใน Keychain/Credential Manager/Secret Service เท่านั้น หน้าเว็บจะไม่อ่านค่ากลับมา</p>
+      </div>
       <details class="details">
         <summary>ค่าขั้นสูง</summary>
         <div class="two-col">

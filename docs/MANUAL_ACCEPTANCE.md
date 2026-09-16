@@ -2,6 +2,10 @@
 
 ผล manual ต้องบันทึกเป็น `MANUAL_PASS` หรือ `MANUAL_NOT_RUN` พร้อมวันเวลาและ environment ห้ามเดาผลจาก automated test
 
+สถานะ release 1.2.0: UI/authority/connection-mode fixtures ผ่านอัตโนมัติ แต่การใช้
+**Cloudflare Local** และ **DODO Tunnel** ผ่าน public hostname จริงยัง
+`MANUAL_NOT_RUN` จนกว่าเจ้าของจะทดสอบด้วย Tunnel/DNS/credential จริง
+
 สถานะล่าสุดของ owner-state setup/import gate: `MANUAL_NOT_RUN` (2026-09-14) ชุด automated ใช้ fixture แยกและไม่แตะ config/OAuth/tunnel ของผู้ใช้
 
 สถานะ live Cloudflare connection smoke ของรุ่น 1.0.2: `MANUAL_PASS` (2026-09-15) บน
@@ -26,18 +30,19 @@ connection smoke เดิมไม่ได้อ้างว่า AI client �
 10. ตรวจ `dodo tunnel doctor` แยก local/public health และไม่กล่าวว่า AI client connected
 11. ตรวจ process list ว่า argv ไม่มี token และ `dodo tunnel logs`/audit/config ไม่มี token
 12. ทดสอบ OAuth + MCP ผ่าน public origin แล้วหยุด DODO; ยืนยัน owned child หยุดตาม
-13. เปิด Local Config เลือก Local แล้ว restart; ตรวจว่าไม่เริ่ม cloudflared และ Active MCP URL เป็น loopback
-14. เลือก Tunnel ผ่าน Local Config พร้อม write-only token แล้ว restart; ตรวจว่าช่องไม่ถูกเติมกลับและ endpoint เป็น public
-15. บันทึก macOS และ Linux Docker แยก environment; Windows manual result แยกตามเครื่องจริง
+13. เปิด Local Config เลือก **เฉพาะเครื่อง (Loopback)** แล้ว restart; ตรวจว่าไม่เริ่ม cloudflared และ Active MCP URL เป็น loopback
+14. เลือก **Cloudflare Local (ติดตั้งในเครื่อง)** พร้อม public origin; ตรวจว่าช่อง token ถูกปิด, DODO ไม่เริ่ม/หยุด cloudflared และ endpoint เป็น public หลัง restart
+15. เลือก **DODO Tunnel** พร้อม write-only token แล้ว restart; ตรวจว่าช่องไม่ถูกเติมกลับและ endpoint เป็น public
+16. บันทึก macOS และ Linux Docker แยก environment; Windows manual result แยกตามเครื่องจริง
 
-## Remote Config ผ่าน Tunnel
+## Remote Config ผ่าน Cloudflare
 
 Automated Chromium fixture ผ่านแล้วทั้ง 1440×900 และ 390×844 โดยใช้ isolated
 loopback public-origin fixture: จับคู่, dashboard/assets/API, workspace-bound mutation,
 หมดอายุและปิดเป็น 404 ทำงานจริง การตรวจผ่าน public Cloudflare hostname จริงยัง
 `MANUAL_NOT_RUN`
 
-1. เลือก Tunnel แบบ persistent และรัน DODO จน `dodo tunnel status` รายงาน connected
+1. ทดสอบสองรอบ: (ก) Cloudflare Local โดยเจ้าของรัน tunnel เอง และ (ข) DODO Tunnel จน `dodo tunnel status` รายงาน connected
 2. จาก terminal อื่นรัน `dodo --web`; คำสั่งต้องไม่ถามหรือส่ง Tunnel token ผ่าน IPC
 3. ตรวจว่า process ไม่ restart และ MCP/OAuth/workspace epoch เดิมไม่เปลี่ยน
 4. เปิด URL `/config` จากอีกอุปกรณ์ ตรวจว่า URL ไม่มี query/fragment secret
@@ -47,7 +52,7 @@ loopback public-origin fixture: จับคู่, dashboard/assets/API, worksp
 8. รัน `dodo --web` อีกครั้ง ตรวจ session เดิมถูกยกเลิกและได้ code ใหม่
 9. รัน `dodo web --close` ตรวจ `/config`, assets และ API เป็น 404 แต่ `/healthz`, OAuth และ `/mcp` ยังอยู่
 10. เปิดใหม่แล้วรอ 1 ชั่วโมง ตรวจ namespace ปิดเองโดยไม่หยุด MCP/Tunnel
-11. เปลี่ยน persistent mode เป็น Local แล้ว restart; `dodo --web` ต้องถูกปฏิเสธและไม่เริ่ม Tunnel เอง
+11. เปลี่ยน persistent mode เป็นเฉพาะเครื่อง (Loopback) แล้ว restart; `dodo --web` ต้องถูกปฏิเสธและไม่เริ่ม Tunnel เอง
 12. ตรวจ config, audit, tunnel log, browser local/session storage และ process argv ว่าไม่มี Tunnel token, pairing code หรือ session token
 
 ## Setup foundation
@@ -87,6 +92,17 @@ loopback public-origin fixture: จับคู่, dashboard/assets/API, worksp
 6. ทดสอบ malformed/unknown config, symlink และ active IPC marker ให้ fail closed
 
 ## Local Config
+
+0b. โปรเจกต์และระดับการเข้าถึง (2026-09-16) — **MANUAL_NOT_RUN**:
+   บนเครื่อง Windows จริงที่ใช้ tunnel จริง ให้ตรวจว่า
+   (ก) เพิ่มโปรเจกต์จากหน้า Projects ด้วย path + ชื่อ + ระดับเดียว แล้วใช้งานได้ทันที
+       โดยไม่ต้องตั้ง client ACL/trust เพิ่ม
+   (ข) สั่ง AI ว่า "ใช้ DODO แก้โปรเจกต์ auto-upload" แล้ว AI resolve ชื่อได้เอง
+       และแก้ไฟล์ในโปรเจกต์ที่ถูกต้อง
+   (ค) ตั้งระดับเป็น `read` แล้วคำสั่งเขียน/รันถูกปฏิเสธจริง
+   (ง) แถบสถานะ Tunnel ไม่กระพริบระหว่างใช้งานต่อเนื่อง และ `dodo tunnel status`
+       แสดง phase/`lastReadyAt` ที่สอดคล้องกับความเป็นจริง
+   (จ) banner ตอน start ไม่พูดถึง ACL เมื่ออยู่ในโหมดส่วนตัว
 
 0. UI ใหม่ (2026-09-14): ตรวจบนเครื่องจริงว่า (ก) nav 8 หน้าใช้ได้ทั้ง desktop และมือถือ
    (ข) tooltip `?` เปิดด้วยการแตะบนอุปกรณ์ touch จริงและ screen reader อ่านได้

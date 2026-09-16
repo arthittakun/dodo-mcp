@@ -223,8 +223,8 @@ describe.skipIf(!fs.existsSync(chromium.executablePath()))('local config UI comp
     }
   }, 45000);
 
-  it('UI-05: connection mode is exclusive, reports the active endpoint, and refuses an unready Tunnel selection', async () => {
-    const ctx = await launch({ trust: 'trusted', configPort: 0, connectionMode: 'local' });
+  it('UI-05: distinguishes loopback, owner-managed Cloudflare and DODO-owned Tunnel', async () => {
+    const ctx = await launch({ trust: 'trusted', configPort: 0, connectionMode: 'local', configPatch: { publicUrl: 'https://owner-cloudflared.example.test' } });
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const problems = await collectProblems(page);
@@ -235,19 +235,35 @@ describe.skipIf(!fs.existsSync(chromium.executablePath()))('local config UI comp
       expect(await page.locator('#conn-active').textContent()).toBe(`http://127.0.0.1:${ctx.port}/mcp`);
       expect(await page.locator('#conn-local').textContent()).toBe(`http://127.0.0.1:${ctx.port}/mcp`);
       expect(await page.locator('#tunnel-mode-local').isChecked()).toBe(true);
+      expect(await page.locator('#tunnel-mode-external').isChecked()).toBe(false);
       expect(await page.locator('#tunnel-mode-tunnel').isChecked()).toBe(false);
 
-      // The fixture has only an intentionally insecure loopback origin and no
-      // stored credential. Selecting Tunnel must fail without changing the
-      // saved mode or displaying a canned success message.
-      await page.locator('#tunnel-mode-tunnel').check();
+      // Owner-managed cloudflared uses the public origin without asking DODO
+      // to store a token or supervise a process.
+      await page.locator('#tunnel-mode-external').check();
+      expect(await page.locator('#tunnel-token').isDisabled()).toBe(true);
+      expect(await page.locator('#tunnel-credential-fields').isHidden()).toBe(true);
       await page.locator('#tunnel-save').click();
-      await expect.poll(() => page.locator('#tunnel-error').textContent()).toContain('publicUrl must be https://');
-      expect(JSON.parse(fs.readFileSync(path.join(ctx.configDir, 'config.json'), 'utf8')).tunnel.connectionMode).toBe('local');
+      await expect.poll(() => JSON.parse(fs.readFileSync(path.join(ctx.configDir, 'config.json'), 'utf8')).tunnel.connectionMode).toBe('external');
+      await page.locator('#refresh').click();
+      await expect.poll(() => page.locator('#tunnel-mode-external').isChecked()).toBe(true);
+      const connectionEvidence = path.resolve('release-evidence/connection-ui');
+      fs.mkdirSync(connectionEvidence, { recursive: true });
+      await page.screenshot({ path: path.join(connectionEvidence, 'cloudflare-local.png'), fullPage: true });
+
+      // DODO-owned Tunnel still requires a stored credential. A failed save
+      // must keep the owner-managed mode selected in persistent config.
+      await page.locator('#tunnel-mode-tunnel').check();
+      expect(await page.locator('#tunnel-token').isDisabled()).toBe(false);
+      expect(await page.locator('#tunnel-credential-fields').isVisible()).toBe(true);
+      await page.locator('#tunnel-save').click();
+      await expect.poll(() => page.locator('#tunnel-error').textContent()).toContain('requires a saved Cloudflare Tunnel credential');
+      expect(JSON.parse(fs.readFileSync(path.join(ctx.configDir, 'config.json'), 'utf8')).tunnel.connectionMode).toBe('external');
 
       // A refresh restores the authoritative persisted selection.
       await page.locator('#refresh').click();
-      await expect.poll(() => page.locator('#tunnel-mode-local').isChecked()).toBe(true);
+      await expect.poll(() => page.locator('#tunnel-mode-external').isChecked()).toBe(true);
+      expect(await page.locator('#tunnel-mode-local').isChecked()).toBe(false);
       expect(await page.locator('#tunnel-mode-tunnel').isChecked()).toBe(false);
       const expectedHttpErrors = problems.filter((problem) => problem.includes('status of 400'));
       expect(expectedHttpErrors).toHaveLength(1);

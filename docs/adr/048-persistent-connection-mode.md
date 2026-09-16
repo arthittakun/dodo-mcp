@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted in source; unreleased.
+Accepted in DODO 1.0.3. Extended by ADR-050 with an owner-managed Cloudflare Local
+mode; the credential and DODO-owned supervisor rules below remain authoritative for
+`tunnel` mode.
 
 ## Context
 

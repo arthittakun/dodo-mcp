@@ -2,6 +2,12 @@
 
 ## MCP OAuth
 
+> **Simple Project Access Policy** — นอกจาก OAuth scopes และ client ACL แล้ว โปรเจกต์
+> ที่ลงทะเบียนแต่ละตัวมีระดับของตัวเอง (`read`/`edit`/`full`) ที่เป็นเพดานเพิ่มอีกชั้น
+> สิทธิ์จริง = token scopes ∩ grant scopes ∩ (personal ? grant : client ACL) ∩ ระดับโปรเจกต์
+> ระดับนี้บีบได้อย่างเดียว ไม่เคยขยาย และไม่แทนที่ OAuth ดู
+> [docs/PROJECTS.md](PROJECTS.md)
+
 MCP HTTP ใช้ OAuth 2.1 authorization code + PKCE S256:
 
 1. client discover protected resource metadata

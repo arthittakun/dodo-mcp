@@ -20,7 +20,7 @@ import type { AgentOperationTicket } from '../services/agent/agentService.js';
 import { digestOf } from '../util/hash.js';
 import { rollbackChangesTool } from './changeTools.js';
 import { CORE_TOOL_CATALOG } from './coreCatalog.js';
-import { defineTool, invokeToolDefinition, type AnyToolDef, type ExtraContentBlock, type HandlerResult, type ToolCtx } from './context.js';
+import { defineTool, invokeToolDefinition, type AnyToolDef, type ExtraContentBlock, type HandlerResult, type ToolCtx, assertNoNestedRoutingContext } from './context.js';
 
 const read = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 const plan = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
@@ -53,7 +53,7 @@ async function dispatch(
   const target = targetByName.get(args.operation);
   if (!target || !targets.includes(target)) throw new DodoError('INVALID_INPUT', `operation ${args.operation} is outside this managed agent dispatcher`);
   const raw = args.args ?? {};
-  if ('workspaceId' in raw || 'workspaceEpoch' in raw) throw new DodoError('INVALID_INPUT', 'nested agent args must not contain workspaceId/workspaceEpoch');
+  assertNoNestedRoutingContext(raw as Record<string, unknown>, 'nested agent args');
   let ticket: AgentOperationTicket | undefined;
   try {
     ticket = service(ctx).beginOperation(ctx, args.runId, args.hypothesisId, target.name, raw, target.requiredScope);

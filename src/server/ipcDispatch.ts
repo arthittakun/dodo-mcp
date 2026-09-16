@@ -1,6 +1,7 @@
 import type { IpcHandler } from '../ipc/server.js';
 import type { StatusData } from '../ipc/protocol.js';
 import type { BootstrappedWorkspace } from './bootstrap.js';
+import type { ConnectionMode } from '../config/tunnelConfig.js';
 import type { TrustMode } from '../store/store.js';
 import { phraseFor } from '../util/hash.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
@@ -16,7 +17,7 @@ import { accessMode } from '../security/accessMode.js';
  */
 export interface IpcContext {
   ws: BootstrappedWorkspace;
-  transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null; connectionMode?: 'local' | 'tunnel' };
+  transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null; connectionMode?: ConnectionMode };
   requestStop: () => void;
   remoteConfig?: {
     open(args: Record<string, unknown>): Promise<{ url: string; pairingCode: string; expiresAt: number }>;

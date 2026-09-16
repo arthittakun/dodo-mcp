@@ -165,7 +165,11 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     projectConfig,
     workspaceId,
     epoch,
-    trustMode: () => opts.runMode || isPersonalMode(store) ? 'trusted' : store.trustMode(workspaceId),
+    // Explicit parentheses: `||` already bound tighter than `?:`, so this is
+    // the existing behavior made readable. Personal mode does not gate actions
+    // on a saved trust mode — what a client may do there is decided by its
+    // OAuth scopes intersected with the project's access level.
+    trustMode: () => (opts.runMode || isPersonalMode(store)) ? 'trusted' : store.trustMode(workspaceId),
   };
 
   services.multimodal = new MultimodalService(services, configDir);

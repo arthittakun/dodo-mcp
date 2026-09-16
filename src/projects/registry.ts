@@ -7,6 +7,7 @@ import { newId } from '../util/hash.js';
 import { mintWorkspaceId } from '../workspace/identity.js';
 import { resolveWorkspaceRoot, type RootInfo } from '../workspace/root.js';
 import { fileIdentityBigInt, parseFileIdentity, type FileIdentity } from '../platform/fileIdentity.js';
+import { isProjectAccessLevel, parseProjectAccessLevel, type ProjectAccessLevel } from '../security/projectAccess.js';
 
 export const PROJECT_METADATA_VERSION = 2;
 const MAX_PROJECTS = 1000;
@@ -23,6 +24,7 @@ interface RegistryRow {
   root_dev: unknown;
   root_ino: unknown;
   root_birthtime_ns: unknown;
+  access_level: unknown;
   metadata_version: unknown;
   created_at: unknown;
   updated_at: unknown;
@@ -35,6 +37,7 @@ export interface RegisteredProject {
   workspaceId: string;
   root: string;
   displayName: string;
+  accessLevel: ProjectAccessLevel;
   createdAt: number;
   updatedAt: number;
   removedAt: number | null;
@@ -75,9 +78,31 @@ function validateProjectId(projectId: string): void {
   if (!PROJECT_ID.test(projectId)) throw new DodoError('INVALID_INPUT', 'invalid project ID');
 }
 
+/**
+ * Omitting a level keeps the authority a project had before the Simple Project
+ * Access Policy existed, so upgrading an install never revokes access the owner
+ * did not ask to revoke. Owner-facing surfaces (Local Config, `dodo project
+ * add`) always pass an explicit level instead of relying on this.
+ */
+export const DEFAULT_PROJECT_ACCESS_LEVEL: ProjectAccessLevel = 'full';
+
+/** Display names address projects in tool calls, so they must not collide. */
+function assertNameAvailable(db: Database.Database, name: string, exceptProjectId?: string): void {
+  const clash = db.prepare(
+    `SELECT id, display_name FROM project_registry
+      WHERE removed_at IS NULL AND lower(display_name) = lower(?) ${exceptProjectId ? 'AND id != ?' : ''}
+      LIMIT 1`,
+  ).get(...(exceptProjectId ? [name, exceptProjectId] : [name])) as { id?: unknown; display_name?: unknown } | undefined;
+  if (clash) {
+    throw new DodoError('CONFLICT', `another registered project is already named "${String(clash.display_name)}"`, {
+      recovery: 'choose a different project name; names are compared without case so AI clients can address a project by name',
+    });
+  }
+}
+
 function rawRows(db: Database.Database, includeRemoved: boolean): RegistryRow[] {
   return db.prepare(
-    `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns,
+    `SELECT id, workspace_id, canonical_root, display_name, access_level, root_dev, root_ino, root_birthtime_ns,
             metadata_version, created_at, updated_at, removed_at
        FROM project_registry
       ${includeRemoved ? '' : 'WHERE removed_at IS NULL'}
@@ -123,6 +148,7 @@ function invalidProject(row: RegistryRow): RegisteredProject {
     workspaceId: typeof row.workspace_id === 'string' ? row.workspace_id : 'ws_invalid',
     root: typeof row.canonical_root === 'string' ? row.canonical_root : '(invalid path)',
     displayName: typeof row.display_name === 'string' ? row.display_name : '(invalid project)',
+    accessLevel: isProjectAccessLevel(row.access_level) ? row.access_level : 'read',
     createdAt: asFiniteInteger(row.created_at) ?? now,
     updatedAt: asFiniteInteger(row.updated_at) ?? now,
     removedAt: row.removed_at === null ? null : asFiniteInteger(row.removed_at) ?? null,
@@ -142,6 +168,8 @@ function materialize(row: RegistryRow): RegisteredProject {
   const workspaceId = typeof row.workspace_id === 'string' && WORKSPACE_ID.test(row.workspace_id) ? row.workspace_id : undefined;
   const root = typeof row.canonical_root === 'string' && path.isAbsolute(row.canonical_root) ? row.canonical_root : undefined;
   const displayName = typeof row.display_name === 'string' && row.display_name.length >= 1 && row.display_name.length <= 120 && !/[\u0000-\u001f\u007f]/.test(row.display_name) ? row.display_name : undefined;
+  // An unrecognised level is treated as the least authority, never as full.
+  const accessLevel: ProjectAccessLevel = isProjectAccessLevel(row.access_level) ? row.access_level : 'read';
   const dev = parseFileIdentity(row.root_dev);
   const ino = parseFileIdentity(row.root_ino);
   const birthtimeNs = asBirthtimeNs(row.root_birthtime_ns);
@@ -160,6 +188,7 @@ function materialize(row: RegistryRow): RegisteredProject {
     workspaceId,
     root,
     displayName,
+    accessLevel,
     createdAt,
     updatedAt,
     removedAt,
@@ -203,7 +232,7 @@ export class ProjectRegistry {
     let row: RegistryRow | undefined;
     try {
       row = this.store.db.prepare(
-        `SELECT id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns,
+        `SELECT id, workspace_id, canonical_root, display_name, access_level, root_dev, root_ino, root_birthtime_ns,
                 metadata_version, created_at, updated_at, removed_at
            FROM project_registry WHERE id = ? ${options.includeRemoved ? '' : 'AND removed_at IS NULL'}`,
       ).get(projectId) as RegistryRow | undefined;
@@ -214,9 +243,16 @@ export class ProjectRegistry {
     return materialize(row);
   }
 
-  add(candidate: string, displayName?: string): AddProjectResult {
+  /**
+   * Register (or re-register) a project. The whole operation runs in ONE
+   * immediate transaction: path identity, name uniqueness and the access level
+   * are committed together, so a rejected level never leaves a half-registered
+   * project behind.
+   */
+  add(candidate: string, displayName?: string, accessLevel?: ProjectAccessLevel): AddProjectResult {
     const root = resolveInput(candidate);
     const name = safeDisplayName(displayName, root.root);
+    const level = accessLevel === undefined ? undefined : parseProjectAccessLevel(accessLevel);
     const workspaceId = mintWorkspaceId(this.store.installSecret(), root.root);
     let result!: AddProjectResult;
     const tx = this.store.db.transaction(() => {
@@ -230,9 +266,13 @@ export class ProjectRegistry {
             detail: { projectId: current.projectId, availability: current.availability },
           });
         }
-        if (displayName !== undefined && current.displayName !== name) {
+        const renaming = displayName !== undefined && current.displayName !== name;
+        const relevelling = level !== undefined && current.accessLevel !== level;
+        if (renaming) assertNameAvailable(this.store.db, name, current.projectId);
+        if (renaming || relevelling) {
           const now = Date.now();
-          this.store.db.prepare('UPDATE project_registry SET display_name = ?, updated_at = ? WHERE id = ?').run(name, now, current.projectId);
+          this.store.db.prepare('UPDATE project_registry SET display_name = ?, access_level = ?, updated_at = ? WHERE id = ?')
+            .run(renaming ? name : current.displayName, relevelling ? level : current.accessLevel, now, current.projectId);
           result = { changed: true, relocated: false, project: this.get(current.projectId) };
           this.audit(result, 'updated');
         } else result = { changed: false, relocated: false, project: current };
@@ -256,9 +296,10 @@ export class ProjectRegistry {
         if (current.availability !== 'missing') {
           throw new DodoError('CONFLICT', 'the same directory identity is already registered at another active path', { detail: { projectId: current.projectId } });
         }
+        if (displayName !== undefined && current.displayName !== name) assertNameAvailable(this.store.db, name, current.projectId);
         const now = Date.now();
-        this.store.db.prepare('UPDATE project_registry SET workspace_id = ?, canonical_root = ?, display_name = ?, root_birthtime_ns = ?, updated_at = ? WHERE id = ?')
-          .run(workspaceId, root.root, displayName === undefined ? current.displayName : name, root.birthtimeNs, now, current.projectId);
+        this.store.db.prepare('UPDATE project_registry SET workspace_id = ?, canonical_root = ?, display_name = ?, access_level = ?, root_birthtime_ns = ?, updated_at = ? WHERE id = ?')
+          .run(workspaceId, root.root, displayName === undefined ? current.displayName : name, level ?? current.accessLevel, root.birthtimeNs, now, current.projectId);
         result = { changed: true, relocated: true, project: this.get(current.projectId) };
         this.audit(result, 'relocated');
         return;
@@ -266,13 +307,14 @@ export class ProjectRegistry {
 
       const count = (this.store.db.prepare('SELECT COUNT(*) AS count FROM project_registry WHERE removed_at IS NULL').get() as { count: number }).count;
       if (count >= MAX_PROJECTS) throw new DodoError('RESOURCE_LIMIT', `project registry is limited to ${MAX_PROJECTS} active entries`);
+      assertNameAvailable(this.store.db, name);
       const now = Date.now();
       const projectId = newId('prj', 12);
       this.store.db.prepare(
         `INSERT INTO project_registry
-          (id, workspace_id, canonical_root, display_name, root_dev, root_ino, root_birthtime_ns, metadata_version, created_at, updated_at, removed_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      ).run(projectId, workspaceId, root.root, name, root.dev, root.ino, root.birthtimeNs, PROJECT_METADATA_VERSION, now, now);
+          (id, workspace_id, canonical_root, display_name, access_level, root_dev, root_ino, root_birthtime_ns, metadata_version, created_at, updated_at, removed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+      ).run(projectId, workspaceId, root.root, name, level ?? DEFAULT_PROJECT_ACCESS_LEVEL, root.dev, root.ino, root.birthtimeNs, PROJECT_METADATA_VERSION, now, now);
       result = { changed: true, relocated: false, project: this.get(projectId) };
       this.audit(result, 'added');
     });
@@ -289,6 +331,46 @@ export class ProjectRegistry {
       throw registryFailure('update');
     }
     return result;
+  }
+
+  /** Change only the Simple Project Access Policy level, atomically. */
+  setAccessLevel(projectId: string, accessLevel: ProjectAccessLevel): RegisteredProject {
+    validateProjectId(projectId);
+    const level = parseProjectAccessLevel(accessLevel);
+    try {
+      const tx = this.store.db.transaction(() => {
+        const changed = this.store.db
+          .prepare('UPDATE project_registry SET access_level = ?, updated_at = ? WHERE id = ? AND removed_at IS NULL')
+          .run(level, Date.now(), projectId);
+        if (changed.changes !== 1) throw new DodoError('NOT_FOUND', `project not found: ${projectId}`);
+      });
+      tx.immediate();
+    } catch (error) {
+      if (error instanceof DodoError) throw error;
+      throw registryFailure('update');
+    }
+    const project = this.get(projectId);
+    this.store.audit({
+      principal: 'local-project-owner', workspaceId: project.workspaceId, tool: 'local.project.access',
+      paths: [project.root], refId: projectId, result: `level:${level}`,
+    });
+    return project;
+  }
+
+  /**
+   * Resolve an owner-facing project NAME to exactly one registered project.
+   *
+   * Matching is case-insensitive and trimmed. Ambiguity is an error rather than
+   * a guess: silently picking one of two same-named projects could route an
+   * edit into the wrong repository. `candidates` is only ever populated by the
+   * caller after it has filtered the list for the principal.
+   */
+  findByName(name: string): { match?: RegisteredProject; candidates: RegisteredProject[] } {
+    const wanted = typeof name === 'string' ? name.trim().toLowerCase() : '';
+    if (!wanted) throw new DodoError('INVALID_INPUT', 'project name must not be empty');
+    const matches = this.list().filter((p) => p.displayName.trim().toLowerCase() === wanted);
+    if (matches.length === 1) return { match: matches[0]!, candidates: matches };
+    return { candidates: matches };
   }
 
   remove(projectId: string): RegisteredProject {

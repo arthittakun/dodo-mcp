@@ -1,5 +1,29 @@
 # DODO MCP — Test Report
 
+## Release 1.2.0 — Cloudflare Local และ Simple Project Access
+
+ผล candidate บน macOS arm64 วันที่ 2026-09-16:
+
+- build: **AUTOMATED_PASS** — Complete Full 138, live Full default 134, Compact 20,
+  Hybrid 49 และ config schemas 2 ชุด
+- typecheck/lint: **AUTOMATED_PASS**
+- core/integration/security/compatibility: **AUTOMATED_PASS** — 726 passed /
+  35 skipped / 0 failed ใน 107 ไฟล์ที่ผ่านและ 3 ไฟล์ที่ skip
+- packaging: **AUTOMATED_PASS** — 16/16 รวม release document, ADR, generated UI
+  assets และ fresh tarball checks ตาม manifest
+- focused connection/project/OAuth/security/Chromium: **AUTOMATED_PASS** — 92 passed,
+  1 skipped, 0 failed; ทดสอบสาม connection modes, write-only credential boundary,
+  Remote Config ผ่าน owner-managed public mode, per-project `read/edit/full`,
+  project-name routing และ real browser UI
+- production dependency audit: **AUTOMATED_PASS** — 0 vulnerabilities
+- Cloudflare Local ผ่าน public hostname/process จริงของเจ้าของ: **MANUAL_NOT_RUN**
+- DODO Tunnel credential store/readiness ผ่าน public hostname จริงของ 1.2.0:
+  **MANUAL_NOT_RUN**
+
+Regression รอบแรกพบ security fixture คาด marker `Project Registry` ที่หายจากหัวข้อไทย
+จึงคืน marker ใน UI แล้วรัน focused และ full suite ใหม่จนผ่าน ไม่ได้ลด assertion
+หรือ security requirement
+
 ## Release 1.1.0 — Android ADB tool family
 
 ผล candidate บน macOS วันที่ 2026-09-16:
@@ -95,6 +119,56 @@ Hybrid 49 tools; `npm run test:all` ผ่าน core/security/compatibility 99 
 
 Live Cloudflare hostname และ OS credential store ด้วย credential ของเจ้าของสำหรับ source
 นี้: **MANUAL_NOT_RUN** — ไม่ถือว่า fixture cloudflared เป็นหลักฐานของ public network จริง
+
+## Pre-release project access, project names and tunnel readiness — 2026-09-16
+
+หลักฐานชุดนี้สร้างก่อนรวมเข้า 1.2.0 งานรอบนี้: Simple Project Access Policy (read/edit/full),
+เรียกโปรเจกต์ด้วยชื่อ (`targetProject`), แก้ข้อความที่บังคับ ACL ในโหมดส่วนตัว และแก้
+Cloudflare readiness ที่สถานะกระพริบ
+
+**รันจริงบน macOS arm64, Node v22.23.2:**
+
+- `npm run typecheck` / `npm run lint` / `npm run build` — **AUTOMATED_PASS** (exit 0)
+- `npm run test:all` — **AUTOMATED_PASS**: 705 passed / 34 skipped / 0 failed (106 ไฟล์)
+  + packaging 16/16
+- `npx vitest run tests/security/projectAccessLevel.test.ts` (ใหม่, 11 ข้อ) —
+  **AUTOMATED_PASS**: mapping ระดับ→scope, `full` token ถูกบีบตามระดับ, token `read`
+  เขียน/exec ไม่ได้แม้โปรเจกต์ `full`, managed mode ยังต้องมี ACL แล้วระดับบีบซ้ำ,
+  workspace ที่ไม่ได้ลงทะเบียนไม่ถูกบีบ, ค่าที่อ่านไม่ออก → `read` (fail closed),
+  row เก่า migrate เป็น `full` (ไม่ถอนสิทธิ์), ระดับผิด → ไม่มีโปรเจกต์ค้าง,
+  ชื่อซ้ำถูกปฏิเสธแบบไม่สนตัวพิมพ์, resolve ชื่อ/ชื่อกำกวม/ชื่อไม่รู้จัก
+- `npx vitest run tests/integration/projectByName.test.ts` (ใหม่) — **AUTOMATED_PASS**
+  ผ่าน HTTP + OAuth จริง: route ด้วยชื่อ, เขียนลงโปรเจกต์ถูกตัว, ตัวพิมพ์/ช่องว่างไม่สำคัญ,
+  ระดับ `edit` บล็อก exec แล้วยกเป็น `full` ทำได้, ชื่อไม่รู้จัก → NOT_FOUND,
+  id+ชื่อขัดกัน → INVALID_INPUT, ชื่อกำกวม → CONFLICT พร้อม candidate,
+  `targetProject` ใน nested args ถูกปฏิเสธและไม่มีไฟล์ถูกเขียน
+- `npx vitest run tests/unit/tunnelReadiness.test.ts` (ใหม่, 8 ข้อ) — **AUTOMATED_PASS**:
+  probe 200/503/ปิด/ค้าง, ไม่ใช้ socket ซ้ำ (นับ connection = 2), schema รองรับทุก phase,
+  state.json รุ่นเก่า parse ได้, ปฏิเสธ field แปลกปลอม
+- `npx vitest run tests/integration/tunnelSupervisor.test.ts` (เพิ่ม 3 ข้อ) —
+  **AUTOMATED_PASS** ด้วย fake cloudflared จริง: readiness ตกชั่วคราว → `degraded`
+  และ `connected` ยังเป็น true, ไม่มีบรรทัด "is not connected"; ล้มติดกันครบเกณฑ์ →
+  `disconnected` แล้ว recover กลับ `connected`; ไม่เคยรายงาน connected โดยไม่มีหลักฐาน
+- `npx vitest run tests/integration/projectAccessUi.test.ts` (ใหม่, 2 ข้อ) —
+  **AUTOMATED_PASS** ใน Chromium จริง: เพิ่มโปรเจกต์ครบในหน้าเดียว (path/ชื่อ/ระดับ),
+  การ์ดแสดงระดับที่ backend เก็บจริง, เปลี่ยนระดับแล้วยืนยันหลัง backend ตอบ,
+  reload ยังเห็นค่าเดิม, ชื่อซ้ำขึ้น error (ไม่ขึ้น success), personal ซ่อนฟอร์ม ACL /
+  managed แสดงครบ, 390px ไม่มี horizontal scroll, `pageerror` = 0
+- `npm run test:linux:docker` — **AUTOMATED_PASS** (node v22.23.2, arm64, Chromium)
+- `npm pack` + fresh install จาก tarball — **AUTOMATED_PASS**: 461 ไฟล์, ไม่มี
+  state.db/.env/jwks/.sock, `dist/projects/ownerAdmin.js` และ
+  `dist/security/projectAccess.js` อยู่ในแพ็กเกจ, และรัน
+  `dodo project add --access read` → `dodo project access "auto-upload" --mode full`
+  → `dodo project list` ได้จริงจาก tarball ที่ติดตั้งสด
+- `npm run test:windows` บน macOS — 56 passed / 30 skipped: **ไม่ใช่หลักฐาน Windows**
+  (ข้อที่เป็น Windows-only ถูก skip)
+
+**MANUAL_NOT_RUN** (ยังไม่มีหลักฐาน):
+- Windows native (windows-ci-02) — ยังไม่ได้รัน รอบนี้แก้สาเหตุที่เป็น Windows-specific
+  ไว้แล้ว (event-loop starvation จากการเขียน log, keep-alive socket) แต่ยังไม่มีหลักฐานจริง
+- การยืนยันบน tunnel จริง `https://mcp.baanseriesnow.com/mcp` กับ cloudflared จริง
+  (เทสต์ใช้ fake cloudflared ที่ควบคุม `/ready` ได้)
+- การอัปเกรดจาก state ของ 1.0.2/1.0.3 จริง (migration ตรวจด้วย fixture เท่านั้น)
 
 ## Scope
 

@@ -201,6 +201,12 @@ describe('local config boundary', () => {
       expect(JSON.stringify(s.ws.store.recentAudit(s.ws.workspaceId, 20))).not.toContain(submitted);
       expect(JSON.parse(configText).tunnel).toMatchObject({ connectionMode: 'tunnel', credentialRef, metricsPort: 32174, maxRestarts: 1 });
 
+      const external = await fetch(`${s.url.origin}/api/tunnel/config`, {
+        method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ connectionMode: 'external' }),
+      });
+      expect(external.status).toBe(200);
+      expect(JSON.parse(fs.readFileSync(s.ws.paths.configFile, 'utf8')).tunnel).toMatchObject({ connectionMode: 'external' });
+
       const local = await fetch(`${s.url.origin}/api/tunnel/config`, {
         method: 'POST', headers: { ...context, authorization: `Bearer ${s.token}` }, body: JSON.stringify({ connectionMode: 'local' }),
       });

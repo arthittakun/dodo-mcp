@@ -307,7 +307,14 @@ loopback metrics port และ bounded restart count Token ถูก resolve �
 store หรือ owner-controlled env/private-file reference เมื่อเริ่ม process และส่งผ่าน
 child environment โดยไม่เข้า argv
 
-managed supervisor เป็น foreground process มี state machine `starting → connecting → connected/backoff → stopped/failed`, private bounded/redacted log และ authenticated singleton IPC `status/logs/stop` การ stop อ้างอิง live `ChildProcess` ที่ supervisor ถืออยู่เท่านั้น Local mode ไม่ spawn process และ `doctor` ตรวจ local/public health โดยไม่จัดการ Cloudflare account หรือ DNS
+การเชื่อมต่อมีสามโหมด: `local` เป็น loopback-only, `external` ใช้ public origin แต่
+เจ้าของเป็นผู้รัน `cloudflared`, และ `tunnel` ให้ DODO เป็นเจ้าของ child process
+เฉพาะ managed supervisor ของ `tunnel` มี state machine
+`starting → connecting → connected/backoff → stopped/failed`, private
+bounded/redacted log และ authenticated singleton IPC `status/logs/stop` การ stop
+อ้างอิง live `ChildProcess` ที่ supervisor ถืออยู่เท่านั้น `local` และ `external`
+ไม่ spawn process ส่วน `doctor` ตรวจ local/public health โดยไม่จัดการ Cloudflare
+account หรือ DNS
 
 `TunnelRuntime` ผูก supervisor หนึ่งตัวกับ DODO HTTP process และยอมเริ่มเฉพาะเมื่อ
 saved mode เป็น Tunnel พร้อม credential reference Runtime ส่งค่าผ่าน `TUNNEL_TOKEN`
@@ -319,9 +326,10 @@ Remote Config ไม่เปลี่ยน bind ของ Local Config แล�
 app `RemoteConfigGateway` ถือ pairing/session digest กับ expiry ใน memory, proxy เฉพาะ
 `/config`, `/config/assets/*`, `/config/api/*` และส่ง request ไป loopback owner server
 ด้วย internal capability เดิม CLI เปิด/ต่ออายุผ่าน authenticated installation IPC
-เฉพาะเมื่อ persistent Tunnel mode ทำงานอยู่ IPC ไม่รับ credential หรือสลับ connection
-mode การหมดอายุล้าง code/session และทำให้ namespace กลับเป็น 404 โดยไม่หยุด
-MCP/OAuth/Tunnel
+เมื่อ process ใช้ public mode (`external` หรือ `tunnel`) ใน `external` เจ้าของต้อง
+ดูแล public route เอง ส่วน `tunnel` ต้องมี DODO-owned supervisor ที่กำลังทำงาน IPC
+ไม่รับ credential หรือสลับ connection mode การหมดอายุล้าง code/session และทำให้
+namespace กลับเป็น 404 โดยไม่หยุด MCP/OAuth/Cloudflare process
 
 ## Optional services
 

@@ -1,6 +1,7 @@
 import type { InstallationRuntime } from '../server/installationRuntime.js';
 import type { MutationQueue } from '../security/mutationQueue.js';
 import { isOwner, projectAuthority } from '../security/projectAuthority.js';
+import { accessMode } from '../security/accessMode.js';
 import type { MultimodalService } from '../services/multimodal/multimodalService.js';
 import type { ResourceService } from '../services/resources/resourceService.js';
 import type { FederationService } from '../projects/federation.js';
@@ -140,7 +141,16 @@ export interface ToolDef<In extends z.ZodRawShape> {
   handler: (args: z.infer<z.ZodObject<In>>, ctx: ToolCtx) => Promise<HandlerResult>;
 }
 
-const TARGET_PROJECT = { targetProjectId: z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional().describe("Explicit owner-registered target; use its project_overview context") };
+const TARGET_PROJECT = {
+  targetProjectId: z.string().regex(/^prj_[0-9a-hjkmnp-tv-z]{8,64}$/).optional().describe("Explicit owner-registered target; use its project_overview context"),
+  /**
+   * The owner-facing project name. Owners say "แก้โปรเจกต์ auto-upload", not a
+   * `prj_…` id, so a name is accepted anywhere the id is. It resolves to
+   * exactly one registered project the caller may see, or fails — it never
+   * guesses between same-named projects.
+   */
+  targetProject: z.string().min(1).max(120).optional().describe('Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)'),
+};
 const WORKSPACE_CONTEXT_FIELDS = {
   workspaceId: z.string().min(1).max(128).describe('Workspace id from project_overview'),
   workspaceEpoch: z.string().min(1).max(128).describe('Workspace epoch from project_overview (changes on server restart or workspace switch)'),
@@ -183,6 +193,68 @@ export interface InvokeToolResult {
   extraBlocks: ExtraContentBlock[];
 }
 
+/**
+ * Fields that choose WHICH workspace/project a call runs against. They are only
+ * ever read from the top level. A nested `args` object carrying one is an
+ * attempt to re-route a call past the checks its gateway already performed, so
+ * every dispatcher rejects them through this one list.
+ */
+export const ROUTING_CONTEXT_KEYS = ['workspaceId', 'workspaceEpoch', 'targetProjectId', 'targetProject'] as const;
+
+export function assertNoNestedRoutingContext(raw: Record<string, unknown>, what = 'args'): void {
+  const found = ROUTING_CONTEXT_KEYS.filter((key) => key in raw);
+  if (found.length === 0) return;
+  throw new DodoError('INVALID_INPUT', `${what} must not carry ${found.join('/')}; the caller takes routing and workspace context from its top-level fields`, {
+    recovery: `remove ${found.join(' and ')} from ${what}; keep them only at the top level of the call`,
+  });
+}
+
+/** True when a call explicitly routes to another registered project. */
+export function hasExplicitProjectTarget(args: Record<string, unknown> | undefined): boolean {
+  return typeof args?.['targetProjectId'] === 'string' || typeof args?.['targetProject'] === 'string';
+}
+
+/**
+ * Resolve the explicit project target of a call to a single project id.
+ *
+ * Accepts `targetProjectId` (stable id) and/or `targetProject` (the owner-facing
+ * NAME). Resolution is deterministic and fail-closed:
+ *  - a name matches case-insensitively after trimming, against ONLY the projects
+ *    this principal may already read, so it can never confirm the existence of a
+ *    project the caller is not allowed to see;
+ *  - two projects sharing a name is an error listing the visible candidates,
+ *    never a guess — picking wrong would route an edit into another repository;
+ *  - supplying both an id and a name that disagree is an error.
+ */
+function resolveTargetProject(args: Record<string, unknown>, services: AppServices, principal: Principal): string | undefined {
+  const byId = args['targetProjectId'];
+  const byName = args['targetProject'];
+  if (byName === undefined) return byId as string | undefined;
+  if (typeof byName !== 'string' || byName.trim().length === 0) throw new DodoError('INVALID_INPUT', 'targetProject must be a non-empty project name');
+  if (!services.installation) throw new DodoError('NOT_SUPPORTED', 'explicit project routing is unavailable');
+  const wanted = byName.trim().toLowerCase();
+  const visible = services.installation.list(principal);
+  const matches = visible.filter((p) => p.displayName.trim().toLowerCase() === wanted);
+  if (matches.length === 0) {
+    throw new DodoError('NOT_FOUND', `no registered project named "${byName.trim()}" is available to this client`, {
+      recovery: 'call project_overview to list the projects this client may use, then use the exact name or its targetProjectId',
+    });
+  }
+  if (matches.length > 1) {
+    throw new DodoError('CONFLICT', `"${byName.trim()}" matches ${matches.length} registered projects`, {
+      recovery: 'rename the projects in Local Config so each name is unique, or pass the exact targetProjectId',
+      detail: { candidates: matches.map((p) => ({ projectId: p.projectId, displayName: p.displayName })) },
+    });
+  }
+  const resolved = matches[0]!.projectId;
+  if (byId !== undefined && byId !== resolved) {
+    throw new DodoError('INVALID_INPUT', 'targetProjectId and targetProject refer to different projects', {
+      recovery: 'send only one of them',
+    });
+  }
+  return resolved;
+}
+
 export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<InvokeToolResult> {
   const { def } = opts;
   let services = opts.services;
@@ -195,7 +267,9 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
   let extraBlocks: ExtraContentBlock[] = [];
   try {
     principal = typeof opts.principal === 'function' ? opts.principal() : opts.principal;
-    const targetId = opts.args['targetProjectId'];
+    // A name is resolved to an id BEFORE any routing happens, so everything
+    // downstream (lease acquisition, authority, audit) sees one canonical id.
+    const targetId = resolveTargetProject(opts.args, services, principal);
     if (targetId !== undefined) {
       if (typeof targetId !== 'string' || 'projectId' in opts.args || 'projectIds' in opts.args || (opts.args['args'] && typeof opts.args['args'] === 'object' && ('projectId' in opts.args['args'] || 'projectIds' in opts.args['args']))) throw new DodoError('INVALID_INPUT', 'ambiguous project routing');
       if (!services.installation) throw new DodoError('NOT_SUPPORTED', 'explicit project routing is unavailable');
@@ -211,7 +285,14 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
         return { envelope: { ...okEnvelope(ws, { selectProjectRequired: true, projects }), workspaceId: null, workspaceEpoch: null }, extraBlocks: [] };
       }
     }
-    if (principal.scopes.length === 0) throw new DodoError('WORKSPACE_ACCESS_REQUIRED', 'Owner must allow this client for the active workspace in private Local Config; OAuth login is retained');
+    if (principal.scopes.length === 0) {
+      // Personal mode never asks the owner to assign a per-workspace ACL; an
+      // empty scope set there means the OAuth grant itself carries no usable
+      // scope for this project, or the project's access level removed them.
+      throw new DodoError('WORKSPACE_ACCESS_REQUIRED', accessMode(services.store) === 'personal'
+        ? 'This client has no usable scope for this project. Check the project access level in Local Config > Projects, or reconnect the client with the scopes you need; OAuth login is retained'
+        : 'Owner must allow this client for the active workspace in private Local Config; OAuth login is retained');
+    }
     if (!scopeSatisfied(def.requiredScope, principal.scopes)) {
       throw new DodoError('FORBIDDEN', `this tool requires the ${def.requiredScope} scope`, {
         detail: { requiredScope: def.requiredScope },
@@ -329,7 +410,7 @@ export function registerTool(server: McpServer, services: AppServices, def: AnyT
       // the envelope contract instead of surfacing as a raw SDK text error.
       let release: (() => void) | undefined;
       try {
-        if (args['targetProjectId'] === undefined) release = services.beginTool?.();
+        if (!hasExplicitProjectTarget(args as Record<string, unknown>)) release = services.beginTool?.();
       } catch (err) {
         const envelope = errorEnvelope(null, toDodoError(err).toInfo());
         return {

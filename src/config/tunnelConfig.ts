@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const ConnectionModeSchema = z.enum(['local', 'external', 'tunnel']);
+export type ConnectionMode = z.infer<typeof ConnectionModeSchema>;
+
 const CredentialKey = z.string().regex(/^[a-f0-9]{24}$/);
 
 /** Opaque locator only. A Cloudflare Tunnel token is never valid config data. */
@@ -12,7 +15,7 @@ export const TunnelCredentialRefSchema = z.discriminatedUnion('provider', [
 export const TunnelConfigSchema = z
   .object({
     /** Exactly one advertised connection path is active for a DODO process. */
-    connectionMode: z.enum(['local', 'tunnel']).default('local'),
+    connectionMode: ConnectionModeSchema.default('local'),
     credentialRef: TunnelCredentialRefSchema.optional(),
     /** Canonical cloudflared path selected by the local owner, never by repo config. */
     executable: z.string().min(1).max(4096).optional(),

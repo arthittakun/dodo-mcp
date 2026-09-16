@@ -6,6 +6,8 @@ import { renameWithRetry } from '../platform/fsRetry.js';
 import { logLine } from '../security/redact.js';
 
 const LOG_BYTES = 512 * 1024;
+/** Bounded coalescing window for the on-disk tail. */
+const FLUSH_INTERVAL_MS = 750;
 
 function tailUtf8(input: Buffer, limit: number): Buffer {
   if (input.length <= limit) return input;
@@ -30,6 +32,8 @@ function writePrivateAtomic(file: string, bytes: Buffer<ArrayBufferLike>): void 
 export class TunnelLog {
   readonly file: string;
   private bytes: Buffer<ArrayBufferLike> = Buffer.alloc(0);
+  private flushTimer: NodeJS.Timeout | undefined;
+  private pendingFlush = false;
 
   constructor(directory: string, private readonly credential?: string) {
     ensurePrivateDirectory(directory);
@@ -42,11 +46,37 @@ export class TunnelLog {
     }
   }
 
+  /**
+   * Credential removal and the bounded in-memory tail happen synchronously, so
+   * `read()` and the owner IPC are always current. The DISK write is coalesced:
+   * rewriting the whole 512 KiB tail for every cloudflared line blocked the
+   * event loop (on Windows `renameWithRetry` parks it with `Atomics.wait`),
+   * which starved the readiness probe and made the tunnel status flap.
+   */
   append(source: 'dodo' | 'stdout' | 'stderr', value: string): void {
     const withoutCredential = this.credential ? value.split(this.credential).join('[REDACTED_TUNNEL_TOKEN]') : value;
     const line = `${new Date().toISOString()} ${source} ${logLine(withoutCredential)}\n`;
     this.bytes = tailUtf8(Buffer.concat([this.bytes, Buffer.from(line, 'utf8')]), LOG_BYTES);
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
+    this.pendingFlush = true;
+    if (this.flushTimer) return;
+    this.flushTimer = setTimeout(() => { this.flushTimer = undefined; this.flush(); }, FLUSH_INTERVAL_MS);
+    this.flushTimer.unref?.();
+  }
+
+  /** Persist the bounded tail now. Safe to call repeatedly; used on shutdown. */
+  flush(): void {
+    if (!this.pendingFlush) return;
+    this.pendingFlush = false;
     writePrivateAtomic(this.file, this.bytes);
+  }
+
+  close(): void {
+    if (this.flushTimer) { clearTimeout(this.flushTimer); this.flushTimer = undefined; }
+    this.flush();
   }
 
   read(lineLimit = 200): { lines: string[]; truncated: boolean } {

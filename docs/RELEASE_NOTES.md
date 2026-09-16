@@ -1,5 +1,20 @@
 # DODO MCP — Release Notes
 
+## 1.2.0 — Cloudflare Local และสิทธิ์ต่อโปรเจกต์ที่มองเห็นได้
+
+- แยกการเชื่อมต่อเป็นสามโหมด: เฉพาะเครื่อง (Loopback), Cloudflare Local ที่ผู้ใช้
+  รัน `cloudflared` เอง และ DODO Tunnel ที่ DODO ดูแล process
+- Cloudflare Local ใช้ public MCP/OAuth URL โดยไม่รับ/อ่าน Tunnel token และไม่รายงาน
+  supervisor connected จาก config อย่างเดียว
+- หน้า Projects แสดงและบันทึกระดับ `read` / `edit` / `full` ของทุกโปรเจกต์จริง
+  ในโหมดส่วนตัว ไม่ต้องตามหา Trust/Client ACL หลายส่วน
+- ระดับโปรเจกต์เป็นเพดานที่ intersect กับ OAuth/grant/managed ACL เท่านั้น ไม่เพิ่ม
+  สิทธิ์ ไม่ข้าม approval, sandbox, workspace context หรือ file guards
+- Remote Config เปิดผ่าน public Cloudflare ได้ทั้ง owner-managed และ DODO-owned mode;
+  loopback-only ยังคงปฏิเสธ
+
+ติดตั้งด้วย `npm install -g dodo-mcp@1.2.0` แล้ว restart DODO
+
 ## 1.1.0 — Android device tools through owner-approved ADB
 
 - เพิ่ม Full 13 `android_*` operations และ Compact `dodo_mobile` gateway สำหรับ

@@ -1,4 +1,6 @@
 import { isOwner } from '../../security/projectAuthority.js';
+import { isPersonalMode } from '../../security/accessMode.js';
+import { projectScopeCeiling } from '../../security/projectAccess.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -16,7 +18,14 @@ export function liveAccess(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:write' | 'do
   if (!ctx.principal.scopes.includes(scope)) throw new DodoError('FORBIDDEN', `requires ${scope}`);
   if (isOwner(ctx.principal)) return;
   const s = ctx.services.store, grant = s.getGrant(ctx.principal.grantId);
-  if (!grant || grant.revokedAt !== null || !s.getOAuthClient(ctx.principal.clientId) || !grant.scopes.includes(scope) || !s.clientAccess(ctx.services.workspaceId, ctx.principal.clientId).includes(scope)) {
+  // Personal mode has no per-workspace ACL row by design (projectAuthority
+  // derives scopes from the grant instead), so requiring one here refused every
+  // media call for single-owner installs. Re-check the same live authority the
+  // invocation pipeline used: grant liveness, client liveness, and the scope
+  // ceiling for this workspace.
+  const allowed = isPersonalMode(s) ? grant?.scopes ?? [] : s.clientAccess(ctx.services.workspaceId, ctx.principal.clientId);
+  const ceiling: readonly string[] = projectScopeCeiling(s, ctx.services.workspaceId);
+  if (!grant || grant.revokedAt !== null || !s.getOAuthClient(ctx.principal.clientId) || !grant.scopes.includes(scope) || !allowed.includes(scope) || !ceiling.includes(scope)) {
     throw new DodoError('FORBIDDEN', 'client/grant/workspace access changed; operation stopped');
   }
 }

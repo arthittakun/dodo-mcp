@@ -142,13 +142,117 @@ describe('tunnel connectivity diagnostics', () => {
       const localPort = typeof localAddress === 'object' && localAddress ? localAddress.port : 0;
       const publicPort = typeof publicAddress === 'object' && publicAddress ? publicAddress.port : 0;
       const config = GlobalConfigSchema.parse({ port: localPort, publicUrl: `http://127.0.0.1:${publicPort}`, dangerouslyAllowInsecurePublicUrl: true, tunnel: { connectionMode: 'local' } });
-      const report = await tunnelDoctor(dir, config) as { mode: string; localMcpHealth: { ok: boolean; status: number }; publicHealth: { ok: boolean; status: number }; evidence: { connected: boolean } };
+      const report = await tunnelDoctor(dir, config) as { mode: string; credential: string; localMcpHealth: { ok: boolean; status: number }; publicHealth: { ok: boolean; status: number }; evidence: { connected: boolean; processOwnership: string } };
       expect(report.mode).toBe('local');
+      expect(report.credential).toBe('not-used');
       expect(report.localMcpHealth).toEqual({ ok: true, status: 200 });
       expect(report.publicHealth).toEqual({ ok: true, status: 200 });
       expect(report.evidence.connected).toBe(false);
+      expect(report.evidence.processOwnership).toBe('none');
+
+      const external = GlobalConfigSchema.parse({ ...config, tunnel: { connectionMode: 'external' } });
+      const externalReport = await tunnelDoctor(dir, external) as { mode: string; credential: string; evidence: { connected: boolean; processOwnership: string; note: string } };
+      expect(externalReport).toMatchObject({ mode: 'external', credential: 'not-used' });
+      expect(externalReport.evidence).toMatchObject({ connected: false, processOwnership: 'owner' });
+      expect(externalReport.evidence.note).toMatch(/does not supervise/i);
     } finally {
       await Promise.all([new Promise<void>(resolve => local.close(() => resolve())), new Promise<void>(resolve => publicServer.close(() => resolve()))]);
     }
   });
+});
+
+/**
+ * Readiness debouncing. The owner saw the status alternate between
+ * "reports connected" and "is not connected" while the tunnel was in fact
+ * usable, because a single non-200 /ready flipped the reported state.
+ */
+describe.skipIf(process.platform === 'win32')('tunnel readiness debouncing', () => {
+  /** A fake cloudflared whose /ready follows a control file the test flips. */
+  function flappingCloudflared(dir: string, control: string): string {
+    const file = path.join(dir, 'fake-flapping.cjs');
+    fs.writeFileSync(file, `#!/usr/bin/env node
+const fs=require('node:fs'),http=require('node:http');
+const args=process.argv.slice(2);
+const value=args[args.indexOf('--metrics')+1], port=Number(value.split(':').pop());
+const control=${JSON.stringify(control)};
+const server=http.createServer((req,res)=>{
+  let ready=true; try { ready = fs.readFileSync(control,'utf8').trim() !== 'down'; } catch {}
+  res.statusCode = req.url==='/ready' ? (ready?200:503) : 404; res.end('fixture');
+});
+server.listen(port,'127.0.0.1');
+const stop=()=>server.close(()=>process.exit(0));process.on('SIGTERM',stop);process.on('SIGINT',stop);
+`, { flag: 'wx', mode: 0o700 });
+    fs.chmodSync(file, 0o700);
+    return file;
+  }
+
+  async function startFlapping(threshold: number) {
+    const dir = fixture(), control = path.join(dir, 'ready.control'), port = await freePort();
+    fs.writeFileSync(control, 'up');
+    const executable = flappingCloudflared(dir, control);
+    const config = GlobalConfigSchema.parse({
+      publicUrl: 'https://dodo.fixture.invalid',
+      tunnel: { connectionMode: 'tunnel', credentialRef: { provider: 'env', name: 'FIXTURE_FLAP_TOKEN' }, executable, metricsPort: port, maxRestarts: 0 },
+    });
+    process.env['FIXTURE_FLAP_TOKEN'] = token;
+    const lines: string[] = [];
+    const supervisor = await startManagedTunnel({
+      configDir: dir, config, readinessIntervalMs: 120, readinessFailureThreshold: threshold,
+      onLog: (line) => lines.push(line),
+    });
+    return { dir, control, supervisor, lines, cleanup: async () => { supervisor.stop(); await supervisor.wait(); delete process.env['FIXTURE_FLAP_TOKEN']; } };
+  }
+
+  it('does not report disconnected for a transient readiness dip, and recovers', async () => {
+    const f = await startFlapping(3);
+    try {
+      await until(() => f.supervisor.status().phase === 'connected');
+      expect(f.supervisor.status().lastReadyAt).not.toBeNull();
+
+      // One failing window: degraded, and still reported as connected because
+      // cloudflared reconnects its own edge sessions.
+      fs.writeFileSync(f.control, 'down');
+      await until(() => f.supervisor.status().phase === 'degraded');
+      expect(f.supervisor.status().connected).toBe(true);
+      expect(f.supervisor.status().phase).not.toBe('disconnected');
+
+      fs.writeFileSync(f.control, 'up');
+      await until(() => f.supervisor.status().phase === 'connected');
+      expect(f.supervisor.status().connected).toBe(true);
+      // Never announced a disconnection for a dip shorter than the threshold.
+      expect(f.lines.filter(l => l.includes('is not connected'))).toHaveLength(0);
+    } finally { await f.cleanup(); }
+  }, 20000);
+
+  it('reports disconnected only after consecutive failures, then recovers', async () => {
+    const f = await startFlapping(2);
+    try {
+      await until(() => f.supervisor.status().phase === 'connected');
+      fs.writeFileSync(f.control, 'down');
+      await until(() => f.supervisor.status().phase === 'disconnected', 8000);
+      const down = f.supervisor.status();
+      expect(down.connected).toBe(false);
+      expect(down.consecutiveReadyFailures).toBeGreaterThanOrEqual(2);
+      expect(down.lastFailureAt).not.toBeNull();
+      expect(down.lastReadyAt).not.toBeNull(); // evidence of the earlier success is kept
+
+      fs.writeFileSync(f.control, 'up');
+      await until(() => f.supervisor.status().phase === 'connected', 8000);
+      expect(f.supervisor.status().consecutiveReadyFailures).toBe(0);
+      expect(JSON.stringify(f.supervisor.status())).not.toContain(token);
+    } finally { await f.cleanup(); }
+  }, 25000);
+
+  it('never claims connected without readiness evidence', async () => {
+    const f = await startFlapping(2);
+    try {
+      fs.writeFileSync(f.control, 'down'); // never ready
+      await until(() => f.supervisor.status().consecutiveReadyFailures >= 3, 8000);
+      const s = f.supervisor.status();
+      expect(s.connected).toBe(false);
+      // Without a prior success there is nothing to have lost: still connecting.
+      expect(s.phase).toBe('connecting');
+      expect(s.lastReadyAt).toBeNull();
+    } finally { await f.cleanup(); }
+  }, 20000);
 });

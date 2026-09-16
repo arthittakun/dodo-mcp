@@ -169,6 +169,35 @@ Chat & Tasks · Runs & Jobs · Approvals · Knowledge · Settings) หน้า�
 สร้าง MCP app ใหม่ตามพฤติกรรมของ client การตั้งค่านี้เปลี่ยนเฉพาะการมองเห็น tools
 และไม่เพิ่ม OAuth scope, trust, approval หรือสิทธิ์ของ profile
 
+### เพิ่มโปรเจกต์ครั้งเดียว แล้วสั่งงานด้วยชื่อ
+
+เพิ่มโปรเจกต์จากหน้า Projects (หรือ CLI) โดยกรอกแค่ **ชื่อ**, **absolute path** และ
+**ระดับการเข้าถึง** หนึ่งค่า:
+
+| ระดับ | AI ทำอะไรได้ |
+|---|---|
+| อ่านอย่างเดียว | อ่าน ค้นหา วิเคราะห์ |
+| แก้ไข | อ่านและแก้ไฟล์ |
+| ทำงานเต็มรูปแบบ | อ่าน แก้ไฟล์ และรันคำสั่ง/ทดสอบ |
+
+```bash
+dodo project add "C:\Users\User\Desktop\auto-upload" --name "auto-upload" --access full
+dodo project access "auto-upload" --mode edit
+dodo project list
+```
+
+ในโหมดส่วนตัว (ค่าเริ่มต้น) เท่านี้ก็พร้อมใช้ — ไม่ต้องตั้ง Client ACL, Trust หรือ
+profile allowlist ซ้ำอีกหลายหน้า ระดับที่เลือกเป็น **เพดาน** สิทธิ์จริงคือส่วนที่ทับกับ
+OAuth scope ของ client นั้น (token ที่อ่านได้อย่างเดียวจะยังอ่านได้อย่างเดียวเสมอ)
+
+จากนั้นสั่ง AI ด้วยชื่อโปรเจกต์ได้ตรง ๆ:
+
+> "ใช้ DODO แก้โปรเจกต์ auto-upload"
+
+AI จะ resolve ชื่อเอง (`project_overview` ด้วย `targetProject: "auto-upload"`) รับ
+`workspaceId`/`workspaceEpoch` ของโปรเจกต์นั้น แล้วส่ง `targetProject` ไปกับทุกคำสั่งถัดไป
+เจ้าของไม่ต้องรู้หรือพิมพ์ project ID เลย ดู [docs/PROJECTS.md](docs/PROJECTS.md)
+
 ลงทะเบียนโปรเจกต์ที่ต้องการใช้งานบ่อยได้โดยไม่เริ่ม server:
 
 ```bash
@@ -341,14 +370,22 @@ command sandbox, idempotency และ audit เดิม `agent_exec` ใช้
 
 ### เชื่อม Remote MCP ผ่าน Cloudflare Tunnel
 
-DODO เลือกวิธีเชื่อมต่อระดับ installation ได้หนึ่งแบบ: `local` หรือ `tunnel` ค่าที่เลือก
-มีผลกับทุก `dodo start` และไม่มี fallback อัตโนมัติ หากเลือก Tunnel แล้ว credential หรือ
-readiness ไม่พร้อม DODO จะหยุด startup แทนการเปิด local โดยไม่แจ้ง
+DODO เลือกวิธีเชื่อมต่อระดับ installation ได้หนึ่งแบบ: `local` (loopback เท่านั้น),
+`external` (Cloudflare ที่เจ้าของติดตั้ง/รันเอง) หรือ `tunnel` (DODO ดูแล cloudflared)
+ค่าที่เลือกมีผลกับทุก `dodo start` และไม่มี fallback อัตโนมัติ
 
-Local mode:
+เฉพาะเครื่อง:
 
 ```bash
-dodo tunnel configure --local
+dodo tunnel configure --loopback
+dodo start
+```
+
+Cloudflare Local (ติดตั้งในเครื่อง) — ผู้ใช้ดูแล process/token เอง:
+
+```bash
+dodo tunnel configure --cloudflare-local --public-url https://mcp.example.com
+# เริ่ม cloudflared ที่ติดตั้งในเครื่องด้วยวิธีของผู้ใช้
 dodo start
 ```
 
@@ -365,7 +402,8 @@ dodo start
 
 เจ้าของสร้าง remotely-managed Tunnel, public hostname และ DNS ใน Cloudflare และ route
 **ทุก path** มาที่ `http://127.0.0.1:21730` DODO ไม่จัดการ Cloudflare account/DNS
-Token ถูกบันทึกใน macOS Keychain, Windows Credential Manager หรือ Linux Secret Service;
+เฉพาะ DODO Tunnel เท่านั้นที่ใช้ token ซึ่งถูกบันทึกใน macOS Keychain, Windows
+Credential Manager หรือ Linux Secret Service;
 global config เก็บเพียง opaque reference ทุกครั้งที่เปิด DODO ระบบจะเริ่ม
 `cloudflared` เป็น child และหยุด child พร้อม DODO Token ไม่อยู่ใน argv, config, log,
 audit, browser storage, MCP response หรือ environment ของ MCP jobs
@@ -382,14 +420,17 @@ dodo web --close    # ปิดหน้า Remote Config แต่ MCP/Tunnel �
 terminal หลังจับคู่ browser จะใช้ cookie ที่เป็น `Secure`, `HttpOnly`,
 `SameSite=Strict` และจำกัด path ที่ `/config` หน้า Remote Config ปิดอัตโนมัติภายใน
 1 ชั่วโมง การเปิดใหม่ออก code/session ใหม่และไม่ต้อง restart MCP ไม่มี token หรือ
-credential อยู่ใน URL คำสั่งนี้ใช้ได้เฉพาะเมื่อ persistent mode เป็น `tunnel` และ
-DODO-owned Tunnel กำลังทำงาน; มันไม่รับ token ใหม่ผ่าน IPC และไม่เปลี่ยนจาก Local เอง
+credential อยู่ใน URL ใช้ได้ทั้งโหมด **Cloudflare Local** ที่เจ้าของรัน
+`cloudflared` เอง และ **DODO Tunnel** ที่ DODO ดูแล process; โหมดเฉพาะเครื่องไม่มี
+public route จึงเปิด Remote Config ไม่ได้
 
-หน้า Local Config ที่ `127.0.0.1:21731` เลือก Local/Tunnel, ตั้ง public origin และบันทึก
-token แบบ write-only เข้า OS credential store ได้ ค่าใหม่มีผลหลัง restart หน้าเว็บแสดง
-Active MCP URL จาก runtime จริงและไม่กล่าวว่า Tunnel หรือ AI client เชื่อมแล้วหากไม่มี
-หลักฐาน ดูสถานะด้วย `dodo tunnel status`, ตรวจ connectivity ด้วย `dodo tunnel doctor`
-และดู log ที่ redacted ด้วย `dodo tunnel logs`
+หน้า Local Config ที่ `127.0.0.1:21731` แยกตัวเลือกชัดเจนเป็น
+**เฉพาะเครื่อง (Loopback)**, **Cloudflare Local (ติดตั้งในเครื่อง)** และ
+**DODO Tunnel** ตั้ง public origin ได้ และรับ token แบบ write-only เฉพาะ DODO Tunnel
+ค่าใหม่มีผลหลัง restart หน้าเว็บแสดง Active MCP URL จาก runtime จริงและไม่กล่าวว่า
+Tunnel หรือ AI client เชื่อมแล้วหากไม่มีหลักฐาน ดูสถานะด้วย `dodo tunnel status`,
+ตรวจ connectivity ด้วย `dodo tunnel doctor` และดู log ที่ redacted ด้วย
+`dodo tunnel logs` (log/supervisor ใช้กับ DODO Tunnel เท่านั้น)
 
 บน macOS `dodo setup --yes` เลือก component `cloudflared` อยู่ในชุด `all` แล้ว
 Tunnel route ต้องชี้เฉพาะ MCP/OAuth listener `21730` ห้ามชี้ Local Config `21731`

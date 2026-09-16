@@ -5,6 +5,8 @@ import { sandboxAvailability } from '../jobs/sandbox.js';
 import { CronExpressionParser } from 'cron-parser';
 import type { AppServices, Principal } from '../../tools/context.js';
 import { DodoError } from '../../errors.js';
+import { isPersonalMode } from '../../security/accessMode.js';
+import { projectScopeCeiling } from '../../security/projectAccess.js';
 import { digestOf, newId } from '../../util/hash.js';
 import { validateShellCommand } from '../jobs/commandInput.js';
 
@@ -77,7 +79,12 @@ export class ScheduleService {
     if (root.root !== p.root || root.dev !== p.dev || root.ino !== p.ino || p.policy !== this.policy() || this.s.store.trustMode(this.s.workspaceId) !== 'trusted') throw new DodoError('FORBIDDEN', 'root or policy changed, or saved trust is not trusted; propose and approve again');
     if (p.clientId !== null && p.clientId !== 'stdio') {
       const g = p.grantId ? this.s.store.getGrant(p.grantId) : undefined;
-      if (!g || !this.s.store.oauthFind('Grant', p.grantId!) || g.revokedAt !== null || !g.scopes.includes('dodo:exec') || !this.s.store.clientAccess(this.s.workspaceId, p.clientId).includes('dodo:exec')) throw new DodoError('FORBIDDEN', 'schedule client grant/access revoked');
+      // Personal mode keeps no per-workspace ACL row, so re-check the same live
+      // authority the invocation pipeline uses instead of demanding a row that
+      // is never written there.
+      const live = isPersonalMode(this.s.store) ? g?.scopes ?? [] : this.s.store.clientAccess(this.s.workspaceId, p.clientId);
+      const ceiling: readonly string[] = projectScopeCeiling(this.s.store, this.s.workspaceId);
+      if (!g || !this.s.store.oauthFind('Grant', p.grantId!) || g.revokedAt !== null || !g.scopes.includes('dodo:exec') || !live.includes('dodo:exec') || !ceiling.includes('dodo:exec')) throw new DodoError('FORBIDDEN', 'schedule client grant/access revoked');
     }
     return p;
   }

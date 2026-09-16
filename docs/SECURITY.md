@@ -67,6 +67,20 @@ Launcher mode ไม่มี active AI workspace และไม่ใช้ CW
 private inert root ไม่ถูกแสดงต่อ client; OAuth และ authenticated catalog เปิดให้ตั้ง
 connection ได้ โหมดส่วนตัวซึ่งเป็นค่าเริ่มต้นอนุญาต owner-approved OAuth installation
 ให้ใช้ target ที่ owner ลงทะเบียนตาม token/profile scopes โดยไม่ต้องสร้าง ACL ซ้ำ
+Simple Project Access Policy เพิ่มเพดานอีกหนึ่งชั้นต่อโปรเจกต์ (`read`/`edit`/`full` →
+`dodo:read` / `+dodo:write` / `+dodo:exec`) บังคับที่จุดเดียวใน
+`src/security/projectAuthority.ts` โดย intersect กับ token scopes, grant scopes และ
+client ACL สิทธิ์จริงจึงเป็นส่วนที่ทับกันทั้งหมด ระดับนี้ **บีบได้อย่างเดียว ไม่เคยขยาย**:
+token ที่มีแค่ `dodo:read` ยังเขียนหรือ exec ไม่ได้แม้โปรเจกต์เป็น `full` workspace ที่
+ไม่ได้อยู่ใน registry (launcher root, stdio cwd) ไม่ถูกบีบเพิ่ม และค่าที่อ่านไม่ออกจะถูก
+ตีเป็น `read` (fail closed) การเพิ่มโปรเจกต์กับการตั้งระดับ commit ใน transaction เดียว
+จึงไม่มีโปรเจกต์ที่ลงทะเบียนครึ่งเดียว
+
+`targetProject` (ชื่อโปรเจกต์) route เหมือน `targetProjectId` ทุกประการ: resolve ก่อน
+เข้า pipeline, ค้นเฉพาะโปรเจกต์ที่ principal อ่านได้อยู่แล้ว (ไม่เปิดเผยโปรเจกต์ที่ไม่มีสิทธิ์),
+ชื่อกำกวมหรือ id/ชื่อขัดกันถูกปฏิเสธ, รับเฉพาะ top level และถูกปฏิเสธใน nested args
+ผ่านรายการ routing key ชุดเดียวกัน (`ROUTING_CONTEXT_KEYS`) ทุก dispatcher
+
 โหมด managed ต้องมี target ACL แยกตามเดิม Mutation จาก Local Config ยังผูกกับ current control context
 workspace/epoch การเลือก startup project เป็น preference เท่านั้นและไม่คัดลอก trust,
 OAuth grant, client ACL, approval, jobs หรือ workspace epoch
@@ -241,10 +255,16 @@ device-side shell สามารถเปลี่ยนข้อมูลด�
 ## Cloudflare Tunnel
 
 เจ้าของเป็นผู้สร้าง remotely-managed Tunnel, hostname และ DNS DODO ไม่ใช้ Cloudflare
-API DODO บันทึกการเลือกแบบ exclusive เป็น `local` หรือ `tunnel` ใน private global
-config หากเลือก Tunnel ทุก `dodo start` จะเริ่มเฉพาะ live `cloudflared` child ของ
-process นั้นและหยุด child พร้อม DODO หาก credential/readiness ไม่พร้อม startup จะ
-fail closed และไม่ fallback ไป Local
+API DODO บันทึกการเลือกแบบ exclusive หนึ่งค่าใน private global config: `local` คือ
+loopback-only, `external` คือ Cloudflare Local ที่เจ้าของรัน `cloudflared` เอง และ
+`tunnel` คือ DODO-owned process เฉพาะ `tunnel` เท่านั้นที่ DODO อ่าน credential,
+เริ่ม child, ตรวจ readiness และหยุด child พร้อม DODO หาก credential/readiness ไม่พร้อม
+startup จะ fail closed และไม่ fallback ไปโหมดอื่น
+
+ใน `external` DODO ใช้ public HTTPS origin เป็น OAuth issuer/MCP URL แต่ไม่รับ token,
+ไม่ค้น process และไม่อ้างว่า Tunnel connected จากค่า config เพียงอย่างเดียว เจ้าของ
+ต้องดูแล process และ route เอง `dodo tunnel doctor` แยก public health ออกจาก process
+ownership และ public health ไม่ใช่หลักฐานว่า AI client เชื่อมอยู่
 
 Token ถูกเก็บใน macOS Keychain, Windows Credential Manager หรือ Linux Secret Service
 เมื่อใช้ `--os-credential`; config เก็บ opaque locator เท่านั้น Owner-controlled
@@ -253,11 +273,12 @@ headless deployment อาจเลือก env/private-file reference โด�
 browser storage หรือ setup receipt ค่า `TUNNEL_TOKEN` และ `TUNNEL_TOKEN_FILE` ถูก
 ปฏิเสธจาก environment ของ MCP jobs เสมอ
 
-Local Config รับ token แบบ write-only เฉพาะ POST ที่ผ่าน private capability,
+Local Config รับ token แบบ write-only เฉพาะเมื่อเลือก DODO Tunnel และ POST ผ่าน private capability,
 Host/Origin/proxy checks, rate limit และ control-context headers จากนั้นส่งตรงไปยัง
 reviewed OS credential provider และล้าง request field Response/config/audit ส่งกลับ
 เฉพาะ credential presence/provider ไม่มี MCP tool สำหรับส่ง token, เปลี่ยน connection
-mode หรือควบคุม owner Tunnel
+mode หรือควบคุม owner Tunnel การเลือก Cloudflare Local จะปิดช่อง token และ backend
+ไม่รับหรืออ่าน credential สำหรับโหมดนั้น
 
 Tunnel route ต้องชี้ทุก public path ไป MCP/OAuth listener `127.0.0.1:21730` เท่านั้น
 Local Config `21731`, metrics `21732` และ private IPC ไม่ถูก expose `/config` ที่

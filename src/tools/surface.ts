@@ -10,8 +10,7 @@ import {
   invokeToolDefinition,
   toolInputShape,
   type AnyToolDef,
-  type AppServices,
-} from './context.js';
+  type AppServices, assertNoNestedRoutingContext } from './context.js';
 import { envelopeSchema } from './envelope.js';
 
 /**
@@ -348,11 +347,7 @@ function buildGateway(spec: GatewaySpec): AnyToolDef {
     handler: async (args, ctx) => {
       const target = targetOf(args.operation);
       const raw = (args.args ?? {}) as Record<string, unknown>;
-      if ('workspaceId' in raw || 'workspaceEpoch' in raw || 'targetProjectId' in raw) {
-        throw new DodoError('INVALID_INPUT', 'args must not carry workspaceId/workspaceEpoch; the gateway takes them from its top-level fields', {
-          recovery: 'remove workspaceId and workspaceEpoch from args; keep them only at the top level of the gateway call',
-        });
-      }
+      assertNoNestedRoutingContext(raw);
       const merged: Record<string, unknown> = target.noWorkspaceContext
         ? { ...raw }
         : { ...raw, workspaceId: (args as Record<string, unknown>)['workspaceId'], workspaceEpoch: (args as Record<string, unknown>)['workspaceEpoch'] };

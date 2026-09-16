@@ -71,4 +71,26 @@ describe('persistent MCP connection mode', () => {
       activePublicUrl: publicUrl,
     });
   });
+
+  it('advertises the owner-managed Cloudflare origin without requiring or starting a DODO Tunnel', async () => {
+    const publicUrl = 'https://owner-cloudflared.example.test';
+    const context = await launch({
+      configPort: 0,
+      connectionMode: 'external',
+      configPatch: { publicUrl, tunnel: { connectionMode: 'external' } },
+    });
+    running.push(context);
+
+    expect(context.server.connectionMode).toBe('external');
+    expect(context.server.publicUrl).toBe(publicUrl);
+    const state = await ownerState(context) as { connection: Record<string, unknown>; tunnel: Record<string, unknown> };
+    expect(state.connection).toMatchObject({
+      connectionMode: 'external',
+      activeMcpUrl: `${publicUrl}/mcp`,
+      mcpPublicUrl: `${publicUrl}/mcp`,
+      mcpLocalUrl: `${context.baseUrl}/mcp`,
+      activePublicUrl: publicUrl,
+    });
+    expect(state.tunnel).toMatchObject({ connectionMode: 'external', credentialConfigured: false });
+  });
 });

@@ -6,6 +6,7 @@ import { DodoError } from '../errors.js';
 import { bootstrapWorkspace, type BootstrappedWorkspace } from './bootstrap.js';
 import { attachOptionalServices } from './optionalServices.js';
 import { projectAuthority, isOwner } from '../security/projectAuthority.js';
+import { isPersonalMode } from '../security/accessMode.js';
 import type { Principal, AppServices } from '../tools/context.js';
 import type { WorkspaceResources } from './workspaceHost.js';
 
@@ -38,7 +39,11 @@ export class InstallationRuntime {
     const r = this.registry.list().find(r => r.projectId === id);
     if (!r) throw new DodoError('FORBIDDEN', 'project unavailable or not authorized');
     const authority = projectAuthority(this.store, p, r.workspaceId);
-    if (authority.scopes.length === 0) throw new DodoError('WORKSPACE_ACCESS_REQUIRED', 'owner must allow access to the target project');
+    if (authority.scopes.length === 0) {
+      throw new DodoError('WORKSPACE_ACCESS_REQUIRED', isPersonalMode(this.store)
+        ? `no usable scope for project "${r.displayName}" (access level: ${r.accessLevel}); raise the level in Local Config > Projects or reconnect the client with the scopes you need`
+        : 'owner must allow access to the target project');
+    }
     if (!r.available) throw new DodoError('PATH_DENIED', 'registered project directory is not ready');
     return r;
   }

@@ -593,6 +593,20 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
    CREATE TABLE ai_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL REFERENCES ai_runs(id) ON DELETE CASCADE,
      created_at INTEGER NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL);
    CREATE INDEX idx_ai_runs_owner ON ai_runs(workspace_id,owner,created_at);`,
+  (db) => {
+    // Simple Project Access Policy: one owner-chosen level per registered
+    // project (read | edit | full) that maps to an OAuth scope ceiling.
+    //
+    // Existing rows migrate to 'full' deliberately. 'full' adds NO narrowing,
+    // so an install upgrading from 1.0.x keeps exactly the authority it had —
+    // which is still bounded by the OAuth token scopes, the per-workspace ACL
+    // in managed mode, trust mode, sandbox and every path/secret guard.
+    // Silently tightening a working install would revoke authority the owner
+    // never asked to revoke; the level is surfaced in the UI and `dodo project
+    // list` so it can be reduced explicitly.
+    db.exec("ALTER TABLE project_registry ADD COLUMN access_level TEXT NOT NULL DEFAULT 'full'");
+    db.exec('CREATE INDEX IF NOT EXISTS idx_project_registry_workspace ON project_registry(workspace_id) WHERE removed_at IS NULL');
+  },
 ];
 
 /**

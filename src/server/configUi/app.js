@@ -217,7 +217,10 @@
     // chips
     const c = s.connection || {};
     if (c.workspaceSelected === false) setChip('chip-mcp', 'warn', '⚠', 'เปิดอยู่ แต่รอเจ้าของเลือก workspace');
-    else if (c.activeMcpUrl) setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `${c.connectionMode === 'tunnel' ? 'Tunnel' : 'Local'} · ${c.activeMcpUrl.replace(/^https?:\/\//, '')}`);
+    else if (c.activeMcpUrl) {
+      const connectionLabel = c.connectionMode === 'tunnel' ? 'DODO Tunnel' : c.connectionMode === 'external' ? 'Cloudflare Local' : 'เฉพาะเครื่อง';
+      setChip('chip-mcp', s.state === 'switching' ? 'busy' : 'ok', s.state === 'switching' ? '⟳' : '●', s.state === 'switching' ? 'กำลังสลับ workspace' : `${connectionLabel} · ${c.activeMcpUrl.replace(/^https?:\/\//, '')}`);
+    }
     else setChip('chip-mcp', 'warn', '○', 'ไม่มี HTTP listener ใน entry นี้');
     if (c.oauthConfigured === true) setChip('chip-oauth', 'ok', '●', `เปิดใช้ · ${c.activePublicUrl || c.activeMcpUrl}`);
     else if (c.oauthConfigured === false) setChip('chip-oauth', 'warn', '⚠', 'LOCKED — ยังไม่ตั้ง public URL');
@@ -273,7 +276,10 @@
     // entirely (a short note with a tooltip replaces it); managed mode keeps
     // every original control. Pure presentation: no scope/guard changes.
     const p = s.permissions;
-    const personalMode = Boolean(w && p && p.accessMode === 'personal');
+    // Read the installation-level mode, not the per-workspace permissions
+    // block: `permissions` is null until a workspace is selected, which used to
+    // make a fresh personal-mode install render the managed-mode ACL cards.
+    const personalMode = (s.accessMode ?? (p && p.accessMode)) === 'personal';
     $('card-perm').hidden = personalMode;
     $('card-clients').hidden = personalMode;
     $('personal-note').hidden = !personalMode;
@@ -359,16 +365,20 @@
     const browserFormSig = JSON.stringify([browserMode ? browserMode.value : 'local', Number($('tunnel-metrics').value), Number($('tunnel-restarts').value)]);
     const tunnelDirty = !force && lastTunnelFormSig !== null && browserFormSig !== lastTunnelFormSig;
     if (!tunnelDirty) {
-      $('tunnel-mode-local').checked = tunnel.connectionMode !== 'tunnel';
+      $('tunnel-mode-local').checked = tunnel.connectionMode === 'local';
+      $('tunnel-mode-external').checked = tunnel.connectionMode === 'external';
       $('tunnel-mode-tunnel').checked = tunnel.connectionMode === 'tunnel';
       $('tunnel-metrics').value = String(tunnel.metricsPort || 21732);
       $('tunnel-restarts').value = String(tunnel.maxRestarts ?? 2);
     }
-    $('tunnel-credential').textContent = tunnel.credentialConfigured
-      ? `● มี credential แล้ว (${tunnel.credentialStorage}; ไม่แสดงค่า)`
-      : tunnel.credentialStore && tunnel.credentialStore.available
-        ? `○ ยังไม่มี credential · พร้อมบันทึกใน ${tunnel.credentialStore.provider}`
-        : `✕ credential store ใช้ไม่ได้${tunnel.credentialStore && tunnel.credentialStore.provider ? ` (${tunnel.credentialStore.provider})` : ''}`;
+    $('tunnel-credential').textContent = tunnel.connectionMode !== 'tunnel'
+      ? 'ไม่ใช้ token ในโหมดนี้ — token ใช้เฉพาะเมื่อ DODO เป็นผู้เริ่ม cloudflared'
+      : tunnel.credentialConfigured
+        ? `● มี credential แล้ว (${tunnel.credentialStorage}; ไม่แสดงค่า)`
+        : tunnel.credentialStore && tunnel.credentialStore.available
+          ? `○ ยังไม่มี credential · พร้อมบันทึกใน ${tunnel.credentialStore.provider}`
+          : `✕ credential store ใช้ไม่ได้${tunnel.credentialStore && tunnel.credentialStore.provider ? ` (${tunnel.credentialStore.provider})` : ''}`;
+    syncTunnelControls();
     lastTunnelFormSig = serverFormSig;
     const tunnelRuntime = tunnel.runtime || {};
     const currentTunnel = tunnelRuntime.current;
@@ -379,8 +389,12 @@
       $('tunnel-badge').className = 'badge warn';
       $('tunnel-badge').textContent = `◌ Tunnel ${currentTunnel.phase || 'กำลังเริ่ม'}`;
     } else {
-      $('tunnel-badge').className = tunnel.connectionMode === 'tunnel' ? 'badge warn' : 'badge';
-      $('tunnel-badge').textContent = tunnel.connectionMode === 'tunnel' ? '◌ เลือก Tunnel · ต้อง restart' : '● ใช้ Local';
+      $('tunnel-badge').className = tunnel.connectionMode === 'tunnel' ? 'badge warn' : tunnel.connectionMode === 'external' ? 'badge ok' : 'badge';
+      $('tunnel-badge').textContent = tunnel.connectionMode === 'tunnel'
+        ? '◌ เลือก DODO Tunnel · ต้อง restart'
+        : tunnel.connectionMode === 'external'
+          ? '● ใช้ Cloudflare ที่รันในเครื่อง'
+          : '● ใช้เฉพาะเครื่อง';
     }
 
     // clients
@@ -445,6 +459,47 @@
       head.append(titleWrap, status);
 
       const root = document.createElement('code'); root.className = 'path project-path'; root.textContent = project.root; root.title = project.root;
+
+      // ระดับการเข้าถึง: ค่าเดียวที่ควบคุมว่า AI ทำอะไรได้ในโปรเจกต์นี้
+      const accessRow = document.createElement('div'); accessRow.className = 'project-access';
+      const accessLabel = document.createElement('label');
+      accessLabel.textContent = 'ระดับการเข้าถึง';
+      const accessSelect = document.createElement('select');
+      accessSelect.setAttribute('aria-label', `ระดับการเข้าถึงของ ${project.displayName}`);
+      for (const [value, text] of [['read', 'อ่านอย่างเดียว'], ['edit', 'แก้ไข'], ['full', 'ทำงานเต็มรูปแบบ']]) {
+        const option = document.createElement('option'); option.value = value; option.textContent = text;
+        accessSelect.append(option);
+      }
+      accessSelect.value = project.accessLevel;
+      accessLabel.append(accessSelect);
+      const accessSummary = document.createElement('p'); accessSummary.className = 'help'; accessSummary.textContent = project.accessSummary;
+      const accessStatus = document.createElement('p'); accessStatus.className = 'help project-access-status'; accessStatus.setAttribute('role', 'status'); accessStatus.setAttribute('aria-live', 'polite');
+      const accessSave = document.createElement('button'); accessSave.type = 'button'; accessSave.className = 'btn small'; accessSave.textContent = 'บันทึกระดับ';
+      accessSave.disabled = true;
+      accessSelect.addEventListener('change', () => { accessSave.disabled = accessSelect.value === project.accessLevel; accessStatus.textContent = ''; });
+      accessSave.addEventListener('click', () => withBusy(accessSave, 'กำลังบันทึก…', async () => {
+        const chosen = accessSelect.value;
+        try {
+          // The backend is the source of truth: only report success once it confirms.
+          const saved = await api('projects/access', { projectId: project.projectId, access: chosen }, context);
+          // Update this card from the backend's response instead of re-rendering
+          // the whole list: a full re-render replaced the node and threw away
+          // the confirmation the owner needs to see.
+          project.accessLevel = saved.project.accessLevel;
+          accessSelect.value = saved.project.accessLevel;
+          accessSummary.textContent = saved.project.accessSummary;
+          accessStatus.textContent = `✓ บันทึกแล้ว: ${saved.project.accessSummary}`;
+          accessSave.disabled = true;
+          notify('success', `ตั้งระดับของ ${saved.project.displayName} เป็น ${saved.project.accessLevel} แล้ว`);
+        } catch (error) {
+          accessSelect.value = project.accessLevel;
+          accessSave.disabled = true;
+          accessStatus.textContent = `✕ ${error.message}`;
+          notify('error', `เปลี่ยนระดับไม่สำเร็จ: ${error.message}`);
+        }
+      }));
+      accessRow.append(accessLabel, accessSummary, accessSave, accessStatus);
+
       const description = document.createElement('p'); description.className = 'help project-status'; description.textContent = project.statusText;
       const details = document.createElement('details'); details.className = 'details';
       const summary = document.createElement('summary'); summary.textContent = 'รายละเอียด registry';
@@ -464,7 +519,9 @@
           const switched = await api('workspace/switch', { path: project.root }, context);
           if (switched.changed) {
             switchedOnce = true;
-            notify('success', `สลับไปที่ ${project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และ client ต้องมีสิทธิ์ใน workspace ใหม่`, true);
+            notify('success', result.accessMode === 'personal'
+              ? `สลับไปที่ ${project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และใช้ระดับ ${project.accessLevel} ของโปรเจกต์นี้`
+              : `สลับไปที่ ${project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และ client ต้องมีสิทธิ์ใน workspace ใหม่`, true);
           }
           await refresh(true);
         } catch (error) {
@@ -485,7 +542,7 @@
         } catch (error) { notify('error', `นำโปรเจกต์ออกไม่สำเร็จ: ${error.message}`); }
       }));
       actions.append(switchButton, removeButton);
-      article.append(head, root, description, details, actions);
+      article.append(head, root, accessRow, description, details, actions);
       list.append(article);
     }
   }
@@ -504,18 +561,23 @@
     const context = workspaceContext();
     withBusy($('project-add'), 'กำลังเพิ่ม…', async () => {
       try {
-        const body = { path: projectPath };
+        const body = { path: projectPath, access: $('project-add-access').value };
         if (displayName) body.displayName = displayName;
         const result = await api('projects/add', body, context);
+        // Only the backend decides whether a project is usable; the message
+        // reflects the mode it reports, never a canned assumption.
+        const ready = result.project.requiresClientAcl
+          ? `เพิ่ม ${result.project.displayName} แล้ว (ระดับ ${result.project.accessLevel}) — โหมดแยกสิทธิ์: อนุญาต client สำหรับโปรเจกต์นี้ก่อนใช้งาน`
+          : `เพิ่ม ${result.project.displayName} แล้ว — พร้อมใช้ทันที (${result.project.accessSummary})`;
         if ($('project-add-open').checked) {
           const switched = await api('workspace/switch', { path: result.project.root }, context);
           switchedOnce = Boolean(switched.changed);
-          notify('success', `เพิ่มและเปิด ${result.project.displayName} แล้ว — AI ต้องเรียก project_overview ใหม่ และ client ต้องได้รับสิทธิ์สำหรับ workspace นี้`, true);
+          notify('success', `${ready} · AI ต้องเรียก project_overview ใหม่`, true);
           pathInput.value = ''; nameInput.value = '';
           await refresh(true);
         } else {
           pathInput.value = ''; nameInput.value = '';
-          notify(result.changed ? 'success' : 'info', result.relocated ? `อัปเดต path ของ ${result.project.displayName} แล้ว โดยไม่คัดลอกสิทธิ์ workspace เดิม` : result.changed ? `เพิ่ม ${result.project.displayName} ใน registry แล้ว` : 'โปรเจกต์นี้อยู่ใน registry แล้ว');
+          notify(result.changed ? 'success' : 'info', result.relocated ? `อัปเดต path ของ ${result.project.displayName} แล้ว โดยไม่คัดลอกสิทธิ์ workspace เดิม` : result.changed ? ready : 'โปรเจกต์นี้อยู่ใน registry แล้ว');
           await loadProjects(true);
         }
       } catch (error) {
@@ -940,6 +1002,17 @@
   });
 
   // ---- Cloudflare Tunnel ----
+  function syncTunnelControls() {
+    const mode = document.querySelector('input[name="connectionMode"]:checked')?.value || 'local';
+    const managed = mode === 'tunnel';
+    $('tunnel-credential-fields').hidden = !managed;
+    $('tunnel-token').disabled = !managed;
+    $('tunnel-metrics').disabled = !managed;
+    $('tunnel-restarts').disabled = !managed;
+    if (!managed) $('tunnel-token').value = '';
+  }
+  document.querySelectorAll('input[name="connectionMode"]').forEach((input) => input.addEventListener('change', syncTunnelControls));
+
   $('tunnel-form').addEventListener('submit', (ev) => {
     ev.preventDefault();
     const errorElement = $('tunnel-error');
@@ -962,12 +1035,14 @@
     }
     withBusy($('tunnel-save'), 'กำลังบันทึก…', async () => {
       try {
-        const body = { connectionMode, metricsPort, maxRestarts, ...(token ? { token } : {}) };
+        const body = { connectionMode, metricsPort, maxRestarts, ...(connectionMode === 'tunnel' && token ? { token } : {}) };
         const result = await api('tunnel/config', body);
         tokenInput.value = '';
         notify('info', result.connectionMode === 'tunnel'
-          ? 'บันทึกแล้ว — restart DODO เพื่อใช้ Tunnel เป็น MCP endpoint หลัก'
-          : 'บันทึกแล้ว — restart DODO เพื่อใช้ Local MCP เท่านั้น');
+          ? 'บันทึกแล้ว — restart DODO เพื่อให้ DODO เริ่ม Tunnel เป็น MCP endpoint หลัก'
+          : result.connectionMode === 'external'
+            ? 'บันทึกแล้ว — restart DODO แล้วรัน cloudflared ที่ติดตั้งในเครื่องด้วยตนเอง'
+            : 'บันทึกแล้ว — restart DODO เพื่อใช้ MCP เฉพาะในเครื่อง');
         await refresh(true);
       } catch (error) {
         tokenInput.value = '';

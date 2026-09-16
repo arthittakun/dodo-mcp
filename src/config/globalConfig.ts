@@ -97,9 +97,13 @@ export function migrateLegacyGlobalConfig(parsed: unknown): unknown {
   const tunnel = owner['tunnel'];
   if (!tunnel || typeof tunnel !== 'object' || Array.isArray(tunnel)) return owner;
   const old = tunnel as Record<string, unknown>;
-  const connectionMode = old['connectionMode'] === 'local' || old['connectionMode'] === 'tunnel'
+  const connectionMode = old['connectionMode'] === 'local' || old['connectionMode'] === 'external' || old['connectionMode'] === 'tunnel'
     ? old['connectionMode']
-    : old['mode'] === 'managed' && old['credentialRef'] !== undefined ? 'tunnel' : 'local';
+    : old['mode'] === 'managed' && old['credentialRef'] !== undefined
+      ? 'tunnel'
+      : old['mode'] === 'external'
+        ? 'external'
+        : 'local';
   const migrated: Record<string, unknown> = { ...old, connectionMode };
   delete migrated['mode'];
   delete migrated['startWithDodo'];

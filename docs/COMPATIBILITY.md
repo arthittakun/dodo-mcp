@@ -13,7 +13,7 @@
 | MCP HTTP | OAuth protected MCP endpoint ที่ `/mcp` |
 | MCP STDIO | Full surface เป็นค่าเริ่มต้น |
 | Local Config | loopback owner control ที่ 21731; เปิด bounded Remote Config `/config` ผ่าน 21730 ได้ครั้งละไม่เกิน 1 ชั่วโมง |
-| Cloudflare Tunnel | เลือก persistent `local` หรือ DODO-owned `tunnel`; credential อยู่ใน OS store/reference และ child `cloudflared` หยุดพร้อม DODO |
+| Cloudflare | เลือก persistent `local` (loopback), `external` (Cloudflare Local ที่เจ้าของรันเอง) หรือ `tunnel` (DODO ดูแล process); credential ใช้เฉพาะ `tunnel` และอยู่ใน OS store/reference |
 | Package | `dodo-mcp` |
 | CLI | `dodo` |
 
@@ -75,7 +75,8 @@ desktop และ browser ยังไม่ถือว่ารองรับ
 
 `dodo setup --components cloudflared` ตรวจ executable ได้ทุก OS การติดตั้งอัตโนมัติ
 รองรับ Homebrew บน macOS ส่วน Linux/Windows ใช้ signed official package ที่เจ้าของติดตั้งเอง
-โหมด Tunnel ต้องมี public origin และ credential reference ที่ผ่านการตรวจแล้ว ค่า
+โหมด Cloudflare Local ต้องมี public origin แต่ไม่รับ credential และไม่ supervise
+`cloudflared` โหมด DODO Tunnel ต้องมี public origin และ credential reference ที่ผ่านการตรวจแล้ว ค่า
 `--os-credential` ใช้ macOS Keychain, Windows Credential Manager หรือ Linux Secret
 Service ส่วน env/file references มีไว้สำหรับ owner-controlled headless environment
 

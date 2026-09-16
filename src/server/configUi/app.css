@@ -345,3 +345,11 @@ body.swal2-toast-shown .swal2-container { background: transparent !important; }
 #client-manage-delete { margin: 12px 0; }
 #client-manage-list small { overflow-wrap: anywhere; }
 #confirm-text { white-space: pre-line; overflow-wrap: anywhere; max-height: 55vh; overflow-y: auto; }
+
+/* ---- Per-project access level (Simple Project Access Policy) ---- */
+.project-access { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s2) var(--s3); padding: var(--s3); border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--panel); }
+.project-access label { display: flex; flex-direction: column; gap: 6px; font-size: .86rem; flex: 1 1 210px; min-width: 0; }
+.project-access select { width: 100%; }
+.project-access .help { flex-basis: 100%; margin: 0; }
+.project-access .btn { flex: none; }
+.project-access-status { flex-basis: 100%; }

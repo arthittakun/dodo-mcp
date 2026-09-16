@@ -7,12 +7,83 @@ project ID แบบ opaque และคงที่เพื่ออ้าง�
 ## คำสั่ง
 
 ```bash
-dodo project add /absolute/path/to/project
-dodo project add /absolute/path/to/project --name "Web application"
+dodo project add /absolute/path/to/project --name "auto-upload" --access full
+dodo project add "C:\\Users\\User\\Desktop\\auto-upload" --name "auto-upload" --access edit
+dodo project access "auto-upload" --mode edit
 dodo project list
 dodo project info prj_xxxxxxxxxxxx
 dodo project remove prj_xxxxxxxxxxxx --yes
 ```
+
+`dodo project access` รับได้ทั้ง **ชื่อโปรเจกต์** และ project ID เว็บ Local Config
+และ CLI เรียก owner-administration service ตัวเดียวกัน (`src/projects/ownerAdmin.ts`)
+จึงใช้ validation, การยืนยันและ audit ชุดเดียวกัน ไม่มี permission logic แยกสองชุด
+
+## Simple Project Access Policy
+
+ตอนเพิ่มโปรเจกต์ให้เลือก **ระดับการเข้าถึง** เพียงค่าเดียว:
+
+| ระดับ | ความหมาย | OAuth scopes ที่เป็นเพดาน |
+|---|---|---|
+| `read` | อ่านอย่างเดียว — อ่าน ค้นหา วิเคราะห์ | `dodo:read` |
+| `edit` | แก้ไข — อ่านและแก้ไฟล์ | `dodo:read` + `dodo:write` |
+| `full` | ทำงานเต็มรูปแบบ — อ่าน แก้ไฟล์ และรันคำสั่ง/ทดสอบ | `dodo:read` + `dodo:write` + `dodo:exec` |
+
+ระดับนี้เป็น **เพดาน ไม่ใช่การให้สิทธิ์** สิทธิ์จริงคือส่วนที่ทับกันของ
+
+```text
+OAuth token scopes ∩ grant scopes ∩ (personal ? grant : client ACL ของ workspace) ∩ ระดับของโปรเจกต์
+```
+
+ดังนั้น token ที่มีแค่ `dodo:read` จะยังอ่านได้อย่างเดียวแม้โปรเจกต์เป็น `full`
+และโปรเจกต์ `read` ก็เขียนไม่ได้แม้ token จะมี `dodo:write` การเปลี่ยนระดับไม่แตะ
+OAuth, trust, approval, path/secret guards, expected hash, sandbox หรือ audit
+
+ใน **โหมดส่วนตัว** (ค่าเริ่มต้น) เพิ่มโปรเจกต์แล้วใช้ได้ทันที ไม่ต้องตั้ง client ACL
+หรือ trust ซ้ำต่อโปรเจกต์ ใน **โหมดแยกสิทธิ์** ยังต้องอนุญาต client ต่อโปรเจกต์ตามเดิม
+และระดับของโปรเจกต์จะบีบให้แคบลงอีกชั้น (ไม่เคยขยาย)
+
+### การอัปเกรดจากรุ่นก่อนหน้า
+
+โปรเจกต์ที่ลงทะเบียนไว้ก่อนมีนโยบายนี้จะได้ระดับ `full` — เพราะ `full` **ไม่บีบอะไรเพิ่ม**
+สิทธิ์จริงจึงเท่าเดิมทุกประการ (ยังถูกจำกัดด้วย OAuth scopes, client ACL ในโหมดแยกสิทธิ์,
+trust และ guards ทั้งหมด) การบีบให้แคบลงเงียบ ๆ จะเป็นการถอนสิทธิ์ที่เจ้าของไม่ได้สั่ง
+ระดับจะแสดงในหน้า Projects และ `dodo project list` เพื่อให้ลดลงได้เอง
+
+## เรียกโปรเจกต์ด้วยชื่อ
+
+ชื่อโปรเจกต์ต้องไม่ซ้ำกัน (เทียบแบบไม่สนตัวพิมพ์) เพราะใช้อ้างอิงโปรเจกต์ในการสั่งงาน AI
+
+พูดกับ AI ได้ตรง ๆ ว่า **"ใช้ DODO แก้โปรเจกต์ auto-upload"** แล้ว AI จะ:
+
+1. เรียก `project_overview` พร้อม `targetProject: "auto-upload"` — DODO resolve ชื่อ
+   เป็นโปรเจกต์เดียวที่ client นั้นมีสิทธิ์เห็น
+2. รับ `workspaceId` / `workspaceEpoch` ของโปรเจกต์นั้นกลับมา
+3. ส่ง `targetProject` พร้อม context นั้นไปกับทุก operation ถัดไป
+
+```jsonc
+project_overview({ targetProject: "auto-upload" })
+
+dodo_write({
+  targetProject: "auto-upload",
+  workspaceId: "ws_…", workspaceEpoch: "boot_…",
+  operation: "edit_file",
+  args: { /* … */ }
+})
+```
+
+กฎของการ resolve:
+
+- เทียบชื่อแบบตัดช่องว่างหัวท้ายและไม่สนตัวพิมพ์
+- ค้นเฉพาะโปรเจกต์ที่ principal นั้นอ่านได้อยู่แล้ว จึงไม่เปิดเผยชื่อหรือ path
+  ของโปรเจกต์ที่ไม่มีสิทธิ์
+- ชื่อกำกวม (เช่นข้อมูลเก่าที่ชื่อซ้ำ) → error พร้อมรายชื่อ candidate ที่เห็นได้ ไม่เดา
+- ส่งทั้ง `targetProjectId` และ `targetProject` ที่ชี้คนละโปรเจกต์ → ปฏิเสธ
+- `targetProject` อยู่ระดับบนสุดเท่านั้น ใส่ใน `args` ที่ซ้อนอยู่จะถูกปฏิเสธ
+- หลัง resolve แล้วผ่าน invocation/security pipeline เดิมครบทุกด่าน
+
+เจ้าของไม่ต้องรู้หรือพิมพ์ project ID เอง (`targetProjectId` ยังใช้ได้ตามเดิมเพื่อ
+ความเข้ากันได้ย้อนหลัง)
 
 ทุกคำสั่งรองรับข้อมูล local owner เท่านั้น `list`, `info` และ `add` รองรับ
 `--json`; `remove` ต้องมี `--yes` หลังตรวจ project ID และ path แล้ว

@@ -13,8 +13,11 @@ import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSche
 import { ALL_SCOPES } from '../security/policy.js';
 import { DodoError } from '../errors.js';
 import { ProjectRegistry } from '../projects/registry.js';
+import { ProjectAdmin } from '../projects/ownerAdmin.js';
+import { PROJECT_ACCESS_LEVELS } from '../security/projectAccess.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
 import type { TunnelCredentialRef } from '../config/tunnelConfig.js';
+import type { ConnectionMode } from '../config/tunnelConfig.js';
 import { accessMode } from '../security/accessMode.js';
 
 /**
@@ -33,7 +36,7 @@ import { accessMode } from '../security/accessMode.js';
 export interface LocalConfigInfo {
   version?: string;
   /** What the MCP listener of this process looks like (absent for entries without one). */
-  transport?: { port: number; locked: boolean; publicUrl: string | null; connectionMode?: 'local' | 'tunnel' };
+  transport?: { port: number; locked: boolean; publicUrl: string | null; connectionMode?: ConnectionMode };
   runMode?: 'allow-all' | 'bypass' | null;
   /** Dynamic because the launcher can activate its first real workspace. */
   workspaceSelected?: () => boolean;
@@ -207,8 +210,8 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     const cfg = loadGlobalConfig(ws.paths.configFile);
     const transport = info.transport;
     const selected = hasWorkspace();
-    const activeConnectionMode: 'local' | 'tunnel' = transport?.connectionMode
-      ?? (transport?.publicUrl ? 'tunnel' : cfg.tunnel.connectionMode);
+    const activeConnectionMode: ConnectionMode = transport?.connectionMode
+      ?? (transport?.publicUrl ? cfg.tunnel.connectionMode === 'local' ? 'external' : cfg.tunnel.connectionMode : 'local');
     res.json({
       version: info.version ?? ws.services.version,
       state: host.state(),
@@ -224,6 +227,10 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         recoveryRequired: ws.store.listChangesetsByStatus('recovery_required').filter((c) => c.workspaceId === ws.workspaceId).length,
         switchSupported,
       } : null,
+      // Top-level: the owner's mode is an installation fact, true even before a
+      // workspace is selected. The UI hid the ACL cards off `permissions`,
+      // which is null on a fresh install — exactly when the owner is confused.
+      accessMode: accessMode(ws.store),
       schedules: selected ? ws.services.schedules.list() : [],
       desktop: selected ? { policy: ws.services.desktop.policy() } : null,
       android: selected ? { policy: ws.services.android.policy() } : null,
@@ -240,17 +247,17 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         connectionMode: activeConnectionMode,
         mcpLocalUrl: transport ? `http://127.0.0.1:${transport.port}/mcp` : null,
         publicUrl: cfg.publicUrl ?? '',
-        mcpPublicUrl: activeConnectionMode === 'tunnel' && transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
+        mcpPublicUrl: activeConnectionMode !== 'local' && transport?.publicUrl ? `${transport.publicUrl}/mcp` : null,
         activeMcpUrl: transport
-          ? activeConnectionMode === 'tunnel' && transport.publicUrl
+          ? activeConnectionMode !== 'local' && transport.publicUrl
             ? `${transport.publicUrl}/mcp`
             : `http://127.0.0.1:${transport.port}/mcp`
           : null,
         oauthConfigured: transport ? !transport.locked : null,
-        activePublicUrl: activeConnectionMode === 'tunnel' ? transport?.publicUrl ?? null : null,
+        activePublicUrl: activeConnectionMode !== 'local' ? transport?.publicUrl ?? null : null,
         restartRequired: transport !== undefined && (
           cfg.tunnel.connectionMode !== activeConnectionMode
-          || (cfg.tunnel.connectionMode === 'tunnel' && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null))
+          || (cfg.tunnel.connectionMode !== 'local' && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null))
         ),
         localConfigOrigin: `http://127.0.0.1:${actualPort}`,
         expiresAt,
@@ -262,7 +269,11 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
         credentialStore: info.tunnelCredentialStore
           ? { available: info.tunnelCredentialStore.available, provider: info.tunnelCredentialStore.provider }
           : { available: false, provider: 'unavailable' },
-        cloudflared: cfg.tunnel.executable ? 'owner-selected' : 'trusted-PATH',
+        cloudflared: cfg.tunnel.connectionMode === 'local'
+          ? 'not-used'
+          : cfg.tunnel.connectionMode === 'external'
+            ? 'owner-managed'
+            : cfg.tunnel.executable ? 'owner-selected' : 'trusted-PATH',
         metricsPort: cfg.tunnel.metricsPort,
         maxRestarts: cfg.tunnel.maxRestarts,
         runtime: info.tunnelRuntime?.status() ?? { available: false, running: false, current: null, lastKnown: null },
@@ -303,21 +314,48 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     if (host.state() !== 'ready' || req.headers['x-dodo-workspace'] !== ws.workspaceId || req.headers['x-dodo-epoch'] !== ws.epoch) {
       res.status(409).json({ error: 'Workspace changed. Refresh before reviewing projects.', code: 'STALE_WORKSPACE' }); return;
     }
-    const projects = new ProjectRegistry(ws.store).list();
+    const projects = new ProjectAdmin(ws.store).list();
     res.json({
       workspaceId: ws.workspaceId,
       workspaceEpoch: ws.epoch,
       activeWorkspaceId: hasWorkspace() ? ws.workspaceId : null,
+      accessMode: accessMode(ws.store),
+      accessLevels: PROJECT_ACCESS_LEVELS,
       projects,
     });
   });
 
   app.post('/api/projects/add', (req, res) => {
-    const input = z.object({ path: z.string().min(1).max(4096), displayName: z.string().min(1).max(120).optional() }).strict().safeParse(req.body);
-    if (!input.success) { res.status(400).json({ error: 'Project path and display name are invalid.', code: 'INVALID_INPUT' }); return; }
+    const input = z.object({
+      path: z.string().min(1).max(4096),
+      displayName: z.string().min(1).max(120).optional(),
+      access: z.enum(['read', 'edit', 'full']).optional(),
+    }).strict().safeParse(req.body);
+    if (!input.success) { res.status(400).json({ error: 'Project path, name or access level is invalid.', code: 'INVALID_INPUT' }); return; }
     try {
-      const result = new ProjectRegistry(host.current().store).add(input.data.path, input.data.displayName);
+      // One transaction in ProjectRegistry.add: path identity, unique name and
+      // access level commit together, so a rejected level cannot leave a
+      // half-registered project behind.
+      const result = new ProjectAdmin(host.current().store).add({
+        path: input.data.path,
+        ...(input.data.displayName ? { name: input.data.displayName } : {}),
+        ...(input.data.access ? { access: input.data.access } : {}),
+      });
       res.json({ ok: true, ...result, authorityChanged: false });
+    } catch (error) {
+      const { status, body } = ownerStateError(error);
+      res.status(status).json(body);
+    }
+  });
+
+  app.post('/api/projects/access', (req, res) => {
+    const input = z.object({
+      projectId: z.string().min(1).max(96),
+      access: z.enum(['read', 'edit', 'full']),
+    }).strict().safeParse(req.body);
+    if (!input.success) { res.status(400).json({ error: 'Project ID or access level is invalid.', code: 'INVALID_INPUT' }); return; }
+    try {
+      res.json({ ok: true, project: new ProjectAdmin(host.current().store).setAccess(input.data.projectId, input.data.access) });
     } catch (error) {
       const { status, body } = ownerStateError(error);
       res.status(status).json(body);
@@ -368,7 +406,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   // provider. Config stores only an opaque reference and one selected mode.
   app.post('/api/tunnel/config', async (req, res) => {
     const input = z.object({
-      connectionMode: z.enum(['local', 'tunnel']),
+      connectionMode: z.enum(['local', 'external', 'tunnel']),
       token: z.string().min(20).max(8192).optional(),
       metricsPort: z.number().int().min(1024).max(65535).optional(),
       maxRestarts: z.number().int().min(0).max(5).optional(),
@@ -382,11 +420,13 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     try {
       const current = loadGlobalConfig(ws.paths.configFile);
       let credentialRef = current.tunnel.credentialRef;
-      if (input.data.connectionMode === 'tunnel') {
+      if (input.data.connectionMode !== 'local') {
         if (!current.publicUrl) {
-          throw new DodoError('CONFLICT', 'Set the public HTTPS origin before selecting Tunnel mode.');
+          throw new DodoError('CONFLICT', 'Set the public HTTPS origin before selecting a Cloudflare mode.');
         }
         validatePublicUrl(current.publicUrl, false);
+      }
+      if (input.data.connectionMode === 'tunnel') {
         if (rawToken) {
           if (!info.tunnelCredentialStore?.available) {
             throw new DodoError('NOT_SUPPORTED', 'The reviewed OS credential store is unavailable on this machine.');

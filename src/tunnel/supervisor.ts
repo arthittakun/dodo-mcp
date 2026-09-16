@@ -17,10 +17,23 @@ import { buildChildEnv } from '../security/env.js';
 import { readTunnelCredential } from './credentials.js';
 import { TunnelLog } from './log.js';
 
+/**
+ * Readiness is debounced on purpose. cloudflared re-registers its edge
+ * connections on its own schedule, so `/ready` legitimately returns non-200 for
+ * a moment during a reconnect. Reporting that single dip as "disconnected"
+ * made the owner-visible status flap. The supervisor therefore probes
+ * SEQUENTIALLY (never overlapping), ignores results from a previous child, and
+ * only leaves `connected` after a bounded number of consecutive failures.
+ */
+const READY_PROBE_INTERVAL_MS = 2000;
+/** Strictly below the interval so one probe can never outlive its own slot. */
+const READY_PROBE_TIMEOUT_MS = 1500;
+const READY_FAILURE_THRESHOLD = 3;
+
 export const TunnelStatusSchema = z.object({
   mode: z.literal('managed'),
   running: z.boolean(),
-  phase: z.enum(['starting', 'connecting', 'connected', 'backoff', 'stopping', 'stopped', 'failed']),
+  phase: z.enum(['starting', 'connecting', 'connected', 'degraded', 'disconnected', 'backoff', 'stopping', 'stopped', 'failed']),
   connected: z.boolean(),
   startedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -31,6 +44,10 @@ export const TunnelStatusSchema = z.object({
   credentialSource: z.literal('configured'),
   lastExitCode: z.number().int().nullable(),
   lastError: z.string().max(500).nullable(),
+  // Defaulted so a state.json written by an older DODO still parses.
+  lastReadyAt: z.string().datetime().nullable().default(null),
+  lastFailureAt: z.string().datetime().nullable().default(null),
+  consecutiveReadyFailures: z.number().int().min(0).max(100000).default(0),
 }).strict();
 export type TunnelPhase = z.infer<typeof TunnelStatusSchema>['phase'];
 export type TunnelStatus = z.infer<typeof TunnelStatusSchema>;
@@ -67,11 +84,14 @@ function writeState(directory: string, state: TunnelStatus): void {
   }
 }
 
-export function probeTunnelReady(port: number, timeoutMs = 1500): Promise<boolean> {
+export function probeTunnelReady(port: number, timeoutMs: number = READY_PROBE_TIMEOUT_MS): Promise<boolean> {
   return new Promise(resolve => {
     let settled = false;
     const finish = (value: boolean) => { if (settled) return; settled = true; resolve(value); };
-    const request = http.get({ host: '127.0.0.1', port, path: '/ready', timeout: timeoutMs, headers: { Host: `127.0.0.1:${port}` } }, response => {
+    // `agent: false` forces a fresh socket per probe. Node's keep-alive global
+    // agent pools sockets between probes, and a pooled socket the peer already
+    // closed surfaces as a connection error — a spurious "not connected".
+    const request = http.get({ host: '127.0.0.1', port, path: '/ready', timeout: timeoutMs, agent: false, headers: { Host: `127.0.0.1:${port}` } }, response => {
       response.resume();
       response.once('end', () => finish(response.statusCode === 200));
     });
@@ -98,11 +118,14 @@ export async function startManagedTunnel(options: {
   config: GlobalConfig;
   env?: NodeJS.ProcessEnv;
   retryDelayMs?: number;
+  /** Test hooks: production uses the debounced defaults above. */
+  readinessIntervalMs?: number;
+  readinessFailureThreshold?: number;
   onLog?: (line: string) => void;
 }): Promise<RunningTunnelSupervisor> {
   const configDir = path.resolve(options.configDir);
   const config = options.config;
-  if (config.tunnel.connectionMode !== 'tunnel') throw new DodoError('CONFLICT', 'DODO is configured for local connection mode', { recovery: 'run dodo tunnel configure --tunnel first' });
+  if (config.tunnel.connectionMode !== 'tunnel') throw new DodoError('CONFLICT', 'DODO is not configured to own the Tunnel process', { recovery: 'run dodo tunnel configure --tunnel first' });
   if (!config.tunnel.credentialRef) throw new DodoError('NOT_FOUND', 'no saved Cloudflare Tunnel credential is available', { recovery: 'run dodo tunnel configure --tunnel --os-credential --public-url https://your-host' });
   if (!config.publicUrl) throw new DodoError('NOT_FOUND', 'public origin is not configured', { recovery: 'run dodo init --public-url https://your-host first' });
   const publicOrigin = validatePublicUrl(config.publicUrl, config.dangerouslyAllowInsecurePublicUrl).origin;
@@ -118,6 +141,7 @@ export async function startManagedTunnel(options: {
     maxRestarts: config.tunnel.maxRestarts, metricsUrl, publicOrigin,
     credentialSource: 'configured',
     lastExitCode: null, lastError: null,
+    lastReadyAt: null, lastFailureAt: null, consecutiveReadyFailures: 0,
   };
   let child: ChildProcess | undefined;
   let ipcServer: net.Server | undefined;
@@ -129,6 +153,15 @@ export async function startManagedTunnel(options: {
     status = { ...status, ...patch, updatedAt: new Date().toISOString() };
     try { writeState(paths.tunnelDir, status); }
     catch { status = { ...status, lastError: 'private tunnel state could not be written' }; }
+  };
+  /**
+   * In-memory only. The readiness probe records a timestamp every couple of
+   * seconds; persisting each one would rewrite state.json continuously for no
+   * owner-visible benefit and, on Windows, park the event loop in the rename
+   * retry. Anything that changes `phase` still goes through `update`.
+   */
+  const updateVolatile = (patch: Partial<TunnelStatus>) => {
+    status = { ...status, ...patch, updatedAt: new Date().toISOString() };
   };
   const appendLog = (source: 'dodo' | 'stdout' | 'stderr', line: string) => {
     try { log.append(source, line); }
@@ -159,6 +192,7 @@ export async function startManagedTunnel(options: {
     if (finished) return;
     finished = true;
     update({ running: false, connected: false, phase, ...(error ? { lastError: error } : {}) });
+    try { log.close(); } catch { /* diagnostics are best effort at shutdown */ }
     if (ipcServer) await new Promise<void>(resolve => ipcServer!.close(() => resolve()));
     resolveWait(code);
   };
@@ -215,23 +249,65 @@ export async function startManagedTunnel(options: {
     child.once('close', code => { flush(); done(code); });
   });
 
+  const probeIntervalMs = options.readinessIntervalMs ?? READY_PROBE_INTERVAL_MS;
+  const failureThreshold = Math.max(1, options.readinessFailureThreshold ?? READY_FAILURE_THRESHOLD);
+  const readyLog: Partial<Record<TunnelPhase, string>> = {
+    connected: 'cloudflared readiness endpoint reports connected',
+    degraded: 'cloudflared readiness check failed; the edge connection is reconnecting',
+    disconnected: `cloudflared readiness endpoint is not connected after ${failureThreshold} consecutive checks`,
+  };
+  /**
+   * One sequential probe loop per spawned child. `generation` fences the loop:
+   * a result that arrives after the child exited (or after stop) is discarded
+   * instead of overwriting the newer state, which is what previously let a
+   * stale probe resurrect a "connected" or "not connected" line.
+   */
+  let childGeneration = 0;
+  const runReadinessLoop = async (generation: number): Promise<void> => {
+    let failures = 0;
+    let everReady = false;
+    while (!stopping && childGeneration === generation) {
+      const ready = await probeTunnelReady(config.tunnel.metricsPort, Math.min(READY_PROBE_TIMEOUT_MS, Math.max(150, probeIntervalMs - 100)));
+      if (stopping || childGeneration !== generation) return;
+      const now = new Date().toISOString();
+      if (ready) { failures = 0; everReady = true; } else failures += 1;
+      // Without readiness evidence the tunnel is still "connecting", never
+      // "disconnected": we have nothing to have lost yet.
+      const phase: TunnelPhase = ready
+        ? 'connected'
+        : !everReady
+          ? 'connecting'
+          : failures >= failureThreshold ? 'disconnected' : 'degraded';
+      const changed = phase !== status.phase;
+      const patch: Partial<TunnelStatus> = {
+        phase,
+        // `connected` is the DEBOUNCED belief, not the last probe result: it
+        // stays true through `degraded` so anything bound to it (CLI status,
+        // Local Config, the owner banner) cannot flicker while cloudflared
+        // re-establishes an edge session. `phase` carries the nuance.
+        connected: phase === 'connected' || phase === 'degraded',
+        consecutiveReadyFailures: failures,
+        ...(ready ? { lastReadyAt: now, lastError: null } : { lastFailureAt: now }),
+      };
+      if (changed) {
+        update(patch);
+        if (readyLog[phase]) ownerLog(readyLog[phase]!);
+      } else updateVolatile(patch);
+      await delay(probeIntervalMs);
+    }
+  };
+
   void (async () => {
-    let readyTimer: NodeJS.Timeout | undefined;
     try {
       while (!stopping) {
-        const readiness = async () => {
-          if (stopping || !child) return;
-          const connected = await probeTunnelReady(config.tunnel.metricsPort);
-          if (connected !== status.connected) {
-            update({ connected, phase: connected ? 'connected' : 'connecting' });
-            ownerLog(connected ? 'cloudflared readiness endpoint reports connected' : 'cloudflared readiness endpoint is not connected');
-          }
-        };
-        readyTimer = setInterval(() => void readiness(), 1000);
-        readyTimer.unref();
-        const code = await runChild();
-        clearInterval(readyTimer); readyTimer = undefined;
-        update({ connected: false, lastExitCode: code });
+        const generation = ++childGeneration;
+        const childExit = runChild();
+        void runReadinessLoop(generation);
+        const code = await childExit;
+        // Fence the readiness loop before recording the exit so a probe that is
+        // already in flight cannot report on a process that is gone.
+        childGeneration += 1;
+        update({ connected: false, lastExitCode: code, consecutiveReadyFailures: 0, phase: stopping ? 'stopping' : 'disconnected' });
         if (stopping) break;
         if (status.restarts >= status.maxRestarts) {
           ownerLog(`cloudflared exited after ${status.restarts} bounded restart(s)`);
@@ -244,10 +320,10 @@ export async function startManagedTunnel(options: {
         ownerLog(`cloudflared exited; restart ${restarts}/${status.maxRestarts} in ${waitMs}ms`);
         await delay(waitMs);
       }
-      if (readyTimer) clearInterval(readyTimer);
+      childGeneration += 1;
       await finish(0, 'stopped');
     } catch {
-      if (readyTimer) clearInterval(readyTimer);
+      childGeneration += 1;
       await finish(1, 'failed', 'tunnel supervisor failed without exposing child diagnostics');
     }
   })();

@@ -23,6 +23,15 @@ describe('temporary Remote Config on the public MCP listener', () => {
     } finally { await ctx.cleanup(); }
   });
 
+  it('can open through owner-managed Cloudflare without a DODO tunnel supervisor', async () => {
+    const ctx = await launch({ configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 30_000, connectionMode: 'external' });
+    try {
+      expect(ctx.server.connectionMode).toBe('external');
+      expect(ctx.server.remoteConfig).toMatchObject({ url: `${ctx.baseUrl}/config` });
+      expect(ctx.server.remoteConfigStatus()).toMatchObject({ active: true, paired: false });
+    } finally { await ctx.cleanup(); }
+  });
+
   it('pairs once, scopes the cookie to /config, proxies the original owner checks and expires closed', async () => {
     const ctx = await launch({ configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 700, tunnelRuntime: runningTunnel, connectionMode: 'tunnel' });
     const lease = ctx.server.remoteConfig;

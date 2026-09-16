@@ -113,7 +113,9 @@ describe('compact surface catalog', () => {
       const schema = operationSchema(gw).inputSchema as { additionalProperties?: boolean; properties: Record<string, { enum?: string[] }> };
       expect(schema.additionalProperties, g.name).toBe(false);
       expect(schema.properties['operation']?.enum).toEqual([...g.operations]);
-      expect(Object.keys(schema.properties).sort()).toEqual(['args', 'operation', 'targetProjectId', 'workspaceEpoch', 'workspaceId']);
+      // targetProject (name) routes exactly like targetProjectId (id); both are
+      // top-level only and both are rejected inside nested args.
+      expect(Object.keys(schema.properties).sort()).toEqual(['args', 'operation', 'targetProject', 'targetProjectId', 'workspaceEpoch', 'workspaceId']);
     }
   });
 

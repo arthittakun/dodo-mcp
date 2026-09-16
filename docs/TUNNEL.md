@@ -1,8 +1,11 @@
-# DODO MCP — Local และ Cloudflare Tunnel
+# DODO MCP — Loopback, Cloudflare Local และ DODO Tunnel
 
 DODO มีโหมดเชื่อมต่อระดับ installation เพียงหนึ่งโหมดในแต่ละเวลา:
 
-- `local` — ใช้ MCP ที่ `http://127.0.0.1:21730/mcp` และไม่เริ่ม `cloudflared`
+- `local` — **เฉพาะเครื่อง (Loopback)** ใช้ MCP ที่
+  `http://127.0.0.1:21730/mcp` และไม่ใช้ Cloudflare
+- `external` — **Cloudflare Local (ติดตั้งในเครื่อง)** เจ้าของติดตั้งและรัน `cloudflared` เอง
+  DODO advertise public HTTPS origin แต่ไม่รับ token และไม่เริ่ม/หยุด process
 - `tunnel` — ใช้ public HTTPS origin เป็น MCP URL หลัก และ DODO เริ่ม/หยุด
   `cloudflared` ของตัวเองพร้อมทุก `dodo start`
 
@@ -14,7 +17,7 @@ DODO มีโหมดเชื่อมต่อระดับ installation �
 
 | บริการ | ค่าเริ่มต้น | การเปิดเผย |
 |---|---:|---|
-| MCP + OAuth upstream | `127.0.0.1:21730` | Local เท่านั้น; Tunnel route มาที่พอร์ตนี้ |
+| MCP + OAuth upstream | `127.0.0.1:21730` | bind loopback เสมอ; Cloudflare ทั้งสองโหมด route มาที่พอร์ตนี้ |
 | Local Config | `127.0.0.1:21731` | Loopback เท่านั้นเสมอ |
 | Tunnel readiness/metrics | `127.0.0.1:21732` | Loopback เท่านั้นเสมอ |
 
@@ -22,14 +25,14 @@ Cloudflare public hostname ต้อง route **ทุก path** มาที่
 `http://127.0.0.1:21730` เพื่อให้ health, OAuth discovery, authorization และ `/mcp`
 ทำงานครบ ห้าม route พอร์ต 21731, 21732, private IPC หรือ debug endpoint ออก public
 
-แม้โหมด Tunnel ยังต้องมี listener 21730 เป็น private upstream ให้ `cloudflared`
-แต่ DODO จะ advertise public HTTPS URL เป็น endpoint ที่มีผล ส่วน Local Config ยังคง
+โหมด Cloudflare ทั้งสองแบบยังต้องมี listener 21730 เป็น private upstream ให้
+`cloudflared` แต่ DODO จะ advertise public HTTPS URL เป็น endpoint ที่มีผล ส่วน Local Config ยังคง
 เข้าผ่าน loopback ยกเว้น bounded `/config` lease ที่เจ้าของเปิดชั่วคราวเอง
 
-## เลือก Local
+## เลือกเฉพาะเครื่อง (Loopback)
 
 ```bash
-dodo tunnel configure --local
+dodo tunnel configure --loopback
 dodo start
 ```
 
@@ -39,8 +42,29 @@ dodo start
 dodo tunnel status
 ```
 
-Local mode ไม่ใช้ public origin และไม่เริ่ม Tunnel หากต้องการกลับไป Tunnel ต้องเลือก
+Loopback mode ไม่ใช้ public origin และไม่เริ่ม Tunnel หากต้องการกลับไป Cloudflare ต้องเลือก
 ใหม่อย่างชัดเจนด้วยคำสั่งหรือหน้า Local Config แล้ว restart DODO
+
+`--local` ยังเป็น alias เดิมของ `--loopback` เพื่อไม่ทำให้สคริปต์เก่าตีความต่างไป
+
+## เลือก Cloudflare Local (ติดตั้งในเครื่อง)
+
+โหมดนี้ใช้เมื่อผู้ใช้ติดตั้งและรัน `cloudflared` เอง เช่นผ่าน terminal, launchd,
+systemd หรือ Windows Service DODO ไม่ขอ Tunnel token และไม่อ้างว่า process เชื่อมต่อแล้ว
+เพียงเพราะบันทึก public URL
+
+```bash
+dodo tunnel configure \
+  --cloudflare-local \
+  --public-url https://mcp.example.com
+
+# รัน cloudflared ด้วยวิธีที่ผู้ใช้จัดการเอง แล้วจึงเปิด DODO
+dodo start
+```
+
+Cloudflare ต้อง route ทุก path ไป `http://127.0.0.1:21730` เช่นเดียวกับ DODO Tunnel
+ตรวจปลายทางจริงด้วย `dodo tunnel doctor` ค่า public health ที่ผ่านยืนยันเพียงว่า origin
+ตอบ DODO health ไม่ได้ยืนยันว่ามี AI client เชื่อมอยู่
 
 ## เลือก DODO Tunnel
 
@@ -89,16 +113,17 @@ CLI argument, config JSON, log, audit, MCP response, browser storage หรื�
 **การเชื่อมต่อ MCP**:
 
 1. ตั้ง Public origin เป็น HTTPS origin ของ Tunnel
-2. เลือก `DODO Tunnel`
-3. ใส่ Cloudflare Tunnel token หากยังไม่มี credential ที่บันทึกไว้
+2. เลือก `Cloudflare Local (ติดตั้งในเครื่อง)` หากจะรัน cloudflared เอง หรือ `DODO Tunnel` หากให้
+   DODO ดูแล process
+3. ใส่ Cloudflare Tunnel token เฉพาะ `DODO Tunnel`
 4. กดบันทึกและ restart DODO
 
-หรือเลือก `Local` แล้วบันทึกและ restart ค่าในหน้าเว็บไม่เปลี่ยน endpoint ของ process
+หรือเลือก `เฉพาะเครื่อง (Loopback)` แล้วบันทึกและ restart ค่าในหน้าเว็บไม่เปลี่ยน endpoint ของ process
 ที่กำลังรันอยู่ทันที หน้าเว็บจะแสดงสถานะ restart ที่ตรงกับ runtime จริง
 
 ## Remote Config ไม่เกินหนึ่งชั่วโมง
 
-Remote Config ใช้ได้เฉพาะเมื่อเลือก Tunnel และ DODO-owned Tunnel กำลังรันอยู่:
+Remote Config ใช้ได้เมื่อเลือก Cloudflare Local (ติดตั้งในเครื่อง) หรือ DODO Tunnel:
 
 ```bash
 dodo --web
@@ -108,6 +133,9 @@ dodo --web
 dodo web --status
 dodo web --close
 ```
+
+ในโหมด Cloudflare Local (ติดตั้งในเครื่อง) เจ้าของต้องรัน tunnel และ route ครบเอง ส่วน DODO Tunnel
+จะตรวจว่า supervisor ที่ DODO เป็นเจ้าของกำลังรันก่อนเปิด lease
 
 `/config` ตอบ 404 ตามค่าเริ่มต้น คำสั่ง `dodo --web` เปิดหรือเปลี่ยน lease ผ่าน
 authenticated private IPC โดยไม่ restart MCP และไม่รับ Tunnel token ผ่าน IPC URL ไม่มี
@@ -128,10 +156,45 @@ dodo tunnel logs --lines 100
 dodo tunnel stop
 ```
 
-`status` ไม่อ่าน credential ส่วน `doctor` ตรวจ executable, credential, local health,
-Tunnel readiness และ public health แยกกัน Public health ที่ผ่านพิสูจน์เพียงว่า origin
-ตอบ DODO health ไม่ได้พิสูจน์ว่า AI client เชื่อมต่อแล้ว `stop` ส่งสัญญาณเฉพาะ live
-child handle ที่ supervisor ปัจจุบันสร้าง ไม่ค้นหรือ kill process ตามชื่อ/PID เก่า
+### สถานะของ Tunnel (state machine)
+
+`phase` ของ supervisor มีค่าเหล่านี้ และเปลี่ยนตามหลักฐานจริงเท่านั้น:
+
+| phase | ความหมาย |
+|---|---|
+| `starting` | supervisor เริ่มทำงาน ยังไม่ spawn cloudflared |
+| `connecting` | cloudflared รันแล้ว แต่ยัง **ไม่เคย** มีหลักฐาน readiness |
+| `connected` | `/ready` ตอบ 200 — ต้องมีหลักฐานจริงเท่านั้นจึงแสดงสถานะนี้ |
+| `degraded` | เคย connected แล้ว probe เริ่มล้ม แต่ยังไม่ถึงเกณฑ์ (กำลัง reconnect) |
+| `disconnected` | probe ล้มติดกันครบเกณฑ์ หรือ cloudflared exit |
+| `backoff` | รอ restart แบบมีขอบเขต |
+| `stopping` / `stopped` / `failed` | เจ้าของสั่งหยุด / หยุดแล้ว / restart หมดโควตา |
+
+สถานะยังมี `lastReadyAt`, `lastFailureAt` และ `consecutiveReadyFailures` เพื่อให้ดูได้ว่า
+readiness สำเร็จครั้งสุดท้ายเมื่อไร
+
+**ทำไมเมื่อก่อนสถานะกระพริบ** — เดิม probe ทุก 1 วินาทีโดย timeout 1.5 วินาที
+จึงซ้อนกันได้ ผลเก่าเขียนทับผลใหม่ และ probe ที่ล้ม **ครั้งเดียว** ก็พลิกสถานะและพิมพ์
+`readiness endpoint is not connected` ทันที ตอนนี้:
+
+- probe ทำทีละครั้ง ไม่ซ้อนกัน และมี generation fence ผลจาก child เก่าถูกทิ้ง
+- ต้องล้มติดกันครบเกณฑ์จึงจะเป็น `disconnected` — ล้มครั้งเดียวเป็นแค่ `degraded`
+  และ `connected` ยังเป็น true เพื่อไม่ให้ UI กระพริบ
+- ใช้ socket ใหม่ทุกครั้ง (`agent: false`) กัน keep-alive socket ที่ถูกปิดแล้ว
+  กลายเป็น error ปลอม
+- เขียน log ของ cloudflared แบบรวมกลุ่ม ไม่เขียนทับไฟล์ 512 KiB ทุกบรรทัด
+  (บน Windows การ retry rename ใช้ `Atomics.wait` ซึ่งบล็อก event loop จน probe timeout)
+- cloudflared exit → `disconnected` ทันที, restart มีขอบเขตตาม `maxRestarts` เสมอ
+- ไม่มี fallback เงียบ ๆ จาก tunnel ไป local และ token ไม่ปรากฏใน log หรือ error
+
+Tunnel เป็นระดับ installation รองรับทุกโปรเจกต์ การเพิ่มหรือเลือกโปรเจกต์ไม่ restart tunnel
+
+`status` ไม่อ่าน credential ส่วน `doctor` ตรวจ executable, local health และ public
+health ทุกโหมด แต่ตรวจ credential/supervisor readiness เฉพาะ DODO Tunnel ใน
+Cloudflare Local รายงาน process ownership เป็น `owner` และไม่ควบคุม process Public
+health ที่ผ่านพิสูจน์เพียงว่า origin ตอบ DODO health ไม่ได้พิสูจน์ว่า AI client
+เชื่อมต่อแล้ว `stop` ส่งสัญญาณเฉพาะ live child handle ที่ DODO supervisor ปัจจุบัน
+สร้าง ไม่ค้นหรือ kill process ตามชื่อ/PID เก่า
 
 ## ตั้งค่า MCP client
 

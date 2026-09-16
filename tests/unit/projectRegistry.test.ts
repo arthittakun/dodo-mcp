@@ -169,7 +169,10 @@ describe('installation project registry', () => {
     const f = fixture();
     const root = path.join(f.base, 'shared'); fs.mkdirSync(root);
     try {
-      f.db.exec('DROP TABLE project_registry; DELETE FROM schema_migrations WHERE version IN (7, 15)');
+      // Every migration that builds project_registry must be replayed: 7 creates
+      // the table, 15 adds root_birthtime_ns, 17 adds access_level. Dropping the
+      // table without replaying all three would leave an incomplete schema.
+      f.db.exec('DROP TABLE project_registry; DELETE FROM schema_migrations WHERE version IN (7, 15, 17)');
       f.db.close();
       const firstDb = openDatabase(path.join(f.base, 'config', 'state.db'));
       const secondDb = openDatabase(path.join(f.base, 'config', 'state.db'));

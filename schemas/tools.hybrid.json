@@ -52,15 +52,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 55373
+      "schemaBytes": 59073
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 125901
+      "schemaBytes": 134966
     },
     "full": {
       "toolCount": 138,
-      "schemaBytes": 475008
+      "schemaBytes": 500538
     }
   },
   "tools": [
@@ -83,6 +83,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "projectId": {
             "description": "Optional owner-registered project ID for read-only federation; omit to use the active workspace",
@@ -208,6 +214,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -405,6 +417,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -594,6 +612,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -774,6 +798,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -942,6 +972,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1101,6 +1137,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -1263,6 +1305,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1423,6 +1471,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -1605,6 +1659,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -1806,6 +1866,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -1999,6 +2065,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2177,6 +2249,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2339,6 +2417,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2498,6 +2582,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2655,6 +2745,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -2814,6 +2910,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -2972,6 +3074,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -3129,6 +3237,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -3300,6 +3414,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -3466,6 +3586,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -3627,6 +3753,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -3802,6 +3934,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -3944,6 +4082,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -4172,6 +4316,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -4342,6 +4492,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -4498,6 +4654,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -4687,6 +4849,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -4834,6 +5002,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -5012,6 +5186,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -5156,6 +5336,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -5303,6 +5489,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -5443,6 +5635,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -5600,6 +5798,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -5760,6 +5964,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -6051,6 +6261,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -6204,6 +6420,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -6352,6 +6574,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -6487,6 +6715,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -6644,6 +6878,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -6790,6 +7030,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -6951,6 +7197,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -7137,6 +7389,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -7325,6 +7583,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -7483,6 +7747,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -7655,6 +7925,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -7795,6 +8071,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",
@@ -7960,6 +8242,12 @@
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
           },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
           "workspaceId": {
             "type": "string",
             "minLength": 1,
@@ -8107,6 +8395,12 @@
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
             "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
           },
           "workspaceId": {
             "type": "string",

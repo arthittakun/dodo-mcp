@@ -45,7 +45,7 @@ export interface LaunchOptions {
   remoteConfig?: boolean; // expose the one-hour owner page on the public listener
   remoteConfigLeaseMs?: number; // short expiry for security fixtures
   tunnelRuntime?: TunnelRuntime; // process-owned tunnel fixture
-  connectionMode?: 'local' | 'tunnel'; // explicit endpoint family for connection-mode tests
+  connectionMode?: 'local' | 'external' | 'tunnel'; // explicit endpoint family for connection-mode tests
 }
 
 const PORT_CLAIM_DIR = path.join(os.tmpdir(), 'dodo-test-port-claims');

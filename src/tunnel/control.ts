@@ -10,9 +10,10 @@ import { assertPrivatePath } from '../platform/privateFs.js';
 import { osCredentialAvailability, readTunnelCredential } from './credentials.js';
 import { readTunnelLog } from './log.js';
 import { resolveCloudflared, TunnelStatusSchema, tunnelIpcPath, type TunnelStatus } from './supervisor.js';
+import type { ConnectionMode } from '../config/tunnelConfig.js';
 
 export interface TunnelStatusReport {
-  configuredMode: 'local' | 'tunnel';
+  configuredMode: ConnectionMode;
   supervisor: TunnelStatus | null;
   lastKnown: TunnelStatus | null;
 }
@@ -73,8 +74,10 @@ export async function tunnelDoctor(configDir: string, config: GlobalConfig): Pro
   const status = await tunnelStatus(configDir, config);
   let executable: 'available' | 'missing' = 'missing';
   try { resolveCloudflared(config); executable = 'available'; } catch { /* reported as missing */ }
-  let credential: 'configured' | 'missing' | 'invalid' = config.tunnel.credentialRef ? 'invalid' : 'missing';
-  if (config.tunnel.credentialRef) {
+  let credential: 'configured' | 'missing' | 'invalid' | 'not-used' = config.tunnel.connectionMode === 'tunnel'
+    ? config.tunnel.credentialRef ? 'invalid' : 'missing'
+    : 'not-used';
+  if (config.tunnel.connectionMode === 'tunnel' && config.tunnel.credentialRef) {
     try { await readTunnelCredential(config.tunnel.credentialRef); credential = 'configured'; } catch { credential = 'invalid'; }
   }
   const local = await health(new URL(`http://127.0.0.1:${config.port}/healthz`));
@@ -92,8 +95,13 @@ export async function tunnelDoctor(configDir: string, config: GlobalConfig): Pro
     localMcpHealth: local,
     publicHealth,
     evidence: {
-      connected: status.supervisor?.connected === true,
-      note: 'Public health proves only that the configured HTTPS origin returned DODO health; it does not prove an AI client is connected.',
+      connected: config.tunnel.connectionMode === 'tunnel' && status.supervisor?.connected === true,
+      processOwnership: config.tunnel.connectionMode === 'tunnel'
+        ? 'dodo'
+        : config.tunnel.connectionMode === 'external' ? 'owner' : 'none',
+      note: config.tunnel.connectionMode === 'external'
+        ? 'Public health proves only that the owner-managed HTTPS origin returned DODO health; DODO does not supervise that cloudflared process or prove an AI client is connected.'
+        : 'Public health proves only that the configured HTTPS origin returned DODO health; it does not prove an AI client is connected.',
     },
   };
 }

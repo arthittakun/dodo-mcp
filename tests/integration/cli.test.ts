@@ -70,7 +70,7 @@ describe('CLI', () => {
     expect(init.code).toBe(0);
     const nonInteractive = runCli(['start', '--web'], { cwd: proj, configDir: cfg, expectFail: true });
     expect(nonInteractive.code).not.toBe(0);
-    expect(nonInteractive.stderr).toMatch(/Remote Config requires Tunnel mode/i);
+    expect(nonInteractive.stderr).toMatch(/Remote Config requires a public Cloudflare connection/i);
   });
 
   it('CLI: init writes a global config and does not touch the repo', () => {
@@ -122,6 +122,21 @@ describe('CLI', () => {
     expect(refused.stderr).not.toContain(fakeToken);
     const status = runCli(['tunnel', 'status', '--json'], { cwd: proj, configDir: cfg });
     expect(JSON.parse(status.stdout)).toMatchObject({ configuredMode: 'tunnel', supervisor: null });
+  });
+
+  it('CLI tunnel: keeps owner-managed Cloudflare separate from loopback and DODO-owned credentials', () => {
+    const cfg = fs.mkdtempSync(path.join(base, 'external-tunnel-cfg-'));
+    const proj = fs.mkdtempSync(path.join(base, 'external-tunnel-proj-'));
+    const external = runCli(['tunnel', 'configure', '--cloudflare-local', '--public-url', 'https://owner-cloudflared.fixture.invalid', '--json'], { cwd: proj, configDir: cfg });
+    expect(external.code).toBe(0);
+    expect(JSON.parse(external.stdout)).toMatchObject({ connectionMode: 'external', publicOrigin: 'https://owner-cloudflared.fixture.invalid', credential: 'not-used', cloudflared: 'owner-managed' });
+    const saved = JSON.parse(fs.readFileSync(path.join(cfg, 'config.json'), 'utf8'));
+    expect(saved.tunnel.connectionMode).toBe('external');
+    expect(saved.tunnel.credentialRef).toBeUndefined();
+
+    const loopback = runCli(['tunnel', 'configure', '--loopback', '--json'], { cwd: proj, configDir: cfg });
+    expect(loopback.code).toBe(0);
+    expect(JSON.parse(loopback.stdout)).toMatchObject({ connectionMode: 'local', publicOrigin: null });
   });
 
   it('CLI-10: refuses the home directory as a workspace root', () => {
