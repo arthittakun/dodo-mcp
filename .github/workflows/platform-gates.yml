@@ -10,7 +10,11 @@ on:
         type: choice
         required: true
         default: windows
-        options: [windows, linux, all]
+        options: [windows, linux, all, windows-diagnostics]
+      evidence_run:
+        description: Prior run-attempt to inspect (Windows diagnostics only)
+        type: string
+        required: false
 
 # Self-hosted runners execute repository code. Do not add pull_request or
 # pull_request_target without a separate, disposable runner trust boundary.
@@ -22,6 +26,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-diagnostics:
+    name: Inspect retained Windows evidence
+    if: github.event_name == 'workflow_dispatch' && inputs.platform == 'windows-diagnostics'
+    runs-on: [self-hosted, Windows, X64, "windows-ci 02"]
+    timeout-minutes: 10
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
+      DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
+      DODO_INSPECT_RUN: ${{ inputs.evidence_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Inspect allowlisted progress without publishing private logs
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}"
+        run: node scripts/inspect-private-gate.mjs
+
   linux-native:
     name: Linux native / Node ${{ matrix.node }}
     # Remote Linux runs are owner-selected; execute directly on the runner.
