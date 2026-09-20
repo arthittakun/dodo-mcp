@@ -110,7 +110,7 @@ export class RecoveryStorage {
     this.store.db.prepare('INSERT OR IGNORE INTO recovery_objects VALUES (?,?,?)').run(hash,bytes,Date.now());
   }
   async publish(manifest:RecoveryManifest):Promise<void> {
-    for(const e of manifest.entries)if(e.hash)await this.verifyObject(e.hash,e.bytes);
+    await this.verifyEntries(manifest.entries);
     const text=JSON.stringify(manifest), digest=digestOf(manifest);const file=this.manifestPath(manifest.id);
     const fd=fs.openSync(file,'wx',0o600);
     try {fs.writeFileSync(fd,text);fs.fsyncSync(fd);}finally{fs.closeSync(fd);}syncDir(path.dirname(file));
@@ -129,8 +129,19 @@ export class RecoveryStorage {
     try{const st=fs.fstatSync(fd);if(st.ino!==stat.ino||st.dev!==stat.dev||st.nlink!==1)throw new DodoError('RECOVERY_REQUIRED','manifest identity changed');text=fs.readFileSync(fd,'utf8');}finally{fs.closeSync(fd);}
     let m:RecoveryManifest;try{m=JSON.parse(text) as RecoveryManifest;}catch{throw new DodoError('RECOVERY_REQUIRED','backup manifest is corrupt');}
     if(m.id!==id||m.workspaceId!==workspaceId||m.version!==1||m.complete!==true||digestOf(m)!==row.manifest_digest)throw new DodoError('RECOVERY_REQUIRED','backup manifest integrity failed');
-    for(const e of m.entries)if(e.hash)await this.verifyObject(e.hash,e.bytes);
+    await this.verifyEntries(m.entries);
     return m;
+  }
+  /** Content-addressed duplicates refer to the same object, not separate ACLs.
+   * Verify every distinct object freshly for this call; never cache permission
+   * or integrity results across calls, and reject inconsistent size references. */
+  private async verifyEntries(entries: RecoveryManifest['entries']): Promise<void> {
+    const objects = new Map<string, number>();
+    for (const e of entries) if (e.hash) {
+      if (objects.has(e.hash) && objects.get(e.hash) !== e.bytes) throw new DodoError('RECOVERY_REQUIRED', 'inconsistent backup object size references');
+      objects.set(e.hash, e.bytes);
+    }
+    for (const [hash, bytes] of objects) await this.verifyObject(hash, bytes);
   }
   /** Only under the exclusive project lease. Interrupted snapshots never become READY. */
   reconcile(workspaceId:string):void {

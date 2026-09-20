@@ -278,12 +278,16 @@ export class RecoveryService {
       this.storage.collectOrphans();
       this.storage.reserve(id,this.s.workspaceId,estimate.physical,policy,estimate.logical,estimate.staging);
       this.s.store.db.prepare("INSERT INTO recovery_snapshots (id,workspace_id,project_id,state,scope,created_at) VALUES (?,?,?,'PREPARING',?,?)").run(id,this.s.workspaceId,project.projectId,targets?'targets':'source',createdAt);
-      const entries:RecoveryEntry[]=[];
+      const entries:RecoveryEntry[]=[],published=new Set<string>();
       for(const f of inventory.files){
         const entry={...f.entry};if(entry.kind==='file'){
-          staging=this.storage.stagePath();entry.hash=await this.readFile(f,staging);
+          // Rehash every source file even for identical content. Within this
+          // capture only, one CAS publication suffices per hash; publish()
+          // freshly verifies every distinct object before recording READY.
+          const duplicate=published.has(expectedHashes.get(entry.path)!);
+          staging=duplicate?undefined:this.storage.stagePath();entry.hash=await this.readFile(f,staging);
           if(entry.hash!==expectedHashes.get(entry.path))throw new DodoError('FILE_CHANGED','source changed after space reservation');
-          await this.storage.publishObject(staging,entry.hash,entry.bytes);staging=undefined;
+          if(staging)await this.storage.publishObject(staging,entry.hash,entry.bytes);staging=undefined;published.add(entry.hash);
         }entries.push(entry);this.progress.captured++;this.progress.bytes+=entry.bytes;
       }
       // Rescan paths AND reread hashes. A watcher or old checkpoint alone is not freshness proof.
