@@ -3,6 +3,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { DodoError } from '../errors.js';
 import { envValue, windowsSystemExecutable } from './system.js';
+import { nativeWindowsAcl } from './windowsPrivateAcl.js';
 
 // Constant PowerShell/.NET code: the path is data in the child's environment,
 // never interpolated into source. Only the current SID, SYSTEM and local
@@ -69,7 +70,7 @@ Assert-PrivateDacl $acl
 [Console]::Write('private')
 `;
 
-function windowsAcl(target: string, protect: boolean): void {
+function windowsAcl(target: string, protect: boolean, bootstrap = false): void {
   const env: NodeJS.ProcessEnv = {
     SYSTEMROOT: envValue(process.env, 'SystemRoot'),
     WINDIR: envValue(process.env, 'windir'),
@@ -80,6 +81,7 @@ function windowsAcl(target: string, protect: boolean): void {
     DODO_PRIVATE_MODE: protect ? 'protect' : 'verify',
   };
   try {
+    if (!bootstrap && nativeWindowsAcl(env, directory => windowsAcl(directory, true, true))) return;
     const output = execFileSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'), ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ACL_SCRIPT, 'utf16le').toString('base64')], { env, shell: false, windowsHide: true, timeout: 10000, maxBuffer: 4096, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
     if (output.trim() !== 'private') throw new Error('ACL not verified');
   } catch {
