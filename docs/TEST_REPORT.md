@@ -2,6 +2,22 @@
 
 ## 1.3.0 Recovery — หลักฐานก่อน final platform gate
 
+Follow-up Windows หลังแก้ Git/restore: full
+[run35508647355](https://github.com/arthittakun/dodo-mcp/actions/runs/35508647355)
+ที่ `6ff35b8` ได้900pass/1fail/38skip เหลือ atomic modification ของไฟล์ชื่อไทย
+ที่มี BOM/CRLF ระบบชดเชยกลับและคืน INTERNAL_ERROR Focus
+[run35509902825](https://github.com/arthittakun/dodo-mcp/actions/runs/35509902825)
+ทำซ้ำได้8pass/1fail/0skip; OS errno เดิมไม่ได้ถูกเก็บ จึงไม่ระบุว่าเกิดจาก antivirus
+หรือโปรแกรมใดโดยไม่มีหลักฐาน
+
+ระหว่างตรวจพบและ reproduce อีกปัญหา: การ retry syscall หลัง sharing denial
+ต้องตรวจ expected state ซ้ำ การจำลอง external edit ทำให้ regression3/3ล้มก่อนแก้
+แพตช์ `560d930` ตรวจ hash/path ทุกครั้ง รวม compensation และเก็บ internal cause
+แบบ private โดยไม่ส่งออก MCP error envelope Native
+[run35510211305](https://github.com/arthittakun/dodo-mcp/actions/runs/35510211305)
+ผ่าน16/16,0skip รวมเคส BOM/CRLF และ7retry/compensation/error-redaction cases
+ผลนี้เป็น focused pass; full gates ของ candidate หลังแก้ยังต้องผ่านก่อน release
+
 Follow-up วันที่ 2026-09-20 ที่ clean revision `8c76c0a`
 (`sha256:a9118f3ce6d37a0520ef64720122eb36e9c684154aebb9cb984e8e6459f148bc`):
 

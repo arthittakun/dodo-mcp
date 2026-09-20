@@ -29,6 +29,12 @@ DODO ใช้หลายชั้นร่วมกัน:
 
 การผ่านชั้นใดชั้นหนึ่งไม่ grant สิทธิ์ชั้นอื่น
 
+Windows filesystem sharing-lock retries are bounded syscall retries. The journaled
+writer revalidates paths and expected bytes before each replacement, deletion or
+move attempt, including compensation. A concurrent external edit stops the retry
+and is preserved for review; the entire tool/action is never repeated implicitly.
+Internal OS error causes remain private and are omitted from MCP error envelopes.
+
 Project Registry เป็น owner metadata แยกจาก authority: project ID หรือ readiness
 ไม่ grant OAuth scope, workspace ACL หรือ trust และ AI ไม่มี MCP tool สำหรับเพิ่ม ลบ
 หรือเปลี่ยนรายการโปรเจกต์
