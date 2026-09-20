@@ -51,9 +51,10 @@ try {
   foreach ($shim in @('npm.cmd','npx.cmd')) { Copy-Item -LiteralPath (Join-Path $nodeRoot $shim) -Destination $toolchain }
   $phase = 'copy-npm-toolchain'
   New-Item -ItemType Directory (Join-Path $toolchain 'node_modules') | Out-Null
-  # Robocopy handles npm's nested tree without PowerShell 5.1 Copy-Item limits.
-  & (Join-Path $env:SystemRoot 'System32/robocopy.exe') (Join-Path $nodeRoot 'node_modules/npm') (Join-Path $toolchain 'node_modules/npm') /E /COPY:DAT /DCOPY:DA /R:0 /W:0 /XJ /NFL /NDL /NJH /NJS *> (Join-Path $evidence 'toolchain-copy-private.log')
-  if ($LASTEXITCODE -ge 8) { throw 'toolchain copy failed' }
+  # Use Node's Unicode/long-path aware APIs and dereference tool-cache links.
+  $copyLog = Join-Path $evidence 'toolchain-copy-private.log'
+  & $nodeExe -e 'require(''node:fs'').cpSync(process.argv[1], process.argv[2], {recursive:true,dereference:true});' (Join-Path $nodeRoot 'node_modules/npm') (Join-Path $toolchain 'node_modules/npm') *> $copyLog
+  if ($LASTEXITCODE -ne 0) { throw 'toolchain copy failed' }
   $phase = 'copy-test-artifact'
   Copy-Item -LiteralPath (Join-Path $evidence $tarball) -Destination (Join-Path $fixture 'package.tgz')
   foreach ($script in @('windows-standard-user-child.ps1','windows-standard-user-child.mjs')) {
@@ -112,6 +113,12 @@ try {
   # No raw exceptions/paths/credentials in public output.
   $result = @{ scope = 'windows-standard-user'; complete = $false; infrastructurePhase = $phase; hresult = $_.Exception.HResult; cleanup = $false;
     scriptLine = $_.InvocationInfo.ScriptLineNumber; errorType = $_.Exception.GetType().FullName }
+  if ($phase -eq 'copy-npm-toolchain') {
+    $result.sourcePresent = Test-Path -LiteralPath (Join-Path $nodeRoot 'node_modules/npm')
+    $result.destinationPresent = Test-Path -LiteralPath (Join-Path $toolchain 'node_modules')
+    $copyText = Get-Content -LiteralPath (Join-Path $evidence 'toolchain-copy-private.log') -Raw -ErrorAction SilentlyContinue
+    $result.copyCodes = @([regex]::Matches([string]$copyText, '\b(?:ENOENT|EACCES|EPERM|ENAMETOOLONG|EEXIST|ENOSPC|EINVAL)\b') | ForEach-Object { $_.Value } | Select-Object -Unique)
+  }
   [IO.File]::WriteAllText((Join-Path $evidence 'harness-private.log'), ($_ | Out-String))
 } finally {
   $cleaned = $true
