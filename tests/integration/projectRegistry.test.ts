@@ -7,6 +7,8 @@ import { launch, mkTmpDir } from '../helpers/testServer.js';
 
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const CLI = path.join(ROOT, 'dist', 'cli', 'main.js');
+const CLI_PREFIX = process.platform === 'win32' && process.env['DODO_TEST_REPORT_DIR']
+  ? ['--import', new URL('../helpers/nativeAclDiagnostics.mjs', import.meta.url).href, CLI] : [CLI];
 const owned: string[] = [];
 
 function fixture() {
@@ -19,7 +21,7 @@ function fixture() {
 }
 
 function cli(args: string[], cwd: string, env: NodeJS.ProcessEnv, expectFailure = false) {
-  const result = spawnSync(process.execPath, [CLI, ...args], { cwd, env, encoding: 'utf8' });
+  const result = spawnSync(process.execPath, [...CLI_PREFIX, ...args], { cwd, env, encoding: 'utf8' });
   if (!expectFailure && result.status !== 0) throw new Error(`CLI failed (${result.status}): ${result.stderr}`);
   return result;
 }
@@ -55,9 +57,9 @@ describe('project registry CLI', () => {
     expect(JSON.parse(cli(['project', 'list', '--all', '--json'], f.base, f.env).stdout)).toHaveLength(1);
   });
 
-  it('serializes concurrent duplicate adds into one stable project row', async () => {
+  it.each([1, 2, 3])('serializes concurrent duplicate adds into one stable project row (round %s)', async () => {
     const f = fixture();
-    const children = Array.from({ length: 6 }, () => spawn(process.execPath, [CLI, 'project', 'add', f.root, '--json'], {
+    const children = Array.from({ length: 6 }, () => spawn(process.execPath, [...CLI_PREFIX, 'project', 'add', f.root, '--json'], {
       cwd: f.base, env: f.env, stdio: ['ignore', 'pipe', 'pipe'],
     }));
     const results = await Promise.all(children.map((child) => new Promise<{ code: number | null; stdout: string; stderr: string }>((resolve) => {

@@ -39,7 +39,7 @@ try {
     console.log('DODO_ACL_BACKEND_BEGIN');console.log(JSON.stringify(windowsPrivateAclDiagnostics()));console.log('DODO_ACL_BACKEND_END');throw error;
   }
   phase = 'focused-tests';
-  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/integration/windowsRuntime.test.ts', 'tests/security/atomicRetry.test.ts', '--maxWorkers=1'], 20 * 60_000);
+  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/integration/projectRegistry.test.ts', 'tests/security/windowsAclOwner.test.ts', '--maxWorkers=1'], 20 * 60_000);
   phase = 'report';
   const report = JSON.parse(fs.readFileSync(path.join(directory, 'core-tests.json'), 'utf8'));
   const browserFile = path.join(directory, 'recovery-browser-diagnostics.json');
@@ -54,7 +54,16 @@ try {
   const runtimeFile=path.join(directory,'native-runtime-private.jsonl');
   const runtime=fs.existsSync(runtimeFile)?fs.readFileSync(runtimeFile,'utf8').slice(0,32000).trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)):[];
   const runtimeDiagnostics=focusedFailureDetails({testResults:[{name:path.join(root,'tests/integration/windowsRuntime.test.ts'),assertionResults:runtime.slice(0,20).map(item=>({status:'failed',failureMessages:[String(item.code??'')+'\n'+String(item.stack??'')]}))}]},root);
-  const summary = { scope: 'focused_diagnostics_only', exitCode: result.status, durationMs: result.durationMs, runtimeDiagnostics,
+  const aclFile=path.join(directory,'native-acl-observer.jsonl');
+  const aclDiagnostics=fs.existsSync(aclFile)?fs.readFileSync(aclFile,'utf8').slice(0,16000).trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)).slice(0,40).map(item=>({
+    program:['private-state.exe','powershell.exe','csc.exe'].includes(item.program)?item.program:null,
+    mode:['protect','verify'].includes(item.mode)?item.mode:null,
+    code:['ENOENT','EPERM','EACCES','ETIMEDOUT','ENOBUFS'].includes(item.code)?item.code:null,
+    status:Number.isInteger(item.status)?item.status:null,
+    stage:['input','attributes','read','owner','protect-write','verify-dacl','repair-owner','final-attributes','final-read','final-owner','final-dacl'].includes(item.stage)?item.stage:null,
+    hresult:Number.isSafeInteger(item.hresult)?item.hresult:null,
+  })):[];
+  const summary = { scope: 'focused_diagnostics_only', exitCode: result.status, durationMs: result.durationMs, runtimeDiagnostics, aclDiagnostics,
     browserDiagnostics, tests: testCounts(report), failures: focusedFailureDetails(report, root) };
   fs.writeFileSync(path.join(directory, 'focus-summary.json'), JSON.stringify(summary, null, 2), { flag: 'wx', mode: 0o600 });
   console.log('DODO_FOCUS_BEGIN');
