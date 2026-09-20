@@ -64,6 +64,9 @@ export interface StartJobRequest {
   /** Internal service grants; these fields are not in the public tool schemas. */
   sandboxReadablePaths?: string[];
   sandboxWritablePaths?: string[];
+  /** Backend-only bounded archive input/output. Never exposed in a public tool schema. */
+  inputBytes?: Buffer;
+  privateOutput?: boolean;
 }
 
 export interface InlineOutput {
@@ -83,10 +86,10 @@ export class JobManager {
   requiresPreparation?: () => boolean;
   private readonly prepared = new WeakSet<StartJobRequest>();
 
-  async startProtected(req: StartJobRequest, revalidate?: () => void): Promise<{ jobId: string; pid: number; sandboxed: string | null }> {
+  async startProtected(req: StartJobRequest, revalidate?: () => void | Promise<void>): Promise<{ jobId: string; pid: number; sandboxed: string | null }> {
     const run = async () => {
       await this.beforeStart?.(req);
-      revalidate?.();
+      await revalidate?.();
       this.prepared.add(req);
       try { return this.start(req); } finally { this.prepared.delete(req); }
     };
@@ -132,6 +135,8 @@ export class JobManager {
   }
 
   start(req: StartJobRequest): { jobId: string; pid: number; sandboxed: string | null } {
+    if (req.inputBytes && (req.inputBytes.length > 32 * 1024 * 1024 || req.stdin === false))
+      throw new DodoError('RESOURCE_LIMIT', 'invalid internal job input budget');
     if (this.requiresPreparation?.() && !this.prepared.has(req)) throw new DodoError('RECOVERY_REQUIRED', 'job requires a source backup before spawn');
     this.mutations?.assertCanStart();
     if (this.shutdownPromise) throw new DodoError('CONFLICT', 'job manager is shutting down');
@@ -197,6 +202,8 @@ export class JobManager {
       program: req.shell ? programAbs : req.program, args: spawnArgs,
       cwd: cwdResolved.rel, recipeId: req.recipeId ?? null, timeoutMs,
     });
+
+    if (req.privateOutput) this.store.setMeta(`private-job-output:${jobId}`, '1');
 
     this.onRecorded?.(jobId);
     const releaseMutation = this.mutations?.retainJob();
@@ -278,6 +285,8 @@ export class JobManager {
       }
     }, timeoutMs);
     liveJob.timeout.unref();
+
+    if (req.inputBytes) { liveJob.stdinOpen = false; child.stdin?.end(req.inputBytes); }
 
     return { jobId, pid: child.pid ?? -1, sandboxed };
   }
@@ -372,6 +381,7 @@ export class JobManager {
     status: JobRow['status'];
   } {
     const row = this.getJobChecked(jobId, workspaceId);
+    this.assertPublicOutput(jobId);
     const spools = this.spoolsOf(jobId);
     if (!spools) {
       return { content: '', nextOffset: offset, truncatedBeforeOffset: 0, endOfStream: true, status: row.status };
@@ -384,6 +394,7 @@ export class JobManager {
   /** Head of a stream (bounded) plus a small tail when it does not fit — for inline command results. */
   inlineOutput(jobId: string, workspaceId: string, stream: 'stdout' | 'stderr', maxBytes: number): InlineOutput {
     this.getJobChecked(jobId, workspaceId);
+    this.assertPublicOutput(jobId);
     const spools = this.spoolsOf(jobId);
     if (!spools) return { content: '', totalBytes: 0, truncated: false };
     const spool = stream === 'stdout' ? spools.stdout : spools.stderr;
@@ -396,6 +407,23 @@ export class JobManager {
       out.tail = spool.read(Math.max(head.nextOffset, total - tailBytes), tailBytes).content;
     }
     return out;
+  }
+
+  private assertPublicOutput(jobId: string): void {
+    if (this.store.getMeta(`private-job-output:${jobId}`)) throw new DodoError('FORBIDDEN', 'this job carries private adapter bytes; inspect its sanitized deployment receipt');
+  }
+
+  /** Backend-only read: completed, caller-owned and complete output; never reconstruct lost output after restart. */
+  binaryOutput(jobId: string, workspaceId: string, principal: string, maxBytes: number): Buffer {
+    const row = this.getJobChecked(jobId, workspaceId);
+    if (row.principal !== principal) throw new DodoError('FORBIDDEN', 'private adapter job belongs to another caller');
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || maxBytes > 32 * 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'invalid adapter output budget');
+    const spool = this.spoolsOf(jobId)?.stdout;
+    if (row.status !== 'exited' || row.exitCode !== 0 || !spool) throw new DodoError('CONFLICT', 'adapter output is unavailable or incomplete; do not repeat effects');
+    if (spool.totalWritten > maxBytes || spool.truncatedBeforeOffset) throw new DodoError('RESOURCE_LIMIT', 'adapter output was truncated or exceeded its budget');
+    const result = spool.readBytes(0, maxBytes);
+    if (!result.endOfStream || result.nextOffset !== spool.totalWritten) throw new DodoError('RECOVERY_REQUIRED', 'adapter output did not close completely');
+    return result.bytes;
   }
 
   writeInput(jobId: string, workspaceId: string, data: string, closeStdin: boolean): { bytesWritten: number; stdinOpen: boolean } {

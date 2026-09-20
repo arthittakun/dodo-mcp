@@ -8,6 +8,7 @@ const invokedCwd = process.cwd();
 
 import fs from 'node:fs';
 import { Command } from 'commander';
+import { registerDeploymentCommands } from './deployment.js';
 import { startServer, DODO_VERSION } from '../server/appServer.js';
 import { startStdioServer } from '../server/stdioServer.js';
 import { resolveConfigDir, ensureConfigDir, statePaths, ipcSocketPath } from '../config/paths.js';
@@ -17,6 +18,7 @@ import { mintWorkspaceId } from '../workspace/identity.js';
 import { openDatabase, openDatabaseReadonly } from '../store/db.js';
 import { Store, type TrustMode } from '../store/store.js';
 import { ipcCall, IpcError } from '../ipc/client.js';
+import { ownerCommandTimeout } from '../ipc/timeouts.js';
 import { installationIpcCall } from '../ipc/installationClient.js';
 import { formatTerminalLine } from './terminal.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
@@ -34,6 +36,7 @@ import { TunnelRuntime } from '../tunnel/runtime.js';
 import { INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
 
 const program = new Command();
+registerDeploymentCommands(program, ipcForCwd);
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
 
 function fail(message: string, code = 1): never {
@@ -66,7 +69,7 @@ function workspaceIpcPath(root?: string): { ipcPath: string; root: string } {
 
 async function ipcForCwd(cmd: string, args: Record<string, unknown> = {}): Promise<unknown> {
   const { ipcPath } = workspaceIpcPath();
-  return ipcCall(ipcPath, cmd, args);
+  return ipcCall(ipcPath, cmd, args, ownerCommandTimeout(cmd));
 }
 
 /** OAuth identity belongs to the installation, not the shell's CWD. */

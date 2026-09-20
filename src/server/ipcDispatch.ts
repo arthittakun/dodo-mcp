@@ -1,4 +1,5 @@
 import { performRecovery, RECOVERY_INPUTS, type RecoveryOperation } from '../tools/recoveryTools.js';
+import { performDeployment, type DeploymentOperation } from '../tools/deploymentTools.js';
 import type { IpcHandler } from '../ipc/server.js';
 import type { StatusData } from '../ipc/protocol.js';
 import type { BootstrappedWorkspace } from './bootstrap.js';
@@ -269,6 +270,27 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         return r.evidence.pin(b.checkpointId,b.pinned,b.expectedPinned,()=>ctx.revalidateOwner?.());
       }
       case 'recovery.status': return services.recovery?.status();
+      case 'deployment.targets': case 'deployment.configure': case 'deployment.prepare':
+      case 'deployment.list': case 'deployment.inspect': case 'deployment.compare': case 'deployment.build': case 'deployment.apply':
+      case 'deployment.observe': case 'deployment.source_preview': case 'deployment.rollback_prepare': case 'deployment.maintenance': {
+        const r=services.recovery;if(!r)throw new DodoError('NOT_SUPPORTED','Recovery is unavailable');
+        r.assertProject();ctx.revalidateOwner?.();
+        const owner={id:'local-config-owner',owner:true},revalidate=()=>ctx.revalidateOwner?.();
+        if(cmd==='deployment.targets'){z.object({}).strict().parse(args);return {items:r.deployments.targets(),recipes:services.overview.discoverTasks(services.projectConfig).map(t=>({taskId:t.id,recipeDigest:t.recipeDigest})),daemonAccess:'commands may control resources outside the workspace; existing sandbox and approval policy still applies'};}
+        if(cmd==='deployment.list'){const b=z.object({cursor:z.number().int().min(0).max(1000000).default(0),limit:z.number().int().min(1).max(50).default(20)}).strict().parse(args);return r.deployments.list(owner,b.cursor,b.limit);}
+        if(cmd==='deployment.inspect'||cmd==='deployment.compare'){
+          const b=z.object({deploymentId:z.string().min(1).max(128)}).strict().parse(args);
+          const result=cmd==='deployment.inspect'?r.deployments.inspect(b.deploymentId,owner):await r.deployments.compare(b.deploymentId,owner);revalidate();return result;
+        }
+        const b=z.object({workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch),confirm:z.literal(true),input:z.unknown()}).strict().parse(args);
+        if(['deployment.build','deployment.apply','deployment.observe','deployment.source_preview','deployment.rollback_prepare','deployment.maintenance'].includes(cmd)){
+          const principal={grantId:'local-config-owner',clientId:'local-config',sub:'owner',scopes:['dodo:read','dodo:write','dodo:exec']};
+          if(cmd==='deployment.maintenance')return r.withAuthority(revalidate,()=>r.deployments.maintenance(b.input,{services,principal,trustMode:services.trustMode(),revalidate}));
+          const operation=cmd.replace('deployment.','deployment_') as DeploymentOperation;
+          return r.withAuthority(revalidate,()=>performDeployment(operation,z.record(z.string(),z.unknown()).parse(b.input),{services,principal,trustMode:services.trustMode(),revalidate},true));
+        }
+        return r.withAuthority<unknown>(revalidate,()=>cmd==='deployment.configure'?r.deployments.configure(b.input,revalidate):r.deployments.prepare(b.input,owner,revalidate));
+      }
       case 'recovery.configure': {
         const body = z.object({ policy: z.unknown(), confirm: z.literal(true) }).strict().parse(args);
         ctx.revalidateOwner?.();

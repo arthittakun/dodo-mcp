@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 import type { IpcRequest, IpcResponse } from './protocol.js';
+import { ownerCommandTimeout } from './timeouts.js';
 import { ensurePrivateDirectory } from '../platform/privateFs.js';
 import { IPC_FRAME_BYTES, newIpcCredential, publishIpcCredential, removeIpcCredential, ipcMac, validMac } from './authentication.js';
 
@@ -53,6 +54,7 @@ export async function startIpcServer(socketPath: string, handler: IpcHandler, op
         if (typeof payload !== 'string' || !validMac(frame['mac'], ipcMac(credential.token, 'request', clientNonce, serverNonce, payload))) throw new Error('bad request authentication');
         const req = JSON.parse(payload) as IpcRequest;
         if (!req || !Number.isSafeInteger(req.id) || typeof req.cmd !== 'string' || req.cmd.length > 100 || (req.args !== undefined && (!req.args || typeof req.args !== 'object' || Array.isArray(req.args)))) throw new Error('invalid IPC request');
+        conn.setTimeout(ownerCommandTimeout(req.cmd));
         void (async () => {
           let response: IpcResponse;
           try { response = { id: req.id, ok: true, data: await handler(req.cmd, req.args ?? {}) }; }

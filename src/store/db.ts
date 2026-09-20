@@ -642,6 +642,28 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
      PRIMARY KEY(workspace_id,name));
    CREATE TABLE recovery_pointer_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL,
      name TEXT NOT NULL, previous_id TEXT, snapshot_id TEXT, revision INTEGER NOT NULL, created_at INTEGER NOT NULL);`,
+  `CREATE TABLE recovery_deployment_targets (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     revision INTEGER NOT NULL, enabled INTEGER NOT NULL, payload TEXT NOT NULL, docker_context TEXT NOT NULL,
+     compose_project TEXT NOT NULL, service TEXT NOT NULL, updated_at INTEGER NOT NULL,
+     UNIQUE(docker_context,compose_project,service));
+   CREATE TABLE recovery_deployments (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, actor TEXT NOT NULL,
+     target_id TEXT NOT NULL REFERENCES recovery_deployment_targets(id), snapshot_id TEXT NOT NULL REFERENCES recovery_snapshots(id),
+     key_hash TEXT NOT NULL, request_hash TEXT NOT NULL, payload TEXT NOT NULL, plan_hash TEXT NOT NULL,
+     state TEXT NOT NULL CHECK(state IN ('PREPARED','BUILDING','BUILT','DEPLOYING','HEALTH_CHECKING','KNOWN_GOOD','FAILED','UNKNOWN')),
+     image_digest TEXT, result_json TEXT, created_at INTEGER NOT NULL, UNIQUE(workspace_id,actor,key_hash));
+   CREATE INDEX idx_recovery_deployments ON recovery_deployments(workspace_id,created_at);
+   CREATE TABLE recovery_deployment_jobs (deployment_id TEXT NOT NULL REFERENCES recovery_deployments(id),
+     job_id TEXT NOT NULL REFERENCES jobs(id), stage TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY(deployment_id,job_id));
+   CREATE TABLE recovery_production_pointers (target_id TEXT PRIMARY KEY REFERENCES recovery_deployment_targets(id),
+     deployment_id TEXT NOT NULL REFERENCES recovery_deployments(id), previous_id TEXT REFERENCES recovery_deployments(id),
+     revision INTEGER NOT NULL, updated_at INTEGER NOT NULL);`,
+  `CREATE TABLE recovery_deployment_maintenance (deployment_id TEXT PRIMARY KEY REFERENCES recovery_deployments(id),
+     pinned INTEGER NOT NULL DEFAULT 0, retired INTEGER NOT NULL DEFAULT 0,
+     probe_json TEXT, resolution_json TEXT, cleanup_json TEXT);
+   CREATE TABLE recovery_deployment_reviews (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     kind TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, expires_at INTEGER NOT NULL,
+     result_json TEXT);`,
 ];
 
 /**

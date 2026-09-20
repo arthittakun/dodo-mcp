@@ -403,3 +403,21 @@ Expected source state is separate from observed backups. External target drift f
 ## Unreleased Recovery R04
 
 Recovery names/pins are private owner actions, with current project/epoch, confirmation and live authority checks. They never promote test results or grant permissions. No public mark/purge endpoint exists. Caller-owned evidence retains target ACL checks; current inspection compares snapshot/recipes/runtime and never consumes model-supplied success. Truncated/unknown/skipped test evidence cannot certify a snapshot. Raw test logs and environment values are excluded from Recovery metadata. Source integrity, expected hashes, approvals and sandbox remain unchanged. Names and diffs use text-only DOM rendering. Production/DB protection is not implied.
+
+## Unreleased registered deployment adapters
+
+Docker daemon access is explicitly owner registered and still subject to target
+OAuth scope/ACL, current workspace/epoch, exec approval, source hashes and the
+configured command sandbox. Snapshot creation grants none of those rights.
+No repository Compose hooks, arbitrary Docker arguments, bind mounts, privileged
+mode or permission fallback are accepted. Archive extraction verifies bytes in
+memory without executing or copying mounted data. Health requests use declared
+network scope and reject redirects/metadata/admin URLs, including actual private
+listener ports. No provider credentials or `allowWebFetch` permission are reused.
+
+Owner maintenance cannot be discovered/invoked through MCP. Exact review hashes,
+live state and expiry bind cleanup/uncertainty acknowledgement. No force deletion,
+volume prune, silent retry, database downgrade or automatic health success is
+performed. Private job output is not exposed through normal job output tools.
+Generic shell/other daemon clients remain outside this adapter's deployment guard;
+a workspace boundary is not an OS or Docker security sandbox.

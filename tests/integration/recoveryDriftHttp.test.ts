@@ -40,4 +40,26 @@ describe('R03 owner drift review through real HTTP and browser',()=>{
     expect((await c.server.services.recovery!.scanDrift()).changedCount).toBe(0);expect(fs.readFileSync(path.join(c.fixtureDir,'a.txt'),'utf8')).toBe('outside');expect(errors).toEqual([]);
   }finally{await browser.close();}
  },60000);
+ it.skipIf(!fs.existsSync(chromium.executablePath()))('a delayed initial overview cannot replace the project controls being used by the owner',async()=>{
+  const p=await setup(),browser=await chromium.launch({headless:true}),page=await browser.newPage();
+  let release!:()=>void,arrived!:()=>void;
+  const held=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{arrived=resolve;});
+  let first=true;
+  await page.route('**/api/ai/state',async route=>{
+    if(!first){await route.continue();return;}first=false;
+    const response=await route.fetch();arrived();await held;await route.fulfill({response});
+  });
+  try{
+    await page.goto(c.configUrl!);await started;
+    await page.getByRole('button',{name:'โปรเจกต์',exact:true}).click();
+    await page.locator('#wb-project').selectOption(p.projectId);
+    const scan=page.getByRole('button',{name:'ตรวจไฟล์และเปรียบเทียบ',exact:true});
+    await scan.waitFor();await scan.click();
+    await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).waitFor();
+    const finished=page.waitForResponse(r=>r.url().endsWith('/api/ai/state'));release();await finished;
+    await page.evaluate('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
+    expect(await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).isVisible()).toBe(true);
+    expect(await page.locator('#workbench').getAttribute('aria-busy')).toBe(null);
+  }finally{release();await browser.close();}
+ },60000);
 });

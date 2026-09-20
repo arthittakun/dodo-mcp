@@ -47,6 +47,7 @@ const FULL_NAMES = [
   'android_logcat', 'android_packages', 'android_file_read', 'android_action', 'android_app',
   'android_install', 'android_push', 'android_adb',
   'restore_status','checkpoint_list','checkpoint_inspect','checkpoint_create','recovery_session_list','recovery_session_inspect','recovery_session_begin','recovery_session_end','restore_preview','restore_apply',
+  'deployment_targets','deployment_list','deployment_inspect','deployment_compare','deployment_prepare','deployment_build','deployment_apply','deployment_observe','deployment_source_preview','deployment_rollback_prepare',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -163,8 +164,8 @@ describe('compact surface catalog', () => {
     const compact = surfaceCatalog('compact', hidden);
     const hybrid = surfaceCatalog('hybrid', hidden);
 
-    expect(TOOL_CATALOG).toHaveLength(148); // the installed capability contract stays complete
-    expect(full).toHaveLength(144);
+    expect(TOOL_CATALOG).toHaveLength(158); // the installed capability contract stays complete
+    expect(full).toHaveLength(154);
     expect(compact).toHaveLength(20);
     expect(hybrid).toHaveLength(49);
     for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
@@ -180,10 +181,10 @@ describe('compact surface catalog', () => {
     const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
     expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
 
-    expect(surfaceStats('full', hidden).toolCount).toBe(144);
+    expect(surfaceStats('full', hidden).toolCount).toBe(154);
     expect(surfaceStats('compact', hidden).toolCount).toBe(20);
     expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
-    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(148);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(158);
     expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
     expect(instructionsFor('compact', hidden)).toContain('not exposed');
     expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
@@ -249,7 +250,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(148);
+    expect(TOOL_CATALOG).toHaveLength(158);
     expect(COMPACT_CATALOG).toHaveLength(20);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

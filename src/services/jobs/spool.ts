@@ -65,6 +65,14 @@ export class SegmentedSpool {
 
   /** Read up to maxBytes starting at a logical offset, UTF-8 safe. */
   read(offset: number, maxBytes: number): { content: string; nextOffset: number; truncatedBeforeOffset: number; endOfStream: boolean } {
+    const raw = this.readBytes(offset, maxBytes);
+    const { bytes, end } = utf8SafeSlice(raw.bytes, 0, raw.bytes.length);
+    const nextOffset = raw.nextOffset - raw.bytes.length + end;
+    return { content: bytes.toString('utf8'), nextOffset, truncatedBeforeOffset: raw.truncatedBeforeOffset, endOfStream: this.closed && nextOffset >= this.writtenTotal };
+  }
+
+  /** Internal binary consumers must reject truncation before interpreting a tar or digest result. */
+  readBytes(offset: number, maxBytes: number): { bytes: Buffer; nextOffset: number; truncatedBeforeOffset: number; endOfStream: boolean } {
     const from = Math.max(offset, this.truncatedBeforeOffset);
     const chunks: Buffer[] = [];
     let collected = 0;
@@ -86,10 +94,9 @@ export class SegmentedSpool {
       if (collected >= maxBytes) break;
     }
     const raw = Buffer.concat(chunks);
-    const { bytes, end } = utf8SafeSlice(raw, 0, raw.length);
-    const nextOffset = from + end;
+    const nextOffset = from + raw.length;
     return {
-      content: bytes.toString('utf8'),
+      bytes: raw,
       nextOffset,
       truncatedBeforeOffset: this.truncatedBeforeOffset,
       endOfStream: this.closed && nextOffset >= this.writtenTotal,

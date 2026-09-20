@@ -246,7 +246,7 @@ describe('PACK: npm tarball', () => {
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
     expect(compact.defaultLiveToolCount).toBe(20);
-    expect(compact.defaultLiveFullToolCount).toBe(144);
+    expect(compact.defaultLiveFullToolCount).toBe(154);
     expect(compact.optionalMcpFeatures.subagents).toMatchObject({
       default: false,
       operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],

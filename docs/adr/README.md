@@ -66,3 +66,9 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [048 — Persistent exclusive Local/Tunnel connection mode](048-persistent-connection-mode.md)
 - [049 — Owner-approved Android control through ADB](049-android-adb-control.md)
 - [050 — Cloudflare Local mode and visible per-project access](050-cloudflare-local-and-project-access.md)
+
+- [051 — Source Recovery foundation](051-source-recovery-foundation.md)
+- [052 — Reviewed source restore](052-reviewed-source-restore.md)
+- [053 — Content drift and private Git recovery](053-content-drift-and-private-git-recovery.md)
+- [054 — Verified source checkpoints](054-verified-source-checkpoints.md)
+- [055 — Reviewed Docker deployments](055-reviewed-docker-deployments.md)

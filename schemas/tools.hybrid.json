@@ -34,8 +34,8 @@
     "job_wait",
     "job_cancel"
   ],
-  "fullToolCount": 148,
-  "defaultLiveFullToolCount": 144,
+  "fullToolCount": 158,
+  "defaultLiveFullToolCount": 154,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -52,15 +52,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 62921
+      "schemaBytes": 63349
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 143803
+      "schemaBytes": 144231
     },
     "full": {
-      "toolCount": 148,
-      "schemaBytes": 548543
+      "toolCount": 158,
+      "schemaBytes": 572388
     }
   },
   "tools": [
@@ -391,7 +391,7 @@
     {
       "name": "dodo_read",
       "title": "Read workspace state",
-      "description": "Gateway: read-only workspace access: files, search, symbols, jobs, history and agent notes. Set operation to one of: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, diagnostics, change_history, approval_status, environment_info, todo_read, handoff_read, job_status, job_output, job_wait, list_jobs, restore_status, checkpoint_list, checkpoint_inspect, recovery_session_list, recovery_session_inspect. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: read-only workspace access: files, search, symbols, jobs, history and agent notes. Set operation to one of: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, diagnostics, change_history, approval_status, environment_info, todo_read, handoff_read, job_status, job_output, job_wait, list_jobs, restore_status, checkpoint_list, checkpoint_inspect, recovery_session_list, recovery_session_inspect, deployment_targets, deployment_list, deployment_inspect, deployment_compare. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -423,7 +423,11 @@
         "checkpoint_list",
         "checkpoint_inspect",
         "recovery_session_list",
-        "recovery_session_inspect"
+        "recovery_session_inspect",
+        "deployment_targets",
+        "deployment_list",
+        "deployment_inspect",
+        "deployment_compare"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -483,7 +487,11 @@
               "checkpoint_list",
               "checkpoint_inspect",
               "recovery_session_list",
-              "recovery_session_inspect"
+              "recovery_session_inspect",
+              "deployment_targets",
+              "deployment_list",
+              "deployment_inspect",
+              "deployment_compare"
             ],
             "description": "Target operation to invoke"
           },
@@ -813,7 +821,7 @@
     {
       "name": "dodo_exec",
       "title": "Run commands and control jobs",
-      "description": "Gateway: shell/argv commands, task recipes, and stdin/cancel for owned background jobs. Set operation to one of: run_command, run_commands, run_task, exec_command, job_input, job_cancel, runtime_task_start, runtime_task_cancel, agent_exec. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: shell/argv commands, task recipes, and stdin/cancel for owned background jobs. Set operation to one of: run_command, run_commands, run_task, exec_command, job_input, job_cancel, runtime_task_start, runtime_task_cancel, agent_exec, deployment_prepare, deployment_build, deployment_apply, deployment_observe, deployment_source_preview, deployment_rollback_prepare. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -831,7 +839,13 @@
         "job_cancel",
         "runtime_task_start",
         "runtime_task_cancel",
-        "agent_exec"
+        "agent_exec",
+        "deployment_prepare",
+        "deployment_build",
+        "deployment_apply",
+        "deployment_observe",
+        "deployment_source_preview",
+        "deployment_rollback_prepare"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -877,7 +891,13 @@
               "job_cancel",
               "runtime_task_start",
               "runtime_task_cancel",
-              "agent_exec"
+              "agent_exec",
+              "deployment_prepare",
+              "deployment_build",
+              "deployment_apply",
+              "deployment_observe",
+              "deployment_source_preview",
+              "deployment_rollback_prepare"
             ],
             "description": "Target operation to invoke"
           },

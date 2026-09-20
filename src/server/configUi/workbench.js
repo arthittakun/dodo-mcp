@@ -12,6 +12,7 @@
   const alerts = () => (UI.alerts && UI.alerts.available() ? UI.alerts : null);
   const panel = $('workbench');
   let state, selected, stream, currentView, followRun;
+  let renderGeneration = 0;
   const modelCatalog = new Map();
   let refreshProfileModels = () => undefined;
   const el = UI.el || ((tag, text, className) => { const n = document.createElement(tag); if (text !== undefined) n.textContent = text; if (className) n.className = className; return n; });
@@ -71,14 +72,18 @@
     return dialogConfirm(title, text, 'ยืนยันและยอมรับค่าใช้จ่าย');
   }
 
-  async function reload() {
-    state=await api('ai/state');const picker=$('wb-project');const previous=picker.value;picker.replaceChildren(el('option','เลือกโปรเจกต์…'));
+  async function reload(generation) {
+    const next=await api('ai/state');
+    if(generation!==undefined && generation!==renderGeneration)return false;
+    state=next;const picker=$('wb-project');const previous=picker.value;picker.replaceChildren(el('option','เลือกโปรเจกต์…'));
     for(const p of state.projects) { const o=el('option',`${p.displayName} · ${p.available ? 'พร้อม':'ไม่พร้อม'}`);o.value=p.projectId;o.disabled=!p.available;picker.append(o); } if(previous)picker.value=previous;
     $('wb-summary').textContent=`${state.projects.length} โปรเจกต์ · ${state.connections.length} connections · ${state.runs.filter(r=>r.status==='running').length} agents กำลังทำงาน · ${state.accessMode==='personal'?'โหมดส่วนตัว':'โหมดแยกสิทธิ์'}`;
+    return true;
   }
   async function selectProject() { const id=$('wb-project').value;if(!id || !id.startsWith('prj_')) { selected=undefined;return; }selected=await api('ai/project',{projectId:id});$('wb-root').textContent=state.accessMode==='personal'?`${selected.root} · พร้อมใช้ทันทีในโหมดส่วนตัว`:`${selected.root} · บันทึก ${selected.savedTrust} / มีผล ${selected.effectiveTrust}`; }
 
   async function show(view) {
+    const generation=++renderGeneration;
     currentView=view; stream?.abort(); UI.tooltips?.hide();
     for(const b of document.querySelectorAll('[data-wb-view]'))b.setAttribute('aria-pressed',String(b.dataset.wbView===view));
     for(const pageEl of document.querySelectorAll('.page'))pageEl.hidden=!(VIEW_PAGES[view]||[]).includes(pageEl.id);
@@ -86,10 +91,10 @@
     $('wb-toolbar').hidden=!PROJECT_SCOPED.has(view);
     $('wb-root').hidden=!PROJECT_SCOPED.has(view);
     panel.setAttribute('aria-busy','true');
-    const body=$('wb-body');
-    body.replaceChildren(el('div','กำลังโหลด…','skeleton'));
+    const visible=$('wb-body'),body=visible.cloneNode(false);
+    visible.replaceChildren(el('div','กำลังโหลด…','skeleton'));
     try {
-      await reload();body.replaceChildren();
+      if(!await reload(generation))return;
       if(view==='overview')overview(body);
       if(view==='projects')await projects(body);
       if(view==='providers'){providers(body);profiles(body);}
@@ -98,8 +103,11 @@
       if(view==='knowledge')await knowledge(body);
       if(view==='admin')await admin(body);
       if(view==='settings')await settings(body);
+      // Publish one complete view. A slower, superseded request must never
+      // replace controls the owner is already using in the newer view.
+      if(generation===renderGeneration)visible.replaceWith(body);
     }
-    catch(e){notice(e.message,true);body.replaceChildren(el('p','โหลดไม่ได้ กรุณาตรวจการเชื่อมต่อแล้วลองใหม่'));}finally{panel.removeAttribute('aria-busy');}
+    catch(e){if(generation===renderGeneration){notice(e.message,true);visible.replaceChildren(el('p','โหลดไม่ได้ กรุณาตรวจการเชื่อมต่อแล้วลองใหม่'));}}finally{if(generation===renderGeneration)panel.removeAttribute('aria-busy');}
   }
   const goTo = (view) => { const b = document.querySelector(`[data-wb-view="${view}"]`); if (b) void busy(b, () => show(view)); };
 
@@ -202,11 +210,14 @@
       s.append(button('ปิด runtime ที่ว่าง',async()=>{const result=await api('ai/project',{projectId:selected.projectId,action:'close'});notice(result.closed?'ปิด runtime รองแล้ว โปรเจกต์ยังพร้อมเปิดใหม่':'ไม่มี runtime รองที่ปิดได้');}));
     }
     await recoveryPanel(s);
+    const projectContext={...selected};
+    await deploymentPanel(s,(operation,args={})=>api('admin/action',{projectId:projectContext.projectId,operation,args},true),projectContext);
     const jobs=section('Jobs ของโปรเจกต์','สถานะจาก runtime ปัจจุบัน');s.append(jobs);
     const jobsDetails=el('details');jobsDetails.append(el('summary','รายละเอียดทางเทคนิค (JSON)'));output(jobsDetails,selected.jobs);jobs.append(jobsDetails);
   }
 
   const recoveryPanel=window.DodoRecovery({el,section,button,check,field,choice,notice,confirmDanger,help,api,refresh:()=>show('projects'),getSelected:()=>selected});
+  const deploymentPanel=window.DodoDeployment({el,section,button,check,field,choice,notice,confirmDanger});
 
   function providers(body) {
     const s=section('AI Providers','เลือก preset หรือ Custom protocol แต่ละ connection เก็บ key แยกกัน การบันทึกไม่เรียกโมเดลและไม่ส่ง source code');body.append(s);

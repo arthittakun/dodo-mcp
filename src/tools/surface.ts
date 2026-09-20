@@ -94,6 +94,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'job_wait',
       'list_jobs',
       'restore_status', 'checkpoint_list', 'checkpoint_inspect', 'recovery_session_list', 'recovery_session_inspect',
+      'deployment_targets', 'deployment_list', 'deployment_inspect', 'deployment_compare',
     ],
   },
   {
@@ -125,7 +126,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     title: 'Run commands and control jobs',
     domain: 'exec',
     summary: 'shell/argv commands, task recipes, and stdin/cancel for owned background jobs',
-    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel', 'runtime_task_start', 'runtime_task_cancel', 'agent_exec'],
+    operations: ['run_command', 'run_commands', 'run_task', 'exec_command', 'job_input', 'job_cancel', 'runtime_task_start', 'runtime_task_cancel', 'agent_exec', 'deployment_prepare', 'deployment_build', 'deployment_apply', 'deployment_observe', 'deployment_source_preview', 'deployment_rollback_prepare'],
   },
   {
     name: 'dodo_git_read',

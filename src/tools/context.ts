@@ -114,6 +114,8 @@ export interface ToolCtx {
   services: AppServices;
   principal: Principal;
   trustMode: TrustMode;
+  /** Backend-only live authorization callback for multi-step operations. */
+  revalidate?: () => void;
 }
 
 export type ExtraContentBlock = { type: 'image'; data: string; mimeType: string } | { type: 'audio'; data: string; mimeType: string };
@@ -339,7 +341,7 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
         if (!scopeSatisfied(def.requiredScope, principal!.scopes) || services.trustMode() !== trustAtStart) throw new DodoError('FORBIDDEN', 'authority changed during source backup');
       };
       const runHandler = async () => {
-        const result=await def.handler(args as never, { services, principal: principal!, trustMode: trustAtStart });
+        const result=await def.handler(args as never, { services, principal: principal!, trustMode: trustAtStart, revalidate });
         const data=result.data as {verificationId?:unknown}|null;
         if(def.name==='verify_changes'&&typeof data?.verificationId==='string')services.recovery?.history.record('verification',data.verificationId);
         return result;

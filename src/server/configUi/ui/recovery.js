@@ -140,7 +140,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
         const more=el('details');more.append(el('summary','Snapshot และผลทดสอบที่ใช้ตัดสิน'),el('p',d.checkpointId),el('p',`Manifest ${d.manifestHash}`),el('p',`เหตุผล: ${d.reason}`));
         for(const c of d.evidence?.checks||[])more.append(el('p',`${c.taskId} · ${c.status} · exit ${c.exitCode??'ยังไม่มี'} · ผ่าน ${c.counts.passed??'ไม่ทราบ'} / ${c.counts.total??'ไม่ทราบ'} · ข้าม ${c.counts.skipped??'ไม่ทราบ'}${c.outputTruncated?' · output ถูกตัด':''}`));
         if(d.evidence?.notRun.length)more.append(el('p','ยังไม่ได้รัน: '+d.evidence.notRun.join(', ')));
-        more.append(el('p','Deployment: NOT_CONFIGURED · Database recovery: NOT_SUPPORTED','muted'));detail.append(more);
+        more.append(el('p',`Deployment: ${d.production} · Database recovery: ${d.database}`,'muted'));detail.append(more);
       }catch(e){detail.replaceChildren(el('p','ตรวจหลักฐานไม่สำเร็จ: '+e.message,'wb-status'));throw e;}
     };
     const load=async()=>{

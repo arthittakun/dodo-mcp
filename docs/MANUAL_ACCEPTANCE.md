@@ -383,3 +383,18 @@ In disposable projects: capture dirty/staged/untracked source; externally overwr
 ## Unreleased Recovery R04
 
 Fixture browser automation covers project registration, default-on recovery, actual recipe evidence, owner names/pins, stale files, restore read-back and quota-blocked UI on desktop/narrow screens. Before a release, an owner should separately test their own project/storage and restart/reconnect workflow, inspect retained pins/names, and re-run required recipes after source/config changes. Live owner projects, Windows/Android and production/database recovery are MANUAL_NOT_RUN for this phase. Do not label a manual owner name as tested or production-known-good.
+
+## Unreleased Docker deployment and recovery
+
+AUTOMATED_PASS (disposable local daemon fixture, native Node): real build/image
+source verification, deploy/health/stabilization, failure preserving known-good,
+reviewed image rollback, source restore without restarting service, unchanged
+SQLite rows/migration metadata/private fixture config in an existing named volume,
+image pin/review conflicts and exact cleanup. These results are separate from
+native Windows/Linux release gates and do not certify a user's daemon/context.
+
+MANUAL_NOT_RUN: owner production, remote Docker contexts, Windows/Linux Docker
+engines, long-duration stabilization and manual browser deployment. Before opting
+in, review the target's daemon authority and use a disposable project/service to
+exercise interrupted build/deploy, live observation, probe cleanup, reconnect,
+expired approval and reviewed rollback. Source/database recovery remain distinct.

@@ -219,3 +219,106 @@ HTTP has no mark/pin/purge endpoint. Deployment is **NOT_CONFIGURED** and databa
 recovery is **NOT_SUPPORTED** in this source-only phase. Windows/Android and live
 production recovery require their own acceptance; results from macOS/Linux
 fixtures are not substitutes.
+
+## Reviewed Docker deployment (unreleased working source)
+
+Source backup continues to work without a deployment target. To opt in, open
+**Projects → Deployment · Docker → เพิ่มหรือแก้ปลายทาง**. Select the Docker context,
+Compose project/service, source build folder and Dockerfile, an existing test
+recipe, health URL and optional source mapping. The daemon must already be
+available to your OS account. DODO neither installs/starts it nor disables your
+command sandbox. Docker access is broader than workspace file access.
+
+Use advanced definition JSON for multiple required checks, HTTP status checks
+(such as a protected route returning 401), OpenAPI operations, stabilization,
+explicit LAN endpoints, ports and existing named volumes. No credentials, bind
+mounts or privileged Docker arguments are accepted. Source mappings cannot overlap
+volumes. A public URL requires HTTPS; metadata and DODO administration URLs are
+denied. This permission does not turn on `allowWebFetch`.
+
+1. Run `verify_changes` with the current source/required recipe. A passing exit
+   without complete required evidence is insufficient.
+2. Select the target revision and verification ID and create a deployment plan.
+   Review the immutable plan/hash. No build or deployment has happened yet.
+3. Confirm **Build ตามแผนนี้**. DODO streams only the reviewed snapshot, records
+   the actual image ID, and verifies declared source bytes inside a stopped probe.
+4. Confirm **Deploy image นี้**. Source, authority and target are rechecked;
+   deployment does not rebuild. All required health checks must pass throughout
+   stabilization before the known-good pointer advances.
+5. Read the durable result after reconnect. `UNKNOWN` means inspect first; do not
+   make a new plan merely to repeat a command whose result is uncertain.
+
+The same flow is available to an authorized MCP client through `dodo_discover`
+and `dodo_exec` operations `deployment_prepare`, `deployment_build` and
+`deployment_apply`. `dodo_read` exposes bounded targets/list/inspect/compare.
+The full surface retains individual definitions; compact remains at 20 gateways.
+Target registration, image pins and cleanup stay private owner controls.
+
+Private owner CLI commands use the current workspace ID/epoch and explicit
+confirmation. Start with `dodo deployment targets` and `dodo deployment list`.
+For example, after reviewing a real target JSON file:
+
+```sh
+dodo deployment configure --file /absolute/path/target.json --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo deployment prepare --target TARGET_ID --revision 1 --verification VERIFICATION_ID --key UNIQUE_RETRY_KEY --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo deployment build DEPLOYMENT_ID --hash PLAN_HASH --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo deployment apply DEPLOYMENT_ID --hash PLAN_HASH --image sha256:IMAGE_DIGEST --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+`--file` contains owner-reviewed data, not executable repository configuration.
+The configure file shape is `{"expectedRevision":0,"enabled":true,
+"confirmDaemonAccess":true,"definition":{...}}`; copy current recipe digests from
+`deployment targets`, and use the exact reviewed ID/hash returned by each step.
+`dodo deployment --help` lists observe, source-preview and rollback-prepare.
+
+### Rollback and source recovery
+
+A known-good deployment can prepare a **new image-only rollback plan** after
+inspecting the current service. Apply that plan explicitly. It reuses the exact
+recorded image and requires fresh health; its original tests are historical. It
+does not change workspace source, database rows, migrations, volumes or secrets.
+
+`deployment_source_preview` checks actual running-container bytes for the declared
+mapping against the recorded manifest, then produces the normal Recovery restore
+preview. Review and call `restore_apply` to change source, with a mandatory current
+backup and conflict checks. The container keeps running. Mounted data, image
+labels, missing source, compiled-only artifacts or a missing/corrupt CAS manifest
+cannot be substituted for verified source. DODO does not reconstruct source from
+binaries or treat a copied container root as a project backup.
+
+### Uncertain outcomes, probes and image retention
+
+The owner dashboard offers **ตรวจและรับทราบผลที่ไม่แน่นอน**. It records the live
+observation and acknowledges the old uncertainty without retrying or declaring
+production healthy. Historical `UNKNOWN` remains visible. Recover via a separately
+reviewed known-good image rollback or an owner-controlled external repair.
+
+A crash can leave a stopped source probe. **ตรวจ container probe ที่ค้าง** compares
+its durable name/ID/image/claim and requires it to remain stopped and mount-free
+before exact-ID removal. It never stops or force-removes a running container.
+
+**การเก็บ image** previews candidates outside the target's retained image count
+(default 5). Current/previous known-good, active containers, pins, live plans,
+unresolved outcomes and other targets protect images even if the count is above
+the budget. Nothing is deleted automatically. Confirm the exact preview to remove
+only eligible DODO tags/IDs; changed references block deletion. No broad prune,
+volume removal or migration is performed. An uncertain cleanup needs a fresh
+observation; repeating the same review returns its recorded result.
+
+CLI maintenance takes a bounded JSON file. Examples of its input objects:
+`{"action":"cleanup_preview","targetId":"TARGET_ID"}`,
+`{"action":"pin","deploymentId":"DEPLOYMENT_ID","pinned":true,"expectedPinned":false}`,
+`{"action":"resolve_preview","deploymentId":"DEPLOYMENT_ID"}` or
+`{"action":"apply","reviewId":"REVIEW_ID","reviewHash":"sha256:REVIEW_HASH"}`.
+Pass it with `dodo deployment maintenance --file ... --workspace ... --epoch ... --yes`.
+
+Deployment manifests remain protected source evidence independently of image
+cleanup. History is bounded at 500 deployment records per target and 2,000 owner
+maintenance reviews per project; reaching a bound stops new records rather than
+silently evicting recovery evidence. Target changes invalidate pending plans;
+restore the reviewed target definition before inspecting its old Docker resources.
+
+These guards apply to this adapter. Generic shell commands, owner terminals and
+external CI can still change production independently. Historical known-good is
+not a continuous live health monitor. No live owner production deployment or
+manual platform acceptance is implied by disposable automated fixtures.

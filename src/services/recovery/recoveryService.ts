@@ -1,4 +1,5 @@
 import { RecoveryEvidence } from './evidence.js';
+import { RecoveryDeployments } from './deploymentService.js';
 import { RecoveryGitCopies } from './gitCopies.js';
 import { RecoveryDrift } from './drift.js';
 import { RecoveryHistory } from './history.js';
@@ -29,6 +30,7 @@ export class RecoveryService {
   readonly drift:RecoveryDrift;
   readonly git:RecoveryGitCopies;
   readonly evidence:RecoveryEvidence;
+  readonly deployments:RecoveryDeployments;
   private readonly deadline=new AsyncLocalStorage<number>();
   private readonly verificationCheck=new AsyncLocalStorage<()=>boolean>();
   async verifiedCheckpoint(verificationId:string,actor:string,stillVerified:()=>boolean){
@@ -90,6 +92,7 @@ export class RecoveryService {
     this.drift=new RecoveryDrift(s,this);
     this.storage=new RecoveryStorage(s.store,configDir,()=>loadGlobalConfig(path.join(configDir,'config.json')).recovery);
     this.git=new RecoveryGitCopies(s,this.storage,configDir);
+    this.deployments=new RecoveryDeployments(s,this);
   }
   private project():RegisteredProject|undefined {
     const row=this.s.store.db.prepare('SELECT id FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(this.s.workspaceId) as {id:string}|undefined;
@@ -160,7 +163,7 @@ export class RecoveryService {
     if(this.closed||this.activated)return;
     try {if(!this.project())return;}catch(e){this.fail(e);return;}
     this.activated=true;
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.reconciled=true;}
+    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.reconciled=true;}
     if(!this.policy().enabled){this.state='DISABLED_BY_OWNER';return;}
     this.initialization=(async()=>{
       // The same queue protects activation from direct, agent and scheduled writers.
@@ -176,7 +179,7 @@ export class RecoveryService {
   async checkpoint(trigger:RecoveryTrigger,actor:string,targets?:string[]):Promise<string|undefined>{
     if(this.closed)throw new DodoError('CONFLICT','Recovery runtime is closing');
     if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.reconciled=true;}
+    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.reconciled=true;}
     if(!this.policy().enabled){this.state='DISABLED_BY_OWNER';return undefined;}
     // Initialization may itself be waiting behind this call's mutation ticket.
     // Capture here within that ticket; never await a queued activation from a writer.

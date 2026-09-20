@@ -430,3 +430,14 @@ See [ADR-051](adr/051-source-recovery-foundation.md). Reviewed session/restore f
 ## Unreleased Recovery R04
 
 RecoveryEvidence binds pre-run source manifests to existing verify_changes jobs and recipe digests. Live inspection checks the full Recovery source scope and current recipes/runtime; observed stale state is sticky. Safe evidence projections omit logs and environment values. Revisioned owner pointers, tombstones and audit events are separate from immutable manifests and execution permissions. Retention preview and prune use the same protected-reference calculation. The dashboard is bundled as ui/recovery.js. See [ADR 054](adr/054-verified-source-checkpoints.md).
+
+## Unreleased deployment provenance
+
+`RecoveryDeployments` binds immutable plans to verified manifests, recipe evidence,
+project/epoch and owner target revisions. `DockerDeploymentAdapter` uses protected
+JobManager invocations, binary private spool and bounded sealed archives. Typed
+Docker argv never consumes repo Compose hooks. `DeploymentMaintenance` is private
+owner administration with durable preview hashes, re-observation and uncertain
+receipts; it is not an MCP definition. HTTP/CLI reuse the same service and live
+context checks. See [ADR 055](adr/055-reviewed-docker-deployments.md) and the
+[usage and limits](RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).

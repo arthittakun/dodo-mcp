@@ -1,4 +1,5 @@
 import { RECOVERY_TOOLS } from './recoveryTools.js';
+import { DEPLOYMENT_TOOLS } from './deploymentTools.js';
 import { SUBAGENT_TOOLS } from './subagentTools.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import { registerTool, type AnyToolDef, type AppServices } from './context.js';
@@ -28,6 +29,7 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   // Append platform additions so the complete pre-Android catalog stays an exact prefix.
   ...ANDROID_TOOLS,
   ...RECOVERY_TOOLS,
+  ...DEPLOYMENT_TOOLS,
 ];
 
 export function registerCatalog(server: McpServer, services: AppServices): void {

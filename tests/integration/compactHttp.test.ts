@@ -158,7 +158,7 @@ describe('sub-agent MCP exposure switch', () => {
 
       const overview = await callToolLegacy(ctx, tokens.accessToken, 'project_overview', {});
       expect(overview.envelope['data']).toMatchObject({
-        toolSurface: 'compact', compactToolCount: 20, fullToolCount: 144, mcpSubagentsEnabled: false,
+        toolSurface: 'compact', compactToolCount: 20, fullToolCount: 154, mcpSubagentsEnabled: false,
       });
       const hidden = await callToolLegacy(ctx, tokens.accessToken, 'dodo_discover', { ...wsArgs(ctx), operation: 'subagent_spawn' });
       expect(hidden.isError).toBe(true);
@@ -174,7 +174,7 @@ describe('sub-agent MCP exposure switch', () => {
       const tokens = await obtainToken(ctx);
       const names = (await listTools(ctx, tokens.accessToken)).map((tool) => tool.name);
       expect(names).toEqual(surfaceCatalog('full', { subagents: false }).map((tool) => tool.name));
-      expect(names).toHaveLength(144);
+      expect(names).toHaveLength(154);
       expect(names).not.toEqual(expect.arrayContaining(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']));
     } finally {
       await ctx.cleanup();

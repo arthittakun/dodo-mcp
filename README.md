@@ -621,3 +621,10 @@ Recovery R04 ใน working source: หน้าโปรเจกต์แย�
 `VERIFIED / FAILED / INCONCLUSIVE / STALE` และชื่อ `stable` ที่เจ้าของเลือกเอง
 มี Pin, ประวัติงาน, preview retention และ `dodo recovery evidence`
 ยังไม่ใช่ release และไม่ครอบคลุม production/ฐานข้อมูล ดู [คู่มือ Recovery](docs/RECOVERY.md).
+
+Recovery development candidate also includes owner-registered Docker deployment:
+verified source → reviewed build → immutable image → health/stabilization →
+known-good. The project dashboard and `dodo deployment --help` expose configuration,
+inspection, reviewed rollback and image retention. Source-only restore never
+reverses database changes or copies volume data. This remains unreleased work;
+see [deployment and recovery usage](docs/RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).

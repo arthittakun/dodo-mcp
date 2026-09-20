@@ -1,3 +1,4 @@
+import { addressClass } from '../../security/outboundAddress.js';
 import http from 'node:http';
 import https from 'node:https';
 import dns from 'node:dns/promises';
@@ -11,19 +12,6 @@ export function validateEndpoint(connection: Provider, adminPorts: number[]): UR
   if (u.protocol === 'http:' && !connection.allowPrivateNetwork) throw new DodoError('FORBIDDEN', 'HTTP requires explicit private endpoint permission');
   if (adminPorts.includes(Number(u.port || (u.protocol === 'https:' ? 443 : 80)))) throw new DodoError('FORBIDDEN', 'DODO control and MCP ports cannot be AI endpoints');
   return u;
-}
-function addressClass(ip: string): 'public' | 'private' | 'denied' {
-  ip = ip.toLowerCase().replace(/^::ffff:/, '');
-  if (ip.includes(':')) {
-    if (ip.startsWith('2002:') || ip.startsWith('2001:0:') || ip === '::' || /^fe[89ab]/.test(ip) || ip.startsWith('ff') || ip.includes('.')) return 'denied';
-    if (ip === '::1' || /^f[cd]/.test(ip)) return 'private';
-    if (!ip.startsWith('2') && !ip.startsWith('3')) return 'denied';
-    return 'public';
-  }
-  const [a = 0,b = 0] = ip.split('.').map(Number);
-  if (a === 0 || (a === 169 && b === 254) || a >= 224 || (a === 100 && b >= 64 && b <= 127)) return 'denied';
-  if (a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return 'private';
-  return 'public';
 }
 /** Resolve once, validate every address, then pin the selected address on the actual socket. */
 export async function providerRequest(connection: Provider, suffix: string, key: string, body: unknown | undefined,

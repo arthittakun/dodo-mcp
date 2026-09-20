@@ -2,7 +2,7 @@
   "name": "dodo-mcp",
   "version": "1.2.1",
   "author": "Arthittakun",
-  "description": "DODO \u2014 local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
+  "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -103,6 +103,7 @@
     "picomatch": "^4.0.7",
     "playwright": "1.63.0",
     "sharp": "0.35.4",
+    "tar-stream": "3.2.1",
     "typescript": "5.9.3",
     "zod": "^4.2.0"
   },
