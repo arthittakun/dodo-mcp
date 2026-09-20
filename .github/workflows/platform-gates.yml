@@ -195,6 +195,8 @@ jobs:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
       DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
       DODO_CI_EVIDENCE: ${{ github.workspace }}/../.dodo-ci-evidence/${{ github.run_id }}-${{ github.run_attempt }}/windows-node-${{ matrix.node }}
+      # Dedicated random fixture item only; never reads the owner's stored keys.
+      DODO_TEST_OS_RECOVERY_KEYS: "1"
     steps:
       - name: Prepare Git for Windows before checkout
         run: |
