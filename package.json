@@ -81,6 +81,7 @@
     "test:all": "npm run typecheck && npm run lint && vitest run tests/unit tests/integration tests/security tests/compatibility && npm run test:pack",
     "release:gate": "node scripts/release-gate.mjs --allow-dirty",
     "release:gate:ci": "node scripts/release-gate.mjs",
+    "ci:windows:focus": "node scripts/windows-focus.mjs",
     "release:gate:strict": "node scripts/release-gate.mjs --release",
     "prepublishOnly": "node scripts/guard-publish.mjs",
     "desktop:setup": "node dist/cli/main.js desktop setup",
