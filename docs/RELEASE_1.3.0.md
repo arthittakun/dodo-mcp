@@ -1,7 +1,8 @@
 # DODO MCP 1.3.0 — Recovery & Local Git Safety
 
-สถานะ: **release candidate** ยังไม่อ้างว่า npm เผยแพร่แล้ว ผลตรวจชุดรวมและ platform
-ต้องดู [TEST_REPORT](TEST_REPORT.md) แยกจากผลของ candidate รอบก่อน
+เอกสารขอบเขตและวิธีอัปเกรดรุ่น1.3.0 การเผยแพร่ต้องผ่าน macOS และ native
+Windows/Linux gates ก่อน ตรวจรุ่นที่เผยแพร่ด้วย `npm view dodo-mcp version`
+ดู [TEST_REPORT](TEST_REPORT.md) โดยแยกผลตาม revision จาก candidate รอบก่อน
 
 ## สิ่งที่เพิ่ม
 

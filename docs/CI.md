@@ -79,8 +79,10 @@ Windows gate ต้องใช้ enabled Administrator token เพื่อ�
 Gate รัน build, typecheck, lint, full tests, packaging, DodoBench, production audit,
 immutable tarball และ fresh install โดยไม่เผยแพร่ npm
 `test:all` มีเวลา aggregate สูงสุด 60 นาทีบน Windows และ 30 นาทีบนระบบอื่น เพราะ
-native Windows มีต้นทุนตรวจ NTFS ACL และชุด Recovery เพิ่มขึ้น ไม่เปลี่ยน timeout
-ราย test/hook ไม่ลด assertions และ failure ใด ๆ ยังคงทำให้ gate ไม่ผ่าน
+native Windows มีต้นทุนตรวจ NTFS ACL และชุด Recovery เพิ่มขึ้น ไม่ลด assertions
+และ failure ใด ๆ ยังคงทำให้ gate ไม่ผ่าน ราย test/hook มีขอบเขตเวลาแยกกัน:
+ค่าเริ่มต้น 60 วินาที ส่วน scenario ที่ทำสำเนา Git/CAS หลายรอบของ 15 ไฟล์และตรวจ
+restore/replay ทั้งวงจรให้ 180 วินาทีบน Windows โดยคง deadline ของแต่ละ operation
 ผลละเอียดอยู่บน runner ใน `<runner-workspace>/.dodo-ci-evidence/<run-id>-<attempt>/<platform>-node-<major>/`
 นอก checkout เพื่อไม่ถูก checkout cleanup ลบ จึงไม่ push/pack การ rerun ใช้ directory
 ใหม่ ไม่เขียนทับ report เก่า Linux ย้ายสำเนา evidence แบบเก่าที่อยู่ใน checkout
@@ -109,3 +111,8 @@ clean revision, source fingerprint และ lockfile ไม่รับผล D
 ใช้ allowlisted summary จาก workflow ได้โดยไม่ต้องคัดลอก private logs ออกมา
 Windows รัน dedicated random-item Credential Manager fixture และลบเฉพาะ item นั้น
 Linux Secret Service บนเครื่อง headless ที่ไม่ได้เปิด fixture ยังคง NOT_RUN
+
+Fresh-install smoke เริ่ม server ใหม่ด้วย private fixture เดิมเพื่อตรวจ receipt และ
+stale epoch หาก Node fetch pool คืน socket ที่เพิ่งปิด จะ retry เฉพาะ JSON-RPC
+`initialize` เมื่อเป็น connection-reset/socket-close แบบจำกัดจำนวนครั้ง ไม่มีการ
+retry `tools/call`, คำสั่งที่มีผลข้างเคียง หรือ OAuth exchange โดยอัตโนมัติ

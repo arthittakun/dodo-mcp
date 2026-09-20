@@ -70,8 +70,10 @@ same OS owner intentionally tampering with both data and metadata.
 A checkpoint is not an atomic filesystem-wide snapshot. DODO queues its own
 writers but cannot stop an IDE or unrelated process. It verifies paths, identity,
 hashes and inventory; detected drift fails closed. Modes are preserved, not all
-ACLs/xattrs/alternate streams. On Windows directory fsync is unavailable; native
-Windows acceptance for this new subsystem has not been performed.
+ACLs/xattrs/alternate streams. On Windows directory fsync is unavailable. Private
+Git copy files use write-capable handles for mandatory file flushes, with fresh
+ACL and file identity checks. See [platform evidence](TEST_REPORT.md) for the
+tested revision; a macOS/Linux result alone does not certify Windows.
 
 An abrupt restart marks incomplete captures as incomplete, releases only the
 leased project's abandoned reservation, and rebuilds/rechecks the active

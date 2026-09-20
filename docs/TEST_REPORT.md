@@ -2,6 +2,36 @@
 
 ## 1.3.0 Recovery — หลักฐานก่อน final platform gate
 
+Follow-up วันที่ 2026-09-20 ที่ clean revision `8c76c0a`
+(`sha256:a9118f3ce6d37a0520ef64720122eb36e9c684154aebb9cb984e8e6459f148bc`):
+
+| Platform | Core (142 files / 938 tests) | Packaging | Fresh install |
+|---|---|---|---|
+| macOS arm64 / Node 22 | 902 pass / 0 fail / 36 skip | 17/17 | PASS |
+| Linux native / Node 22 | 894 pass / 0 fail / 44 skip | 17/17 | PASS |
+| Linux native / Node 24 | 894 pass / 0 fail / 44 skip | 17/17 | PASS |
+
+ทั้งสาม gate: build/typecheck/lint/test:all exit0, DodoBench7/7, production audit0
+Linux [run35507491429](https://github.com/arthittakun/dodo-mcp/actions/runs/35507491429)
+ยืนยัน fresh-install หลังแก้ Node24 fixture connection reset: retry เฉพาะ initialize
+ที่ไม่มี effect ไม่ retry tool calls หรือ OAuth exchange
+
+Windows full [run35506660660](https://github.com/arthittakun/dodo-mcp/actions/runs/35506660660)
+ที่ `acf805a`: Node24 core889pass/7fail/38skip; duplicate-activation/UI409 ผ่านแล้ว
+เหลือ Git-copy6เคส และ timeout ของ scenario restore15ไฟล์ หลังเก็บหลักฐานยกเลิก
+Node22 ของ revision เก่าเพื่อทดสอบแพตช์ใหม่ ไม่ถือว่ารอบที่ยกเลิกผ่าน
+แพตช์ Git-copy ใช้ writable fd สำหรับ mandatory flush และ fixture ของปลายทาง private
+ใช้ Windows ACL จริง ความถูกต้องของแพตช์ต้องอ้าง native run ของ revision นั้น
+ผลย้อนหลังข้างต้นไม่ใช้แทน final gate หลังเปลี่ยน source
+
+Windows focused [run35507971440](https://github.com/arthittakun/dodo-mcp/actions/runs/35507971440)
+ที่ `144a3ee`: 22pass/3fail/0skip ยืนยัน writable-fd Git backup และ flush-failure
+regression, dirty/untracked restore15ไฟล์, worktree/large blobs และ browser drift
+success path ผ่าน เหลือสาม assertion ที่รอ asynchronous initialization ด้วย poll
+budget เริ่มต้น แยกเพิ่มเวลารอสถานะเป็น30วินาทีโดยไม่เปลี่ยนผล READY/BLOCKED
+ที่ต้องได้หรือ assertions การป้องกันไฟล์/การรันคำสั่ง Full gate ต้องรันอีกครั้ง
+บน clean revision หลังแพตช์นี้ก่อนเผยแพร่
+
 ผลแต่ละรอบอ้างเฉพาะ source fingerprint/revision ที่ระบุ ไม่ใช่ผล npm รุ่นก่อน
 และไม่รวม skipped tests เป็น pass ต้องใช้ final native Windows/Linux และ macOS
 ที่ตรง clean candidate ก่อน publish ดู [workflow](https://github.com/arthittakun/dodo-mcp/actions/workflows/platform-gates.yml)

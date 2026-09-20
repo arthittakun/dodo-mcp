@@ -26,13 +26,13 @@ describe('R03 independent Git recovery copies',()=>{
  });
  it('owner-selected bare copy survives deleting working .git and source; reviewed restore recovers exact bytes',async()=>{
   const r=setup(),destination=path.join(f.base,'separate-backups');ensurePrivateDirectory(destination);await r.configure({...r.policy(),gitRequired:true,gitDirectory:destination},true);
-  await expect.poll(()=>r.status().state).toBe('READY');const cp=await r.checkpoint('owner-checkpoint','local-stdio');const copy=copies().at(-1)!;
+  await expect.poll(()=>r.status().state,{timeout:30000}).toBe('READY');const cp=await r.checkpoint('owner-checkpoint','local-stdio');const copy=copies().at(-1)!;
   for(const name of fs.readdirSync(f.root))fs.rmSync(path.join(f.root,name),{recursive:true,force:true});const meta=JSON.parse(copy.payload);expect(git(['--git-dir='+copy.directory,'show',meta.commit+':a']).toString()).toBe('committed');
   const plan=await f.call('restore_preview',{checkpointId:cp});await f.call('restore_apply',{planId:plan.planId,planHash:plan.planHash,idempotencyKey:f.key()});expect(fs.readFileSync(path.join(f.root,'a'),'utf8')).toBe('committed');expect(fs.existsSync(path.join(f.root,'.git'))).toBe(false);
  });
  it('rejects repository/private-state destinations and unavailable volumes without fallback',async()=>{
   const r=setup();await expect(r.configure({...r.policy(),gitDirectory:f.root},true)).rejects.toThrow();await expect(r.configure({...r.policy(),gitDirectory:f.configDir},true)).rejects.toThrow();
-  const destination=path.join(f.base,'private-backups');ensurePrivateDirectory(destination);await r.configure({...r.policy(),gitDirectory:destination},true);await expect.poll(()=>r.status().state).toBe('READY');
+  const destination=path.join(f.base,'private-backups');ensurePrivateDirectory(destination);await r.configure({...r.policy(),gitDirectory:destination},true);await expect.poll(()=>r.status().state,{timeout:30000}).toBe('READY');
   fs.renameSync(destination,destination+'-removed');await expect(r.checkpoint('before-exec','owner')).rejects.toThrow('backup is blocked');expect(fs.existsSync(destination)).toBe(false);
  });
  it('handles unborn and detached HEAD; a parent repo copy never includes a sibling',async()=>{
@@ -50,7 +50,7 @@ describe('R03 independent Git recovery copies',()=>{
   const r=setup(),mixed=path.join(f.base,'mixed');ensurePrivateDirectory(mixed);fs.writeFileSync(path.join(mixed,'user-data'),'never overwrite');
   await expect(r.configure({...r.policy(),gitDirectory:mixed},true)).rejects.toThrow('dedicated');
   const secret=path.join(f.base,'.ssh');ensurePrivateDirectory(secret);await expect(r.configure({...r.policy(),gitDirectory:secret},true)).rejects.toThrow('credential');
-  await r.configure({...r.policy(),projectBytes:1024*1024,gitRequired:true},true);await expect.poll(()=>r.status().state).toBe('BLOCKED');
+  await r.configure({...r.policy(),projectBytes:1024*1024,gitRequired:true},true);await expect.poll(()=>r.status().state,{timeout:30000}).toBe('BLOCKED');
   await expect(f.call('exec_command',{program:'node',args:['-e','process.exit(0)'],idempotencyKey:f.key()})).rejects.toThrow('RECOVERY_REQUIRED');expect(f.ws.services.jobs.runningCount()).toBe(0);expect(fs.readFileSync(path.join(mixed,'user-data'),'utf8')).toBe('never overwrite');
  });
 
