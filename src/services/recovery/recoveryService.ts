@@ -1,3 +1,5 @@
+import { RecoveryConfigVault } from './configVault.js';
+import { RecoveryDatabases } from './databaseAwareness.js';
 import { RecoveryEvidence } from './evidence.js';
 import { RecoveryDeployments } from './deploymentService.js';
 import { RecoveryGitCopies } from './gitCopies.js';
@@ -31,6 +33,8 @@ export class RecoveryService {
   readonly git:RecoveryGitCopies;
   readonly evidence:RecoveryEvidence;
   readonly deployments:RecoveryDeployments;
+  readonly databases:RecoveryDatabases;
+  readonly configVault:RecoveryConfigVault;
   private readonly deadline=new AsyncLocalStorage<number>();
   private readonly verificationCheck=new AsyncLocalStorage<()=>boolean>();
   async verifiedCheckpoint(verificationId:string,actor:string,stillVerified:()=>boolean){
@@ -43,7 +47,7 @@ export class RecoveryService {
       if(id)this.s.store.setMeta(key,id);
     });
   }
-  private readonly reviewedRestore=new AsyncLocalStorage<boolean>();
+  private readonly reviewedRestore=new AsyncLocalStorage<()=>Promise<void>>();
   private scanTimer:NodeJS.Timeout|undefined;
   private background:Promise<unknown>|undefined;
   private observations=new Set<Promise<unknown>>();
@@ -52,7 +56,7 @@ export class RecoveryService {
     const work=this.deadline.run(Date.now()+this.policy().scanMs,()=>this.drift.scan()).catch(()=>undefined);
     this.observations.add(work);void work.finally(()=>this.observations.delete(work));return work;
   }
-  withReviewedRestore<T>(fn:()=>Promise<T>):Promise<T>{return this.reviewedRestore.run(true,fn);}
+  withReviewedRestore<T>(fn:()=>Promise<T>,recheck:()=>Promise<void>=async()=>{}):Promise<T>{return this.reviewedRestore.run(recheck,fn);}
   private checkBudget(){if(Date.now()>(this.deadline.getStore()??Infinity))throw new DodoError('RESOURCE_LIMIT','source drift scan exceeded its time budget; state was not acknowledged');}
   async scanDrift(){
     if(!this.policy().enabled)return this.drift.status();
@@ -93,6 +97,8 @@ export class RecoveryService {
     this.storage=new RecoveryStorage(s.store,configDir,()=>loadGlobalConfig(path.join(configDir,'config.json')).recovery);
     this.git=new RecoveryGitCopies(s,this.storage,configDir);
     this.deployments=new RecoveryDeployments(s,this);
+    this.databases=new RecoveryDatabases(s,this);
+    this.configVault=new RecoveryConfigVault(s,this);
   }
   private project():RegisteredProject|undefined {
     const row=this.s.store.db.prepare('SELECT id FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(this.s.workspaceId) as {id:string}|undefined;
@@ -163,7 +169,7 @@ export class RecoveryService {
     if(this.closed||this.activated)return;
     try {if(!this.project())return;}catch(e){this.fail(e);return;}
     this.activated=true;
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.reconciled=true;}
+    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
     if(!this.policy().enabled){this.state='DISABLED_BY_OWNER';return;}
     this.initialization=(async()=>{
       // The same queue protects activation from direct, agent and scheduled writers.
@@ -179,7 +185,7 @@ export class RecoveryService {
   async checkpoint(trigger:RecoveryTrigger,actor:string,targets?:string[]):Promise<string|undefined>{
     if(this.closed)throw new DodoError('CONFLICT','Recovery runtime is closing');
     if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.reconciled=true;}
+    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
     if(!this.policy().enabled){this.state='DISABLED_BY_OWNER';return undefined;}
     // Initialization may itself be waiting behind this call's mutation ticket.
     // Capture here within that ticket; never await a queued activation from a writer.
@@ -196,6 +202,7 @@ export class RecoveryService {
         const id = await this.capture(trigger,actor,targets);
         this.startScanner();
         this.authority.getStore()?.();
+        try{await this.reviewedRestore.getStore()?.();}catch(e){guardRejected=true;throw e;}
         return id;
       }catch(e){if(guardRejected||e instanceof DodoError && (['FORBIDDEN','AUTH_REQUIRED'].includes(e.code)))throw e;this.fail(e);throw new DodoError('RECOVERY_REQUIRED','source backup is blocked; no source mutation was started',{detail:{reason:this.errorCode},recovery:'inspect Recovery in project settings, fix storage/path/integrity problems and retry'});}
     });

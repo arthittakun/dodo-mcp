@@ -146,10 +146,11 @@ export class RecoveryStorage {
     const livePlan=(id:string)=>Boolean(this.store.db.prepare(`SELECT 1 FROM recovery_plan_refs r JOIN change_plans p ON p.id=r.plan_id WHERE r.snapshot_id=? AND p.expires_at>=? AND p.invalidated_at IS NULL LIMIT 1`).get(id,now));
     const named=(id:string)=>Boolean(this.store.db.prepare('SELECT 1 FROM recovery_pointers WHERE snapshot_id=? LIMIT 1').get(id));
     const deployment=(id:string)=>Boolean(this.store.db.prepare('SELECT 1 FROM recovery_deployments WHERE snapshot_id=? LIMIT 1').get(id));
+    const databaseRule=(id:string)=>Boolean(this.store.db.prepare('SELECT 1 FROM recovery_database_bindings WHERE snapshot_id=? LIMIT 1').get(id));
     for(const [i,session]of sessions.entries()){
       if(i<policy.retainedPoints&&session.created_at>=now-policy.retentionDays*86400000)continue;
       const events=this.store.db.prepare(`SELECT e.snapshot_id,s.pinned,e.kind,e.ref FROM recovery_events e LEFT JOIN recovery_snapshots s ON s.id=e.snapshot_id WHERE e.session_id=?`).all(session.id) as Array<{snapshot_id:string|null;pinned:number|null;kind:string;ref:string|null}>;
-      if(events.some(e=>e.pinned===1||(e.snapshot_id&&(named(e.snapshot_id)||livePlan(e.snapshot_id)||deployment(e.snapshot_id)))
+      if(events.some(e=>e.pinned===1||(e.snapshot_id&&(named(e.snapshot_id)||livePlan(e.snapshot_id)||deployment(e.snapshot_id)||databaseRule(e.snapshot_id)))
         ||e.kind==='changeset'&&Boolean(this.store.db.prepare("SELECT 1 FROM changesets WHERE id=? AND status IN ('committing','recovery_required')").get(e.ref))
         ||e.kind==='job'&&Boolean(this.store.db.prepare("SELECT 1 FROM jobs WHERE id=? AND status='running'").get(e.ref))))continue;
       removeSessions.add(session.id);
@@ -160,6 +161,7 @@ export class RecoveryStorage {
       let reason='eligible';
       if(keep.has(r.id))reason='latest_backup';else if(r.pinned)reason='pinned';else if(named(r.id))reason='named_checkpoint';
       else if(deployment(r.id))reason='deployment_provenance';
+      else if(databaseRule(r.id))reason='database_compatibility_rule';
       else if(this.store.db.prepare('SELECT 1 FROM recovery_drift WHERE baseline_id=?').get(r.id))reason='drift_baseline';
       else if(livePlan(r.id))reason='reviewed_restore_plan';
       else if((this.store.db.prepare('SELECT session_id FROM recovery_events WHERE snapshot_id=?').all(r.id) as Array<{session_id:string}>).some(e=>!removeSessions.has(e.session_id)))reason='session_history';

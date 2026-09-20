@@ -8,6 +8,7 @@ const invokedCwd = process.cwd();
 
 import fs from 'node:fs';
 import { Command } from 'commander';
+import { registerDataRecoveryCommands } from './dataRecovery.js';
 import { registerDeploymentCommands } from './deployment.js';
 import { startServer, DODO_VERSION } from '../server/appServer.js';
 import { startStdioServer } from '../server/stdioServer.js';
@@ -1216,6 +1217,7 @@ auth
 
 // -------------------------------------------------------------- recovery ---
 const recovery = program.command('recovery').description('inspect or configure automatic source backups for the current registered project');
+registerDataRecoveryCommands(recovery,ipcForCwd);
 recovery.command('status').action(async () => console.log(JSON.stringify(await ipcForCwd('recovery.status'), null, 2)));
 recovery.command('scan').option('--cursor <n>','page offset','0').option('--limit <n>','page size (1–100)','50').action(async(opts:{cursor:string;limit:string})=>console.log(JSON.stringify(await ipcForCwd('recovery.drift.scan',{cursor:Number(opts.cursor),limit:Number(opts.limit)}),null,2)));
 recovery.command('acknowledge <digest>').requiredOption('--workspace <id>','reviewed workspace ID').requiredOption('--epoch <epoch>','reviewed workspace epoch').option('--yes','accept exactly the reviewed observed state',false)

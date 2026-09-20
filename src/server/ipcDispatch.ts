@@ -291,6 +291,29 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         }
         return r.withAuthority<unknown>(revalidate,()=>cmd==='deployment.configure'?r.deployments.configure(b.input,revalidate):r.deployments.prepare(b.input,owner,revalidate));
       }
+      case 'recovery.config.list': case 'recovery.config.configure': case 'recovery.config.backup': case 'recovery.config.preview': case 'recovery.config.apply': case 'recovery.config.rotate': {
+        const r=services.recovery;if(!r)throw new DodoError('NOT_SUPPORTED','Recovery is unavailable');
+        const revalidate=()=>{ctx.revalidateOwner?.();r.assertProject();};revalidate();
+        if(cmd==='recovery.config.list'){z.object({}).strict().parse(args);return r.configVault.list();}
+        const b=z.object({workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch),confirm:z.literal(true),input:z.unknown()}).strict().parse(args);
+        if(cmd==='recovery.config.configure')return r.configVault.configure(b.input,revalidate);
+        if(cmd==='recovery.config.backup'){const v=z.object({targetId:z.string().min(1).max(128)}).strict().parse(b.input);return r.configVault.backup(v.targetId,revalidate);}
+        if(cmd==='recovery.config.preview'){const v=z.object({backupId:z.string().min(1).max(128)}).strict().parse(b.input);return r.configVault.preview(v.backupId,revalidate);}
+        if(cmd==='recovery.config.rotate'){const v=z.object({targetId:z.string().min(1).max(128),expectedRevision:z.number().int().positive()}).strict().parse(b.input);return r.configVault.rotate(v.targetId,v.expectedRevision,revalidate);}
+        const v=z.object({planId:z.string().min(1).max(128),planHash:z.string().regex(/^sha256:[a-f0-9]{64}$/)}).strict().parse(b.input);
+        return r.configVault.apply(v.planId,v.planHash,revalidate);
+      }
+      case 'recovery.database.list': case 'recovery.database.configure': case 'recovery.database.inspect': case 'recovery.database.bind': case 'recovery.database.unbind': {
+        const r=services.recovery;if(!r)throw new DodoError('NOT_SUPPORTED','Recovery is unavailable');
+        const revalidate=()=>{ctx.revalidateOwner?.();r.assertProject();};revalidate();
+        if(cmd==='recovery.database.list'){z.object({}).strict().parse(args);return {items:r.databases.list(),...r.databases.summary()};}
+        const b=z.object({workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch),confirm:z.literal(true),input:z.unknown()}).strict().parse(args);
+        if(cmd==='recovery.database.configure')return r.databases.configure(b.input,revalidate);
+        if(cmd==='recovery.database.bind')return r.databases.bind(b.input,revalidate);
+        if(cmd==='recovery.database.unbind')return r.databases.unbind(b.input,revalidate);
+        const input=z.object({targetId:z.string().min(1).max(128)}).strict().parse(b.input);
+        return r.databases.inspectOwner(input.targetId,revalidate);
+      }
       case 'recovery.configure': {
         const body = z.object({ policy: z.unknown(), confirm: z.literal(true) }).strict().parse(args);
         ctx.revalidateOwner?.();

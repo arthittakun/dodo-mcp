@@ -74,7 +74,7 @@ function macSecurity(): string {
   return executable;
 }
 
-const WIN_CREDENTIAL_TYPE = String.raw`
+export const WIN_CREDENTIAL_TYPE = String.raw`
 using System;
 using System.ComponentModel;
 using System.Runtime.InteropServices;

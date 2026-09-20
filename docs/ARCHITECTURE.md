@@ -441,3 +441,15 @@ owner administration with durable preview hashes, re-observation and uncertain
 receipts; it is not an MCP definition. HTTP/CLI reuse the same service and live
 context checks. See [ADR 055](adr/055-reviewed-docker-deployments.md) and the
 [usage and limits](RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).
+
+## Unreleased database/config recovery
+
+`RecoveryDatabases` adds owner-registered SQLite migration metadata and explicit
+manifest-bound compatibility rules. `RecoveryHistory` checks them at preview,
+apply and after the pre-restore checkpoint. No database mutation adapter is exposed.
+`RecoveryConfigVault` stores AEAD ciphertext and journaled redacted restore plans
+in separate private tables; `OSRecoveryKeys` stores only keys in OS credential
+providers. Owner IPC, HTTP and CLI share the same services/queue/context checks.
+Bundled `ui/dataRecovery.js` handles both opt-ins without changing MCP catalog or
+source-secret guards. See [ADR 056](adr/056-owner-data-recovery.md) and
+[usage/limits](RECOVERY.md#database-awareness-and-encrypted-private-config-unreleased-working-source).

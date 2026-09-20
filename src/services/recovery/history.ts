@@ -17,7 +17,7 @@ interface Session { id:string; workspace_id:string; actor:string; root_identity:
 interface Event { seq:number; session_id:string; snapshot_id:string|null; kind:string; ref:string|null; created_at:number }
 interface Operation { actor:string; sessionId?:string; implicit:boolean; snapshotId?:string }
 export interface RestoreSelection { checkpointId?:string; sessionId?:string; paths?:string[]; exactMirror?:boolean }
-interface RestoreMeta { version:1; identity:string; epoch:string; source:RestoreSelection; snapshotIds:string[]; selectionDigest:string; planHash:string }
+interface RestoreMeta { version:1; identity:string; epoch:string; source:RestoreSelection; snapshotIds:string[]; selectionDigest:string; planHash:string; databaseDigest?:string }
 const absent=(path:string):RecoveryEntry=>({path,kind:'absent',hash:null,bytes:0,mode:null});
 const selected=(p:string,paths:string[])=>!paths.length||paths.some(s=>s==='.'||p===s||p.startsWith(s+'/'));
 
@@ -198,14 +198,16 @@ export class RecoveryHistory {
         f.directoryChildren=files.filter(c=>(c.action==='delete'||c.action==='rmdir')&&path.posix.dirname(c.path)===f.path).map(c=>path.posix.basename(c.path));
         if(fs.readdirSync(this.s.wfs.resolve(f.path).abs).some(n=>!f.directoryChildren!.includes(n)))conflicts.push({path:f.path,reason:'directory contains unrelated entries; preserved'});
       }
+      const database=await this.recovery.databases.compatibility([...ids]);
+      if(database.blocking)conflicts.push({path:'(database)',reason:'migration compatibility is unknown or incompatible under the owner rule; no database changes performed'});
       const view=files.map(({afterContentB64:_,...f})=>f);// bytes stay private; only bounded diffs go to the caller
-      if(conflicts.length)return {applicable:false,conflicts:conflicts.slice(0,100),files:view,sourceOnly:true,planId:null,planHash:null};
-      if(!files.length)return {applicable:false,conflicts:[],files:[],sourceOnly:true,planId:null,planHash:null,unchanged:true};
+      if(conflicts.length)return {applicable:false,conflicts:conflicts.slice(0,100),files:view,sourceOnly:true,database,planId:null,planHash:null};
+      if(!files.length)return {applicable:false,conflicts:[],files:[],sourceOnly:true,database,planId:null,planHash:null,unchanged:true};
       const plan:StoredPlan={version:1,workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:a.id,source:'restore',summary:`restore ${files.length} source path(s)`,files};
       const id=newId('plan'),payload=JSON.stringify(plan),hash=digestOf({planId:id,payload}),expiresAt=Date.now()+this.s.limits.planExpiryMs;
-      const meta:RestoreMeta={version:1,identity:rootIdentity(this.s.wfs.root),epoch:this.s.epoch,source:selection,snapshotIds:[...ids],selectionDigest,planHash:hash};
+      const meta:RestoreMeta={version:1,identity:rootIdentity(this.s.wfs.root),epoch:this.s.epoch,source:selection,snapshotIds:[...ids],selectionDigest,planHash:hash,databaseDigest:database.digest};
       this.db.transaction(()=>{this.s.store.putPlan({id,workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:a.id,planHash:hash,payload,ttlMs:this.s.limits.planExpiryMs});this.db.prepare('INSERT INTO recovery_restore_plans VALUES (?,?,?,?)').run(id,this.s.workspaceId,a.id,JSON.stringify(meta));for(const snap of ids)this.db.prepare('INSERT INTO recovery_plan_refs VALUES (?,?)').run(id,snap);})();// Preview writes private plan metadata only, never source/emergency snapshots.
-      return {applicable:true,planId:id,planHash:hash,expiresAt,workspaceId:this.s.workspaceId,workspaceEpoch:this.s.epoch,files:view,conflicts:[],sourceOnly:true,coverage:'selected included source only; databases, secrets, volumes and external effects are excluded',exactMirror:selection.exactMirror??false};
+      return {applicable:true,planId:id,planHash:hash,expiresAt,workspaceId:this.s.workspaceId,workspaceEpoch:this.s.epoch,files:view,conflicts:[],sourceOnly:true,database,coverage:'selected included source only; databases, secrets, volumes and external effects are excluded',exactMirror:selection.exactMirror??false};
     });
   }
   status(a:RecoveryActor,planId?:string){
@@ -242,10 +244,14 @@ export class RecoveryHistory {
       for(const f of (JSON.parse(plan.payload) as StoredPlan).files)this.recovery.assertSourcePath(f.path);
       // Session history must still describe this exact selection; new receipts invalidate the plan.
       const current=await this.desired(a,meta.source);if(current.selectionDigest!==meta.selectionDigest||current.conflicts.length)throw new DodoError('FILE_CHANGED','session source drifted before restore');
+      const checkDatabase=async()=>{const observed=await this.recovery.databases.compatibility(meta.snapshotIds);
+        if(observed.blocking||(meta.databaseDigest?meta.databaseDigest!==observed.digest:observed.configured))throw new DodoError('CONFLICT','database compatibility changed; review source restore again');};
+      await checkDatabase();
       return this.around(a.id,undefined,async()=>{
         // Applier makes the pre-restore backup, rechecks all hashes and journals exact direction.
-        const result=await this.recovery.withReviewedRestore(()=>this.s.applier.applyRecovery({planId,planHash,workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:a.id}));
-        return {...result,verified:true,sourceOnly:true};
+        const result=await this.recovery.withReviewedRestore(()=>this.s.applier.applyRecovery({planId,planHash,workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:a.id}),checkDatabase);
+        const database=await this.recovery.databases.compatibility(meta.snapshotIds);
+        return {...result,verified:true,sourceOnly:true,database,databaseChangedDuringRestore:Boolean(meta.databaseDigest&&database.digest!==meta.databaseDigest)};
       });
     });
   }

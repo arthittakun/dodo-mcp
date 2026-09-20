@@ -398,3 +398,25 @@ engines, long-duration stabilization and manual browser deployment. Before optin
 in, review the target's daemon authority and use a disposable project/service to
 exercise interrupted build/deploy, live observation, probe cleanup, reconnect,
 expired approval and reviewed rollback. Source/database recovery remain distinct.
+
+## Unreleased database/config recovery — MANUAL_NOT_RUN on owner data
+
+Use disposable SQLite and a synthetic private `.env`, never production secrets.
+Enable the migration adapter through the project page; verify unbound UNKNOWN,
+owner-rule COMPATIBLE, and mismatched IDs blocking restore without changing rows.
+Check external migration drift during a source restore, and explicitly review the
+warning-only alternative if selected. Database undo/PITR remains unsupported.
+
+For each OS credential provider, opt in a synthetic file, verify actual key-store
+access, encrypted backup, redacted preview and exact read-back. Rotate; verify old
+copies still need old keys. Lock/refuse the OS store and confirm no fallback.
+Stop dependent fixture services before in-place restore. Test restart/reconnect
+using the recorded receipt; UNKNOWN must not repeat writes. Review retention,
+missing-file disable and recovery from the encrypted before-copy. Confirm no
+secrets in MCP, public routes, browser storage, logs, source snapshots or tarball.
+
+Automated browser/protocol tests are AUTOMATED_PASS only when reported. A real
+Keychain fixture round-trip is not a manual Windows Credential Manager or Linux
+Secret Service pass. Android encryption-provider support is NOT_SUPPORTED. Record
+each OS and owner-production/manual case independently; no generic DB rollback
+or disaster-recovery success is implied.

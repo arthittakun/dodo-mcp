@@ -628,3 +628,10 @@ known-good. The project dashboard and `dodo deployment --help` expose configurat
 inspection, reviewed rollback and image retention. Source-only restore never
 reverses database changes or copies volume data. This remains unreleased work;
 see [deployment and recovery usage](docs/RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).
+
+Private data recovery in the working source is separate opt-in: the project page
+can inspect an owner-selected SQLite migration table and bind checkpoint rules,
+and back up an explicitly registered private config file with OS-held encryption
+keys. AI cannot read or restore those secret copies. Database row rollback is not
+supported; config restore requires owner review and manual service restart.
+See [Database/config recovery](docs/RECOVERY.md#database-awareness-and-encrypted-private-config-unreleased-working-source).

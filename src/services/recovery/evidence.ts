@@ -47,7 +47,7 @@ export class RecoveryEvidence {
     }catch(e){reason=e instanceof DodoError?e.code:'evidence_unavailable';}
     if(state==='VERIFIED'&&this.binding(id,a).stale){state='STALE';reason='previously_observed_drift';}
     const result={verificationId:b.id,checkpointId:b.snapshot_id,manifestHash:b.manifest_digest,state,reason,sourceMatches,
-      checkedAt:Date.now(),createdAt:b.created_at,evidence,scope:'included_source_and_selected_checks',production:this.r.deployments.summary().state,database:'NOT_SUPPORTED'};
+      checkedAt:Date.now(),createdAt:b.created_at,evidence,scope:'included_source_and_selected_checks',production:this.r.deployments.summary().state,database:this.r.databases.summary().state};
     // Sanitized evidence only: no stdout/stderr, arbitrary messages or environment values.
     this.db.prepare('UPDATE recovery_verifications SET result_json=?,stale=MAX(stale,?),verified_at=COALESCE(verified_at,?) WHERE id=? AND workspace_id=?').run(JSON.stringify(result),Number(state==='STALE'),state==='VERIFIED'?result.checkedAt:null,id,this.s.workspaceId);
     return result;
@@ -62,7 +62,7 @@ export class RecoveryEvidence {
   summary(){
     const row=this.db.prepare('SELECT MAX(verified_at) AS lastVerifiedAt FROM recovery_verifications WHERE workspace_id=?').get(this.s.workspaceId) as {lastVerifiedAt:number|null};
     // Public overview discloses no cross-caller IDs, titles, paths or test details.
-    return {lastVerifiedAt:row.lastVerifiedAt,freshness:'historical_observation_only',production:this.r.deployments.summary().state,database:'NOT_SUPPORTED'};
+    return {lastVerifiedAt:row.lastVerifiedAt,freshness:'historical_observation_only',production:this.r.deployments.summary().state,database:this.r.databases.summary().state};
   }
   pointerEvents(cursor=0,limit=20){
     this.r.assertProject();

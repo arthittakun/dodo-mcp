@@ -212,11 +212,13 @@
     await recoveryPanel(s);
     const projectContext={...selected};
     await deploymentPanel(s,(operation,args={})=>api('admin/action',{projectId:projectContext.projectId,operation,args},true),projectContext);
+    await dataRecoveryPanel(s,(operation,args={})=>api('admin/action',{projectId:projectContext.projectId,operation,args},true),projectContext);
     const jobs=section('Jobs ของโปรเจกต์','สถานะจาก runtime ปัจจุบัน');s.append(jobs);
     const jobsDetails=el('details');jobsDetails.append(el('summary','รายละเอียดทางเทคนิค (JSON)'));output(jobsDetails,selected.jobs);jobs.append(jobsDetails);
   }
 
   const recoveryPanel=window.DodoRecovery({el,section,button,check,field,choice,notice,confirmDanger,help,api,refresh:()=>show('projects'),getSelected:()=>selected});
+  const dataRecoveryPanel=window.DodoDataRecovery({el,section,button,check,field,choice,confirmDanger});
   const deploymentPanel=window.DodoDeployment({el,section,button,check,field,choice,notice,confirmDanger});
 
   function providers(body) {

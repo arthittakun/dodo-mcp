@@ -72,3 +72,4 @@ decisions; ADR-011+ resolve implementation ambiguities without reducing security
 - [053 — Content drift and private Git recovery](053-content-drift-and-private-git-recovery.md)
 - [054 — Verified source checkpoints](054-verified-source-checkpoints.md)
 - [055 — Reviewed Docker deployments](055-reviewed-docker-deployments.md)
+- [056 — Owner-controlled database awareness and private config recovery](056-owner-data-recovery.md)

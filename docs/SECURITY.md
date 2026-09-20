@@ -421,3 +421,22 @@ volume prune, silent retry, database downgrade or automatic health success is
 performed. Private job output is not exposed through normal job output tools.
 Generic shell/other daemon clients remain outside this adapter's deployment guard;
 a workspace boundary is not an OS or Docker security sandbox.
+
+## Unreleased private data recovery
+
+Database/config opt-ins do not inherit from default-on source backup. Read-only
+SQLite metadata and owner-authored compatibility rules never execute migrations
+or grant generic SQL rollback. Rule checks before and after the source backup
+reduce drift; an external database is not part of the source transaction.
+
+Encrypted config uses dedicated private state and OS-only AES-256-GCM keys, with
+project/root/target/revision-bound associated data. Registered inputs must already
+be private, source-denied files. Owner-only preview is redacted; MCP/discover cannot
+configure, decrypt or restore those copies. Keys never travel in argv/config JSON
+or logs; OS-store failure has no plaintext fallback. Lost keys are unrecoverable.
+
+Restore writes an existing file in place after an encrypted before-copy and durable
+UNKNOWN receipt. A crash may leave partial bytes; it never silently retries or
+restarts services. Owner/context/content checks and same-user filesystem race
+limits apply. Key rotation retains old references; retention protects referenced
+backups and does not promise physical secure erasure. See [ADR 056](adr/056-owner-data-recovery.md).

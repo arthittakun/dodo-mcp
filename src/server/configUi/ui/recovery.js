@@ -75,6 +75,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
       try{p=await act('recovery.restore_preview',{...(kind.value==='sessions'?{sessionId:item.id}:{checkpointId:item.id}),...(selection.value.trim()?{paths:[selection.value.trim()]}:{}),exactMirror:kind.value==='checkpoints'&&mirror.checked});}
       catch(error){const status=el('p','ตรวจแผนไม่สำเร็จ: '+error.message,'wb-status');status.setAttribute('role','alert');preview.replaceChildren(status);return;}
       preview.replaceChildren(el('h4','ตรวจแผนก่อนกู้คืน'));preview.append(el('p',p.applicable?'ยังไม่มีการแก้ไฟล์ — ตรวจ diff แล้วจึงยืนยัน':'ยังไม่มีการแก้ไฟล์ — '+(p.unchanged?'ไฟล์ตรงกับจุดที่เลือกแล้ว':'พบ conflict ต้องตรวจไฟล์ก่อน')));
+      if(p.database)preview.append(el('p',`Database compatibility: ${p.database.state} · ${p.database.configured?'ใช้กติกาที่เจ้าของกำหนด':'ยังไม่ตั้ง adapter'} · ไม่มีการย้อนข้อมูล DB`,'wb-status'));
       for(const c of p.conflicts||[])preview.append(el('p',`${c.path}: ${c.reason}`,'wb-status'));
       for(const f of p.files||[]){const d=el('details');d.append(el('summary',`${f.action} · ${f.path} (${f.bytesBefore} → ${f.bytesAfter} bytes)`));d.append(el('pre',f.diff||'(ตรวจตามชนิดและ hash)'));d.append(el('p',`${f.beforeHash||'ไม่มีไฟล์'} → ${f.afterHash||'ลบไฟล์'}`,'muted'));preview.append(d);}
       if(!p.applicable)return;
@@ -86,7 +87,8 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
         sent=true;apply.hidden=true;
         try{
           const result=await act('recovery.restore_apply',{planId:p.planId,planHash:p.planHash,idempotencyKey:key,workspaceId:p.workspaceId,workspaceEpoch:p.workspaceEpoch,confirm:true});
-          preview.replaceChildren(el('h4','ผลกู้คืน'),el('p',`ตรวจสอบสำเร็จ · ${result.changesetId}`));
+          preview.replaceChildren(el('h4','ผลกู้คืน'),el('p',`ตรวจสอบ source สำเร็จ · ${result.changesetId}`));
+          if(result.databaseChangedDuringRestore)preview.append(el('p','ตรวจพบ schema เปลี่ยนระหว่างกู้ source ต้องให้เจ้าของตรวจความเข้ากันได้ก่อนใช้งาน · DODO ไม่ได้ย้อนข้อมูล DB','wb-status'));
         }catch(e){preview.append(el('p','ยังไม่ยืนยันว่ากู้คืนสำเร็จ: '+e.message+' · ตรวจสถานะก่อนสั่งใหม่','wb-status'));}
       });
       preview.append(apply,button('ตรวจสถานะแผนนี้',()=>showStatus(p.planId)));

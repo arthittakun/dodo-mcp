@@ -215,8 +215,8 @@ dodo recovery mark stable SNAPSHOT_ID --revision REVIEWED_REVISION --workspace W
 
 After browser reconnect, refresh evidence and query the existing restore receipt.
 Do not repeat uncertain effects. These are private owner controls; MCP/public
-HTTP has no mark/pin/purge endpoint. Deployment is **NOT_CONFIGURED** and database
-recovery is **NOT_SUPPORTED** in this source-only phase. Windows/Android and live
+HTTP has no mark/pin/purge endpoint. Without an owner-registered deployment target its state is **NOT_CONFIGURED**;
+database row rollback remains **NOT_SUPPORTED**. Optional adapters are described below. Windows/Android and live
 production recovery require their own acceptance; results from macOS/Linux
 fixtures are not substitutes.
 
@@ -322,3 +322,124 @@ These guards apply to this adapter. Generic shell commands, owner terminals and
 external CI can still change production independently. Historical known-good is
 not a continuous live health monitor. No live owner production deployment or
 manual platform acceptance is implied by disposable automated fixtures.
+
+## Database awareness and encrypted private config (unreleased working source)
+
+Source recovery remains enabled by default for registered projects. **Database
+inspection and secret-file backup remain separate owner opt-ins.** Nothing connects
+to a database, reads a secret or creates an encryption key merely because source
+backup is on. These controls are under **Projects → Database / Private config**;
+they are not MCP operations.
+
+### Read-only migration compatibility
+
+The first adapter supports an existing, project-relative SQLite `.db`, `.sqlite`
+or `.sqlite3` file and an ordinary migration table with a string ID column. Choose
+the exact file/table/column and explicitly permit metadata access. There is no
+remote SQL endpoint, credential field, arbitrary query or database rollback API.
+Readiness checks canonical file identity, links, sidecars and bounded IDs. File
+replacement requires a new owner review; a missing/changed schema is not success.
+
+For a source checkpoint, the owner specifies required migration IDs and whether
+extra IDs are allowed. This rule is bound to the checkpoint manifest and target
+revision. SQL text, repository instructions and AI guesses do not create a rule.
+A bound rule protects its checkpoint from retention. Use the owner-only
+**ถอนกติกาของ checkpoint นี้** control or `database unbind --file ...` with
+`{"targetId":"TARGET_ID","expectedRevision":1,"checkpointId":"CHECKPOINT_ID","confirmCompatibilityRemoval":true}`
+to remove the rule and its retention reference; fresh previews then return UNKNOWN.
+`COMPATIBLE` means only that the **explicit owner's ID rule** matched; it does not
+prove arbitrary application/data compatibility. No adapter or rule means
+`UNKNOWN`. The default rule blocks source restore when unknown/incompatible; the
+owner can explicitly choose a warning-only policy for that target.
+
+Source restore shows bounded compatibility, checks it again under the mutation
+queue and after the mandatory pre-restore backup. Changed evidence invalidates a
+preview. The database is external to the source transaction: another process can
+still migrate it during a write. A final observation reports that drift without
+silently undoing source or data. Quotas/orders/customer records and migration rows
+are not restored; no up/down migration is executed. Generic `run_command` SQL is
+not a fully audited or reversible database operation. Database rollback/PITR is
+`NOT_SUPPORTED`; arrange backups with the database operator separately.
+
+Private owner CLI examples (review the JSON, never put credentials in it):
+
+```sh
+dodo recovery database targets
+dodo recovery database configure --file /absolute/path/database-target.json --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery database inspect TARGET_ID --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery database bind --file /absolute/path/checkpoint-rule.json --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+Target JSON:
+
+```json
+{"expectedRevision":0,"enabled":true,"confirmReadOnlyAccess":true,"definition":{"name":"App migrations","adapter":"sqlite-migration-table","databaseFile":"data/app.sqlite","table":"migrations","column":"id","onMismatch":"block"}}
+```
+
+Checkpoint rule JSON:
+
+```json
+{"targetId":"TARGET_ID","expectedRevision":1,"checkpointId":"CHECKPOINT_ID","requiredMigrationIds":["001_initial"],"allowExtra":false,"confirmCompatibilityRule":true}
+```
+
+### Private configuration backup
+
+Register an existing private file such as `.env`, by exact project-relative path.
+It must already be denied to source tools and private to the OS user, with no
+symlink/hardlink/alias and at most 1 MiB. DODO does not chmod the workspace or
+expand source permissions. The owner UI/CLI never accepts or displays its contents.
+
+Each target gets a random AES-256 key in **macOS Keychain**, **Windows Credential
+Manager**, or **Linux Secret Service**. The backup store contains authenticated
+AES-256-GCM ciphertext and opaque key references in private state, separately from
+source CAS/Git. Fresh nonces and associated data bind project/root, target,
+revision and backup ID. Keys travel to the OS helper over stdin, never argv/config
+JSON/logs. No session/plaintext fallback exists. Unlock/setup the OS store locally;
+headless Linux without `secret-tool` and an available Secret Service cannot use
+this opt-in feature. Android currently has no reviewed recovery-key provider.
+
+Use **สำรอง config ตอนนี้** to capture, **ตรวจแผนคืน config** to review redacted sizes
+and impact, then explicitly confirm the exact plan. Stop any dependent program
+before restoring. DODO encrypts a pre-restore copy before the first write, checks
+live owner/context/hash/identity again and reads back the result. It preserves the
+existing private file and writes **in place**, not by an atomic file swap. A crash
+may leave a partial file; the durable receipt then says `UNKNOWN`. Repeating that
+plan never rewrites. Inspect locally and make a fresh reviewed plan from the
+listed encrypted pre-restore backup. DODO never restarts a service automatically.
+
+Rotating a key invalidates old previews. New backups use the new OS key; old
+backups still require their original key and are not silently re-encrypted. **A
+lost OS key makes those backups unrecoverable.** State copies alone are not a
+portable/disaster backup. Secure OS key-store recovery is the owner's separate
+responsibility; DODO offers no plaintext key export. Same-user processes and
+administrators remain outside this storage isolation guarantee.
+
+Separate retention defaults to 10 backups per target (2–100). Lowering it deletes
+only older unreferenced ciphertext rows. Restore plans/receipts protect their
+source/pre-restore backups, even above the count. Keys are not automatically
+removed from the OS store. There are at most 10 targets, 32 MiB of plaintext-size
+accounted ciphertext per project and 1,000 restore reviews; reaching a bound
+refuses new work instead of silently evicting recovery evidence. Disabling a
+missing target is allowed and retains its backups. Database/config settings have
+independent revisions and do not grant AI any additional access.
+
+```sh
+dodo recovery private-config list
+dodo recovery private-config configure --file /absolute/path/private-config-target.json --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery private-config backup TARGET_ID --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery private-config preview BACKUP_ID --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery private-config apply PLAN_ID --hash PLAN_HASH --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+dodo recovery private-config rotate TARGET_ID --revision REVIEWED_REVISION --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+Registration JSON contains only metadata:
+
+```json
+{"expectedRevision":0,"enabled":true,"confirmEncryptedPrivateBackup":true,"definition":{"name":"App config","path":".env","retention":10}}
+```
+
+Do not put secret values into that JSON, an MCP argument, screenshots or chat.
+Anonymous/OAuth calls cannot use these owner controls; public MCP has no admin
+routes. Existing private owner expiry, Host/Origin, project context and rate limits
+remain in force. Automated fixtures and manual provider/platform tests are reported
+separately in [TEST_REPORT](TEST_REPORT.md) and [MANUAL_ACCEPTANCE](MANUAL_ACCEPTANCE.md).

@@ -724,3 +724,31 @@ screenshots are automated evidence, not manual owner acceptance. The first local
 Docker build failed because its daemon was off; the completed container gate above
 was run after starting Docker. Early test-fixture mistakes were corrected without
 relaxing security/schema assertions and remain in private logs.
+
+## Unreleased deployment/data recovery candidates — 2026-09-20
+
+R05 source fingerprint `sha256:548622178672a0baf317c33db634d17e33a1d28595781c48d9e18c4a4020b5c5`:
+macOS core135files910total874passed36skipped0failed; packaging17/17. Native Linux
+Node22+24 in run35503836757 each868passed42skipped0failed; packaging17/17,
+benchmark7/7, production audit0 and fresh tarball installPASS. All gate commands
+exit0. Disposable actual Docker acceptance separately passed (26.12s), including
+source/image tampering, unhealthy deployment, exact image rollback, source restore,
+unchanged SQLite/private volume data and reviewed probe/image cleanup.
+
+Initial R06 source fingerprint `sha256:77595e3557db592479fcb32c41324d2fdd7f441d10560622343c9f13a040a4c5`:
+macOS Node22 core141files929total892passed37skipped0failed; packaging17/17,
+benchmark7/7,audit0,fresh tarball installPASS; all gate commands exit0. Browser
+fixture exercises SQLite registration, encrypted config backup/redacted review/
+restore, real file read-back, CLI and desktop/narrow layouts. Crypto fixtures use
+an explicitly injected key store; a separate actual macOS Keychain random-item
+put/read/delete test also passed. Helper protocol fixtures cover secret stdin,
+fixed references and failure behavior for macOS/Windows/Linux.
+
+These snapshots predate final combined changes and are not release authorization.
+Native Windows R04 focus35503022077 used native .NET ACL checks (20checks718ms),
+75/78passed;3failures remained in drift tests. The earlier full Windows run failed.
+Those failures remain recorded and are not replaced with skipped assertions.
+Subsequent fixes require new exact-source native gates. Live owner production,
+manual ChatGPT, Linux Secret Service and Windows Credential Manager acceptance
+are MANUAL_NOT_RUN unless a later result explicitly records them. Database row
+rollback/PITR is NOT_SUPPORTED; no such result is implied by source recovery.

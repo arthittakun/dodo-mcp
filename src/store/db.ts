@@ -664,6 +664,21 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
    CREATE TABLE recovery_deployment_reviews (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
      kind TEXT NOT NULL, payload TEXT NOT NULL, digest TEXT NOT NULL, expires_at INTEGER NOT NULL,
      result_json TEXT);`,
+  `CREATE TABLE recovery_database_targets (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     revision INTEGER NOT NULL, enabled INTEGER NOT NULL, definition TEXT NOT NULL, file_identity TEXT NOT NULL);
+   CREATE TABLE recovery_database_bindings (target_id TEXT NOT NULL REFERENCES recovery_database_targets(id),
+     snapshot_id TEXT NOT NULL REFERENCES recovery_snapshots(id), target_revision INTEGER NOT NULL,
+     manifest_hash TEXT NOT NULL, expected_ids TEXT NOT NULL, allow_extra INTEGER NOT NULL,
+     PRIMARY KEY(target_id,snapshot_id));`,
+  `CREATE TABLE recovery_config_targets (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     revision INTEGER NOT NULL, enabled INTEGER NOT NULL, payload TEXT NOT NULL, key_ref TEXT NOT NULL);
+   CREATE TABLE recovery_config_backups (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     target_id TEXT NOT NULL REFERENCES recovery_config_targets(id), target_revision INTEGER NOT NULL,
+     key_ref TEXT NOT NULL, sealed TEXT NOT NULL, bytes INTEGER NOT NULL, created_at INTEGER NOT NULL);
+   CREATE TABLE recovery_config_restores (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     target_id TEXT NOT NULL REFERENCES recovery_config_targets(id), snapshot_id TEXT NOT NULL REFERENCES recovery_config_backups(id),
+     before_id TEXT REFERENCES recovery_config_backups(id), payload TEXT NOT NULL, hash TEXT NOT NULL,
+     state TEXT NOT NULL, result TEXT);`,
 ];
 
 /**
