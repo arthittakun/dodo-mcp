@@ -286,7 +286,8 @@ jobs:
         env:
           TEMP: ${{ runner.temp }}
           TMP: ${{ runner.temp }}
-        run: node scripts/windows-focus.mjs
+        # npm supplies npm_execpath for shell-free nested npm on Windows.
+        run: npm exec --no -- node scripts/windows-focus.mjs
       - name: Summarize Windows evidence
         id: windows_summary
         if: always()
