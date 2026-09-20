@@ -7,7 +7,7 @@ import type { Limits } from '../../config/limits.js';
 import type { Store, ChangesetRow, JournalStepRow } from '../../store/store.js';
 import { sha256Bytes, newId, digestOf } from '../../util/hash.js';
 import type { StoredPlan, PlanFileChange, FileConflict } from './types.js';
-import { renameWithRetry, retryWindowsFs } from '../../platform/fsRetry.js';
+import { retryWindowsFs } from '../../platform/fsRetry.js';
 import { assertPrivatePath, ensurePrivateDirectory } from '../../platform/privateFs.js';
 
 interface ApplyInput { planId: string; planHash: string; workspaceId: string; epoch: string; principal: string }
@@ -197,7 +197,7 @@ export class Applier {
           this.store.setChangesetStatus(changesetId, 'failed', 'apply failed; attempted changes reverted');
           throw err instanceof DodoError
             ? err
-            : new DodoError('INTERNAL_ERROR', `apply failed at ${f.path}`, { detail: { path: f.path } });
+            : new DodoError('INTERNAL_ERROR', `apply failed at ${f.path}`, { detail: { path: f.path }, cause: err });
         }
         this.store.setChangesetStatus(changesetId, 'recovery_required', `apply failed at ${f.path}; revert incomplete`);
         throw new DodoError('PARTIAL_RECOVERY_REQUIRED', 'apply failed and automatic revert could not restore every file', {
@@ -353,13 +353,19 @@ export class Applier {
         break;
       }
       case 'delete': {
-        retryWindowsFs(() => fs.unlinkSync(abs));
+        retryWindowsFs(() => {
+          if(this.verifyPreState(f))throw new DodoError('FILE_CHANGED','file changed before delete retry');
+          fs.unlinkSync(abs);
+        });
         fsyncDir(path.dirname(abs));
         break;
       }
       case 'move': {
         const dest = this.wfs.absOf(f.destPath as string);
-        renameWithRetry(abs, dest);
+        retryWindowsFs(() => {
+          if(this.verifyPreState(f))throw new DodoError('FILE_CHANGED','file changed before move retry');
+          fs.renameSync(abs, dest);
+        });
         fsyncDir(path.dirname(abs));
         if (path.dirname(dest) !== path.dirname(abs)) fsyncDir(path.dirname(dest));
         break;
@@ -403,7 +409,10 @@ export class Applier {
           }
           case 'create': {
             if (this.guardedHash(f.path) === f.afterHash) {
-              retryWindowsFs(() => fs.unlinkSync(abs));
+              retryWindowsFs(() => {
+                if(!this.matchesState(f,false))throw new DodoError('FILE_CHANGED','created file changed before compensation retry');
+                fs.unlinkSync(abs);
+              });
               fsyncDir(path.dirname(abs));
               for (const dir of [...(f.createParents ?? [])].reverse()) {
                 try {
@@ -436,7 +445,10 @@ export class Applier {
           case 'move': {
             const dest = this.wfs.absOf(f.destPath as string);
             if (this.guardedHash(f.destPath!) === f.afterHash && this.guardedHash(f.path) === null) {
-              renameWithRetry(dest, abs);
+              retryWindowsFs(() => {
+                if(!this.matchesState(f,false))throw new DodoError('FILE_CHANGED','moved file changed before compensation retry');
+                fs.renameSync(dest, abs);
+              });
               fsyncDir(path.dirname(abs));
               if (path.dirname(dest) !== path.dirname(abs)) fsyncDir(path.dirname(dest));
             } else {
@@ -591,12 +603,11 @@ function writeFileAtomic(abs: string, bytes: Buffer, mode: number, opts: { mustN
     const fd = fs.openSync(tmp, 'wx', mode);
     try { fs.writeFileSync(fd, bytes); if(process.platform!=='win32')fs.fchmodSync(fd,mode); fs.fsyncSync(fd); }
     finally { fs.closeSync(fd); }
-    opts.beforeReplace?.();
     if (opts.mustNotExist) {
       // Exclusive publication: rename would silently overwrite a new file.
-      retryWindowsFs(() => fs.linkSync(tmp, abs));
+      retryWindowsFs(() => {opts.beforeReplace?.();fs.linkSync(tmp, abs);});
       retryWindowsFs(() => fs.unlinkSync(tmp));
-    } else renameWithRetry(tmp, abs);
+    } else retryWindowsFs(() => {opts.beforeReplace?.();fs.renameSync(tmp, abs);});
     fsyncDir(dir);
   } finally {
     try { fs.unlinkSync(tmp); } catch { /* already published or never created */ }

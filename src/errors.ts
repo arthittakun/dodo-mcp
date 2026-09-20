@@ -57,9 +57,9 @@ export class DodoError extends Error {
   constructor(
     code: ErrorCode,
     message: string,
-    opts: { retryable?: boolean; recovery?: string; detail?: Record<string, unknown> } = {},
+    opts: { retryable?: boolean; recovery?: string; detail?: Record<string, unknown>; cause?: unknown } = {},
   ) {
-    super(message);
+    super(message, opts.cause === undefined ? undefined : { cause: opts.cause });
     this.name = 'DodoError';
     this.code = code;
     this.retryable = opts.retryable ?? false;

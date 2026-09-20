@@ -18,8 +18,9 @@ describe('native runtime contracts in a Thai/spaced workspace', () => {
       vi.spyOn(errors,'toDodoError').mockImplementation(error=>{
         // Capture unexpected fixture failures before production sanitization.
         // This file remains private; CI emits only allowlisted codes/frames.
-        if(!(error instanceof errors.DodoError))try{
-          fs.appendFileSync(path.join(directory,'native-runtime-private.jsonl'),JSON.stringify({stack:error instanceof Error?error.stack:'unknown',code:(error as NodeJS.ErrnoException)?.code})+'\n',{mode:0o600});
+        const cause=error instanceof errors.DodoError?error.cause:error;
+        if(cause)try{
+          fs.appendFileSync(path.join(directory,'native-runtime-private.jsonl'),JSON.stringify({stack:cause instanceof Error?cause.stack:'unknown',code:(cause as NodeJS.ErrnoException)?.code})+'\n',{mode:0o600});
         }catch{/* Diagnostics must not change the original tool response. */}
         return original(error);
       });
