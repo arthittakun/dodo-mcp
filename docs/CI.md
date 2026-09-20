@@ -69,11 +69,17 @@ Windows gate ต้องใช้ enabled Administrator token เพื่อ�
 
 Gate รัน build, typecheck, lint, full tests, packaging, DodoBench, production audit,
 immutable tarball และ fresh install โดยไม่เผยแพร่ npm
-ผลละเอียดอยู่บน runner ใน `release-evidence/ci/<run-id>-<attempt>/<platform>-node-<major>/`
-ซึ่งไม่ push/pack การ rerun ใช้ directory ใหม่ ไม่เขียนทับ report เก่า
+ผลละเอียดอยู่บน runner ใน `<runner-workspace>/.dodo-ci-evidence/<run-id>-<attempt>/<platform>-node-<major>/`
+นอก checkout เพื่อไม่ถูก checkout cleanup ลบ จึงไม่ push/pack การ rerun ใช้ directory
+ใหม่ ไม่เขียนทับ report เก่า Linux ย้ายสำเนา evidence แบบเก่าที่อยู่ใน checkout
+ออกไปก่อน cleanup หากยังมีอยู่ ไม่เขียนทับสำเนาที่มีแล้ว
 
 GitHub log/artifact รับเฉพาะ summary ที่เลือก scalar fields ไว้แล้ว ไม่อัปโหลด raw
-test output, keys หรือ state DB รายละเอียด probe ที่ fail เก็บไว้ให้เจ้าของอ่านบนเครื่อง
+test output, keys หรือ state DB กรณี test fail แสดงเฉพาะ path ของ test ใน repo,
+ลำดับ assertion (เริ่มที่ 0), หมายเลขบรรทัด และชนิด failure ไม่แสดงชื่อ test,
+expected/actual values, ข้อความ error หรือ stack ของเครื่อง รายละเอียด probe
+ที่ fail เก็บไว้ให้เจ้าของอ่านบนเครื่อง สรุป failure ก่อนหน้าแสดง revision/run ID
+ชัดเจน ไม่ปะปนกับผลรอบปัจจุบัน
 
 - `AUTOMATED_PASS`: gate ของ revision/platform นั้นผ่านครบ
 - `AUTOMATED_FAIL`: gate ล้มเหลว ดู step/summary และ private evidence

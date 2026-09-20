@@ -78,9 +78,10 @@ Strict gate รับ Linux evidence เฉพาะ `local-git` และ origi
 revision/source fingerprint/lock digest จึงไม่รับ uncommitted source หรือ Docker
 report เก่ามาแทน native CI Report บันทึก origin ตามจริง ไม่มีคำสั่งเหล่านี้ publish npm
 
-ผลทดสอบและ private diagnostics อยู่ใน runner ใต้ ignored `release-evidence/ci/`
-แยกตาม run ID/attempt/platform/Node ไม่เขียนทับหลักฐานจากการ rerun
-อัปโหลดเฉพาะ allowlisted summary ไม่ส่ง raw test logs หรือ private state ขึ้น artifact
+ผลทดสอบและ private diagnostics อยู่ใน runner ใต้ `.dodo-ci-evidence/` ข้าง checkout
+แยกตาม run ID/attempt/platform/Node ไม่เขียนทับหลักฐานจากการ rerun หรือ checkout cleanup
+อัปโหลดเฉพาะ allowlisted summary และตำแหน่ง failure ใน test source
+ไม่ส่ง raw test logs หรือ private state ขึ้น artifact
 
 ## Security invariants
 

@@ -97,6 +97,32 @@ export function matchPlatformEvidence(evidence, expected) {
   return { platform, origin };
 }
 
+/** Public diagnostics contain only existing test paths, assertion positions and
+ * numeric source lines. Test titles, messages, values and stacks stay private. */
+export function failureLocations(report, root) {
+  const locations = [];
+  let truncated = false;
+  for (const file of report.testResults ?? []) {
+    if (typeof file.name !== 'string') continue;
+    const relative = path.relative(root, file.name).replaceAll('\\', '/');
+    if (!/^tests\/(unit|integration|security|compatibility|packaging)\/[A-Za-z0-9_/-]+\.test\.ts$/.test(relative)
+      || !fs.existsSync(path.join(root, relative))) continue;
+    const failures = (file.assertionResults ?? []).flatMap((assertion, index) => assertion.status === 'failed' ? [{ assertion, index }] : []);
+    if (!failures.length && file.status === 'failed') failures.push({ assertion: {}, index: null });
+    for (const { assertion, index } of failures) {
+      if (locations.length === 32) { truncated = true; continue; }
+      const messages = (assertion.failureMessages ?? []).filter(message => typeof message === 'string').join('\n');
+      const frames = messages.replaceAll('\\', '/').matchAll(/(tests\/(?:unit|integration|security|compatibility|packaging)\/[A-Za-z0-9_/-]+\.test\.ts):(\d+)(?::\d+)?/g);
+      const lines = [...new Set([...frames].filter(frame => frame[1] === relative).map(frame => Number(frame[2])))]
+        .filter(line => Number.isSafeInteger(line) && line > 0).slice(0, 4);
+      const kind = index === null ? 'suite' : /timed out|timeout/i.test(messages) ? 'timeout'
+        : /AssertionError|expected .+ to /s.test(messages) ? 'assertion' : 'exception';
+      locations.push({ file: relative, assertionIndex: index, lines, kind });
+    }
+  }
+  return { locations, truncated };
+}
+
 function publicCounts(counts) {
   if (counts == null) return null;
   const result = {};

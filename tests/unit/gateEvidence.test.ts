@@ -7,12 +7,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 // The gate runs before build; its source is dependency-free ESM, not dist code.
 const moduleUrl = pathToFileURL(path.resolve('scripts/gate-evidence.mjs')).href;
-const { sourceFingerprint, testCounts, sanitizeGateReport, readAuditEvidence, matchPlatformEvidence } = await import(moduleUrl) as {
+const { sourceFingerprint, testCounts, sanitizeGateReport, readAuditEvidence, matchPlatformEvidence, failureLocations } = await import(moduleUrl) as {
   sourceFingerprint: (root: string) => string;
   testCounts: (value: unknown) => unknown;
   sanitizeGateReport: (value: unknown) => Record<string, unknown>;
   readAuditEvidence: (value: unknown) => { vulnerabilities: Record<string, number> };
   matchPlatformEvidence: (value: unknown, expected: Record<string, unknown>) => { platform: string; origin: string };
+  failureLocations: (value: unknown, root: string) => { locations: Record<string, unknown>[]; truncated: boolean };
 };
 const owned: string[] = [];
 function directory() { const p = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-gate-evidence-')); owned.push(p); return p; }
@@ -173,6 +174,28 @@ describe('allowlisted release evidence', () => {
     const noPlatform = platformReport(); noPlatform.platforms.linux = 'NOT_RUN';
     expect(() => matchPlatformEvidence(noPlatform, expectedCandidate())).toThrow();
     expect(() => matchPlatformEvidence(platformReport('win32'), expectedCandidate())).toThrow();
+  });
+
+  it('reports failure locations without publishing titles, expected values or host paths', () => {
+    const filename = path.resolve('tests/unit/gateEvidence.test.ts');
+    const failed = { status: 'failed', fullName: poison, failureMessages: [`AssertionError: ${poison}\n at ${filename}:12:3`] };
+    const output = failureLocations({ testResults: [{ name: filename, status: 'failed', assertionResults: [{ status: 'passed' }, failed] },
+      { name: `/private/${poison}/secret.test.ts`, status: 'failed', assertionResults: [failed] }] }, process.cwd());
+    expect(output).toEqual({ locations: [{ file: 'tests/unit/gateEvidence.test.ts', assertionIndex: 1, lines: [12], kind: 'assertion' }], truncated: false });
+    expect(JSON.stringify(output)).not.toContain(poison);
+    expect(JSON.stringify(output)).not.toContain(process.cwd());
+  });
+
+  it('bounds failure diagnostics and reports suite failures and timeouts distinctly', () => {
+    const filename = path.resolve('tests/unit/gateEvidence.test.ts');
+    const timeout = { status: 'failed', failureMessages: [`Test timed out: ${poison}`] };
+    const suite = failureLocations({ testResults: [{ name: filename, status: 'failed', assertionResults: [] }] }, process.cwd());
+    expect(suite.locations[0]).toMatchObject({ assertionIndex: null, kind: 'suite' });
+    const output = failureLocations({ testResults: [{ name: filename, assertionResults: Array.from({ length: 40 }, () => timeout) }] }, process.cwd());
+    expect(output.locations).toHaveLength(32);
+    expect(output.truncated).toBe(true);
+    expect(output.locations[0]).toMatchObject({ kind: 'timeout' });
+    expect(JSON.stringify(output)).not.toContain(poison);
   });
 
   it('CLI publishes only the summary and refuses to overwrite old evidence', () => {

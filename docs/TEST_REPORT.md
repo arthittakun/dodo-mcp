@@ -11,6 +11,11 @@ actionlint 1.7.12, typecheck, lint และ gate-evidence unit tests **23 passe
 รวมการปฏิเสธ Docker report, fingerprint/revision/lock ที่ไม่ตรง, dirty source,
 false pass และ fresh-install ที่ไม่ครบ ผลนี้ไม่ใช่ native Linux/Windows PASS
 
+Follow-up: diagnostics เพิ่มเฉพาะ test path/index/source line โดยไม่ส่ง raw error,
+titles หรือ expected/actual values และย้าย CI evidence ออกนอก checkout เพื่อไม่ถูก
+cleanup ลบ Typecheck/lint/actionlint และ gate-evidence tests **25 passed / 0 failed**
+ผ่านบน macOS หลังแก้ ส่วน native application test results ต้องดูแยกตาม CI run
+
 Native CI ของ candidate นี้: `NOT_RUN` จนกว่า workflow/source จะถูก push และรันจริง
 ผล Recovery/Docker ด้านล่างเป็นหลักฐานของ candidate รอบก่อนตาม fingerprint เดิม
 ไม่ยกให้เป็น native CI evidence ของ source ปัจจุบัน

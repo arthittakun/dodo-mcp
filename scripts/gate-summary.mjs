@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { sanitizeGateReport } from './gate-evidence.mjs';
+import { fileURLToPath } from 'node:url';
+import { sanitizeGateReport, failureLocations } from './gate-evidence.mjs';
 
 try {
   let directory, githubSummary = false;
@@ -13,6 +14,14 @@ try {
   if (!directory) throw new Error('input directory required');
   const report = JSON.parse(fs.readFileSync(path.join(directory, 'gate-report.json'), 'utf8'));
   const summary = sanitizeGateReport(report);
+  if (summary.status === 'AUTOMATED_FAIL') {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+    summary.failures = {};
+    for (const suite of ['core', 'packaging']) {
+      const filename = path.join(directory, `${suite}-tests.json`);
+      if (fs.existsSync(filename)) summary.failures[suite] = failureLocations(JSON.parse(fs.readFileSync(filename, 'utf8')), root);
+    }
+  }
   fs.writeFileSync(path.join(directory, 'public-summary.json'), `${JSON.stringify(summary, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
   if (githubSummary && process.env['GITHUB_STEP_SUMMARY']) {
     fs.appendFileSync(process.env['GITHUB_STEP_SUMMARY'], `### ${summary.host.platform} ${summary.host.node}\n\n- Status: ${summary.status}\n- Revision: ${summary.source.revision}\n- Fresh install: ${summary.freshInstall}\n- Manual: ${summary.manual}\n`);

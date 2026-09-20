@@ -38,8 +38,17 @@ jobs:
     env:
       CI: "1"
       DODO_TEST_REQUIRE_LINUX_MEDIA: "1"
-      DODO_CI_EVIDENCE: ${{ github.workspace }}/release-evidence/ci/${{ github.run_id }}-${{ github.run_attempt }}/linux-node-${{ matrix.node }}
+      DODO_CI_EVIDENCE: ${{ github.workspace }}/../.dodo-ci-evidence/${{ github.run_id }}-${{ github.run_attempt }}/linux-node-${{ matrix.node }}
     steps:
+      - name: Preserve prior Linux evidence outside the checkout
+        run: |
+          umask 077
+          previous="$GITHUB_WORKSPACE/release-evidence/ci"
+          saved="$GITHUB_WORKSPACE/../.dodo-ci-evidence"
+          if test -d "$previous"; then
+            mkdir -p "$saved"
+            cp -an "$previous/." "$saved/"
+          fi
       - name: Checkout owner-selected revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -50,6 +59,32 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
+      - name: Report prior failed test locations without raw logs
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import { failureLocations, sanitizeGateReport } from './scripts/gate-evidence.mjs';
+          const root = process.env.GITHUB_WORKSPACE;
+          const base = path.resolve(root, '../.dodo-ci-evidence');
+          if (fs.existsSync(base)) {
+            const runs = fs.readdirSync(base).filter(name => /^\d+-\d+$/.test(name)).sort((a, b) => b.localeCompare(a, 'en', { numeric: true })).slice(0, 3);
+            for (const run of runs) for (const major of [22, 24]) {
+              const directory = path.join(base, run, `linux-node-${major}`);
+              const file = path.join(directory, 'gate-report.json');
+              if (!fs.existsSync(file)) continue;
+              try {
+                const summary = sanitizeGateReport(JSON.parse(fs.readFileSync(file, 'utf8')));
+                if (summary.status !== 'AUTOMATED_FAIL') continue;
+                for (const suite of ['core', 'packaging']) {
+                  const tests = path.join(directory, `${suite}-tests.json`);
+                  if (fs.existsSync(tests)) console.log(JSON.stringify({ previousRun: run, revision: summary.source.revision, node: summary.host.node, suite,
+                    ...failureLocations(JSON.parse(fs.readFileSync(tests, 'utf8')), root) }));
+                }
+              } catch { console.log('[prior-gate] invalid evidence; diagnostics withheld'); }
+            }
+          }
+          JS
       - name: Verify native Linux runner prerequisites
         run: |
           test "$RUNNER_OS" = Linux
@@ -109,6 +144,7 @@ jobs:
         with:
           name: linux-node-${{ matrix.node }}-summary
           path: ${{ env.DODO_CI_EVIDENCE }}/public-summary.json
+          include-hidden-files: true # Exact allowlisted file only, not its directory.
           if-no-files-found: error
           retention-days: 7
 
@@ -134,7 +170,7 @@ jobs:
     env:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
       DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
-      DODO_CI_EVIDENCE: ${{ github.workspace }}/release-evidence/ci/${{ github.run_id }}-${{ github.run_attempt }}/windows-node-${{ matrix.node }}
+      DODO_CI_EVIDENCE: ${{ github.workspace }}/../.dodo-ci-evidence/${{ github.run_id }}-${{ github.run_attempt }}/windows-node-${{ matrix.node }}
     steps:
       - name: Prepare Git for Windows before checkout
         run: |
@@ -241,5 +277,6 @@ jobs:
         with:
           name: windows-node-${{ matrix.node }}-summary
           path: ${{ env.DODO_CI_EVIDENCE }}/public-summary.json
+          include-hidden-files: true # Exact allowlisted file only, not its directory.
           if-no-files-found: error
           retention-days: 7
