@@ -10,9 +10,9 @@ on:
         type: choice
         required: true
         default: windows
-        options: [windows, linux, all, windows-diagnostics, windows-focus]
+        options: [windows, linux, all, windows-diagnostics, linux-diagnostics, windows-focus]
       evidence_run:
-        description: Prior run-attempt to inspect (Windows diagnostics only)
+        description: Prior run-attempt to inspect (native diagnostics only)
         type: string
         required: false
 
@@ -26,6 +26,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  linux-diagnostics:
+    name: Inspect retained Linux evidence
+    if: github.event_name == 'workflow_dispatch' && inputs.platform == 'linux-diagnostics'
+    runs-on: [self-hosted, Linux, X64, linux-ci]
+    timeout-minutes: 10
+    env:
+      DODO_INSPECT_RUN: ${{ inputs.evidence_run }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Inspect allowlisted progress without publishing private logs
+        run: node scripts/inspect-private-gate.mjs
+
   windows-diagnostics:
     name: Inspect retained Windows evidence
     if: github.event_name == 'workflow_dispatch' && inputs.platform == 'windows-diagnostics'

@@ -42,3 +42,26 @@ export function focusedFailureDetails(report, root) {
   });
   return { locations, truncated: allowed.truncated };
 }
+
+/** Inspect only the fresh-install section, returning fixed labels/codes and
+ * repository line numbers. Never publish a raw stack, message, path or value. */
+export function freshInstallFailureDetails(log, root) {
+  const start = log.lastIndexOf('scripts/release-smoke.mjs --tarball');
+  if (start < 0) return null;
+  const text = stripVTControlCharacters(log.slice(start, start + 160000)).replaceAll('\\', '/');
+  const labels = [
+    ['npm-install', 'fresh npm install failed'], ['cli-version', 'installed CLI version smoke failed'],
+    ['oauth', 'OAuth '], ['tool-call', 'MCP tool failed:'], ['connection', 'fetch failed'],
+    ['target-routing', 'installed target routing failed'], ['agent', 'installed agent target/receipt smoke failed'],
+    ['recovery-activation', 'installed project default Recovery is not active'],
+    ['recovery-restore', 'installed source recovery/replay/isolation smoke failed'],
+    ['recovery-stale', 'installed restart accepted stale Recovery context'],
+    ['recovery-receipt', 'installed restore receipt did not survive restart'],
+    ['assets', 'installed UI asset missing'], ['catalog', 'surface count mismatch'],
+  ].filter(([, literal]) => text.includes(literal)).map(([label]) => label);
+  const allowed = new Set([...fs.readFileSync(path.join(root,'src/errors.ts'),'utf8').matchAll(/^  '([A-Z_]+)',?$/gm)].map(m=>m[1]));
+  for (const code of ['ECONNRESET','ECONNREFUSED','UND_ERR_SOCKET','EADDRINUSE','ENOENT','EPERM','EACCES','ETIMEDOUT']) allowed.add(code);
+  const codes = [...new Set([...text.matchAll(/\b[A-Z][A-Z_]{2,63}\b/g)].map(m=>m[0]).filter(code=>allowed.has(code)))];
+  const lines = [...new Set([...text.matchAll(/scripts\/release-smoke-worker\.mjs:(\d+):\d+/g)].map(m=>Number(m[1])))].slice(0,12);
+  return { labels, codes, workerLines: lines };
+}

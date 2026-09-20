@@ -2,9 +2,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const { partialTestProgress, focusedFailureDetails } = await import(pathToFileURL(path.resolve('scripts/gate-progress.mjs')).href) as {
+const { partialTestProgress, focusedFailureDetails, freshInstallFailureDetails } = await import(pathToFileURL(path.resolve('scripts/gate-progress.mjs')).href) as {
   partialTestProgress: (log: string, root: string) => { complete: boolean; files: Record<string, unknown>[]; truncated: boolean };
   focusedFailureDetails: (report: unknown, root: string) => { locations: Record<string, unknown>[] };
+  freshInstallFailureDetails: (log: string, root: string) => unknown;
 };
 const file = 'tests/unit/gateProgress.test.ts';
 describe('bounded partial gate diagnostics', () => {
@@ -26,5 +27,12 @@ describe('bounded partial gate diagnostics', () => {
     expect(output.locations[0]).toMatchObject({ errorCodes: ['RECOVERY_REQUIRED', 'EPERM'], frames: [{ file: 'src/services/recovery/storage.ts', line: 22 }] });
     expect(JSON.stringify(output)).not.toContain('SYNTHETIC_SECRET');
     expect(JSON.stringify(output)).not.toContain(process.cwd());
+  });
+  it('classifies installed-package failures without exporting private diagnostics',()=>{
+    const log='earlier MCP tool failed: FORBIDDEN\nnode scripts/release-smoke.mjs --tarball /private/SECRET.tgz\nTypeError: fetch failed\n at /private/SECRET/scripts/release-smoke-worker.mjs:185:3\n cause: UND_ERR_SOCKET private-token-value\n';
+    const result=freshInstallFailureDetails(log,process.cwd());
+    expect(result).toEqual({labels:['connection'],codes:['UND_ERR_SOCKET'],workerLines:[185]});
+    expect(JSON.stringify(result)).not.toMatch(/SECRET|private|token/);
+    expect(freshInstallFailureDetails('no smoke invocation',process.cwd())).toBeNull();
   });
 });

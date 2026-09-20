@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { sanitizeGateReport, failureLocations } from './gate-evidence.mjs';
+import { freshInstallFailureDetails } from './gate-progress.mjs';
 
 try {
   let directory, githubSummary = false;
@@ -17,6 +18,8 @@ try {
   if (summary.status === 'AUTOMATED_FAIL') {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
     summary.failures = {};
+    const log=path.join(directory,'gate.log');
+    if(fs.existsSync(log)&&fs.statSync(log).size<=80*1024*1024)summary.failures.freshInstall=freshInstallFailureDetails(fs.readFileSync(log,'utf8'),root);
     for (const suite of ['core', 'packaging']) {
       const filename = path.join(directory, `${suite}-tests.json`);
       if (fs.existsSync(filename)) summary.failures[suite] = failureLocations(JSON.parse(fs.readFileSync(filename, 'utf8')), root);
