@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BrainNode, BrainQueryResult, BrainStatus } from '../../src/services/brain/contracts.js';
 import { callToolLegacy, launch, obtainToken, type TestContext, type TokenSet } from '../helpers/testServer.js';
 import { assertOk, tool } from '../helpers/multimodal.js';
@@ -27,10 +27,14 @@ describe('Phase 05 Project Brain over real HTTP + OAuth', () => {
       '.env': 'DODO_SECRET=never-index\n',
       'package.json': JSON.stringify({ dependencies: { zod: '^4.2.0' }, devDependencies: { vitest: '^5.0.0' } }),
     } });
+    // This group asserts the counters for one manual run. Keep the automatic
+    // timer from doing the same edit first (or replacing metrics before wait
+    // returns) under load; all parsing/indexing and HTTP security remain real.
+    vi.spyOn(ctx.server.services.brain! as unknown as {autoIndex():Promise<void>},'autoIndex').mockResolvedValue(undefined);
     await build(ctx, 'full');
     token = await obtainToken(ctx);
   }, 120_000);
-  afterAll(async () => ctx?.cleanup());
+  afterAll(async () => {await ctx?.cleanup();vi.restoreAllMocks();});
   const call = (name: string, args: Record<string, unknown> = {}) => tool(ctx, token.accessToken, name, args);
 
   it('reports a fresh bounded index and exposes it from project_overview', async () => {

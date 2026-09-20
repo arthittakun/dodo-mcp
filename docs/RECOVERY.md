@@ -1,0 +1,221 @@
+# Source Recovery (unreleased working source)
+
+This describes the R01–R04 implementation in the development checkout. It is not
+a claim that the published npm package includes it. Reviewed restore is implemented;
+release still requires final gates and an explicit owner release request.
+
+Registered projects default to automatic source backups on first activation.
+Existing projects without a Recovery policy also default to enabled; an explicit
+owner opt-out persists. Merely starting DODO from an arbitrary directory does
+not scan that directory, the launcher workspace, or your home directory.
+
+In Local Config, select a project and open **Recovery · สำรอง source**. The card
+shows initializing, ready, blocked, or disabled by owner, the last saved
+checkpoint (integrity checked at capture), included/excluded counts and logical project storage. Advanced
+settings cover the project's quota, retention, and relative runtime/data roots.
+Installation storage/free-space limits are under Settings → system JSON →
+`recovery`. Changing that configuration never grants access to source or commands.
+
+From the registered project's directory, while its server is running:
+
+```sh
+dodo recovery status
+dodo recovery checkpoint
+dodo recovery configure --enabled false --yes
+dodo recovery configure --enabled true --yes
+```
+
+These commands use private owner IPC. There are no public MCP tools for changing
+Recovery policy. Disabling requires owner confirmation, is audited, preserves
+old points and does not turn off the existing file journal. Re-enabling schedules
+a new baseline; saving a preference alone does not mean a backup has completed.
+
+Writes and directory creation capture their targets before mutation. Commands,
+verification recipes, runtime/media jobs, schedules, and Git commits capture the
+source scope before executing. These paths keep the shared project mutation queue,
+authorization, hash/conflict and sandbox checks. A caller cannot bypass backups
+by hiding an operation from discover or selecting a more permissive trust mode.
+
+Backups hold actual independent bytes, modes and existence tombstones in private
+`recovery/objects`, with versioned manifests and SQLite references separate from
+resource/media cache. No working Git repository, branch or commit is modified, and nothing is pushed.
+Independent private Git copies are described below.
+Deleting a working file does not delete its backup. Hash verification and a source
+rescan precede readiness. Corruption, changing files, scan limits, insufficient
+disk space or a failed backup stop the pending source mutation.
+
+Defaults: 5 GiB of referenced objects per project, 20 GiB physical objects per
+installation, 500 MiB free-space floor, 30 days/200 unpinned points, 64 MiB per
+file, and 100,000 scanned entries. Reservations account for concurrent projects
+and temporary copies. Content is deduplicated; the newest full baseline, newest
+point and pinned points are retained. Unreferenced objects/staging have a 24-hour
+grace period and are collected only without active captures. Storage reclamation
+can therefore require waiting or extra space; it never evicts protected points
+just to allow another write.
+
+This is **source-only coverage**. Default exclusions include secret/protected
+paths, `.git`, dependencies/build/cache directories, database/dump/log files and
+owner-declared data roots. Ordinary ignore rules reduce baseline scanning; an
+explicit allowed source target is captured even if ordinarily ignored. Explicit
+targets excluded by the source/data policy are refused while protection is on.
+Do not interpret this as a backup of databases, volumes, secrets, OS settings,
+Desktop/ADB effects or remote systems.
+
+Credential screening is bounded and heuristic, not a guarantee that every
+secret is recognizable. Backup storage has the same private filesystem/ACL
+requirements as DODO state. It is not protected against an administrator or the
+same OS owner intentionally tampering with both data and metadata.
+
+A checkpoint is not an atomic filesystem-wide snapshot. DODO queues its own
+writers but cannot stop an IDE or unrelated process. It verifies paths, identity,
+hashes and inventory; detected drift fails closed. Modes are preserved, not all
+ACLs/xattrs/alternate streams. On Windows directory fsync is unavailable; native
+Windows acceptance for this new subsystem has not been performed.
+
+An abrupt restart marks incomplete captures as incomplete, releases only the
+leased project's abandoned reservation, and rebuilds/rechecks the active
+baseline. It never repeats a command. It cannot recover source lost before the
+first complete backup. Use the reviewed flow below rather than copying private
+backup objects directly into the workspace.
+
+## Preview and restore
+
+On the selected project's Recovery card, choose checkpoint or session history,
+optionally select a relative file/directory, then click **ดู preview**. Review the
+create/modify/delete list, diffs, hashes and conflicts before **กู้คืนตามแผนนี้**.
+Confirmation applies only that immutable plan. Changed files refuse the selection;
+there is no force overwrite or automatic merge. Use the journal status button
+after reconnect or an uncertain response, rather than sending another apply.
+
+CLI (private owner IPC; capture the IDs from preview):
+
+```sh
+dodo recovery list
+dodo recovery list --sessions
+dodo recovery preview SNAPSHOT_ID --path src
+dodo recovery preview SESSION_ID --session
+dodo recovery apply PLAN_ID --hash PLAN_HASH --key SAME_RETRY_KEY --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+`--exact-mirror` is an explicit preview option for a full-source checkpoint. It
+includes deletion of extra allowed source files. The default preserves unrelated
+extras; excluded secrets, databases, runtime data and volumes remain excluded.
+Recovery must be enabled to apply, so a verified pre-restore backup is mandatory.
+Binary source files are restored as exact bytes within the existing file/plan
+budgets. Oversized selections fail with a smaller-selection hint, never truncate.
+
+MCP full operations: `checkpoint_list`, `checkpoint_inspect`, `checkpoint_create`,
+`recovery_session_list`, `recovery_session_inspect`, `recovery_session_begin`,
+`recovery_session_end`, `restore_preview`, `restore_apply`, `restore_status`.
+Use the existing `dodo_read` and `dodo_write` compact gateways and discover schemas.
+Full catalog: 148 capabilities (144 with sub-agents hidden); Compact remains 20.
+Gateway arguments cannot override top-level workspace/project/recovery context.
+
+For several edits belonging to one task, call `recovery_session_begin`, then pass
+its `sessionId` as top-level `recoverySessionId` on each mutation. Close it with
+`recovery_session_end`. Calls without this context retain automatic before-images
+in separate implicit sessions. Different conversations are never guessed to be
+one task. Session undo preserves pre-existing dirty/untracked files and coalesces
+repeated edits, moves, creations and deletions; external/interleaved edits conflict.
+Shell jobs have unknown authorship: session-wide undo is refused when jobs appear,
+but a specific checkpoint can still be reviewed. External effects are never undone.
+
+Only your own historical records are exposed over MCP, under current target ACLs.
+Private owner controls can review other callers' records. Session/snapshot/plan
+IDs grant no permission. Inspect mode still requires approval of the exact restore
+plan; read-only clients cannot restore. Old journal-only `rollback_changes` and
+`dodo recover` remain available. Directory journal changes use the reviewed recovery
+flow; directories created implicitly as file parents may be retained conservatively.
+Existing directories whose permission modes differ from the checkpoint require
+owner review and produce a conflict; this version does not silently chmod them.
+Missing structural parents of a selected directory appear as explicit creations
+in preview. Parents outside the selection use the normal default directory mode.
+
+After restart, sessions are interrupted and old previews expire. Create a fresh
+context/preview for new recovery. A completed retry returns the original receipt;
+a key with uncertain outcome reports recovery-required without repeating writes.
+Closed history obeys retention, while open/interrupted sessions, unresolved changes,
+active jobs, pinned points and unexpired plans retain their backup references.
+
+## External changes and Git copies (unreleased R03 candidate)
+
+DODO now keeps the **expected source state** separately from its snapshots. When a mutation target was changed outside the journal, the write fails with `FILE_CHANGED` even when the caller rereads its new hash. Other non-conflicting file edits remain possible. Significant source drift blocks new commands until the owner reviews it. Defaults: at least 20 changed files and more than 20% of the baseline, or 10 deletions. Commands still run under the existing exec/sandbox policy; backups cannot undo database or volume effects.
+
+In the project's Recovery card choose **ตรวจไฟล์และเปรียบเทียบ**. The comparison shows paths and before/observed hashes, with pagination, not raw credential/file contents. **ยอมรับสถานะที่ตรวจนี้** accepts exactly the reviewed state; it neither restores files nor marks tests as passed. To restore previous source instead, use the existing checkpoint/session preview and confirm that exact plan.
+
+Equivalent owner terminal flow:
+
+```sh
+dodo recovery scan --limit 50
+# If nextCursor is present:
+dodo recovery scan --cursor 50 --limit 50
+# Only after reviewing the digest and current project context:
+dodo recovery acknowledge 'sha256:THE_REVIEWED_DIGEST' --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+MCP can call `restore_status` with `scan:true` (through `dodo_read` in Compact mode). It has no operation to acknowledge drift or change backup policy. Restart and creating a checkpoint do not acknowledge external changes. A bounded scan runs every 60 seconds when the project is idle, and commands receive a preflight scan. The default 15-second scan budget is a limit, not a completion guarantee for every repository. Busy or incomplete scans report their status; they do not silently accept the files.
+
+External changes are labeled **unknown author**, including changes observed after a shell job. An emergency snapshot saves the state DODO actually observes, without replacing the protected baseline. DODO cannot recreate bytes overwritten before any backup existed. A reviewed source restore remains possible while drift is present, with all existing plan/hash/path checks intact.
+
+For Git projects, DODO creates independent private bare copies at source checkpoint boundaries. No working branch, HEAD, staged/unstaged split or user index changes. Each copy contains only approved source bytes and a create-only `refs/dodo/snapshots/<snapshot-id>`; not old Git history, secrets or remotes. Hooks, filters, helpers and network protocols are disabled for this builder. The source manifest also records modes/empty directories that Git alone cannot represent.
+
+The advanced Recovery settings can require Git copies and select a separate backup directory. Prepare an **empty, dedicated private directory** outside projects and DODO state; its existing filesystem identity is verified. Removing or replacing that directory stops configured copies rather than redirecting them elsewhere. Copies count toward Recovery quotas. With no Git repository, ordinary source recovery still works; Git-required mode blocks full checkpoints until Git is available.
+
+If `.git` and source files are deleted but the registered root directory remains, preview/restore still uses the independent source checkpoint. If the entire root or installation state was lost, automatic restore cannot validate its old identity. Inspect the separately stored bare copy and `dodo-source-manifest.json` locally, extract approved files to a new directory, review it, then register that directory. For a single reviewed file, an owner may use `git --git-dir=/absolute/backup/snap_ID.git show refs/dodo/snapshots/snap_ID:path/to/file` to inspect the independent bytes. Do not pipe an unreviewed archive over an existing project. Git copies do not back up Git history, external LFS objects, databases or volumes.
+
+## Test evidence and named checkpoints (unreleased R04 candidate)
+
+The Recovery dashboard now separates three things:
+
+- **SAVED**: source bytes passed integrity checks at capture. No test claim.
+- **VERIFIED / FAILED / INCONCLUSIVE / STALE**: results of the selected
+  `verify_changes` recipes against a specific before-run snapshot and manifest.
+  Open **ตรวจหลักฐานปัจจุบัน** to recheck freshness. List entries and the last
+  verified time are historical observations, not a claim about current files.
+- **OWNER_MARKED_STABLE**: a name selected by the owner. It does not change a
+  failed test into a pass or expand any permission.
+
+Use `verify_changes` plan → run → report through the existing assistance gateway.
+Select exact recipe digests and use the plan's source digest and an idempotency key.
+With Recovery enabled, the response includes the checkpoint ID, manifest hash,
+verification state, reason and check timestamp. Read-only clients cannot execute
+verification; inspect trust still requires approval. Checks not selected remain
+listed as not run. An empty, skipped, inconsistent or truncated test report does
+not certify the snapshot. Ordinary successful build/lint commands prove only
+those commands, not tests that were never run.
+
+DODO compares included source and selected recipes before/after verification.
+Source generation or formatting makes the old evidence stale; capture and verify
+again. Changes reverted between observations, external dependencies/environment,
+and dishonest test scripts are not covered. Evidence is not an OS sandbox or a
+proof of correctness. Restart/parser changes require new verification.
+
+In checkpoint history choose **Pin สำเนานี้** or **ตั้งชื่อสำเนา**. Names such as
+`before-refactor`, `stable`, and `release candidate` refer to immutable snapshots.
+A name update uses the revision shown by the owner API; a concurrent edit is
+refused rather than overwritten. Pins and active names both protect retention.
+Unpinning a named point alone will not delete it. Old/new name changes appear in
+owner history. Naming never rewrites source or the snapshot manifest.
+
+Advanced settings include **ดู preview การล้างตาม retention**. It shows eligible
+points and why others are retained without deleting anything. Shared objects,
+Git copies and orphan grace periods mean the logical byte total is not immediate
+free disk space. This version does not expose a manual destructive purge.
+
+Owner CLI, in the registered project's directory:
+
+```sh
+dodo recovery status
+dodo recovery evidence
+dodo recovery evidence --id VERIFICATION_ID
+dodo recovery cleanup-preview
+# Read the existing name's revision first (0 only when the name never existed):
+dodo recovery mark stable SNAPSHOT_ID --revision REVIEWED_REVISION --workspace WORKSPACE_ID --epoch WORKSPACE_EPOCH --yes
+```
+
+After browser reconnect, refresh evidence and query the existing restore receipt.
+Do not repeat uncertain effects. These are private owner controls; MCP/public
+HTTP has no mark/pin/purge endpoint. Deployment is **NOT_CONFIGURED** and database
+recovery is **NOT_SUPPORTED** in this source-only phase. Windows/Android and live
+production recovery require their own acceptance; results from macOS/Linux
+fixtures are not substitutes.

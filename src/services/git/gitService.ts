@@ -1,3 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { sha256Bytes } from '../../util/hash.js';
+import { renameWithRetry, removeWithRetry } from '../../platform/fsRetry.js';
 import { spawn } from 'node:child_process';
 import { DodoError } from '../../errors.js';
 import type { WorkspaceFS } from '../../workspace/fs.js';
@@ -56,6 +60,8 @@ interface RunOptions {
   userConfig?: boolean;
   timeoutMs?: number;
   stdin?: Buffer;
+  /** Internal candidate index; never supplied by MCP callers. */
+  indexFile?: string;
 }
 
 export class GitService {
@@ -64,12 +70,23 @@ export class GitService {
     private readonly limits: Limits,
   ) {}
 
+  /** Sanitized recovery evidence only; no working index/tree mutation or remote URL. */
+  async recoveryMetadata(){
+    if(!(await this.isRepo()))return {isRepo:false};
+    const head=await this.run(['rev-parse','--verify','HEAD']);
+    const branch=await this.run(['symbolic-ref','--quiet','--short','HEAD']);
+    const index=await this.run(['rev-parse','--git-path','index']);let indexFingerprint:string|null=null;
+    if(index.code===0){const p=path.resolve(this.wfs.root,index.stdout.toString().trim());try{const st=fs.lstatSync(p);if(st.isFile()&&!st.isSymbolicLink()&&st.nlink===1&&st.size<32*1024*1024)indexFingerprint=sha256Bytes(fs.readFileSync(p));}catch{/* unborn */}}
+    return {isRepo:true,head:head.code===0&&/^[a-f0-9]{40,64}$/.test(head.stdout.toString().trim())?head.stdout.toString().trim():null,branch:branch.code===0?branch.stdout.toString().trim().slice(0,256):null,indexFingerprint};
+  }
+
   private async run(args: string[], opts: RunOptions = {}): Promise<{ code: number; stdout: Buffer; stderr: string }> {
     const env = buildChildEnv({ parentEnv: process.env, workspaceRoot: this.wfs.root, extraAllowlist: [] });
     env['GIT_TERMINAL_PROMPT'] = '0';
     env['GIT_OPTIONAL_LOCKS'] = '0';
     env['GIT_PAGER'] = 'cat';
     env['GIT_LITERAL_PATHSPECS'] = '1';
+    if (opts.indexFile) env['GIT_INDEX_FILE'] = opts.indexFile;
     const executable = resolveTrustedExecutable('git', this.wfs.root, { allowBatch: false });
     if (!opts.userConfig) {
       env['GIT_CONFIG_NOSYSTEM'] = '1';
@@ -123,6 +140,7 @@ export class GitService {
       });
       child.on('close', (code) => {
         clearTimeout(timer);
+        if (outBytes > 8 * 1024 * 1024) { reject(new DodoError('RESOURCE_LIMIT', 'git output exceeded inspection limit')); return; }
         resolve({ code: code ?? -1, stdout: Buffer.concat(out), stderr: Buffer.concat(errChunks).toString('utf8') });
       });
     });
@@ -149,7 +167,9 @@ export class GitService {
     if (!(await this.isRepo())) {
       return { isRepo: false, entries: [], truncated: false, filteredSecretPaths: 0 };
     }
-    const res = await this.run(['status', '--porcelain=v2', '--branch', '-z', '--', '.']);
+    // Enumerate leaves: an untracked directory may contain a denied secret or
+    // symlink. Treating that directory as one safe path would stage both.
+    const res = await this.run(['status', '--porcelain=v2', '--branch', '--untracked-files=all', '-z', '--', '.']);
     if (res.code !== 0) {
       throw new DodoError('INTERNAL_ERROR', 'git status failed', { detail: { stderr: res.stderr.slice(0, 500) } });
     }
@@ -213,13 +233,12 @@ export class GitService {
     return result;
   }
 
-  private prefixCache: string | undefined;
-
   private async repoPrefix(): Promise<string> {
-    if (this.prefixCache !== undefined) return this.prefixCache;
     const res = await this.run(['rev-parse', '--show-prefix']);
-    this.prefixCache = res.code === 0 ? res.stdout.toString('utf8').trim() : '';
-    return this.prefixCache;
+    if (res.code !== 0) throw new DodoError('CONFLICT', 'cannot resolve repository scope');
+    // Repository boundaries can change while DODO is running (init/worktree
+    // operations outside this service). Never reuse a previous scope prefix.
+    return res.stdout.toString('utf8').replace(/\r?\n$/, '');
   }
 
   /** Convert a repo-root-relative path to workspace-relative; undefined if outside. */
@@ -340,41 +359,94 @@ export class GitService {
       stagedPaths = r.pathspecs;
     } else if (opts.all) {
       const st = await this.status();
+      if (st.truncated) throw new DodoError('RESOURCE_LIMIT', 'status is truncated; select explicit paths');
       stagedPaths = st.entries.map((e) => `./${e.path}`);
       if (stagedPaths.length === 0) throw new DodoError('CONFLICT', 'nothing to commit (working tree clean within the workspace)');
     }
-    if (stagedPaths.length > 0) {
-      // `git add -A -- <paths>` also stages deletions of the listed paths.
-      const add = await this.run(['add', '-A', '--pathspec-from-file=-', '--pathspec-file-nul'], { userConfig: true, stdin: Buffer.from(stagedPaths.join('\0') + '\0', 'utf8') });
-      if (add.code !== 0) {
-        throw new DodoError('INTERNAL_ERROR', 'git add failed', { detail: { stderr: add.stderr.slice(0, 500) } });
+    const indexResult = await this.run(['rev-parse', '--path-format=absolute', '--git-path', 'index']);
+    const indexPath = indexResult.stdout.toString('utf8').trim();
+    if (indexResult.code !== 0 || !path.isAbsolute(indexPath)) throw new DodoError('CONFLICT', 'cannot locate Git index safely');
+    const lockPath = `${indexPath}.lock`;
+    let lockFd: number;
+    try { lockFd = fs.openSync(lockPath, 'wx', 0o600); }
+    catch { throw new DodoError('CONFLICT', 'Git index is busy or not writable; no index changes made'); }
+    let tempDir: string | undefined;
+    let published = false;
+    let commitStarted = false;
+    let uncertain = false;
+    try {
+      const original = this.indexBytes(indexPath);
+      const originalHash = original ? sha256Bytes(original) : null;
+      tempDir = fs.mkdtempSync(path.join(path.dirname(indexPath), '.dodo-index-'));
+      const candidate = path.join(tempDir, 'index');
+      if (original) fs.writeFileSync(candidate, original, { mode: 0o600, flag: 'wx' });
+      await this.validateIndex(candidate);
+      if (stagedPaths.length > 0) {
+        const add = await this.run(['add', '-A', '--pathspec-from-file=-', '--pathspec-file-nul'], { indexFile: candidate, userConfig: true, stdin: Buffer.from(stagedPaths.join('\0') + '\0', 'utf8') });
+        if (add.code !== 0) throw new DodoError('CONFLICT', 'git add failed; original index preserved');
       }
+      await this.validateIndex(candidate);
+      const commitArgs = ['commit', '-m', message];
+      if (opts.noVerify) commitArgs.push('--no-verify');
+      const beforeHead = (await this.run(['rev-parse', '--verify', 'HEAD'])).stdout.toString('utf8').trim();
+      commitStarted = true;
+      const res = await this.run(commitArgs, { indexFile: candidate, userConfig: true, timeoutMs: COMMIT_TIMEOUT_MS });
+      if (res.code !== 0) {
+        const afterHead = (await this.run(['rev-parse', '--verify', 'HEAD'])).stdout.toString('utf8').trim();
+        if (beforeHead !== afterHead) throw new DodoError('RECOVERY_REQUIRED', 'HEAD changed during a failed commit; inspect Git before retrying');
+        commitStarted = false;
+        const text = `${res.stdout.toString('utf8')}\n${res.stderr}`;
+        if (/nothing to commit|no changes added to commit|nothing added to commit/i.test(text)) throw new DodoError('CONFLICT', 'nothing to commit; original index preserved');
+        if (/Please tell me who you are|unable to auto-detect email/i.test(text)) throw new DodoError('INVALID_INPUT', 'git identity is not configured; original index preserved');
+        throw new DodoError('CONFLICT', 'git commit or hook failed; original index preserved');
+      }
+      const current = this.indexBytes(indexPath);
+      if ((current ? sha256Bytes(current) : null) !== originalHash) throw new DodoError('RECOVERY_REQUIRED', 'commit created but index changed externally; inspect before retrying');
+      const finalIndex = this.indexBytes(candidate);
+      if (!finalIndex) throw new DodoError('RECOVERY_REQUIRED', 'commit created but candidate index is unavailable');
+      fs.writeFileSync(lockFd, finalIndex);
+      fs.fsyncSync(lockFd);
+      fs.closeSync(lockFd); lockFd = -1;
+      renameWithRetry(lockPath, indexPath);
+      published = true;
+      const sha = (await this.run(['rev-parse', 'HEAD'])).stdout.toString('utf8').trim();
+      const subject = (await this.run(['log', '-1', '--format=%s'])).stdout.toString('utf8').trim();
+      const files = (await this.run(['diff-tree', '--root', '--no-commit-id', '--name-only', '-z', '-r', 'HEAD'])).stdout.toString('utf8').split('\0').filter(Boolean);
+      return { commit: sha, subject, filesChanged: files.length, stagedPaths: stagedPaths.map(p => p.replace(/^\.\//, '')) };
+    } catch (err) {
+      if (commitStarted) {
+        uncertain = true;
+        throw new DodoError('RECOVERY_REQUIRED', 'Git commit outcome or index publication is uncertain; inspect HEAD/index before any retry');
+      }
+      throw err;
+    } finally {
+      if (lockFd >= 0) fs.closeSync(lockFd);
+      if (!published) { try { fs.unlinkSync(lockPath); } catch { /* only our acquired lock */ } }
+      // Keep the candidate for owner inspection if a commit may have occurred.
+      if (tempDir && !uncertain) removeWithRetry(tempDir, true);
     }
-    const commitArgs = ['commit', '-m', message];
-    if (opts.noVerify) commitArgs.push('--no-verify');
-    const res = await this.run(commitArgs, { userConfig: true, timeoutMs: COMMIT_TIMEOUT_MS });
-    if (res.code !== 0) {
-      const text = `${res.stdout.toString('utf8')}\n${res.stderr}`;
-      if (/nothing to commit|no changes added to commit|nothing added to commit/i.test(text)) {
-        throw new DodoError('CONFLICT', 'nothing to commit', { recovery: 'stage paths with `paths` or `all: true`' });
-      }
-      if (/Please tell me who you are|unable to auto-detect email/i.test(text)) {
-        throw new DodoError('INVALID_INPUT', 'git identity is not configured on this machine', {
-          recovery: 'run `git config --global user.name ...` and `user.email ...` on the server machine',
-        });
-      }
-      if (/hook/i.test(text)) {
-        throw new DodoError('CONFLICT', 'a git hook rejected the commit', { detail: { output: text.slice(0, 1000) } });
-      }
-      throw new DodoError('INTERNAL_ERROR', 'git commit failed', { detail: { output: text.slice(0, 1000) } });
+  }
+
+  private indexBytes(file: string): Buffer | null {
+    let st: fs.Stats;
+    try { st = fs.lstatSync(file); }
+    catch (err) { if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null; throw err; }
+    if (!st.isFile() || st.isSymbolicLink() || st.nlink !== 1 || st.size > 128 * 1024 * 1024) throw new DodoError('PATH_DENIED', 'Git index is not a bounded regular file');
+    return fs.readFileSync(file);
+  }
+
+  /** Inspect the entire staged diff, including paths staged before this call. */
+  private async validateIndex(indexFile: string): Promise<void> {
+    const result = await this.run(['diff', '--cached', '--no-relative', '--name-only', '--no-renames', '--no-ext-diff', '--no-textconv', '-z'], { indexFile });
+    if (result.code !== 0) throw new DodoError('CONFLICT', 'cannot inspect staged index');
+    const prefix = await this.repoPrefix();
+    for (const repoPath of result.stdout.toString('utf8').split('\0').filter(Boolean)) {
+      const rel = this.scopeToRoot(repoPath, prefix);
+      if (rel === undefined) throw new DodoError('PATH_DENIED', 'staged index contains paths outside this workspace; index preserved');
+      if (!this.visible(rel)) throw new DodoError('SECRET_PATH_DENIED', 'staged index contains denied paths; index preserved');
+      const resolved = this.wfs.resolve(rel, { allowMissing: true });
+      if (resolved.stat?.isFile()) this.wfs.assertRegularFileForDirectAccess(resolved);
     }
-    const sha = (await this.run(['rev-parse', 'HEAD'])).stdout.toString('utf8').trim();
-    const subject = (await this.run(['log', '-1', '--format=%s'])).stdout.toString('utf8').trim();
-    const files = (await this.run(['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])).stdout
-      .toString('utf8')
-      .split('\n')
-      .filter((l) => l !== '');
-    return { commit: sha, subject, filesChanged: files.length, stagedPaths: stagedPaths.map((p) => p.replace(/^\.\//, '')) };
   }
 
   /** Small summary for project_overview: branch + dirty counts only. */

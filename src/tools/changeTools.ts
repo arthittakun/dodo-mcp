@@ -154,7 +154,7 @@ export const rollbackChangesTool = defineTool({
   name: 'rollback_changes',
   title: 'Rollback changes',
   description:
-    'Restore the files of a committed changeset to their pre-apply bytes from durable backups. Refused with per-file conflicts if ANY affected file was edited after the apply (human work is never overwritten). Takes the changesetId from apply_changes and a fresh idempotencyKey.',
+    'Restore your own committed changeset to its pre-apply bytes from verified durable backups. Changesets owned by another caller require private owner recovery. Refused if any affected file or backup changed. Takes the changesetId from apply_changes and a fresh idempotencyKey.',
   input: {
     changesetId: z.string().max(128),
     idempotencyKey: IdempotencyKey,

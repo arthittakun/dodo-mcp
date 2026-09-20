@@ -1211,6 +1211,32 @@ auth
     }
   });
 
+// -------------------------------------------------------------- recovery ---
+const recovery = program.command('recovery').description('inspect or configure automatic source backups for the current registered project');
+recovery.command('status').action(async () => console.log(JSON.stringify(await ipcForCwd('recovery.status'), null, 2)));
+recovery.command('scan').option('--cursor <n>','page offset','0').option('--limit <n>','page size (1–100)','50').action(async(opts:{cursor:string;limit:string})=>console.log(JSON.stringify(await ipcForCwd('recovery.drift.scan',{cursor:Number(opts.cursor),limit:Number(opts.limit)}),null,2)));
+recovery.command('acknowledge <digest>').requiredOption('--workspace <id>','reviewed workspace ID').requiredOption('--epoch <epoch>','reviewed workspace epoch').option('--yes','accept exactly the reviewed observed state',false)
+  .action(async(digest:string,opts:{workspace:string;epoch:string;yes:boolean})=>{if(!opts.yes)throw new DodoError('INVALID_INPUT','review drift then add --yes');console.log(JSON.stringify(await ipcForCwd('recovery.drift.acknowledge',{digest,workspaceId:opts.workspace,workspaceEpoch:opts.epoch,confirm:true}),null,2));});
+recovery.command('evidence').option('--id <verificationId>','refresh evidence for a specific verification').action(async(opts:{id?:string})=>console.log(JSON.stringify(await ipcForCwd(opts.id?'recovery.evidence.inspect':'recovery.evidence.list',opts.id?{verificationId:opts.id}:{}),null,2)));
+recovery.command('cleanup-preview').action(async()=>console.log(JSON.stringify(await ipcForCwd('recovery.cleanup.preview'),null,2)));
+recovery.command('mark <name> <checkpointId>').requiredOption('--revision <n>','reviewed pointer revision; 0 for a new name').requiredOption('--workspace <id>','reviewed workspace ID').requiredOption('--epoch <epoch>','reviewed epoch').option('--yes','confirm owner label (does not certify tests)',false)
+  .action(async(name:string,checkpointId:string,opts:{revision:string;workspace:string;epoch:string;yes:boolean})=>{if(!opts.yes)throw new DodoError('INVALID_INPUT','review checkpoint and add --yes');console.log(JSON.stringify(await ipcForCwd('recovery.mark',{name,snapshotId:checkpointId,expectedRevision:Number(opts.revision),workspaceId:opts.workspace,workspaceEpoch:opts.epoch,confirm:true}),null,2));});
+recovery.command('checkpoint').action(async () => console.log(JSON.stringify(await ipcForCwd('recovery.checkpoint'), null, 2)));
+recovery.command('list').option('--sessions','list sessions instead of checkpoints',false).action(async(opts:{sessions:boolean})=>console.log(JSON.stringify(await ipcForCwd(opts.sessions?'recovery.recovery_session_list':'recovery.checkpoint_list'),null,2)));
+recovery.command('preview <id>').option('--session','undo caller session receipts',false).option('--path <relative>','select a file or directory').option('--exact-mirror','explicitly include extra source-file deletions',false)
+  .action(async(id:string,opts:{session:boolean;path?:string;exactMirror:boolean})=>console.log(JSON.stringify(await ipcForCwd('recovery.restore_preview',{...(opts.session?{sessionId:id}:{checkpointId:id}),...(opts.path?{paths:[opts.path]}:{}),exactMirror:opts.exactMirror}),null,2)));
+recovery.command('apply <planId>').requiredOption('--hash <hash>','exact reviewed planHash').requiredOption('--key <key>','durable idempotency key; reuse for retries').requiredOption('--workspace <id>','reviewed workspace ID').requiredOption('--epoch <epoch>','reviewed workspace epoch').option('--yes','confirm exactly this reviewed plan',false)
+  .action(async(planId:string,opts:{hash:string;key:string;workspace:string;epoch:string;yes:boolean})=>{
+    if(!opts.yes)fail('review the preview, then pass --yes with the same plan/hash and workspace context');
+    console.log(JSON.stringify(await ipcForCwd('recovery.restore_apply',{planId,planHash:opts.hash,idempotencyKey:opts.key,workspaceId:opts.workspace,workspaceEpoch:opts.epoch,confirm:true}),null,2));
+  });
+recovery.command('configure').option('--enabled <value>', 'true or false').option('--yes', 'confirm the owner policy change', false)
+  .action(async (opts: {enabled?: string; yes: boolean}) => {
+    if (!opts.yes || !['true','false'].includes(opts.enabled ?? '')) fail('use --enabled true|false --yes to confirm');
+    const current = await ipcForCwd('recovery.status') as {policy: Record<string,unknown>};
+    console.log(JSON.stringify(await ipcForCwd('recovery.configure', {policy:{...current.policy,enabled:opts.enabled==='true'},confirm:true}),null,2));
+  });
+
 // --------------------------------------------------------------- recover ---
 program
   .command('recover')

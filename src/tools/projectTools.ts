@@ -79,6 +79,7 @@ export const projectOverviewTool = defineTool({
     return {
       data: {
         ...data,
+        recovery: s.recovery?.summary() ?? { state: 'unavailable' },
         brain,
         contextEngine,
         memory,

@@ -114,7 +114,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   const expiresAt = Date.now() + TOKEN_TTL_MS;
   const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
   // Fail fast at startup when the shipped UI is incomplete (broken install).
-  for (const critical of ['workbench.js', 'workbench.css', 'ui/dom.js', 'ui/tooltips.js', 'ui/alerts.js', 'vendor/sweetalert2.min.js', 'vendor/sweetalert2.min.css']) loadAsset(critical);
+  for (const critical of ['workbench.js', 'workbench.css', 'ui/dom.js', 'ui/recovery.js', 'ui/tooltips.js', 'ui/alerts.js', 'vendor/sweetalert2.min.js', 'vendor/sweetalert2.min.css']) loadAsset(critical);
 
   const app = express();
   app.disable('x-powered-by');

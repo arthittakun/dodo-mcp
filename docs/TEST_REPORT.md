@@ -1,5 +1,83 @@
 # DODO MCP — Test Report
 
+## Unreleased — native CI workflow (2026-09-20)
+
+Linux platform gate เปลี่ยนเป็น self-hosted native เช่นเดียวกับ Windows โดยไม่ใช้
+Docker เพิ่ม prerequisites และ sandboxed Chromium launch probe; media tests ยัง
+ถูกบังคับให้รัน เก็บ evidence แยกตาม run ID/attempt เพื่อไม่เขียนทับผลเมื่อ rerun
+
+`AUTOMATED_PASS` บน macOS สำหรับการเปลี่ยน workflow/gate ครั้งนี้:
+actionlint 1.7.12, typecheck, lint และ gate-evidence unit tests **23 passed / 0 failed**
+รวมการปฏิเสธ Docker report, fingerprint/revision/lock ที่ไม่ตรง, dirty source,
+false pass และ fresh-install ที่ไม่ครบ ผลนี้ไม่ใช่ native Linux/Windows PASS
+
+Native CI ของ candidate นี้: `NOT_RUN` จนกว่า workflow/source จะถูก push และรันจริง
+ผล Recovery/Docker ด้านล่างเป็นหลักฐานของ candidate รอบก่อนตาม fingerprint เดิม
+ไม่ยกให้เป็น native CI evidence ของ source ปัจจุบัน
+
+## Unreleased — Source Recovery R00–R02 candidate
+
+ตรวจ 2026-09-20 บน source fingerprint
+`sha256:89c3ad25f99781f41824c3b13c39400ef231d173ea818e7eb9cd1717d4782c69`
+ผลนี้เป็น development candidate ไม่ใช่การรับรองว่า npm รุ่นที่เผยแพร่มีฟีเจอร์นี้แล้ว
+
+| Gate | macOS arm64 / Node 22 | Linux Docker arm64 / Node 22 |
+|---|---|---|
+| build, typecheck, lint, test:all | exit 0 | exit 0 |
+| Core: 121 files / 832 tests | 797 pass / 35 skip / 0 fail | 791 pass / 41 skip / 0 fail |
+| Packaging / fresh installed restore | 17 pass / 0 fail | 17 pass / 0 fail |
+| Production npm audit | 0 vulnerabilities | 0 vulnerabilities |
+| DodoBench | not rerun in this gate | 7/7 pass |
+
+`AUTOMATED_PASS`: real HTTP OAuth/target A/B/caller isolation, read-only refusal,
+inspect approval, external hash/mode conflicts, dirty Git index preservation,
+binary/directory/partial restore, injected write failure compensation, six abrupt
+restore crash boundaries, private owner API and built CLI. Real Chromium verifies
+desktop/390px preview → confirmation → restore → journal status. PACK-17 repeats
+backup/preview/restore/read-back/idempotent retry against an installed tarball.
+
+Linux fresh exact-tarball smoke additionally verifies Full STDIO 148 and Compact
+HTTP 20, OAuth, write/edit, target routing and sub-agent protocol fixtures. Sub-agent
+operations are explicitly enabled in that smoke; the normal hidden Full count is 144.
+
+One preliminary full run failed a Brain per-run metric assertion when automatic
+indexing ran before the fixture's manual rebuild. The fixture isolates that timer;
+the real parser/index/security and original assertions remain. The final full runs
+above passed; preliminary failed logs were retained. Skips cover platform/backend
+conditions and are not counted as passes.
+
+`MANUAL_NOT_RUN`: native Windows/Android, live owner data restore, live provider
+credentials and publication. Automated browser use is not `MANUAL_PASS`.
+See [Recovery scope and limitations](RECOVERY.md) and
+[ADR-052](adr/052-reviewed-source-restore.md).
+
+## 1.2.1 Agent Profile creation and Compact/Hybrid visibility controls
+
+วันที่ตรวจ: 2026-09-16
+
+- Root cause reproduction: Agent form ส่ง `model: ""` หรือค่าตัวเลขที่ไม่ผ่าน schema
+  แล้ว owner API ตอบเพียง `invalid request fields`
+- Chromium real UI: ตรวจ Model ID ว่างก่อนส่ง, backend ระบุ field `model`, โหลด model
+  fixture แล้วเลือกให้อัตโนมัติ, สร้าง Coding Agent, ทดสอบ tool calling, สร้างไฟล์จริง
+  และอ่านผลกลับ — `AUTOMATED_PASS`
+- Responsive: desktop 1440px และ mobile 390px ไม่มี horizontal overflow —
+  `AUTOMATED_PASS`
+- Per-operation visibility: ปิด `write_file` แล้วหายจาก discover, gateway enum และ
+  Hybrid direct duplicate; ปิด `git_commit` แล้ว gateway ที่ว่างหาย; Full ยังครบ —
+  `AUTOMATED_PASS`
+- Owner-only API ปฏิเสธ unauthenticated/stale/unknown operation และบันทึกรายการแบบ
+  canonical; public MCP ไม่มี admin route — `AUTOMATED_PASS`
+- Chromium real UI: สวิตช์ราย operation, search, เปิด/ปิดทั้งหมวด, restart notice,
+  desktop 1280px และ 320px ไม่มี horizontal overflow — `AUTOMATED_PASS`
+- Focused catalog/HTTP/security/UI suites: 40/40 — `AUTOMATED_PASS`
+- `npm run test:all`: 107 files passed, 3 skipped; 731 tests passed, 35 skipped;
+  packaging 16/16 — `AUTOMATED_PASS`
+- `npm audit --omit=dev`: 0 vulnerabilities — `AUTOMATED_PASS`
+- Fresh immutable tarball smoke: CLI 1.2.1, generated config schema และ Local Config
+  UI assets ครบ — `AUTOMATED_PASS`
+- Live owner provider credentials: `MANUAL_NOT_RUN`
+- npm publish: `MANUAL_NOT_RUN`
+
 ## Release 1.2.0 — Cloudflare Local และ Simple Project Access
 
 ผล candidate บน macOS arm64 วันที่ 2026-09-16:
@@ -478,11 +556,11 @@ Fresh release smoke ติดตั้ง exact tarball ใน temporary prefix 
 แบบ explicit แล้วตรวจ CLI 1.0.0, STDIO Full 125, HTTP Streamable + OAuth Compact 19,
 write/edit read-back และ Sub-agent receipt จริง ค่า default-off ถูกตรวจแยกใน STDIO/HTTP/
 packaging regressions
-Release policy ใช้ macOS local และ Linux Docker โดย report ต้องมี revision/lock digest
-ตรงกันก่อน strict gate จะผ่าน Linux Docker image ติดตั้ง Playwright Chromium
-Dedicated self-hosted GitHub Actions รัน Linux X64 Docker และ Windows X64 native
-candidate บน Node 22/24 โดยไม่รับ untrusted pull requests Windows manual acceptance
-ยังคง `MANUAL_NOT_RUN`
+นโยบายปัจจุบันใช้ macOS local และ Linux native GitHub Actions โดย report ต้องมี
+clean revision/source fingerprint/lock digest ตรงกันก่อน strict gate จะผ่าน
+Dedicated self-hosted GitHub Actions รัน Linux X64 และ Windows X64 โดยตรงบน
+Node 22/24 โดยไม่รับ untrusted pull requests Windows manual acceptance
+ยังคง `MANUAL_NOT_RUN` ดู [CI](CI.md) สำหรับ prerequisites
 
 ## Required security scenarios
 
@@ -528,3 +606,62 @@ end-to-end บนอุปกรณ์ภายนอก: `MANUAL_NOT_RUN`
 สถานะ Runtime Intelligence ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`
 
 สถานะ Advanced Agent Runtime ผ่าน external AI และ owner repository จริง: `MANUAL_NOT_RUN`
+
+## Unreleased R03 candidate — 2026-09-20 (AUTOMATED_PASS)
+
+Final source/test/gate fingerprint: `sha256:e8e638e493bbdacf27f39221178ba29005c9c094348c4cca2cbec19f7ad15f5b`.
+
+| Gate | macOS arm64 / Node 22.23.2 | Linux Docker arm64 / Node 22.23.2 |
+|---|---:|---:|
+| Build, typecheck, lint | exit 0 | exit 0 |
+| Core (124 files / 851 tests) | 816 pass / 35 skip / 0 fail | 810 pass / 41 skip / 0 fail |
+| Packaging | 17 pass / 0 fail | 17 pass / 0 fail |
+| Production npm audit | 0 vulnerabilities | 0 vulnerabilities |
+| Headless desktop/narrow owner UI | pass | pass |
+| Exact tarball install and HTTP OAuth / STDIO | packaging smoke pass | release smoke pass |
+
+R03 exercises persistent same-size/mtime drift, 54 overwrites + 2 deletions, original/emergency snapshot separation, unknown-author job observation, unchanged/non-target writes, nested ignore rules, deadline/raced hash failures, exact owner acknowledgement and revoked/stale authority. Independent Git tests cover staged secrets, hooks/filters, preserved index/HEAD/config, unborn/detached/parent/linked-worktree repositories, large blobs, unavailable backup volumes, quotas, and uncertain final journal persistence. Existing restore crash, OAuth, ACL, sandbox and path guard suites remain enabled.
+
+A separate disposable disaster fixture deleted the original root, working `.git` and CAS objects. On both platforms two approved files were recovered byte-for-byte from independent bare Git objects into a NEW directory; excluded credentials/database data were not restored. This demonstrates an owner-directed recovery procedure, not permission to override the original runtime's root identity.
+
+Environment-specific 200-file × 8 KiB scan measurements: unchanged source 63 ms macOS / 151 ms Docker; 54 overwrites + 2 deletions including emergency copy 2316 ms / 1382 ms. The default scan budget is 15000 ms; these small fixtures do not establish performance for all repositories. Linux DodoBench also passed its seven existing cases.
+
+Earlier failed rounds are retained privately: a legacy-schema fixture omitted new tables; a new test used the wrong fixture accessor; expected transport/error assertions were corrected to their actual typed contract. Final gates above reran the complete suite. Detailed logs, manifests, screenshots and checksums stay in private development evidence and are excluded from npm.
+
+MANUAL_NOT_RUN: live owner projects, native Windows/Android, physical removable-drive removal, live ChatGPT and external provider credentials. Automated browser tests are not manual acceptance. No npm publish or owner-server restart was performed.
+
+## Unreleased R04 candidate — 2026-09-20 (AUTOMATED_PASS)
+
+Source fingerprint (both gates):
+`sha256:fb79ab8f05a095b47545299af30e0dabb48633a2a547e3025990101688c375bc`.
+This is a dirty development candidate, not the published package with the same
+version metadata. No release readiness claim is made.
+
+| Platform | Core | Packaging | Skipped | Failures |
+|---|---:|---:|---:|---:|
+| macOS arm64, Node 22.23.2 | 833 passed / 868 | 17 passed | 35 | 0 |
+| Linux Docker arm64, Node 22.23.2 | 827 passed / 868 | 17 passed | 41 | 0 |
+
+`npm run build`, `npm run test:all` (including typecheck/lint), packaging and
+installed-package checks exited 0. Linux additionally passed the 7-case DodoBench
+and exact-tarball fresh-install smoke (Full STDIO 148; HTTP/OAuth Compact 20,
+write/edit/read-back and target routing). Production dependency audits reported
+0 vulnerabilities on both platforms. Platform/optional skips remain explicit in
+private machine reports; skipped tests are not passes.
+
+17 new R04 cases cover actual passing/failing/skipped/truncated/unknown/inconsistent
+recipe output, manifest/recipe/runtime drift, caller isolation, owner expiry,
+revision races/tombstones, immutable snapshots, protected pin/name retention,
+OAuth read-only/revoked ACL, rejected model-supplied status, private/public admin
+separation and hostile Origin/proxy headers. Browser fixtures on desktop/390px
+register a project with Recovery on, edit through MCP, verify, pin/name, detect
+stale source, restore/read back, and show a real quota reservation failure. Existing
+restore/crash/hash/secret/sandbox tests remain enabled. UI assets are included in
+the tarball and do not use external CDNs.
+
+MANUAL_NOT_RUN: owner's live projects/storage, native Windows, Android and live
+ChatGPT. Production/database recovery is not implemented in R04. Browser fixture
+screenshots are automated evidence, not manual owner acceptance. The first local
+Docker build failed because its daemon was off; the completed container gate above
+was run after starting Docker. Early test-fixture mistakes were corrected without
+relaxing security/schema assertions and remain in private logs.

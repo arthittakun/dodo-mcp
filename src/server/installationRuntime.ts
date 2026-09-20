@@ -29,7 +29,7 @@ export class InstallationRuntime {
     this.attach(initial);
     this.ai = new Subagents(this, ports);
   }
-  attach(ws: BootstrappedWorkspace): void { ws.services.installation = this; }
+  attach(ws: BootstrappedWorkspace): void { ws.services.installation = this; ws.services.recovery?.activate(); }
   list(p: Principal) {
     return this.registry.list().filter(r => {
       try { return projectAuthority(this.store, p, r.workspaceId).scopes.includes('dodo:read'); } catch { return false; }
@@ -66,6 +66,7 @@ export class InstallationRuntime {
         try { ws = await pending; } finally { this.opening.delete(id); }
       }
     }
+    ws.services.recovery?.activate();
     this.project(id, p); // identity/ACL may have changed while preparing resources
     if (this.closing.has(id)) throw new DodoError('CONFLICT', 'project runtime is closing');
     if (this.closed) throw new DodoError('CONFLICT', 'runtime manager is closing');
@@ -112,6 +113,7 @@ export class InstallationRuntime {
     await Promise.all([this.current(), ...this.runtimes.values()].map(w => w.services.jobs.shutdown(3000)));
     await this.ai.close();
     while ([...this.users.values()].some(n => n > 0)) await new Promise(r => setTimeout(r, 25));
+    await Promise.all([this.current(), ...this.runtimes.values()].map(w => w.services.recovery?.close()));
     for (const id of this.runtimes.keys()) await this.closeProject(id);
     this.store.db.close();
   }

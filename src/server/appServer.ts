@@ -18,7 +18,7 @@ import { buildProvider } from '../auth/provider.js';
 import { buildTokenVerifier } from '../auth/verifier.js';
 import { interactionRouter } from '../auth/interactions.js';
 import { ALL_SCOPES } from '../security/policy.js';
-import { registerSurface, surfaceStats, type ToolSurface } from '../tools/surface.js';
+import { registerSurface, surfaceStats, normalizeDisabledDiscoverOperations, type ToolSurface } from '../tools/surface.js';
 import { hasExplicitProjectTarget, type AppServices } from '../tools/context.js';
 import { startOwnerControl } from '../ipc/ownerControl.js';
 import { ipcCall, IpcError } from '../ipc/client.js';
@@ -135,7 +135,14 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   // Tool exposure only — never permissions (ADR-029). HTTP defaults to the
   // compact gateway surface so remote clients ingest a small catalog.
   const surface: ToolSurface = opts.toolSurface ?? config.toolSurface ?? 'compact';
-  const surfaceFeatures = { subagents: config.exposeSubagentsToMcp };
+  let disabledDiscoverOperations: string[];
+  try {
+    disabledDiscoverOperations = normalizeDisabledDiscoverOperations(config.disabledDiscoverOperations);
+  } catch (error) {
+    await ws0.shutdownServices();
+    throw error;
+  }
+  const surfaceFeatures = { subagents: config.exposeSubagentsToMcp, disabledDiscoverOperations };
   const bootstrapFor = (root: string): BootstrappedWorkspace => {
     const ws = bootstrapWorkspace({
       invokedCwd: opts.invokedCwd,
@@ -390,7 +397,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const actualPort = (httpServer.address() as net.AddressInfo).port;
   {
     const stats = surfaceStats(surface, surfaceFeatures);
-    log(`[dodo] mcp tool surface | transport=http | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'}`);
+    log(`[dodo] mcp tool surface | transport=http | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'} | hiddenOperations=${surfaceFeatures.disabledDiscoverOperations.length}`);
   }
 
   function closeHttp(): Promise<void> {

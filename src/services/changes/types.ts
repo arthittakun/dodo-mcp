@@ -19,13 +19,18 @@ export type AnyPlanOp = PublicPlanOp | SpanEditOp;
 export interface PlanFileChange {
   path: string;
   destPath?: string;
-  action: 'create' | 'modify' | 'delete' | 'move';
+  action: 'create' | 'modify' | 'delete' | 'move' | 'mkdir' | 'rmdir';
+  directoryIdentity?: string;
+  directoryChildren?: string[];
+  createdDirectoryIdentity?: string;
   beforeHash: string | null; // sha256 of raw bytes; null for create
   afterHash: string | null; // null for delete
   /** base64 of complete new content for create/modify; absent for delete/move. */
   afterContentB64?: string;
   /** file mode to preserve on modify (from the original file). */
   mode?: number;
+  /** Required pre-restore mode; compensation restores this rather than desired mode. */
+  beforeMode?: number;
   /** directories that must be created (in order) before writing. */
   createParents?: string[];
   diff: string;
@@ -39,7 +44,7 @@ export interface StoredPlan {
   workspaceId: string;
   epoch: string;
   principal: string;
-  source: 'preview_changes' | 'preview_rename' | 'direct';
+  source: 'preview_changes' | 'preview_rename' | 'direct' | 'restore';
   files: PlanFileChange[];
   summary: string;
 }

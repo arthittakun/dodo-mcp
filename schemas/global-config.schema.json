@@ -7,6 +7,39 @@
       "type": "number",
       "const": 1
     },
+    "recovery": {
+      "default": {
+        "version": 1,
+        "storageBytes": 21474836480,
+        "freeFloorBytes": 524288000
+      },
+      "type": "object",
+      "properties": {
+        "version": {
+          "default": 1,
+          "type": "number",
+          "const": 1
+        },
+        "storageBytes": {
+          "default": 21474836480,
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 1099511627776
+        },
+        "freeFloorBytes": {
+          "default": 524288000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 107374182400
+        }
+      },
+      "required": [
+        "version",
+        "storageBytes",
+        "freeFloorBytes"
+      ],
+      "additionalProperties": false
+    },
     "publicUrl": {
       "type": "string",
       "format": "uri"
@@ -357,6 +390,15 @@
       "default": false,
       "type": "boolean"
     },
+    "disabledDiscoverOperations": {
+      "default": [],
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,63}$"
+      }
+    },
     "tunnel": {
       "default": {
         "connectionMode": "local",
@@ -469,6 +511,7 @@
   },
   "required": [
     "version",
+    "recovery",
     "port",
     "configPort",
     "allowedHosts",
@@ -485,6 +528,7 @@
     "logRetentionDays",
     "accessMode",
     "exposeSubagentsToMcp",
+    "disabledDiscoverOperations",
     "tunnel",
     "dangerouslyAllowInsecurePublicUrl"
   ],

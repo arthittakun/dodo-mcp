@@ -607,6 +607,41 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
     db.exec("ALTER TABLE project_registry ADD COLUMN access_level TEXT NOT NULL DEFAULT 'full'");
     db.exec('CREATE INDEX IF NOT EXISTS idx_project_registry_workspace ON project_registry(workspace_id) WHERE removed_at IS NULL');
   },
+  `CREATE TABLE recovery_policies (workspace_id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+   CREATE TABLE recovery_snapshots (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, project_id TEXT NOT NULL,
+     state TEXT NOT NULL CHECK(state IN ('PREPARING','READY','FAILED','INCOMPLETE')), scope TEXT NOT NULL,
+     manifest_digest TEXT, bytes INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, pinned INTEGER NOT NULL DEFAULT 0);
+   CREATE INDEX idx_recovery_snapshots_workspace ON recovery_snapshots(workspace_id,created_at);
+   CREATE TABLE recovery_objects (hash TEXT PRIMARY KEY, bytes INTEGER NOT NULL, created_at INTEGER NOT NULL);
+   CREATE TABLE recovery_refs (snapshot_id TEXT NOT NULL REFERENCES recovery_snapshots(id) ON DELETE CASCADE,
+     object_hash TEXT NOT NULL REFERENCES recovery_objects(hash), PRIMARY KEY(snapshot_id,object_hash));
+   CREATE TABLE recovery_reservations (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, bytes INTEGER NOT NULL,
+     logical_bytes INTEGER NOT NULL, staging_bytes INTEGER NOT NULL, created_at INTEGER NOT NULL);`,
+  `CREATE TABLE recovery_sessions (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, actor TEXT NOT NULL,
+     root_identity TEXT NOT NULL, epoch TEXT NOT NULL, title TEXT NOT NULL, state TEXT NOT NULL,
+     baseline_id TEXT, dirty_json TEXT NOT NULL DEFAULT '{}', created_at INTEGER NOT NULL, ended_at INTEGER);
+   CREATE INDEX idx_recovery_sessions ON recovery_sessions(workspace_id,actor,created_at);
+   CREATE TABLE recovery_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT NOT NULL REFERENCES recovery_sessions(id),
+     snapshot_id TEXT REFERENCES recovery_snapshots(id), kind TEXT NOT NULL, ref TEXT, created_at INTEGER NOT NULL);
+   CREATE TABLE recovery_restore_plans (plan_id TEXT PRIMARY KEY REFERENCES change_plans(id),
+     workspace_id TEXT NOT NULL, actor TEXT NOT NULL, payload TEXT NOT NULL);
+   CREATE TABLE recovery_plan_refs (plan_id TEXT NOT NULL REFERENCES recovery_restore_plans(plan_id) ON DELETE CASCADE,
+     snapshot_id TEXT NOT NULL REFERENCES recovery_snapshots(id), PRIMARY KEY(plan_id,snapshot_id));`,
+
+  `CREATE TABLE recovery_drift (workspace_id TEXT PRIMARY KEY, payload TEXT NOT NULL,
+     baseline_id TEXT NOT NULL REFERENCES recovery_snapshots(id));
+   CREATE TABLE recovery_git_destinations (workspace_id TEXT PRIMARY KEY, path TEXT NOT NULL, identity TEXT NOT NULL);
+   CREATE TABLE recovery_git_copies (snapshot_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     directory TEXT NOT NULL, identity TEXT, bytes INTEGER NOT NULL, state TEXT NOT NULL, payload TEXT NOT NULL);`,
+  `CREATE TABLE recovery_verifications (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, actor TEXT NOT NULL,
+     snapshot_id TEXT NOT NULL REFERENCES recovery_snapshots(id) ON DELETE CASCADE,
+     manifest_digest TEXT NOT NULL, created_at INTEGER NOT NULL, result_json TEXT, stale INTEGER NOT NULL DEFAULT 0, verified_at INTEGER);
+   CREATE INDEX idx_recovery_verifications ON recovery_verifications(workspace_id,created_at);
+   CREATE TABLE recovery_pointers (workspace_id TEXT NOT NULL, name TEXT NOT NULL,
+     snapshot_id TEXT REFERENCES recovery_snapshots(id), revision INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+     PRIMARY KEY(workspace_id,name));
+   CREATE TABLE recovery_pointer_events (seq INTEGER PRIMARY KEY AUTOINCREMENT, workspace_id TEXT NOT NULL,
+     name TEXT NOT NULL, previous_id TEXT, snapshot_id TEXT, revision INTEGER NOT NULL, created_at INTEGER NOT NULL);`,
 ];
 
 /**

@@ -89,7 +89,7 @@ export const gitCommitTool = defineTool({
     });
     const opts: Parameters<typeof ctx.services.git.commit>[0] = { message: args.message, all: args.all, noVerify: args.noVerify };
     if (args.paths !== undefined) opts.paths = args.paths;
-    const res = await ctx.services.git.commit(opts);
-    return { data: res };
+    await ctx.services.recovery?.checkpoint('before-exec', ctx.principal.grantId);
+    try {return {data:await ctx.services.git.commit(opts)};}finally{await ctx.services.recovery?.observeJob();}
   },
 });

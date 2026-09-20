@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import fs from 'node:fs';
 import path from 'node:path';
 import picomatch from 'picomatch';
 import { MAX_FILE_BYTES } from '../config/limits.js';
 import { policyGate, defineTool, type ToolCtx } from './context.js';
 import { DodoError } from '../errors.js';
-import { digestOf, sha256Bytes } from '../util/hash.js';
-import type { AnyPlanOp } from '../services/changes/types.js';
+import { digestOf, sha256Bytes, newId } from '../util/hash.js';
+import type { AnyPlanOp, StoredPlan, PlanFileChange } from '../services/changes/types.js';
 import { checkReplacementSize } from '../services/changes/contentBudget.js';
 
 /**
@@ -229,9 +228,14 @@ export const makeDirectoryTool = defineTool({
       return { data: { path: existing.rel, created: false } };
     }
     policyGate(ctx, { tool: 'make_directory', action: 'mutate-files', approvalAction: { path: existing.rel }, summary: `mkdir ${existing.rel}` });
-    const target = wfs.resolveForCreate(existing.rel, true); // validates every segment inside the root
-    fs.mkdirSync(target.abs, { recursive: true, mode: 0o755 });
-    return { data: { path: target.rel, created: true, createdParents: target.missingParents } };
+    const target = wfs.resolveForCreate(existing.rel, true);
+    const dirs=[...target.missingParents,target.rel];
+    const files:PlanFileChange[]=dirs.map((rel,i)=>({path:rel,action:'mkdir',beforeHash:null,afterHash:'directory',mode:0o755,createParents:dirs.slice(0,i),diff:'create directory',diffTruncated:false,bytesBefore:0,bytesAfter:0}));
+    const plan:StoredPlan={version:1,workspaceId:ctx.services.workspaceId,epoch:ctx.services.epoch,principal:ctx.principal.grantId,source:'direct',files,summary:`create directory ${target.rel}`};
+    const planId=newId('plan'),payload=JSON.stringify(plan),planHash=digestOf({planId,payload});
+    ctx.services.store.putPlan({id:planId,workspaceId:plan.workspaceId,epoch:plan.epoch,principal:plan.principal,planHash,payload,ttlMs:ctx.services.limits.planExpiryMs});
+    const result=await ctx.services.applier.apply({planId,planHash,workspaceId:plan.workspaceId,epoch:plan.epoch,principal:plan.principal});
+    return {data:{path:target.rel,created:true,createdParents:target.missingParents,changesetId:result.changesetId}};
   },
 });
 

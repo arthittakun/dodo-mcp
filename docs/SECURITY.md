@@ -234,6 +234,16 @@ Full จะไม่ register สี่ Sub-agent definitions และ Compact/
 ไม่เปลี่ยน trust/profile policy และไม่ข้าม approvals, sandbox, path/secret guards หรือ
 workspace context ทุก call ที่เปิดให้เห็นยังผ่าน invocation pipeline เดิมทั้งหมด
 
+### Per-operation Compact/Hybrid visibility
+
+`disabledDiscoverOperations` เป็นการตั้งค่าของเจ้าของใน private Local Config และมีผล
+เฉพาะ Compact/Hybrid catalog operation ที่ปิดจะไม่อยู่ใน `dodo_discover`, gateway enum
+หรือ direct duplicate ของ Hybrid และ gateway ที่ไม่เหลือ operation จะไม่ถูก register
+Full/STDIO direct definitions ไม่ถูกลบด้วยค่านี้ รายชื่อที่บันทึกต้องตรงกับ operation
+จริงและ owner API ปฏิเสธชื่ออื่น การซ่อนหรือเปิดกลับไม่ grant OAuth scope, project ACL,
+trust, approval, sandbox หรือสิทธิ์อื่น และ target ที่ยังเปิดอยู่ผ่าน invocation pipeline
+เดิมทุกชั้น
+
 ## Android / ADB access
 
 ADB ปิดโดยค่าเริ่มต้น การมี `adb` หรืออุปกรณ์ที่เชื่อมอยู่ไม่ใช่ permission เจ้าของต้อง
@@ -331,3 +341,65 @@ Admin API ไม่อยู่บน public MCP Events ใช้ authenticated 
 ใช้ textContent แสดง path/model/error และไม่ render HTML จากโมเดล Tunnel credential
 อยู่ใน reviewed OS store/reference และไม่ถูกส่งกลับให้ browser การเริ่ม DODO,
 ปลดล็อก Keychain และให้ macOS permissions ต้องผ่านเจ้าของ
+
+## Verified recovery and staged-index boundaries (unreleased)
+
+`rollback_changes` is restricted to the principal that owns the committed
+changeset. A write scope alone does not authorize another caller's undo. This
+matches the agent snapshot contract. Cross-caller recovery is an explicit owner
+operation, `recover.rollback`, on authenticated private administration, with a
+current workspace/epoch, idempotency receipt and audit. It is not an MCP tool or
+an input flag that an AI can set. Existing changesets retain their recorded
+owner; no ownership migration or automatic transfer occurs.
+
+Before source mutation, DODO verifies stored before-image bytes, file identity,
+path policy and current hashes. Restore uses the same engine with an inverse
+plan and its own pre-restore backups. A durable write intent is saved before the
+filesystem operation; startup verifies actual bytes rather than trusting a
+journal status alone. Mixed, damaged or unverifiable state requires owner review;
+startup never replays filesystem writes. Unknown historical rollback direction
+is treated as recovery-required. Final hash checks preserve conflicting human
+edits rather than reporting a successful restore.
+
+`git_commit` validates the entire staged diff, including previously staged files,
+against workspace and denied-path rules. Staging uses a separate candidate index;
+a refused stage/commit leaves the user's index unchanged. Allowed pre-existing
+staged changes remain part of normal Git commit semantics. A commit whose result
+or index publication is uncertain requires inspection instead of silent retry.
+Git hooks/filters still execute under the existing exec policy and OS account:
+this protection is not a sandbox against arbitrary hooks or other local programs.
+
+Current recovery covers journaled file edits, not every effect of shell commands,
+package installs, directory creation, browser/desktop/device actions, databases
+or external editors. File mode bits are preserved where supported; this is not
+a full ACL/xattr/ownership backup. Portable path rechecks reduce races but do not
+provide filesystem confinement against a hostile process with the same OS user.
+The unreleased source snapshot/session UI uses the boundaries below.
+
+## Automatic source snapshots (unreleased)
+
+Recovery policy is private owner state; repository settings, MCP calls, discover
+visibility and trust overrides cannot disable it. Explicit opt-out is confirmed
+and audited. Source/backup identity and hashes are checked before effects.
+Caller authority and schedule approvals are rechecked after asynchronous backup.
+No credential echo, extra OAuth scope or approval bypass is introduced.
+See [Recovery boundaries](RECOVERY.md): this does not restore DBs, secrets, remote
+effects or all metadata, and same-user TOCTOU and tampering limits still apply.
+
+
+Reviewed restore (unreleased) binds plans to caller/project/root identity/epoch and
+requires write scope plus the existing exact-action approval in inspect mode.
+Source selection, backup integrity and current hashes are checked again under the
+shared mutation queue. Private owner cross-caller access is not an MCP argument.
+Session receipt chains reject interleaved edits; unknown shell authorship is never
+claimed as exclusively owned. Restore status and durable idempotency support
+reconnect without repeating uncertain effects. See [ADR-052](adr/052-reviewed-source-restore.md).
+
+## Unreleased Recovery R03
+
+Expected source state is separate from observed backups. External target drift fails closed; only verified committed journals or exact, live owner acknowledgement can advance the baseline. MCP read access cannot acknowledge drift. Acknowledgement never grants OAuth/trust/exec authority. Private Git copies use captured bytes and an empty private index; no working Git history/config, hooks, filters, remotes or helpers are imported. Selected backup paths must be dedicated private directories, outside project/state/credential namespaces, with pinned identity; unavailable volumes do not fall back. Content and Git bytes share quotas. Job observations remain unknown-author data and hold the mutation ticket until their bounded scan finishes. See ADR 053 for scope and root-replacement limits.
+
+
+## Unreleased Recovery R04
+
+Recovery names/pins are private owner actions, with current project/epoch, confirmation and live authority checks. They never promote test results or grant permissions. No public mark/purge endpoint exists. Caller-owned evidence retains target ACL checks; current inspection compares snapshot/recipes/runtime and never consumes model-supplied success. Truncated/unknown/skipped test evidence cannot certify a snapshot. Raw test logs and environment values are excluded from Recovery metadata. Source integrity, expected hashes, approvals and sandbox remain unchanged. Names and diffs use text-only DOM rendering. Production/DB protection is not implied.

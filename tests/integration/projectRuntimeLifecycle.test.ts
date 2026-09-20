@@ -16,7 +16,7 @@ describe('project runtime lifetime',()=>{
     const manager=new InstallationRuntime(initial,()=>initial,async()=>({close:async()=>{started();await wait;}}),()=>undefined);
     try{
       const registry=new ProjectRegistry(manager.store),a=registry.add(path.join(fixture,'a')).project,b=registry.add(path.join(fixture,'b')).project;
-      const lease=await manager.acquire(b.projectId,manager.owner());const epoch=lease.services.epoch;lease.release();
+      const lease=await manager.acquire(b.projectId,manager.owner());const epoch=lease.services.epoch;await lease.services.recovery!.checkpoint('owner-checkpoint','fixture');lease.release();
       const close=manager.closeProject(b.projectId);await closing;
       await expect(manager.acquire(b.projectId,manager.owner())).rejects.toMatchObject({code:'CONFLICT'});
       const active=await manager.acquire(a.projectId,manager.owner());expect(active.services.workspaceId).toBe(initial.workspaceId);active.release();

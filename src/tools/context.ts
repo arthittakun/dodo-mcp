@@ -11,6 +11,7 @@ import type { MemoryService } from '../services/memory/memoryService.js';
 import type { RuntimeService } from '../services/runtime/runtimeService.js';
 import type { AgentRuntimeService } from '../services/agent/agentService.js';
 import type { ScheduleService } from '../services/schedules/scheduleService.js';
+import type { RecoveryService } from '../services/recovery/recoveryService.js';
 import { z } from 'zod';
 import type { DesktopService } from '../services/desktop/desktopService.js';
 import type { AndroidService } from '../services/android/androidService.js';
@@ -50,6 +51,7 @@ export interface Principal {
 export interface AppServices {
   installation?: InstallationRuntime;
   mutations?: MutationQueue;
+  recovery?: RecoveryService;
   federation: FederationService;
   /** Durable, incrementally refreshed project structure index. */
   brain?: ProjectBrainService;
@@ -166,7 +168,7 @@ export function defineTool<In extends z.ZodRawShape>(def: ToolDef<In>): AnyToolD
 }
 
 export function toolInputShape(def: AnyToolDef): z.ZodRawShape {
-  return { ...TARGET_PROJECT, ...(def.noWorkspaceContext ? {} : WORKSPACE_CONTEXT_FIELDS), ...def.input };
+  return { recoverySessionId: z.string().min(1).max(128).optional().describe('Explicit caller-owned recovery session for this operation; never an authorization grant'), ...TARGET_PROJECT, ...(def.noWorkspaceContext ? {} : WORKSPACE_CONTEXT_FIELDS), ...def.input };
 }
 
 /**
@@ -199,7 +201,7 @@ export interface InvokeToolResult {
  * attempt to re-route a call past the checks its gateway already performed, so
  * every dispatcher rejects them through this one list.
  */
-export const ROUTING_CONTEXT_KEYS = ['workspaceId', 'workspaceEpoch', 'targetProjectId', 'targetProject'] as const;
+export const ROUTING_CONTEXT_KEYS = ['workspaceId', 'workspaceEpoch', 'targetProjectId', 'targetProject', 'recoverySessionId'] as const;
 
 export function assertNoNestedRoutingContext(raw: Record<string, unknown>, what = 'args'): void {
   const found = ROUTING_CONTEXT_KEYS.filter((key) => key in raw);
@@ -330,7 +332,23 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
         const job = services.jobs.getJobChecked(args['jobId'],services.workspaceId);
         if (job.principal !== principal!.grantId) throw new DodoError('FORBIDDEN','job belongs to another caller');
       }
-      return def.handler(args as never, { services, principal: principal!, trustMode: services.trustMode() });
+      const trustAtStart = services.trustMode();
+      const revalidate = () => {
+        if (typeof opts.principal === 'function') principal = opts.principal();
+        if (principal!.tokenScopes) principal = projectAuthority(services.store, principal!, services.workspaceId);
+        if (!scopeSatisfied(def.requiredScope, principal!.scopes) || services.trustMode() !== trustAtStart) throw new DodoError('FORBIDDEN', 'authority changed during source backup');
+      };
+      const runHandler = async () => {
+        const result=await def.handler(args as never, { services, principal: principal!, trustMode: trustAtStart });
+        const data=result.data as {verificationId?:unknown}|null;
+        if(def.name==='verify_changes'&&typeof data?.verificationId==='string')services.recovery?.history.record('verification',data.verificationId);
+        return result;
+      };
+      const track = !def.name.startsWith('dodo_') && !def.name.startsWith('recovery_') && !def.name.startsWith('checkpoint_') && !def.name.startsWith('restore_') && (def.action === 'mutate-files' || def.action === 'exec');
+      const handle = () => services.recovery && track ? services.recovery.history.around(principal!.grantId, args['recoverySessionId'] as string|undefined, runHandler) : runHandler();
+      const result=await (services.recovery ? services.recovery.withAuthority(revalidate, handle) : handle());
+      revalidate();
+      return result;
     };
     const control = ['job_input', 'job_cancel', 'subagent_spawn', 'subagent_control'].includes(def.name);
     const gateway = def.name.startsWith('dodo_');

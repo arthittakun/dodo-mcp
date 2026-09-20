@@ -1,3 +1,4 @@
+import { performRecovery, RECOVERY_INPUTS, type RecoveryOperation } from '../tools/recoveryTools.js';
 import type { IpcHandler } from '../ipc/server.js';
 import type { StatusData } from '../ipc/protocol.js';
 import type { BootstrappedWorkspace } from './bootstrap.js';
@@ -9,6 +10,9 @@ import { addStaticClient, listStaticClients } from '../auth/clients.js';
 import { DODO_VERSION } from './version.js';
 import { INSTALLATION_AUTHORITY_EPOCH, INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
 import { accessMode } from '../security/accessMode.js';
+import { z } from 'zod';
+import { DodoError } from '../errors.js';
+import { withIdempotency } from '../tools/changeTools.js';
 
 /**
  * Private-IPC owner commands (spec §8.4), shared by the HTTP and stdio
@@ -19,6 +23,7 @@ export interface IpcContext {
   ws: BootstrappedWorkspace;
   transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null; connectionMode?: ConnectionMode };
   requestStop: () => void;
+  revalidateOwner?: () => void;
   remoteConfig?: {
     open(args: Record<string, unknown>): Promise<{ url: string; pairingCode: string; expiresAt: number }>;
     close(): void;
@@ -220,6 +225,62 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         const limit = Math.max(1, Math.min(Number(args['limit'] ?? 50), 500));
         return store.recentAudit(workspaceId, limit);
       }
+      case 'recovery.restore_status': case 'recovery.checkpoint_list': case 'recovery.checkpoint_inspect': case 'recovery.checkpoint_create':
+      case 'recovery.recovery_session_list': case 'recovery.recovery_session_inspect': case 'recovery.recovery_session_begin': case 'recovery.recovery_session_end':
+      case 'recovery.restore_preview': case 'recovery.restore_apply': {
+        const operation = cmd.slice('recovery.'.length) as RecoveryOperation;
+        const shape = RECOVERY_INPUTS[operation];
+        const input = z.object({...shape, ...(operation === 'restore_apply' ? {confirm:z.literal(true),workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch)} : {})}).strict().parse(args) as Record<string,unknown>;
+        const raw = Object.fromEntries(Object.keys(shape).map(k => [k,input[k]]));
+        const principal = {grantId:'local-config-owner',clientId:'local-owner',sub:'owner',scopes:['dodo:read','dodo:write','dodo:exec']};
+        const execute = async () => {
+          ctx.revalidateOwner?.();
+          const result = await performRecovery(operation,raw,{services,principal,trustMode:services.trustMode()},true);
+          ctx.revalidateOwner?.();
+          store.audit({principal:principal.grantId,workspaceId,tool:cmd,result:'ok'});
+          return result;
+        };
+        return services.recovery ? services.recovery.withAuthority(()=>ctx.revalidateOwner?.(),execute) : execute();
+      }
+      case 'recovery.drift.scan': {
+        const page=z.object({cursor:z.number().int().min(0).max(1000000).default(0),limit:z.number().int().min(1).max(100).default(50)}).strict().parse(args);ctx.revalidateOwner?.();
+        if(!services.recovery)throw new DodoError('NOT_SUPPORTED','Recovery is unavailable');
+        await services.recovery.withAuthority(()=>ctx.revalidateOwner?.(),()=>services.recovery!.scanDrift());ctx.revalidateOwner?.();return services.recovery.drift.status(page.limit,page.cursor);
+      }
+      case 'recovery.drift.acknowledge': {
+        const body=z.object({digest:z.string().regex(/^sha256:[a-f0-9]{64}$/),workspaceId:z.string(),workspaceEpoch:z.string(),confirm:z.literal(true)}).strict().parse(args);
+        if(body.workspaceId!==workspaceId||body.workspaceEpoch!==services.epoch)throw new DodoError('STALE_WORKSPACE','review the current project and epoch again');
+        ctx.revalidateOwner?.();
+        return services.recovery?.acknowledgeDrift(body.digest,()=>ctx.revalidateOwner?.());
+      }
+      case 'recovery.evidence.list': case 'recovery.evidence.inspect': case 'recovery.mark': case 'recovery.pin': case 'recovery.cleanup.preview': {
+        const r=services.recovery;if(!r)throw new DodoError('NOT_SUPPORTED','Recovery is unavailable');
+        r.assertProject();ctx.revalidateOwner?.();
+        const owner={id:'local-config-owner',owner:true};
+        const page={cursor:z.number().int().min(0).max(1000000).default(0),limit:z.number().int().min(1).max(50).default(10)};
+        if(cmd==='recovery.evidence.list'){const b=z.object(page).strict().parse(args);return {...r.evidence.list(owner,b.cursor,b.limit),pointers:r.evidence.pointers(),pointerEvents:r.evidence.pointerEvents(b.cursor,b.limit)};}
+        if(cmd==='recovery.evidence.inspect'){const b=z.object({verificationId:z.string().min(1).max(128)}).strict().parse(args);const result=await r.evidence.inspect(b.verificationId,owner);ctx.revalidateOwner?.();return result;}
+        if(cmd==='recovery.cleanup.preview'){const b=z.object(page).strict().parse(args);return r.storage.cleanupPreview(workspaceId,r.policy(),b.cursor,b.limit);}
+        const context={workspaceId:z.string(),workspaceEpoch:z.string(),confirm:z.literal(true)};
+        const shape=cmd==='recovery.mark'?z.object({...context,name:z.string().min(1).max(64),snapshotId:z.string().max(128).nullable(),expectedRevision:z.number().int().nonnegative()}):z.object({...context,checkpointId:z.string().min(1).max(128),pinned:z.boolean(),expectedPinned:z.boolean()});
+        const b=shape.strict().parse(args);
+        if(b.workspaceId!==workspaceId||b.workspaceEpoch!==services.epoch)throw new DodoError('STALE_WORKSPACE','review the current project and epoch again');
+        if('name' in b)return r.evidence.mark(b.name,b.snapshotId,b.expectedRevision,()=>ctx.revalidateOwner?.());
+        return r.evidence.pin(b.checkpointId,b.pinned,b.expectedPinned,()=>ctx.revalidateOwner?.());
+      }
+      case 'recovery.status': return services.recovery?.status();
+      case 'recovery.configure': {
+        const body = z.object({ policy: z.unknown(), confirm: z.literal(true) }).strict().parse(args);
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.configure(body.policy, body.confirm, ctx.revalidateOwner);
+      }
+      case 'recovery.checkpoint': {
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        await services.recovery.checkpoint('owner-checkpoint', 'local-config-owner');
+        return services.recovery.status();
+      }
       case 'recover.list': {
         return store.listChangesetsByStatus('recovery_required').filter(c => c.workspaceId === workspaceId).map((c) => ({
           changesetId: c.id,
@@ -239,6 +300,30 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
           return { changesetId: id, resolved: true };
         }
         throw new Error('unknown recovery action (supported: mark-resolved after fixing files manually; backups are in the DODO state directory)');
+      }
+      case 'recover.rollback': {
+        const input = z.object({
+          changesetId: z.string().min(1).max(128),
+          idempotencyKey: z.string().min(8).max(128),
+          workspaceId: z.string(), workspaceEpoch: z.string(),
+        }).strict().parse(args);
+        const execute = async () => {
+          ctx.revalidateOwner?.();
+          if (input.workspaceId !== workspaceId || input.workspaceEpoch !== epoch) throw new DodoError('STALE_WORKSPACE', 'review the current workspace before owner rollback');
+          const principal = { grantId: 'local-recovery-owner', clientId: 'local-owner', sub: 'owner', scopes: ['dodo:read', 'dodo:write', 'dodo:exec'] as const };
+          const toolCtx = { services, principal: { ...principal, scopes: [...principal.scopes] }, trustMode: services.trustMode() };
+          try {
+            const result = await withIdempotency(toolCtx, 'owner.rollback', input.idempotencyKey, { changesetId: input.changesetId }, () =>
+              services.applier.rollbackAsOwner({ changesetId: input.changesetId, workspaceId, epoch, principal: principal.grantId }));
+            store.audit({ principal: principal.grantId, workspaceId, tool: 'owner.rollback', result: 'ok', inputDigest: input.changesetId });
+            return { ...result.result, replayed: result.replayed };
+          } catch (err) {
+            store.audit({ principal: principal.grantId, workspaceId, tool: 'owner.rollback', result: err instanceof DodoError ? err.code : 'error', inputDigest: input.changesetId });
+            throw err;
+          }
+        };
+        const authorized = () => services.recovery ? services.recovery.withAuthority(() => ctx.revalidateOwner?.(), execute) : execute();
+        return services.mutations ? services.mutations.run(authorized) : authorized();
       }
       default:
         throw new Error(`unknown command ${cmd}`);

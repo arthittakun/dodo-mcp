@@ -16,7 +16,7 @@ export const SpawnInput = z.object({ projectId: z.string(), profileId: z.string(
 type Status = 'queued' | 'running' | 'waiting_approval' | 'waiting_auth' | 'paused' | 'completed' | 'failed' | 'canceled' | 'interrupted';
 type Row = { id: string; workspace_id: string; owner: string; status: Status; payload: string; created_at: number; updated_at: number };
 interface Payload { initialContext?: string; executorId?: string; pricing?: {input:number|null;output:number|null}; conversation?: Array<{task:string;answer:string}>; jobs?: string[]; elapsedMs?: number; processId: number; input: z.infer<typeof SpawnInput>; principal: Principal; workspaceEpoch: string; configuration: string; turns: Turn[]; pending?: ModelReply; pendingResults?: Turn['results']; actions: number; modelCalls: number; result?: string; error?: string; resumeCount: number; }
-const CONTEXT_KEYS = ['workspaceId','workspaceEpoch','targetProjectId','targetProject','projectId','projectIds','project','projects'];
+const CONTEXT_KEYS = ['recoverySessionId','workspaceId','workspaceEpoch','targetProjectId','targetProject','projectId','projectIds','project','projects'];
 const CODE_TOOLS = new Set(['context_query','context_evidence','agent_skill_search', 'agent_skill_inspect', 'project_overview', 'list_files', 'read_files', 'search_code', 'glob_files', 'read_instructions', 'symbols', 'references', 'diagnostics', 'context_for_task', 'analyze_impact', 'read_symbol', 'memory_search', 'memory_inspect', 'write_file', 'edit_file', 'apply_patch', 'preview_changes', 'apply_changes', 'rollback_changes', 'make_directory', 'delete_path', 'move_path', 'exec_command', 'run_task', 'job_status', 'job_output', 'job_wait', 'git_status', 'git_diff']);
 const ownerKey = (p: Principal) => `${p.grantId}:${p.clientId}`;
 const TERMINAL = new Set<Status>(['completed', 'failed', 'canceled']);
@@ -223,7 +223,8 @@ export class Subagents {
           const def = available.find(t => t.name === call.name);
           if (!def || CONTEXT_KEYS.some(k => k in call.args)) throw new DodoError('FORBIDDEN', 'model requested an unavailable operation or attempted context override');
           if (++payload.actions > cfg.profile.maxActions) throw new DodoError('RESOURCE_LIMIT', 'tool action budget exhausted');
-          const raw = { ...call.args, ...(!def.noWorkspaceContext ? { workspaceId: s.workspaceId, workspaceEpoch: s.epoch } : {}) };
+          const recoverySessionId = (def.action==='mutate-files'||def.action==='exec') ? await s.recovery?.history.forAgent(id,live.principal.grantId) : undefined;
+          const raw = { ...call.args, ...(recoverySessionId?{recoverySessionId}:{}), ...(!def.noWorkspaceContext ? { workspaceId: s.workspaceId, workspaceEpoch: s.epoch } : {}) };
           if ('idempotencyKey' in def.input) raw['idempotencyKey' as keyof typeof raw] = `ai:${id}:${payload.turns.length}:${call.id}`;
           payload.error = 'UNCERTAIN'; this.save(id, payload, 'running');
           const outcome = await invokeToolDefinition({ def, services: s, principal: () => {
@@ -259,6 +260,7 @@ export class Subagents {
       try {
         const row = this.row(id);
         if (runtime && (row.status === 'canceled' || row.status === 'failed' || row.status === 'waiting_auth')) this.cancelJobs(payload,runtime);
+        if(runtime&&['completed','failed','canceled'].includes(row.status))runtime.recovery?.history.finishAgent(id,payload.principal.grantId);
         payload.elapsedMs = (payload.elapsedMs ?? 0) + Date.now()-started;
         this.save(id,payload,row.status);
       } finally { credentialRelease?.(); release?.(); }

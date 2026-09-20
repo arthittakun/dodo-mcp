@@ -71,7 +71,7 @@ const runtimeTaskStartTool = defineTool({
         kind: 'exec', program: args.program, args: args.args, cwdRel: args.cwd, sandbox: args.sandbox, network: args.network,
       };
       if (args.timeoutMs !== undefined) request.timeoutMs = args.timeoutMs;
-      const job = ctx.services.jobs.start(request);
+      const job = await ctx.services.jobs.startProtected(request);
       try { return { task: use(ctx).attachTask(ctx, args.sessionId, job.jobId, args.kind), sandboxed: job.sandboxed }; }
       catch (error) { ctx.services.jobs.cancel(job.jobId, ctx.services.workspaceId, 0); throw error; }
     });

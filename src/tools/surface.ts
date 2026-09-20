@@ -36,6 +36,8 @@ export type ToolSurface = 'compact' | 'full' | 'hybrid';
 export interface SurfaceFeatures {
   /** Expose owner-configured sub-agent operations to MCP clients. Web tasks remain available either way. */
   subagents: boolean;
+  /** Owner catalog preference only; never changes authority or Full direct tools. */
+  disabledDiscoverOperations?: readonly string[];
 }
 
 const SUBAGENT_OPERATION_NAMES = new Set(['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control']);
@@ -91,6 +93,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'job_output',
       'job_wait',
       'list_jobs',
+      'restore_status', 'checkpoint_list', 'checkpoint_inspect', 'recovery_session_list', 'recovery_session_inspect',
     ],
   },
   {
@@ -114,6 +117,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'handoff_write',
       'agent_write',
       'agent_snapshot_rollback',
+      'checkpoint_create', 'recovery_session_begin', 'recovery_session_end', 'restore_preview', 'restore_apply',
     ],
   },
   {
@@ -259,13 +263,58 @@ const SCOPE_RANK: Record<OAuthScope, number> = { 'dodo:read': 0, 'dodo:write': 1
 const byName = new Map<string, AnyToolDef>(TOOL_CATALOG.map((d) => [d.name, d]));
 
 function gatewaySpecsFor(features: SurfaceFeatures): readonly GatewaySpec[] {
-  if (features.subagents) return GATEWAY_SPECS;
-  return GATEWAY_SPECS.map((spec) => ({
-    ...spec,
-    operations: spec.operations.filter((operation) => !SUBAGENT_OPERATION_NAMES.has(operation)),
-  }));
+    const disabled = disabledOperationsFor(features.disabledDiscoverOperations ?? []);
+    return GATEWAY_SPECS.map((spec) => ({
+        ...spec,
+        operations: spec.operations.filter((operation) => !disabled.has(operation) && (features.subagents || !SUBAGENT_OPERATION_NAMES.has(operation))),
+    })).filter((spec) => spec.operations.length > 0);
 }
-
+const DISCOVER_OPERATION_ORDER = GATEWAY_SPECS.flatMap((spec) => spec.operations);
+const DISCOVER_OPERATION_SET = new Set(DISCOVER_OPERATION_ORDER);
+/**
+ * Validate and canonicalize the owner-controlled hidden-operation list.  A
+ * stale or misspelled name must never silently hide a different capability.
+ */
+export function normalizeDisabledDiscoverOperations(values: readonly string[]): string[] {
+    const requested = new Set(values);
+    const unknown = [...requested].filter((operation) => !DISCOVER_OPERATION_SET.has(operation));
+    if (unknown.length > 0) {
+        throw new DodoError('INVALID_INPUT', `unknown discover operation: ${unknown.join(', ')}`, {
+            detail: { fields: ['disabledDiscoverOperations'], unknownOperations: unknown },
+            recovery: 'reload the tool visibility page and choose operations from the current list',
+        });
+    }
+    return DISCOVER_OPERATION_ORDER.filter((operation) => requested.has(operation));
+}
+function disabledOperationsFor(values: readonly string[]): Set<string> {
+    return new Set(normalizeDisabledDiscoverOperations(values));
+}
+/** Safe metadata for the owner-only Local Config visibility editor. */
+export function discoverExposure(features: SurfaceFeatures) {
+    const disabled = disabledOperationsFor(features.disabledDiscoverOperations ?? []);
+    const operations = GATEWAY_SPECS.flatMap((spec) => spec.operations.map((operation) => {
+        const def = targetOf(operation);
+        const requiresSubagents = SUBAGENT_OPERATION_NAMES.has(operation);
+        return {
+            operation,
+            title: def.title,
+            description: def.description,
+            gateway: spec.name,
+            gatewayTitle: spec.title,
+            domain: spec.domain,
+            requiredScope: def.requiredScope,
+            action: def.action,
+            requiresSubagents,
+            enabled: !disabled.has(operation) && (features.subagents || !requiresSubagents),
+        };
+    }));
+    return {
+        operations,
+        enabledCount: operations.filter((operation) => operation.enabled).length,
+        totalCount: operations.length,
+        gatewayCount: gatewaySpecsFor(features).length,
+    };
+}
 function targetOf(operation: string): AnyToolDef {
   const def = byName.get(operation);
   /* istanbul ignore next -- construction invariant, validated at module load */
@@ -351,6 +400,7 @@ function buildGateway(spec: GatewaySpec): AnyToolDef {
       const merged: Record<string, unknown> = target.noWorkspaceContext
         ? { ...raw }
         : { ...raw, workspaceId: (args as Record<string, unknown>)['workspaceId'], workspaceEpoch: (args as Record<string, unknown>)['workspaceEpoch'] };
+      if ((args as Record<string,unknown>)['recoverySessionId']) merged['recoverySessionId']=(args as Record<string,unknown>)['recoverySessionId'];
       const { envelope, extraBlocks } = await invokeToolDefinition({
         def: target,
         services: ctx.services,
@@ -581,6 +631,7 @@ function overviewFor(
   surface: 'compact' | 'hybrid',
   counts: { compact: number; full: number; hybrid: number },
   subagents: boolean,
+  hiddenOperationCount = 0,
 ): AnyToolDef {
   const hint =
     surface === 'compact'
@@ -602,6 +653,7 @@ function overviewFor(
           fullToolCount: counts.full,
           ...(surface === 'hybrid' ? { hybridToolCount: counts.hybrid } : {}),
           mcpSubagentsEnabled: subagents,
+          hiddenCompactOperationCount: hiddenOperationCount,
         },
       };
     },
@@ -609,7 +661,6 @@ function overviewFor(
 }
 
 const ALL_FEATURES: SurfaceFeatures = { subagents: true };
-const DEFAULT_FEATURES: SurfaceFeatures = { subagents: false };
 const ALL_COUNTS = { compact: 2 + GATEWAY_SPECS.length, full: TOOL_CATALOG.length, hybrid: 2 + GATEWAY_SPECS.length + 29 };
 const GATEWAYS: AnyToolDef[] = GATEWAY_SPECS.map(buildGateway);
 const discoverTool = buildDiscoverTool(GATEWAY_SPECS, TOOL_CATALOG);
@@ -668,41 +719,54 @@ export const HYBRID_CATALOG: AnyToolDef[] = [overviewFor('hybrid', ALL_COUNTS, t
   }
 }
 
-const MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS = TOOL_CATALOG
-  .filter((def) => !SUBAGENT_OPERATION_NAMES.has(def.name))
-  .map((def) => def.name === 'project_overview' ? fullOverviewWithoutSubagents : def);
-const GATEWAY_SPECS_WITHOUT_SUBAGENTS = gatewaySpecsFor(DEFAULT_FEATURES);
-const GATEWAYS_WITHOUT_SUBAGENTS = GATEWAY_SPECS_WITHOUT_SUBAGENTS.map(buildGateway);
-const COUNTS_WITHOUT_SUBAGENTS = {
-  compact: 2 + GATEWAY_SPECS_WITHOUT_SUBAGENTS.length,
-  full: MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS.length,
-  hybrid: 2 + GATEWAY_SPECS_WITHOUT_SUBAGENTS.length + HYBRID_DIRECT_OPERATIONS.length,
-};
-const DISCOVER_WITHOUT_SUBAGENTS = buildDiscoverTool(GATEWAY_SPECS_WITHOUT_SUBAGENTS, MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS);
-const COMPACT_CATALOG_WITHOUT_SUBAGENTS: AnyToolDef[] = [
-  overviewFor('compact', COUNTS_WITHOUT_SUBAGENTS, false),
-  DISCOVER_WITHOUT_SUBAGENTS,
-  ...GATEWAYS_WITHOUT_SUBAGENTS,
-];
-const HYBRID_CATALOG_WITHOUT_SUBAGENTS: AnyToolDef[] = [
-  overviewFor('hybrid', COUNTS_WITHOUT_SUBAGENTS, false),
-  DISCOVER_WITHOUT_SUBAGENTS,
-  ...GATEWAYS_WITHOUT_SUBAGENTS,
-  ...HYBRID_DIRECT_OPERATIONS.map(targetOf),
-];
-
+type SurfaceCatalogs = Record<ToolSurface, AnyToolDef[]>;
+const surfaceCache = new Map<string, SurfaceCatalogs>();
+function featureKey(features: SurfaceFeatures): string {
+    const disabled = normalizeDisabledDiscoverOperations(features.disabledDiscoverOperations ?? []);
+    return `${features.subagents ? 'subagents' : 'no-subagents'}:${disabled.join(',')}`;
+}
+function buildSurfaces(features: SurfaceFeatures): SurfaceCatalogs {
+    const disabled = normalizeDisabledDiscoverOperations(features.disabledDiscoverOperations ?? []);
+    const disabledSet = new Set(disabled);
+    const specs = gatewaySpecsFor({ ...features, disabledDiscoverOperations: disabled });
+    const full = features.subagents
+        ? TOOL_CATALOG
+        : TOOL_CATALOG
+            .filter((def) => !SUBAGENT_OPERATION_NAMES.has(def.name))
+            .map((def) => def.name === 'project_overview' ? fullOverviewWithoutSubagents : def);
+    const direct = HYBRID_DIRECT_OPERATIONS
+        .filter((operation) => !disabledSet.has(operation))
+        .map(targetOf);
+    const counts = {
+        compact: 2 + specs.length,
+        full: full.length,
+        hybrid: 2 + specs.length + direct.length,
+    };
+    const gateways = specs.map(buildGateway);
+    const discover = buildDiscoverTool(specs, full);
+    return {
+        compact: [overviewFor('compact', counts, features.subagents, disabled.length), discover, ...gateways],
+        full,
+        hybrid: [overviewFor('hybrid', counts, features.subagents, disabled.length), discover, ...gateways, ...direct],
+    };
+}
+function surfacesFor(features: SurfaceFeatures): SurfaceCatalogs {
+    const disabled = normalizeDisabledDiscoverOperations(features.disabledDiscoverOperations ?? []);
+    if (disabled.length === 0 && features.subagents) {
+        return { compact: COMPACT_CATALOG, full: TOOL_CATALOG, hybrid: HYBRID_CATALOG };
+    }
+    const key = featureKey({ ...features, disabledDiscoverOperations: disabled });
+    let cached = surfaceCache.get(key);
+    if (!cached) {
+        cached = buildSurfaces({ ...features, disabledDiscoverOperations: disabled });
+        surfaceCache.set(key, cached);
+    }
+    return cached;
+}
 // ------------------------------------------------------------- surface API --
 export function surfaceCatalog(surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): AnyToolDef[] {
-  if (features.subagents) {
-    if (surface === 'compact') return COMPACT_CATALOG;
-    if (surface === 'hybrid') return HYBRID_CATALOG;
-    return TOOL_CATALOG;
-  }
-  if (surface === 'compact') return COMPACT_CATALOG_WITHOUT_SUBAGENTS;
-  if (surface === 'hybrid') return HYBRID_CATALOG_WITHOUT_SUBAGENTS;
-  return MCP_TOOL_CATALOG_WITHOUT_SUBAGENTS;
+    return surfacesFor(features)[surface];
 }
-
 export function registerSurface(server: McpServer, services: AppServices, surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): void {
   for (const def of surfaceCatalog(surface, features)) registerTool(server, services, def);
 }
@@ -717,7 +781,7 @@ const statsCache = new Map<string, { toolCount: number; schemaBytes: number }>()
  * Never includes request data or tokens.
  */
 export function surfaceStats(surface: ToolSurface, features: SurfaceFeatures = ALL_FEATURES): { toolCount: number; schemaBytes: number } {
-  const cacheKey = `${surface}:${features.subagents ? 'subagents' : 'no-subagents'}`;
+  const cacheKey = `${surface}:${featureKey(features)}`;
   let cached = statsCache.get(cacheKey);
   if (!cached) {
     const tools = surfaceCatalog(surface, features).map((def) => ({

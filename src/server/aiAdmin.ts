@@ -11,15 +11,29 @@ import { invokeToolDefinition } from '../tools/context.js';
 import { CORE_TOOL_CATALOG } from '../tools/coreCatalog.js';
 import { AGENT_RUNTIME_TOOLS } from '../tools/agentRuntimeTools.js';
 import { accessMode, setAccessMode } from '../security/accessMode.js';
+import { discoverExposure, normalizeDisabledDiscoverOperations } from '../tools/surface.js';
 
-const ACTIONS = ['status','trust.set','schedule.list','schedule.propose','schedule.show','schedule.history','schedule.approve','schedule.revoke','memory.pending','memory.show','memory.list','memory.approve','memory.reject','memory.reverify','memory.prune','memory.learning.pending','memory.learning.show','memory.learning.review','agent.skill.pending','agent.skill.show','agent.skill.review','desktop.status','desktop.policy','approvals.pending','approvals.approve','approvals.deny','auth.pending','auth.approve','auth.deny','auth.addClient','auth.listClients','auth.grants','auth.revoke','audit.recent','recover.list','recover.resolve'] as const;
+const ACTIONS = ['status','trust.set','schedule.list','schedule.propose','schedule.show','schedule.history','schedule.approve','schedule.revoke','memory.pending','memory.show','memory.list','memory.approve','memory.reject','memory.reverify','memory.prune','memory.learning.pending','memory.learning.show','memory.learning.review','agent.skill.pending','agent.skill.show','agent.skill.review','desktop.status','desktop.policy','approvals.pending','approvals.approve','approvals.deny','auth.pending','auth.approve','auth.deny','auth.addClient','auth.listClients','auth.grants','auth.revoke','audit.recent','recover.list','recover.resolve','recover.rollback','recovery.status','recovery.evidence.list','recovery.evidence.inspect','recovery.mark','recovery.pin','recovery.cleanup.preview','recovery.drift.scan','recovery.drift.acknowledge','recovery.configure','recovery.checkpoint','recovery.restore_status','recovery.checkpoint_list','recovery.checkpoint_inspect','recovery.checkpoint_create','recovery.recovery_session_list','recovery.recovery_session_inspect','recovery.recovery_session_begin','recovery.recovery_session_end','recovery.restore_preview','recovery.restore_apply'] as const;
+/**
+ * Local Config is an owner-only surface, so naming the invalid form fields is
+ * both safe and much more useful than returning the old generic
+ * "invalid request fields" response. Values are deliberately omitted: a
+ * validation error must never echo an API key, task text, or other payload.
+ */
+function invalidOwnerRequest(error: z.ZodError): DodoError {
+    const fields = [...new Set(error.issues.slice(0, 8).map((issue) => issue.path.join('.') || 'request'))];
+    return new DodoError('INVALID_INPUT', `ข้อมูลไม่ถูกต้อง: ตรวจสอบ ${fields.join(', ')}`, {
+        detail: { fields },
+        recovery: 'แก้ช่องที่ระบุแล้วบันทึกอีกครั้ง',
+    });
+}
 /** Mounted only after Local Config's owner auth + origin checks, never on public MCP. */
 export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalConfigInfo, expiresAt: number): void {
   const manager = () => { const m = host.current().services.installation; if (!m) throw new DodoError('NOT_SUPPORTED', 'installation runtime is unavailable'); return m; };
   const owner = () => ({ ...manager().owner(), expiresAt: expiresAt / 1000 });
   const route = (method: 'get' | 'post', url: string, fn: (req: Request, res: Response) => Promise<unknown> | unknown) => app[method](url, async (req, res) => {
     try { const data = await fn(req, res); if (!res.headersSent) res.json({ ok: true, data }); }
-    catch (error) { const e = error instanceof z.ZodError ? new DodoError('INVALID_INPUT', 'invalid request fields') : toDodoError(error); if (!res.headersSent) res.status(e.code === 'FORBIDDEN' ? 403 : e.code === 'AUTH_REQUIRED' ? 401 : e.code === 'CONFLICT' || e.code === 'STALE_WORKSPACE' ? 409 : 400).json({ ok: false, error: e.message, code: e.code }); }
+    catch (error) { const e = error instanceof z.ZodError ? invalidOwnerRequest(error) : toDodoError(error); if (!res.headersSent) res.status(e.code === 'FORBIDDEN' ? 403 : e.code === 'AUTH_REQUIRED' ? 401 : e.code === 'CONFLICT' || e.code === 'STALE_WORKSPACE' ? 409 : 400).json({ ok: false, error: e.message, code: e.code, ...(e.detail ? { detail: e.detail } : {}), ...(e.recovery ? { recovery: e.recovery } : {}) }); }
   });
   const reviewed = (req: Request, workspaceId = host.current().workspaceId, epoch = host.current().epoch) => {
     if (req.headers['x-dodo-workspace'] !== workspaceId || req.headers['x-dodo-epoch'] !== epoch) throw new DodoError('STALE_WORKSPACE', 'refresh the selected project before making changes');
@@ -114,22 +128,35 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
     const lease = await manager().acquire(b.projectId, owner());
     try {
       reviewed(req,lease.services.workspaceId,lease.services.epoch);
-      const dispatch = createIpcDispatcher({ ws: lease.workspace, transport: { kind: 'http', port: info.transport?.port ?? 0, locked: info.transport?.locked ?? true, publicUrl: info.transport?.publicUrl ?? null }, requestStop: () => undefined });
+      const dispatch = createIpcDispatcher({ ws: lease.workspace, transport: { kind: 'http', port: info.transport?.port ?? 0, locked: info.transport?.locked ?? true, publicUrl: info.transport?.publicUrl ?? null }, requestStop: () => undefined, revalidateOwner: () => { if (Date.now() >= expiresAt) throw new DodoError('AUTH_REQUIRED', 'owner session expired while queued'); reviewed(req, lease.services.workspaceId, lease.services.epoch); } });
       const result = await dispatch(b.operation,b.args);
       manager().store.audit({ principal: 'local-config-owner', workspaceId: lease.services.workspaceId, tool: `web.${b.operation}`, result: 'ok' });
       return result;
     } finally { lease.release(); }
   });
-  route('get', '/api/admin/config', () => {
-    const c = loadGlobalConfig(host.current().paths.configFile);
-    return { limits: c.limits, accessMode: c.accessMode, commandSandbox: c.commandSandbox, sandboxWritablePaths: c.sandboxWritablePaths, allowWebFetch: c.allowWebFetch, lsp: c.lsp, logRetentionDays: c.logRetentionDays, toolSurface: c.toolSurface, exposeSubagentsToMcp: c.exposeSubagentsToMcp, envAllowlist: c.envAllowlist, secretDeny: c.secretDeny, secretAllow: c.secretAllow };
-  });
-  route('post', '/api/admin/config', req => {
-    reviewed(req); const patch = GlobalConfigSchema.pick({ limits:true, accessMode:true, commandSandbox:true, sandboxWritablePaths:true, allowWebFetch:true, lsp:true, logRetentionDays:true, toolSurface:true, exposeSubagentsToMcp:true, envAllowlist:true, secretDeny:true, secretAllow:true }).partial().strict().parse(req.body);
-    const file = host.current().paths.configFile; saveGlobalConfig(file, GlobalConfigSchema.parse({ ...loadGlobalConfig(file), ...patch }));
-    if (patch.accessMode) setAccessMode(manager().store, patch.accessMode);
-    return { saved: true, restartRequired: Object.keys(patch).some(key => key !== 'accessMode') };
-  });
+    route('get', '/api/admin/config', () => {
+        const c = loadGlobalConfig(host.current().paths.configFile);
+        return { recovery: c.recovery, limits: c.limits, accessMode: c.accessMode, commandSandbox: c.commandSandbox, sandboxWritablePaths: c.sandboxWritablePaths, allowWebFetch: c.allowWebFetch, lsp: c.lsp, logRetentionDays: c.logRetentionDays, toolSurface: c.toolSurface, exposeSubagentsToMcp: c.exposeSubagentsToMcp, disabledDiscoverOperations: c.disabledDiscoverOperations, envAllowlist: c.envAllowlist, secretDeny: c.secretDeny, secretAllow: c.secretAllow };
+    });
+    route('get', '/api/admin/discover-exposure', () => {
+        const c = loadGlobalConfig(host.current().paths.configFile);
+        return discoverExposure({
+            subagents: c.exposeSubagentsToMcp,
+            disabledDiscoverOperations: c.disabledDiscoverOperations,
+        });
+    });
+    route('post', '/api/admin/config', req => {
+        reviewed(req);
+        const patch = GlobalConfigSchema.pick({ recovery: true, limits: true, accessMode: true, commandSandbox: true, sandboxWritablePaths: true, allowWebFetch: true, lsp: true, logRetentionDays: true, toolSurface: true, exposeSubagentsToMcp: true, disabledDiscoverOperations: true, envAllowlist: true, secretDeny: true, secretAllow: true }).partial().strict().parse(req.body);
+        const normalizedPatch = patch.disabledDiscoverOperations === undefined
+            ? patch
+            : { ...patch, disabledDiscoverOperations: normalizeDisabledDiscoverOperations(patch.disabledDiscoverOperations) };
+        const file = host.current().paths.configFile;
+        saveGlobalConfig(file, GlobalConfigSchema.parse({ ...loadGlobalConfig(file), ...normalizedPatch }));
+        if (normalizedPatch.accessMode)
+            setAccessMode(manager().store, normalizedPatch.accessMode);
+        return { saved: true, restartRequired: Object.keys(normalizedPatch).some(key => key !== 'accessMode') };
+    });
   route('post', '/api/admin/setup', async req => {
     reviewed(req); const b = z.object({ mode: z.enum(['check','plan','install']), components: z.array(z.enum(COMPONENTS)).min(1), confirmInstall: z.boolean().default(false) }).strict().parse(req.body);
     const options = { cwd: host.current().rootInfo.root, configDir: host.current().configDir, components: b.components };

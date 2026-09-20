@@ -177,7 +177,7 @@ describe('DIRECT: coding-agent tools', () => {
     git(['config', 'user.email', 'test@example.com']);
     git(['config', 'user.name', 'Test']);
     const first = await call('git_commit', { message: 'initial import', all: true });
-    expect(first.isError).toBe(false);
+    expect(first.isError, JSON.stringify(first.envelope.error)).toBe(false);
     const d = data(first.envelope);
     expect(d['commit']).toMatch(/^[0-9a-f]{40}$/);
     expect((d['stagedPaths'] as string[])).not.toContain('.env'); // secret never staged

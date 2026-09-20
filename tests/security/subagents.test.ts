@@ -67,7 +67,7 @@ describe('subagent authorization, approval and recovery boundaries',()=>{
     const f=await fixture('write_file',{path:'blocked.txt',content:'must not write'});let release=()=>undefined as void;
     const held=f.ctx.server.services.mutations!.run(()=>new Promise<void>(r=>{release=r;}));
     try{
-      const id=idOf(await f.spawn());await until(()=>f.ctx.server.services.mutations!.pending>0);
+      const id=idOf(await f.spawn());await until(()=>f.ctx.server.services.mutations!.pending>0 && f.calls()>0);
       await expect(f.ai.settings.saveConnection({...f.connection,baseUrl:f.connection.baseUrl+'/new'},'new-fixture-key')).rejects.toMatchObject({code:'CONFLICT'});
       f.manager.store.setClientAccess(f.ctx.server.workspaceId,f.token.clientId,[]);release();await held;
       await until(()=>f.ai.status(id,f.manager.owner()).status==='waiting_auth');expect(fs.existsSync(path.join(f.ctx.fixtureDir,'blocked.txt'))).toBe(false);expect(f.calls()).toBe(1);
@@ -77,7 +77,7 @@ describe('subagent authorization, approval and recovery boundaries',()=>{
     const f=await fixture('edit_file',{path:'a.txt',expectedHash:'sha256:8ed3f6ad685b959ead7022518e1af76cd816f8e8ec7ccdda1ed4018e8f2223f8',edits:[{find:'alpha',replace:'beta'}]});let release=()=>undefined as void;
     fs.writeFileSync(path.join(f.ctx.fixtureDir,'a.txt'),'alpha');const held=f.ctx.server.services.mutations!.run(()=>new Promise<void>(r=>{release=r;}));
     try{
-      const id=idOf(await f.spawn());await until(()=>f.ctx.server.services.mutations!.pending>0);fs.writeFileSync(path.join(f.ctx.fixtureDir,'a.txt'),'external');release();await held;
+      const id=idOf(await f.spawn());await until(()=>f.ctx.server.services.mutations!.pending>0 && f.calls()>0);fs.writeFileSync(path.join(f.ctx.fixtureDir,'a.txt'),'external');release();await held;
       await until(()=>f.ai.status(id,f.principal).status==='completed');expect(fs.readFileSync(path.join(f.ctx.fixtureDir,'a.txt'),'utf8')).toBe('external');
       expect(f.ai.events(id,f.principal).map(e=>e.payload)).toContainEqual(expect.objectContaining({operation:'edit_file',ok:false,error:expect.objectContaining({code:'FILE_CHANGED'})}));
     }finally{release();await held;await f.close();}

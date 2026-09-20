@@ -363,3 +363,23 @@ credentials ผ่าน private UI ผลต้องแยกตาม provide
 Live OpenAI, Gemini, Claude, MiniMax, GLM, Kimi, Ollama: MANUAL_NOT_RUN สำหรับงานนี้
 จนกว่าจะมีหลักฐานจาก account/model จริง Browser automation และ synthetic Keychain
 round-trip เป็น AUTOMATED_PASS ไม่ใช้แทน MANUAL_PASS ของ provider
+
+## Unreleased Recovery R00–R02
+
+Automation uses separate fixture projects, including Chromium desktop/narrow
+owner policy controls. Manual owner-device use and native Windows are
+`MANUAL_NOT_RUN`. R02 adds automated fixture HTTP/owner browser/restore/crash
+coverage. Before a release, an owner should create a fixture checkpoint, edit two
+files, preview one-file and session undo, inspect exact-mirror deletions, verify
+read-back, and inspect journal status after reconnect. Test backup opt-out,
+external-edit conflict and restart with fresh context. Do not exercise this manual
+gate on a production database or count automated browser tests as MANUAL_PASS.
+
+## Unreleased R03 — MANUAL_NOT_RUN on owner projects
+
+In disposable projects: capture dirty/staged/untracked source; externally overwrite files while preserving size/mtime; verify target writes refuse and unrelated edits remain available. Review paginated drift, reject stale digest/epoch, then explicitly acknowledge or preview/restore. Verify emergency snapshots do not replace the baseline. Run a command that changes source and check unknown-author attribution after job completion. Confirm independent Git refs/objects, unchanged working index/HEAD/branch, and no hooks/filter markers. Remove the selected backup volume: expect refusal without fallback. Delete source and working `.git` while retaining root identity: preview/restore source only. Root replacement, real removable volumes, native Windows/Android and owner live projects require separate manual acceptance. Browser fixture automation is reported as AUTOMATED_PASS only after it runs.
+
+
+## Unreleased Recovery R04
+
+Fixture browser automation covers project registration, default-on recovery, actual recipe evidence, owner names/pins, stale files, restore read-back and quota-blocked UI on desktop/narrow screens. Before a release, an owner should separately test their own project/storage and restart/reconnect workflow, inspect retained pins/names, and re-run required recipes after source/config changes. Live owner projects, Windows/Android and production/database recovery are MANUAL_NOT_RUN for this phase. Do not label a manual owner name as tested or production-known-good.

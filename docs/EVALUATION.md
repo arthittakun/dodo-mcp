@@ -47,21 +47,21 @@ write → read → edit → read-back ผ่าน Compact gateway
 
 ## Platform gates
 
-macOS รันจาก owner checkout ส่วน Linux gate เดียวกันรันได้ทั้ง local Docker และ
-dedicated self-hosted GitHub Actions runner:
+macOS รันจาก checkout ส่วน Linux และ Windows ใช้ dedicated self-hosted GitHub
+Actions runner โดยตรง ไม่ใช้ Docker:
 
 ```bash
 # macOS บน checkout ปัจจุบัน
 npm run release:gate
 
-# Linux จริงใน Docker image แยก พร้อม Playwright Chromium
-npm run test:linux:docker
+# Linux และ Windows native CI / Node 22, 24
+gh workflow run platform-gates.yml --ref main -f platform=all
 ```
 
-Docker build ไม่รับ `.git`, `.npmrc`, `.env`, model, release evidence หรือเอกสารพัฒนา
-private เข้า build context ตัว runner ส่งเฉพาะ revision/dirty state ที่อ่านจาก host Git
-เข้า release gate และ DodoBench ผ่าน environment attestation ที่รับได้เฉพาะใน Linux
-container จากนั้นตรวจ report กลับว่าตรงกับ revision และ lock digest เดิม
+Linux workflow ตรวจ prerequisites, ติดตั้ง dependencies จาก lockfile และ Chromium
+แล้วพิสูจน์ว่า Chromium เปิดด้วย sandbox ได้ก่อนรัน gate อ่าน [CI](CI.md)
+สำหรับการเตรียมเครื่อง ใช้ `npm run release:gate:ci` เช่นเดียวกับ Windows
+ตรวจ Git HEAD ตรง GITHUB_SHA และ source สะอาดก่อนทดสอบ
 
 `.github/workflows/platform-gates.yml` ใช้ self-hosted labels `linux-ci` และ
 `windows-ci 02` ทดสอบ Node 22/24 เฉพาะ push ที่ `main` กับ manual dispatch ไม่มี
@@ -73,10 +73,14 @@ container จากนั้นตรวจ report กลับว่าตร�
 revision กับ `package-lock.json` เดียวกัน Windows ถูกระบุเป็น
 `DEFERRED_MANUAL_NOT_RUN` และไม่ถูกนับเป็น supported release platform ในช่วงนี้
 Manual external-AI, owner workspace และ Windows 11 อยู่แยกเป็น `MANUAL_NOT_RUN`
-Strict gate รับ Linux evidence เฉพาะ `docker-host-git` จาก clean checkout พร้อม
-fresh-install PASS จึงไม่รับ candidate ที่มี uncommitted source หรือ report จาก runner
-ชนิดอื่น Report บันทึก origin ว่ามาจาก local หรือ GitHub Actions ตามจริง ไม่มีคำสั่ง
-เหล่านี้ publish npm
+Strict gate รับ Linux evidence เฉพาะ `local-git` และ origin `github-actions-native`
+จาก clean checkout พร้อม fresh-install PASS และ suites ที่ผ่านจริง ต้องตรงทั้ง
+revision/source fingerprint/lock digest จึงไม่รับ uncommitted source หรือ Docker
+report เก่ามาแทน native CI Report บันทึก origin ตามจริง ไม่มีคำสั่งเหล่านี้ publish npm
+
+ผลทดสอบและ private diagnostics อยู่ใน runner ใต้ ignored `release-evidence/ci/`
+แยกตาม run ID/attempt/platform/Node ไม่เขียนทับหลักฐานจากการ rerun
+อัปโหลดเฉพาะ allowlisted summary ไม่ส่ง raw test logs หรือ private state ขึ้น artifact
 
 ## Security invariants
 

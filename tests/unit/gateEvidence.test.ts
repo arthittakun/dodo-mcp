@@ -7,11 +7,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 // The gate runs before build; its source is dependency-free ESM, not dist code.
 const moduleUrl = pathToFileURL(path.resolve('scripts/gate-evidence.mjs')).href;
-const { sourceFingerprint, testCounts, sanitizeGateReport, readAuditEvidence } = await import(moduleUrl) as {
+const { sourceFingerprint, testCounts, sanitizeGateReport, readAuditEvidence, matchPlatformEvidence } = await import(moduleUrl) as {
   sourceFingerprint: (root: string) => string;
   testCounts: (value: unknown) => unknown;
   sanitizeGateReport: (value: unknown) => Record<string, unknown>;
   readAuditEvidence: (value: unknown) => { vulnerabilities: Record<string, number> };
+  matchPlatformEvidence: (value: unknown, expected: Record<string, unknown>) => { platform: string; origin: string };
 };
 const owned: string[] = [];
 function directory() { const p = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-gate-evidence-')); owned.push(p); return p; }
@@ -126,6 +127,52 @@ describe('allowlisted release evidence', () => {
   it('rejects a public pass claiming audit failure with zero findings', () => {
     const input = report(); input.steps.find(s => s.id === 'audit')!.status = 1;
     expect(() => sanitizeGateReport(input)).toThrow();
+  });
+
+  function platformReport(platform = 'linux', origin = 'github-actions-native') {
+    const input = report();
+    return { ...input, source: { ...input.source, dirty: false },
+      host: { ...input.host, platform }, platforms: { [platform]: 'AUTOMATED_PASS' },
+      platformOrigins: { [platform]: origin }, platformPolicy: { githubActionsUsed: origin === 'github-actions-native' } };
+  }
+  function expectedCandidate() {
+    const input = report();
+    return { requiredPlatforms: ['darwin', 'linux'], name: input.package.name, version: input.package.version,
+      revision: input.source.revision, fingerprint: input.source.fingerprint, dependencyLockSha256: input.source.dependencyLockSha256 };
+  }
+
+  it('accepts native Linux CI and macOS evidence for exactly the same clean source', () => {
+    expect(matchPlatformEvidence(platformReport(), expectedCandidate())).toEqual({ platform: 'linux', origin: 'github-actions-native' });
+    expect(matchPlatformEvidence(platformReport('darwin', 'local'), expectedCandidate())).toEqual({ platform: 'darwin', origin: 'local' });
+  });
+
+  it('rejects Docker and local Linux reports instead of treating them as native CI', () => {
+    for (const origin of ['local', 'local-docker', 'github-actions-docker']) {
+      expect(() => matchPlatformEvidence(platformReport('linux', origin), expectedCandidate())).toThrow('invalid gate evidence');
+    }
+    const input = platformReport(); input.source.provenance = 'docker-host-git';
+    expect(() => matchPlatformEvidence(input, expectedCandidate())).toThrow();
+    input.source.provenance = 'local-git'; input.platformPolicy.githubActionsUsed = false;
+    expect(() => matchPlatformEvidence(input, expectedCandidate())).toThrow();
+  });
+
+  it('rejects a different fingerprint, revision, lock or dirty candidate', () => {
+    for (const key of ['revision', 'fingerprint', 'dependencyLockSha256'] as const) {
+      const input = platformReport(); input.source[key] = key === 'revision' ? 'f'.repeat(40) : `sha256:${'f'.repeat(64)}`;
+      expect(() => matchPlatformEvidence(input, expectedCandidate())).toThrow();
+    }
+    const input = platformReport(); input.source.dirty = true;
+    expect(() => matchPlatformEvidence(input, expectedCandidate())).toThrow();
+  });
+
+  it('rejects false platform passes, missing fresh installs and failed test evidence', () => {
+    const noInstall = platformReport(); noInstall.freshInstall.status = 'NOT_RUN';
+    expect(() => matchPlatformEvidence(noInstall, expectedCandidate())).toThrow();
+    const failed = platformReport(); failed.tests.core.success = false;
+    expect(() => matchPlatformEvidence(failed, expectedCandidate())).toThrow();
+    const noPlatform = platformReport(); noPlatform.platforms.linux = 'NOT_RUN';
+    expect(() => matchPlatformEvidence(noPlatform, expectedCandidate())).toThrow();
+    expect(() => matchPlatformEvidence(platformReport('win32'), expectedCandidate())).toThrow();
   });
 
   it('CLI publishes only the summary and refuses to overwrite old evidence', () => {

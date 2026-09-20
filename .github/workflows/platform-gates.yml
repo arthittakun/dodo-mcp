@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Platform to test (Linux Docker may be verified locally)
+        description: Native self-hosted platform to test (no Docker)
         type: choice
         required: true
         default: windows
@@ -22,9 +22,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  linux-docker:
-    name: Linux Docker / Node ${{ matrix.node }}
-    # Local Docker evidence is accepted; remote Linux runs are owner-selected.
+  linux-native:
+    name: Linux native / Node ${{ matrix.node }}
+    # Remote Linux runs are owner-selected; execute directly on the runner.
     if: github.event_name == 'workflow_dispatch' && (inputs.platform == 'linux' || inputs.platform == 'all')
     strategy:
       fail-fast: false
@@ -35,8 +35,12 @@ jobs:
     defaults:
       run:
         shell: bash
+    env:
+      CI: "1"
+      DODO_TEST_REQUIRE_LINUX_MEDIA: "1"
+      DODO_CI_EVIDENCE: ${{ github.workspace }}/release-evidence/ci/${{ github.run_id }}-${{ github.run_attempt }}/linux-node-${{ matrix.node }}
     steps:
-      - name: Checkout trusted main revision
+      - name: Checkout owner-selected revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           clean: true
@@ -46,23 +50,49 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - name: Verify Linux Docker runner
+      - name: Verify native Linux runner prerequisites
         run: |
           test "$RUNNER_OS" = Linux
-          if ! docker info >/dev/null 2>&1; then
-            echo "::error::Docker is unavailable to this runner. Ask the owner to check the daemon and runner access locally."
+          if test "$(id -u)" = 0; then
+            echo "::error::Run Linux CI as a non-root user; the browser tests require Chromium sandboxing."
             exit 1
           fi
-      - name: Run isolated Linux release gate
+          for dependency in git python3 make g++ ffmpeg ffprobe espeak-ng; do
+            if ! command -v "$dependency" >/dev/null 2>&1; then
+              echo "::error::Missing Linux runner prerequisite: $dependency. See docs/CI.md; this workflow does not change system packages."
+              exit 1
+            fi
+          done
+          printf 'TMPDIR=%s\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+      - name: Install dependencies and Playwright Chromium
+        run: |
+          npm ci --no-audit --no-fund
+          npx --no-install playwright install chromium
+      - name: Verify sandboxed Chromium launches on Linux
+        run: |
+          umask 077
+          mkdir -p "$DODO_CI_EVIDENCE"
+          if ! node --input-type=module >"$DODO_CI_EVIDENCE/chromium-probe.log" 2>&1 <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true, chromiumSandbox: true, timeout: 15000 });
+          try {
+            const page = await browser.newPage();
+            await page.setContent('<p>Native Linux CI fixture</p>');
+            if (!(await page.screenshot()).length) throw new Error('empty screenshot');
+          } finally { await browser.close(); }
+          JS
+          then
+            echo "::error::Sandboxed Chromium could not launch. Check Linux libraries and user namespaces per docs/CI.md. Details remain in the runner's private evidence directory."
+            exit 1
+          fi
+      - name: Run native Linux release candidate gate
         run: >-
-          node scripts/test-linux-docker.mjs
-          --node "${{ matrix.node }}"
-          --output-dir "$GITHUB_WORKSPACE/release-evidence/ci/linux-node-${{ matrix.node }}"
+          npm run release:gate:ci -- --output-dir "$DODO_CI_EVIDENCE"
       - name: Summarize Linux evidence
         id: linux_summary
         if: always()
         run: |
-          report="release-evidence/ci/linux-node-${{ matrix.node }}/gate-report.json"
+          report="$DODO_CI_EVIDENCE/gate-report.json"
           if test -f "$report"; then
             node scripts/gate-summary.mjs --input-dir "$(dirname "$report")" --github-summary
             echo "DODO_PUBLIC_SUMMARY_BEGIN"
@@ -78,7 +108,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-node-${{ matrix.node }}-summary
-          path: release-evidence/ci/linux-node-${{ matrix.node }}/public-summary.json
+          path: ${{ env.DODO_CI_EVIDENCE }}/public-summary.json
           if-no-files-found: error
           retention-days: 7
 
@@ -104,6 +134,7 @@ jobs:
     env:
       DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
       DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
+      DODO_CI_EVIDENCE: ${{ github.workspace }}/release-evidence/ci/${{ github.run_id }}-${{ github.run_attempt }}/windows-node-${{ matrix.node }}
     steps:
       - name: Prepare Git for Windows before checkout
         run: |
@@ -134,7 +165,7 @@ jobs:
             git -C $env:GITHUB_WORKSPACE config --local core.autocrlf false
             if ($LASTEXITCODE -ne 0) { throw "could not configure canonical checkout bytes" }
           }
-      - name: Checkout trusted main revision
+      - name: Checkout owner-selected revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           clean: true
@@ -165,7 +196,7 @@ jobs:
           cache: npm
       - name: Verify native Windows runner and enabled Administrator token
         run: |
-          $evidence = Join-Path $env:GITHUB_WORKSPACE "release-evidence/ci/windows-node-${{ matrix.node }}"
+          $evidence = $env:DODO_CI_EVIDENCE
           New-Item -ItemType Directory -Force $evidence | Out-Null
           $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
           $principal = [Security.Principal.WindowsPrincipal]::new($identity)
@@ -187,12 +218,12 @@ jobs:
           TMP: ${{ runner.temp }}
         run: >-
           npm run release:gate:ci --
-          --output-dir "%GITHUB_WORKSPACE%\release-evidence\ci\windows-node-${{ matrix.node }}"
+          --output-dir "%DODO_CI_EVIDENCE%"
       - name: Summarize Windows evidence
         id: windows_summary
         if: always()
         run: |
-          $reportFile = Join-Path $env:GITHUB_WORKSPACE "release-evidence/ci/windows-node-${{ matrix.node }}/gate-report.json"
+          $reportFile = Join-Path $env:DODO_CI_EVIDENCE "gate-report.json"
           if (Test-Path -LiteralPath $reportFile) {
             node scripts/gate-summary.mjs --input-dir (Split-Path -Parent $reportFile) --github-summary
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -209,6 +240,6 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-node-${{ matrix.node }}-summary
-          path: release-evidence/ci/windows-node-${{ matrix.node }}/public-summary.json
+          path: ${{ env.DODO_CI_EVIDENCE }}/public-summary.json
           if-no-files-found: error
           retention-days: 7

@@ -7,6 +7,7 @@ import { validateExecArgs } from '../jobs/commandInput.js';
 import { digestOf, newId, sha256Bytes } from '../../util/hash.js';
 import { HashSchema, RecipeSchema } from './contracts.js';
 
+export const VERIFICATION_PARSER_VERSION='dodo-checks/2';
 const Count = z.number().int().nonnegative();
 const SnapshotSchema = z.object({
   digest: HashSchema, entries: z.array(z.tuple([z.string(), HashSchema.nullable()])),
@@ -17,6 +18,8 @@ const StoredCheck = z.object({ taskId: z.string(), recipeDigest: z.string(), tit
 const RecordSchema = z.object({
   id: z.string(), workspaceId: z.string(), epoch: z.string(), principal: z.string(),
   files: z.array(z.string()), baseline: SnapshotSchema, checks: z.array(StoredCheck),
+  parserVersion:z.string().default('legacy/1'),
+  recoveryCheckpointId:z.string().nullable().default(null),
   observedDrift: z.boolean(), nodeVersion: z.string(), platform: z.string(), createdAt: z.number(),
 });
 type VerificationRecord = z.infer<typeof RecordSchema>;
@@ -40,6 +43,7 @@ export const VerificationSchema = z.object({
     complete: z.boolean(), monitoredFiles: Count, skippedFiles: Count, changedPaths: z.array(z.string()),
     changedPathsTruncated: z.boolean(), checkedAt: z.number(), scope: z.literal('guarded_nonignored_workspace_before_and_report'),
   }),
+  recovery:z.object({checkpointId:z.string(),manifestHash:HashSchema,state:z.enum(['VERIFIED','FAILED','INCONCLUSIVE','STALE']),checkedAt:z.number(),reason:z.string()}).optional(),
   notRun: z.array(z.string()), notes: z.array(z.string()), replayed: z.boolean(),
 });
 export type VerificationResult = z.infer<typeof VerificationSchema>;
@@ -99,7 +103,7 @@ export function summarizeTests(text: string): TestSummary {
         })).optional() })).optional(),
       }).parse(JSON.parse(plain.slice(start, end + 1)));
       const skipped = (parsed.numPendingTests ?? 0) + (parsed.numTodoTests ?? 0);
-      if (parsed.numPassedTests + parsed.numFailedTests + skipped > parsed.numTotalTests) return empty;
+      if (parsed.numPassedTests + parsed.numFailedTests + skipped !== parsed.numTotalTests) return empty;
       return { source: 'json', total: parsed.numTotalTests, passed: parsed.numPassedTests, failed: parsed.numFailedTests, skipped,
         failures: (parsed.testResults ?? []).flatMap(r => r.assertionResults ?? []).filter(r => r.status === 'failed').slice(0, 5).map(r => `${r.fullName ?? 'test'}: ${(r.failureMessages ?? []).join(' ')}`.slice(0, 500)),
       };
@@ -141,9 +145,11 @@ function render(ctx: ToolCtx, record: VerificationRecord, mode: VerifyInput['mod
   const s = ctx.services, current = captureSnapshot(s, record.files);
   const before = new Map(record.baseline.entries), after = new Map(current.entries);
   const changedPaths = [...new Set([...before.keys(), ...after.keys()])].filter(p => before.get(p) !== after.get(p)).sort();
-  const sameRuntime = record.epoch === s.epoch && record.nodeVersion === process.version;
-  const matches = current.digest === record.baseline.digest && !record.observedDrift && sameRuntime;
-  if (changedPaths.length && !record.observedDrift) { record.observedDrift = true; save(s, record); }
+  const sameRuntime = record.epoch === s.epoch && record.nodeVersion === process.version && record.platform === process.platform && record.parserVersion === VERIFICATION_PARSER_VERSION;
+  const recipes=s.overview.discoverTasks(s.projectConfig);
+  const sameRecipes=record.checks.every(check=>recipes.some(r=>r.id===check.taskId&&r.recipeDigest===check.recipeDigest));
+  const matches = current.digest === record.baseline.digest && !record.observedDrift && sameRuntime && sameRecipes;
+  if ((changedPaths.length || !sameRecipes || !sameRuntime) && !record.observedDrift) { record.observedDrift = true; save(s, record); }
   const checks: VerificationResult['checks'] = record.checks.map(check => {
     if (!check.jobId) return { taskId: check.taskId, jobId: null, status: 'not_started', exitCode: null, commandPassed: false,
       tests: summarizeTests(''), environmentHint: null, outputTruncated: false, errorCode: check.errorCode };
@@ -162,7 +168,7 @@ function render(ctx: ToolCtx, record: VerificationRecord, mode: VerifyInput['mod
   else if (checks.some(c => c.status === 'running')) status = 'running';
   else if (checks.some(c => !c.commandPassed || (c.tests.failed ?? 0) > 0)) status = 'failed';
   else if (!matches) status = 'stale';
-  else if (!record.baseline.complete || !current.complete || checks.some(c => /test|pytest/.test(c.taskId) && (c.tests.total === null || c.tests.total === 0 || (c.tests.passed ?? 0) + (c.tests.failed ?? 0) === 0))) status = 'incomplete';
+  else if (!record.baseline.complete || !current.complete || checks.some(c=>c.outputTruncated) || checks.some(c => /test|pytest/.test(c.taskId) && (c.tests.total === null || c.tests.total === 0 || (c.tests.skipped??0)>0 || (c.tests.passed ?? 0) + (c.tests.failed ?? 0) === 0))) status = 'incomplete';
   const recommended = recommendations(s);
   return {
     mode, verificationId: mode === 'plan' ? null : record.id, status, files: record.files, checks,
@@ -175,11 +181,19 @@ function render(ctx: ToolCtx, record: VerificationRecord, mode: VerifyInput['mod
     notes: [...NOTES, ...(!sameRuntime ? ['Runtime restarted/switched since launch; evidence freshness is not established.'] : [])], replayed,
   };
 }
+async function finalReport(ctx:ToolCtx,record:VerificationRecord,mode:VerifyInput['mode'],replayed:boolean):Promise<VerificationResult>{
+  if(!record.recoveryCheckpointId||!ctx.services.recovery)return render(ctx,record,mode,replayed);
+  const evidence=await ctx.services.recovery.evidence.inspect(record.id,{id:ctx.principal.grantId});
+  const result=render(ctx,record,mode,replayed);
+  if(result.status==='passed'&&evidence.state!=='VERIFIED')result.status=evidence.state==='STALE'?'stale':evidence.state==='FAILED'?'failed':'incomplete';
+  return {...result,recovery:{checkpointId:evidence.checkpointId,manifestHash:evidence.manifestHash,state:evidence.state,checkedAt:evidence.checkedAt,reason:evidence.reason}};
+}
 export async function verifyChanges(ctx: ToolCtx, args: VerifyInput): Promise<VerificationResult> {
   const s = ctx.services;
   if (args.mode === 'report') {
     if (!args.verificationId) throw new DodoError('INVALID_INPUT', 'report needs verificationId');
-    return render(ctx, load(ctx, args.verificationId), 'report', false);
+    const record=load(ctx,args.verificationId);
+    return finalReport(ctx,record,'report',false);
   }
   if (args.verificationId) throw new DodoError('INVALID_INPUT', 'verificationId is only used for report');
   const files = [...new Set(args.files.map(file => s.wfs.normalizeRel(file)))];
@@ -187,7 +201,7 @@ export async function verifyChanges(ctx: ToolCtx, args: VerifyInput): Promise<Ve
     if (args.tasks.length) throw new DodoError('INVALID_INPUT', 'plan only discovers recipes; choose tasks in run');
     const baseline = captureSnapshot(s, files);
     return render(ctx, { id: '', workspaceId: s.workspaceId, epoch: s.epoch, principal: ctx.principal.grantId,
-      files, baseline, checks: [], observedDrift: false, nodeVersion: process.version, platform: process.platform, createdAt: Date.now() }, 'plan', false);
+      files, baseline, checks: [], recoveryCheckpointId:null, parserVersion:VERIFICATION_PARSER_VERSION, observedDrift: false, nodeVersion: process.version, platform: process.platform, createdAt: Date.now() }, 'plan', false);
   }
   if (!args.tasks.length || !args.idempotencyKey || !args.sourceDigest) throw new DodoError('INVALID_INPUT', 'run needs tasks, idempotencyKey and sourceDigest from plan.freshness.baselineDigest');
   if (new Set(args.tasks.map(t => t.taskId)).size !== args.tasks.length) throw new DodoError('INVALID_INPUT', 'duplicate verification task');
@@ -209,14 +223,17 @@ export async function verifyChanges(ctx: ToolCtx, args: VerifyInput): Promise<Ve
     if (s.jobs.runningCount() + selected.length > s.limits.jobsConcurrentMax) throw new DodoError('RESOURCE_LIMIT', 'not enough free job slots; select fewer tasks or wait for current jobs');
     const baseline = captureSnapshot(s, files);
     if (baseline.digest !== args.sourceDigest) throw new DodoError('FILE_CHANGED', 'source changed since verification plan; request plan again');
-    const record: VerificationRecord = { id: newId('verify'), workspaceId: s.workspaceId, epoch: s.epoch, principal: ctx.principal.grantId,
+    const recoveryCheckpointId=await s.recovery?.checkpoint('owner-checkpoint',ctx.principal.grantId)??null;
+    if(captureSnapshot(s,files).digest!==baseline.digest)throw new DodoError('FILE_CHANGED','source changed during verification snapshot; request plan again');
+    const record: VerificationRecord = { recoveryCheckpointId, parserVersion:VERIFICATION_PARSER_VERSION, id: newId('verify'), workspaceId: s.workspaceId, epoch: s.epoch, principal: ctx.principal.grantId,
       files, baseline, checks: selected.map(t => ({ taskId: t.id, recipeDigest: t.recipeDigest, title: t.title, jobId: null, errorCode: null })),
       observedDrift: false, nodeVersion: process.version, platform: process.platform, createdAt: Date.now() };
     save(s, record); // Never launch an unrecorded verification.
+    if(recoveryCheckpointId)await s.recovery!.evidence.bind(record.id,ctx.principal.grantId,recoveryCheckpointId);
     for (let i = 0; i < selected.length; i++) {
       const task = selected[i]!, check = record.checks[i]!;
       try {
-        const job = s.jobs.start({ workspaceId: s.workspaceId, epoch: s.epoch, principal: ctx.principal.grantId,
+        const job = await s.jobs.startProtected({ workspaceId: s.workspaceId, epoch: s.epoch, principal: ctx.principal.grantId,
           kind: 'task', recipeId: task.id, program: task.program, args: task.args, cwdRel: task.cwd, timeoutMs: args.timeoutMs });
         check.jobId = job.jobId;
       } catch (err) {
@@ -235,5 +252,18 @@ export async function verifyChanges(ctx: ToolCtx, args: VerifyInput): Promise<Ve
   });
   const record = load(ctx, result.verificationId);
   await Promise.all(record.checks.filter(c => c.jobId).map(c => s.jobs.waitForExit(c.jobId!, args.waitMs)));
-  return render(ctx, record, 'run', replayed);
+  return finalReport(ctx, record, 'run', replayed);
+}
+
+/** Backend-only projection of actual recorded jobs; never accepts model-supplied results. */
+export function readVerificationEvidence(s:AppServices,id:string,actor:string){
+  const ctx={services:s,principal:{grantId:actor,clientId:'evidence-reader',sub:'owner',scopes:['dodo:read']},trustMode:s.trustMode()} as ToolCtx;
+  const record=load(ctx,id),result=render(ctx,record,'report',false);
+  return {status:result.status,parserVersion:record.parserVersion,startedAt:record.createdAt,
+    environment:{nodeVersion:record.nodeVersion,platform:record.platform,epoch:record.epoch},
+    source:{baselineDigest:record.baseline.digest,currentDigest:result.freshness.currentDigest,complete:result.freshness.complete,scope:result.freshness.scope},
+    requiredChecks:record.checks.map(c=>({taskId:c.taskId,recipeDigest:c.recipeDigest,jobId:c.jobId})),
+    checks:result.checks.map(c=>({taskId:c.taskId,jobId:c.jobId,status:c.status,exitCode:c.exitCode,outputTruncated:c.outputTruncated,
+      counts:{source:c.tests.source,total:c.tests.total,passed:c.tests.passed,failed:c.tests.failed,skipped:c.tests.skipped}})),
+    notRun:result.notRun,limitations:NOTES};
 }

@@ -1,13 +1,16 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.0.4 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
+DODO MCP 1.2.1 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
 
 ## เริ่มใช้งานผ่านเว็บ
 
 1. เปิด `dodo start` หรือ `dodo --cli` แล้วเข้า Local Config จาก URL ส่วนตัวที่ terminal แสดง ใช้หน้าเว็บ loopback เท่านั้น หน้า "ภาพรวม" แสดงขั้นตอนถัดไป (เพิ่มโปรเจกต์ → เพิ่ม Provider → สร้าง Profile → เริ่มงาน) พร้อมสถานะและรายการที่ต้องตรวจสอบ
 2. หน้า "โปรเจกต์": เพิ่ม absolute path ของ A/B แล้วพร้อมใช้ทันที การเลือกดู B ไม่เปลี่ยน default และไม่หยุด A
 3. หน้า "Providers & Profiles" (ส่วน AI Providers): เลือก preset หรือ Custom, protocol, Base URL และกรอก key เลือกเฉพาะรอบนี้หรือ macOS Keychain ปุ่มบันทึกตรวจรูปแบบ/endpoint policy และแสดงสถานะบันทึกพร้อมเวลา; ปุ่มรายชื่อโมเดลเป็น credential test แยกจากการทดสอบ inference ผลบอกชื่อ connection, เวลา และเมื่อพลาดจะระบุว่าไม่ retry อัตโนมัติ
-4. หน้าเดียวกัน (ส่วน Agent Profiles): สร้าง Coding/Review/Research เลือก connection, Model ID, scopes, tool calling, image input และ budgets แล้วใช้กับทุกโปรเจกต์ที่ลงทะเบียนได้ทันที
+4. หน้าเดียวกัน (ส่วน Agent Profiles): เลือกประเภท Coding/Review/Research, connection และ
+   Model ID แล้วกด **สร้าง Agent** ได้เลย รายชื่อโมเดลที่โหลดจาก Provider จะปรากฏใน
+   Agent form อัตโนมัติ ถ้า endpoint ไม่รองรับ model-list ให้พิมพ์ Model ID เอง ส่วน scopes,
+   tool calling, image input, token budgets และราคาอยู่ใน **ตั้งค่าขั้นสูง**
 5. หากเป็น installation ที่แชร์หลาย client ให้เปลี่ยน Settings เป็น managed แล้วกำหนด trust, project ACL, profile/client allowlist และ source egress ต่อโปรเจกต์ (การสลับโหมดมีกล่องยืนยันเสมอ) ในโหมดส่วนตัว ฟอร์มสิทธิ์รายโปรเจกต์ถูกซ่อนและแทนด้วยโน้ตสั้นพร้อม tooltip
 6. ปุ่มทดสอบ inference/tool calling ส่งข้อมูลสังเคราะห์และอาจมีค่าใช้จ่าย ต้องยืนยันผ่านกล่อง warning ก่อนทุกครั้ง (ค่าใช้จ่ายที่ไม่ทราบแสดงว่า "ไม่ทราบ" ไม่ใช่ศูนย์) ระหว่างทดสอบมี loading modal และปุ่มถูกปิดกันส่งซ้ำ; ผลระบุชื่อ connection, Model ID, ชนิดการทดสอบ และเวลา ผลเก่าไม่รับรองค่าที่เปลี่ยนภายหลัง เมื่อพลาดจะแสดงทั้ง inline และ modal พร้อมข้อความว่าไม่ retry อัตโนมัติ โมเดลที่เปิด tool calling เองแต่ยังไม่ทดสอบยังไม่ถือว่า live coding integration ผ่าน
 7. หน้า "Chat & Tasks": เลือกโปรเจกต์/profile ระบุงาน ส่งงานหนึ่งครั้ง (มี idempotency key กันงานซ้ำเมื่อ reconnect) แล้วดู "Runs & Jobs" แสดงสถานะอ่านง่าย ข้อความ, tool receipts และผล jobs อยู่ใน details ที่พับได้ การยกเลิก/ลบประวัติต้องยืนยันก่อน
@@ -45,7 +48,7 @@ Ollama loopback อาจเรียก cloud model ได้ ต้องเ�
 
 ## MCP หลายโปรเจกต์
 
-Full มี 125 tools; Compact 19; Hybrid 49 operations ใหม่ใช้ gateways เดิม
+Complete Full มี 138 tools; Compact 20; Hybrid 49 โดย operations ใหม่ใช้ gateways เดิม
 
 ```text
 project_overview()

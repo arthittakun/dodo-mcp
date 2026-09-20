@@ -14,12 +14,12 @@ describe('SCHEDULE: durable separate consent',()=>{
     try{
       c.server.services.schedules.stop();
       const row=c.server.services.schedules.propose(spec());
-      c.server.services.schedules.tick(Date.now()+60_000);
+      await c.server.services.schedules.tick(Date.now()+60_000);
       expect(fs.existsSync(path.join(c.fixtureDir,'result.txt'))).toBe(false);
       await expect(control(c,'schedule.approve',{id:row.id,digest:'wrong'})).rejects.toThrow('hash');
       const approved=await control(c,'schedule.approve',{id:row.id,digest:row.digest}) as {nextAt:number};
-      c.server.services.schedules.tick(approved.nextAt);
-      c.server.services.schedules.tick(approved.nextAt);
+      await c.server.services.schedules.tick(approved.nextAt);
+      await c.server.services.schedules.tick(approved.nextAt);
       await finished(c);
       expect(fs.readFileSync(path.join(c.fixtureDir,'result.txt'),'utf8')).toBe('scheduled');
       const history=c.server.services.schedules.history(row.id);
@@ -37,7 +37,7 @@ describe('SCHEDULE: durable separate consent',()=>{
       const row=p.envelope['data'] as {id:string;digest:string};
       expect(c.server.services.schedules.inspect(row.id).status).toBe('pending');
       const approved=c.server.services.schedules.approve(row.id,row.digest);
-      c.server.services.schedules.tick(approved.nextAt!);
+      await c.server.services.schedules.tick(approved.nextAt!);
       await finished(c);
       expect(fs.readFileSync(path.join(c.fixtureDir,'result.txt'),'utf8')).toBe('scheduled');
     }finally{await c.cleanup();}
@@ -48,12 +48,12 @@ describe('SCHEDULE: durable separate consent',()=>{
       c.server.services.schedules.stop();
       const row=c.server.services.schedules.propose({...spec('sleep 60'),timeoutMs:120000});
       const a=c.server.services.schedules.approve(row.id,row.digest);
-      c.server.services.schedules.tick(a.nextAt!);
+      await c.server.services.schedules.tick(a.nextAt!);
       expect(c.server.services.jobs.runningCount()).toBe(1);
-      c.server.services.schedules.tick(a.nextAt!+60_000);
+      await c.server.services.schedules.tick(a.nextAt!+60_000);
       expect(c.server.services.schedules.history(row.id)[0]?.status).toBe('skipped_overlap');
       await control(c,'schedule.revoke',{id:row.id});await finished(c);
-      c.server.services.schedules.tick(a.nextAt!+120000);
+      await c.server.services.schedules.tick(a.nextAt!+120000);
       expect(c.server.services.jobs.runningCount()).toBe(0);
       const b=c.server.services.schedules.propose(spec());
       c.server.services.store.db.prepare('UPDATE schedules SET expires_at=? WHERE id=?').run(Date.now()-1,b.id);
@@ -76,9 +76,9 @@ describe('SCHEDULE: durable separate consent',()=>{
       expect(fs.existsSync(path.join(c.fixtureDir,'result.txt'))).toBe(false);
       const due=next.server.services.schedules.inspect(row.id).nextAt!;
       next.server.services.store.db.prepare("INSERT INTO schedule_runs VALUES (?,?,'claimed',NULL,NULL)").run(row.id,due);
-      next.server.services.schedules.tick(due);
+      await next.server.services.schedules.tick(due);
       expect(fs.existsSync(path.join(c.fixtureDir,'result.txt'))).toBe(false);
-      next.server.services.schedules.tick(due+60_000);
+      await next.server.services.schedules.tick(due+60_000);
       await finished(next);
       expect(fs.readFileSync(path.join(c.fixtureDir,'result.txt'),'utf8')).toBe('scheduled');
     }finally{await next.cleanup();}
@@ -91,7 +91,7 @@ describe('SCHEDULE: durable separate consent',()=>{
       const row=c.server.services.schedules.propose(spec());
       const approved=c.server.services.schedules.approve(row.id,row.digest);
       c.server.services.store.setTrustMode(c.server.workspaceId,'inspect');
-      c.server.services.schedules.tick(approved.nextAt!);
+      await c.server.services.schedules.tick(approved.nextAt!);
       expect(c.server.services.schedules.inspect(row.id).status).toBe('paused');
       c.server.services.store.setTrustMode(c.server.workspaceId,'trusted');
       const changed=c.server.services.schedules.propose(spec());
@@ -101,7 +101,7 @@ describe('SCHEDULE: durable separate consent',()=>{
       const r=c.server.services.schedules.propose(spec(),{grantId:t.grantId,clientId:t.clientId,sub:'owner',scopes:['dodo:exec']});
       const a=c.server.services.schedules.approve(r.id,r.digest);
       c.server.services.store.revokeGrant(t.grantId);
-      c.server.services.schedules.tick(a.nextAt!);
+      await c.server.services.schedules.tick(a.nextAt!);
       expect(c.server.services.schedules.inspect(r.id).status).toBe('paused');
       expect(fs.existsSync(path.join(c.fixtureDir,'result.txt'))).toBe(false);
     }finally{await c.cleanup();}
@@ -114,7 +114,7 @@ describe('SCHEDULE: durable separate consent',()=>{
       const second=new ScheduleService(c.server.services);
       const r=c.server.services.schedules.propose(spec());
       const a=c.server.services.schedules.approve(r.id,r.digest);
-      c.server.services.schedules.tick(a.nextAt!);second.tick(a.nextAt!);
+      await Promise.all([c.server.services.schedules.tick(a.nextAt!), second.tick(a.nextAt!)]);
       await finished(c);
       expect(c.server.services.schedules.history(r.id)).toHaveLength(1);
       expect(fs.readFileSync(path.join(c.fixtureDir,'result.txt'),'utf8')).toBe('scheduled');

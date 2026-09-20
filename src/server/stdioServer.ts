@@ -4,7 +4,7 @@ import { McpServer, type McpServerFactory } from '@modelcontextprotocol/server';
 import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { ipcSocketPath } from '../config/paths.js';
 import { ALL_SCOPES } from '../security/policy.js';
-import { registerSurface, surfaceStats, type ToolSurface } from '../tools/surface.js';
+import { registerSurface, surfaceStats, normalizeDisabledDiscoverOperations, type ToolSurface } from '../tools/surface.js';
 import { startOwnerControl } from '../ipc/ownerControl.js';
 import { bootstrapWorkspace } from './bootstrap.js';
 import { createIpcDispatcher } from './ipcDispatch.js';
@@ -60,7 +60,14 @@ export async function startStdioServer(opts: StdioOptions): Promise<RunningStdio
   // STDIO keeps the FULL per-tool catalog by default: local clients (Codex,
   // Claude Code, Cursor) rely on the individual tool contract (ADR-029).
   const surface: ToolSurface = opts.toolSurface ?? ws.config.toolSurface ?? 'full';
-  const surfaceFeatures = { subagents: ws.config.exposeSubagentsToMcp };
+  let disabledDiscoverOperations: string[];
+  try {
+    disabledDiscoverOperations = normalizeDisabledDiscoverOperations(ws.config.disabledDiscoverOperations);
+  } catch (error) {
+    await ws.shutdownServices();
+    throw error;
+  }
+  const surfaceFeatures = { subagents: ws.config.exposeSubagentsToMcp, disabledDiscoverOperations };
   const factory: McpServerFactory = () => {
     const server = new McpServer({ name: 'dodo', version: DODO_VERSION, title: 'DODO workspace server (stdio)' }, { instructions: instructionsFor(surface, surfaceFeatures) });
     registerSurface(server, ws.services, surface, surfaceFeatures);
@@ -100,7 +107,7 @@ export async function startStdioServer(opts: StdioOptions): Promise<RunningStdio
 
   {
     const stats = surfaceStats(surface, surfaceFeatures);
-    log(`[dodo] mcp tool surface | transport=stdio | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'}`);
+    log(`[dodo] mcp tool surface | transport=stdio | surface=${surface} | tools=${stats.toolCount} | schemaBytes=${stats.schemaBytes} | subagents=${surfaceFeatures.subagents ? 'on' : 'off'} | hiddenOperations=${surfaceFeatures.disabledDiscoverOperations.length}`);
   }
   log(`[dodo] stdio  |  workspace ${ws.rootInfo.root}  |  ${ws.workspaceId}  |  policy ${ws.services.trustMode()}  |  state ${ws.configDir}`);
   return { root: ws.rootInfo.root, workspaceId: ws.workspaceId, epoch: ws.epoch, ipcPath, close };

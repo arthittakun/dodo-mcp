@@ -77,6 +77,26 @@ export function readTestCounts(directory) {
   return result;
 }
 
+/** Merge only evidence for the same clean candidate. Linux release evidence
+ * must now come from native GitHub Actions, not a previous container run. */
+export function matchPlatformEvidence(evidence, expected) {
+  const summary = sanitizeGateReport(evidence);
+  const platform = evidence.host?.platform;
+  const origin = evidence.platformOrigins?.[platform];
+  requireValue(expected.requiredPlatforms.includes(platform));
+  requireValue(summary.status === 'AUTOMATED_PASS');
+  requireValue(evidence.package.name === expected.name && evidence.package.version === expected.version);
+  requireValue(evidence.source.revision === expected.revision && evidence.source.fingerprint === expected.fingerprint);
+  requireValue(evidence.source.dependencyLockSha256 === expected.dependencyLockSha256);
+  requireValue(evidence.source.dirty === false && evidence.source.provenance === 'local-git');
+  requireValue(evidence.freshInstall?.status === 'PASS' && evidence.platforms?.[platform] === 'AUTOMATED_PASS');
+  requireValue(typeof evidence.platformPolicy?.githubActionsUsed === 'boolean');
+  requireValue(origin === 'local' || origin === 'github-actions-native');
+  if (origin === 'github-actions-native') requireValue(evidence.platformPolicy.githubActionsUsed);
+  if (platform === 'linux') requireValue(origin === 'github-actions-native');
+  return { platform, origin };
+}
+
 function publicCounts(counts) {
   if (counts == null) return null;
   const result = {};

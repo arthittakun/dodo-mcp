@@ -45,7 +45,7 @@ export class MediaService {
     if (!result || result.owner !== actorKey(actor) || result.expiresAt < Date.now()) throw new DodoError('NOT_FOUND', 'unknown/expired media source for this client');
     this.storage.services.wfs.resolve(result.sourcePath, { allowMissing: true }); return result;
   }
-  private launch(actor: Actor, operation: WorkerSpecData['operation'], mediaId: string | null, input: string, extras: Partial<WorkerSpecData> = {}): string {
+  private async launch(actor: Actor, operation: WorkerSpecData['operation'], mediaId: string | null, input: string, extras: Partial<WorkerSpecData> = {}): Promise<string> {
     this.storage.check(); if (this.jobs.size >= 32) throw new DodoError('RESOURCE_LIMIT', 'media job limit reached; close completed media handles');
     const ffmpeg = this.requireProgram('ffmpeg'), ffprobe = this.requireProgram('ffprobe');
     const workerUrls = [new URL('./mediaWorker.js', import.meta.url), new URL('../../../dist/services/multimodal/mediaWorker.js', import.meta.url)];
@@ -55,7 +55,7 @@ export class MediaService {
       const spec = WorkerSpec.parse({ operation, input, directory, ffmpeg, ffprobe, startSec: 0, durationSec: 30, times: [], maxEdge: 1280, language: 'auto', ...extras });
       const specFile = path.join(directory, 'spec.json'); fs.writeFileSync(specFile, JSON.stringify(spec), { mode: 0o600, flag: 'wx' });
       const s = this.storage.services;
-      const job = s.jobs.start({ workspaceId: s.workspaceId, epoch: s.epoch, principal: actor.grantId, kind: 'exec', program: 'node', args: [worker, specFile], cwdRel: '.', timeoutMs: operation === 'transcribe' ? 600000 : 180000, stdin: false, network: false });
+      const job = await s.jobs.startProtected({ workspaceId: s.workspaceId, epoch: s.epoch, principal: actor.grantId, kind: 'exec', program: 'node', args: [worker, specFile], cwdRel: '.', timeoutMs: operation === 'transcribe' ? 600000 : 180000, stdin: false, network: false });
       this.jobs.set(job.jobId, { owner: actorKey(actor), mediaId, directory, operation, sandboxed: job.sandboxed, notes: [], expiresAt: Date.now() + 1800000 }); return job.jobId;
     } catch (err) { this.storage.removeDirectory(directory); throw err; }
   }
@@ -66,7 +66,7 @@ export class MediaService {
     try {
       const copied = await this.storage.copySource(file, directory);
       source = { id: newId('media'), owner: actorKey(actor), directory, ...copied, expiresAt: Date.now() + 1800000 }; this.sources.set(source.id, source);
-      const jobId = this.launch(actor, 'probe', source.id, source.path); await this.storage.services.jobs.waitForExit(jobId, waitMs);
+      const jobId = await this.launch(actor, 'probe', source.id, source.path); await this.storage.services.jobs.waitForExit(jobId, waitMs);
       return { mediaId: source.id, sourcePath: source.sourcePath, sourceHash: source.hash, bytes: source.size, expiresAt: source.expiresAt, job: this.report(actor, jobId) };
     } catch (err) { if (source) { this.sources.delete(source.id); this.storage.releaseSource(source.size); } this.storage.removeDirectory(directory); throw err; }
     finally { this.pendingOpens--; }
@@ -75,7 +75,7 @@ export class MediaService {
     const source = this.source(actor, id);
     if (kind === 'frames' && !opts.times.length) throw new DodoError('INVALID_INPUT', 'frames requires explicit timestamps');
     if (kind === 'audio' && opts.durationSec > 120) throw new DodoError('RESOURCE_LIMIT', 'audio excerpt cap is 120 seconds');
-    const jobId = this.launch(actor, kind, source.id, source.path, { times: opts.times, startSec: opts.startSec, durationSec: opts.durationSec, maxEdge: opts.maxEdge });
+    const jobId = await this.launch(actor, kind, source.id, source.path, { times: opts.times, startSec: opts.startSec, durationSec: opts.durationSec, maxEdge: opts.maxEdge });
     await this.storage.services.jobs.waitForExit(jobId, opts.waitMs); return this.report(actor, jobId);
   }
   async transcribe(actor: Actor, id: string, opts: { startSec: number; durationSec: number; language: string; modelFile?: string | undefined; waitMs: number }) {
@@ -85,7 +85,7 @@ export class MediaService {
     if (opts.modelFile) { const resolved = this.storage.services.wfs.resolve(opts.modelFile); this.storage.services.wfs.assertRegularFileForDirectAccess(resolved); model = resolved.abs; }
     else { const parent = path.dirname(model); try { if (fs.lstatSync(parent).isSymbolicLink()) throw new DodoError('PATH_DENIED', 'model directory must not be a symlink'); } catch (err) { if (err instanceof DodoError) throw err; } }
     if (!this.modelExists(model)) throw new DodoError('NOT_SUPPORTED', 'local GGML Whisper model missing or invalid; supply modelFile or install models/ggml-tiny.bin in the DODO config directory');
-    const jobId = this.launch(actor, 'transcribe', source.id, source.path, { whisper, model, startSec: opts.startSec, durationSec: opts.durationSec, language: opts.language });
+    const jobId = await this.launch(actor, 'transcribe', source.id, source.path, { whisper, model, startSec: opts.startSec, durationSec: opts.durationSec, language: opts.language });
     await this.storage.services.jobs.waitForExit(jobId, opts.waitMs); return this.report(actor, jobId);
   }
   async synthesize(actor: Actor, text: string, voice: string | undefined, waitMs: number) {
@@ -96,7 +96,7 @@ export class MediaService {
     // Disable embedded speech directives; never put private input text in argv or job logs.
     fs.writeFileSync(input, text.replace(/\[\[/g, '[ ['), { flag: 'wx', mode: 0o600 });
     let jobId: string;
-    try { jobId = this.launch(actor, 'speak', null, input, { speechProgram: speech.program, speechKind: speech.kind, ...(voice ? { voice } : {}) }); }
+    try { jobId = await this.launch(actor, 'speak', null, input, { speechProgram: speech.program, speechKind: speech.kind, ...(voice ? { voice } : {}) }); }
     catch (err) { this.storage.removeDirectory(directory); throw err; }
     this.jobs.get(jobId)!.inputDirectory = directory;
     await this.storage.services.jobs.waitForExit(jobId, waitMs); return this.report(actor, jobId);

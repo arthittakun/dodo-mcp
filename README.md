@@ -162,12 +162,24 @@ Chat & Tasks · Runs & Jobs · Approvals · Knowledge · Settings) หน้า�
 ไม่มี CDN, CSP `'self'` เท่าเดิม) การลบ/ยกเลิก/เปลี่ยนโหมดต้องยืนยันก่อนเสมอ
 และงานที่มีค่าใช้จ่ายหรือผลไม่แน่นอนจะบอกชัดว่า "ไม่ retry อัตโนมัติ"
 
+การสร้าง Agent ใช้หน้า **Providers & Profiles**: เลือกประเภท Coding/Review/Research,
+Provider connection และ Model ID แล้วกด **สร้าง Agent** รายชื่อโมเดลที่โหลดจาก
+Provider จะเข้าแบบฟอร์มให้อัตโนมัติ ส่วน permission, tool calling, token limits และราคา
+อยู่ในหัวข้อ **ตั้งค่าขั้นสูง** หาก endpoint ไม่รองรับการลิสต์โมเดลยังกรอก Model ID เองได้
+
 หน้า **Settings → Sub-agent tools ใน MCP** มีสวิตช์เปิด/ปิดการ expose
 `subagent_spawn`, `subagent_status`, `subagent_result` และ `subagent_control` ให้ AI
 ภายนอก ค่าเริ่มต้นปิดเพื่อให้ catalog สำหรับงานทั่วไปกระชับขึ้น แต่หน้า Chat & Tasks
 ยังสร้างและจัดการ agent ได้ตามเดิม เมื่อเปลี่ยนค่านี้ต้อง restart DODO แล้ว rescan หรือ
 สร้าง MCP app ใหม่ตามพฤติกรรมของ client การตั้งค่านี้เปลี่ยนเฉพาะการมองเห็น tools
 และไม่เพิ่ม OAuth scope, trust, approval หรือสิทธิ์ของ profile
+
+หน้า **Settings → Tools ที่ AI มองเห็น** เลือกเปิด/ปิดแต่ละ operation ได้ พร้อมค้นหา
+และเปิด/ปิดทั้งหมวด ค่าใช้กับ Compact/Hybrid: operation ที่ปิดจะหายจาก
+`dodo_discover`, gateway enum และ direct duplicate ใน Hybrid หากปิดครบทั้งหมวด gateway
+นั้นจะไม่ถูกส่งให้ client จึงลดทั้งจำนวน schema และ context ที่ AI ต้องอ่าน Full/STDIO
+ยังคง definitions รายตัวครบตามเดิม เมื่อบันทึกต้อง restart DODO แล้ว rescan หรือสร้าง
+MCP app ใหม่ การตั้งค่านี้เป็น visibility เท่านั้นและไม่ grant สิทธิ์ใด ๆ
 
 ### เพิ่มโปรเจกต์ครั้งเดียว แล้วสั่งงานด้วยชื่อ
 
@@ -470,6 +482,10 @@ dodo_read(operation="read_files", args={...})
 
 `dodo_discover` คืน schema ของ operation ที่เลือกและ hash ที่ deterministic ส่วน gateway จะส่ง request ผ่าน policy pipeline เดียวกับ tool รายตัว จึงยังตรวจ scope, ACL, workspace ID/epoch, trust, approval, path guard, secret guard, hash และ audit ครบทุกชั้น
 
+เจ้าของลดรายการที่ AI เห็นได้จาก **Local Config → Settings → Tools ที่ AI มองเห็น**
+โดยไม่แตะ permission เมื่อปิด operation แล้ว schema ของ Compact/Hybrid จะตัดรายการนั้น
+ออกจริงหลัง restart/rescan ส่วน Full surface ไม่เปลี่ยน
+
 ชื่อ gateway `dodo_*` เป็นชื่อ MCP protocol ที่คงไว้เพื่อ compatibility กับ client ที่เชื่อมต่ออยู่ การเปลี่ยนชื่อ gateway ต้องทำเป็น protocol migration แยกต่างหาก
 
 ## การเปลี่ยน workspace
@@ -551,18 +567,22 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 
 ## Development
 
-Platform CI ใช้ dedicated self-hosted runners ที่เจ้าของควบคุม: Linux X64 รันผ่าน
-Docker พร้อม Playwright Chromium และ Windows X64 รัน native candidate gate ส่วน
+Platform CI ใช้ dedicated self-hosted runners ที่เจ้าของควบคุม: Linux X64 และ
+Windows X64 รัน native candidate gate บนเครื่อง runner โดยตรง ไม่ใช้ Docker ส่วน
 macOS ยังรัน release gate บนเครื่องพัฒนา Workflow รับเฉพาะ push ที่ `main` และ manual
 dispatch ไม่รัน pull request จากภายนอกบน self-hosted runner
 
-รัน regression benchmark, macOS candidate gate และ Linux Docker gate ได้ด้วย:
+รัน regression benchmark และ macOS candidate gate ได้ด้วย:
 
 ```bash
 npm run bench
 npm run release:gate
-npm run test:linux:docker
 ```
+
+สั่ง Linux/Windows CI ผ่าน GitHub Actions → `platform-gates` → Run workflow →
+เลือก `all` หรือใช้ `gh workflow run platform-gates.yml --ref main -f platform=all`
+Linux รันเมื่อสั่ง workflow; Windows รันทั้งเมื่อ push ไป main และเมื่อสั่ง workflow
+อ่าน [การเตรียม runner และวิธีแก้ CI](docs/CI.md) ก่อนรันครั้งแรก
 
 GitHub workflow รัน Node 22 และ 24 ทั้ง Linux/Windows โดยไม่ publish npm Windows จะ
 ยังไม่ถูกประกาศเป็น supported platform จนกว่า automated native gate และ manual
@@ -572,8 +592,9 @@ Release gate สร้างหลักฐาน non-secret ใน ignored `rel
 exact-tarball ผ่าน STDIO Full กับ HTTP/OAuth Compact โดยไม่ publish npm ดูรายละเอียดที่
 [DodoBench และ Release Gate](docs/EVALUATION.md)
 
-เมื่อทั้งสอง report มาจาก Git revision และ `package-lock.json` เดียวกัน ให้รวมหลักฐาน
+เมื่อทั้งสอง report มาจาก clean Git revision, source fingerprint และ `package-lock.json` เดียวกัน ให้รวมหลักฐาน
 บน macOS ด้วย `node scripts/release-gate.mjs --release --platform-evidence /absolute/path/to/linux/gate-report.json`
+Linux report ต้องมาจาก native GitHub Actions; หลักฐาน Docker เก่าไม่แทน CI รอบใหม่
 คำสั่งนี้ไม่ publish package
 
 ```bash
@@ -586,3 +607,17 @@ npm pack
 ```
 
 โปรเจกต์นี้ใช้ GitHub repository [arthittakun/dodo-mcp](https://github.com/arthittakun/dodo-mcp) และ package `dodo-mcp`
+
+### Source Recovery ใน working source (ยังไม่ release)
+
+สำรอง source เป็นค่าเริ่มต้นเฉพาะโปรเจกต์ที่เจ้าของลงทะเบียน ก่อนแก้ไฟล์หรือรันคำสั่ง
+ตั้งค่าในหน้า Projects → Recovery หรือ `dodo recovery status`
+อ่าน [ขอบเขตและวิธีใช้](docs/RECOVERY.md) ระบบ snapshot มี preview/restore ใน source แล้ว แต่ยังไม่เผยแพร่บน npm
+ก่อนปล่อยให้ผู้ใช้ทั่วไป ไม่ใช่การอ้างว่ารุ่น npm ปัจจุบันมีฟังก์ชันนี้แล้ว
+
+Recovery development candidate: external file changes are detected by content hashes; owner review is available in the project Recovery card or `dodo recovery scan`. Independent Git copies preserve approved source without changing your index or branch. See [Recovery](docs/RECOVERY.md). This source work is not a published release.
+
+Recovery R04 ใน working source: หน้าโปรเจกต์แยกสำเนา `SAVED`, หลักฐาน
+`VERIFIED / FAILED / INCONCLUSIVE / STALE` และชื่อ `stable` ที่เจ้าของเลือกเอง
+มี Pin, ประวัติงาน, preview retention และ `dodo recovery evidence`
+ยังไม่ใช่ release และไม่ครอบคลุม production/ฐานข้อมูล ดู [คู่มือ Recovery](docs/RECOVERY.md).

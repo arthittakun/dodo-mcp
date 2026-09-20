@@ -1,3 +1,4 @@
+import { RecoveryService } from '../services/recovery/recoveryService.js';
 import { acquireProjectLease } from './projectLease.js';
 import { MutationQueue } from '../security/mutationQueue.js';
 import { isPersonalMode, setAccessMode } from '../security/accessMode.js';
@@ -172,6 +173,19 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     trustMode: () => (opts.runMode || isPersonalMode(store)) ? 'trusted' : store.trustMode(workspaceId),
   };
 
+  services.recovery = new RecoveryService(services, configDir);
+  applier.beforeMutation = async (opts, files) => {
+    await services.recovery!.checkpoint('before-write', opts.principal, files.flatMap(f => [f.path, ...(f.destPath ? [f.destPath] : [])]));
+  };
+  applier.onCommitted = files => services.recovery!.drift.committed(files);
+  applier.onChangeset = id => services.recovery!.history.record('changeset',id);
+  jobs.withRecovery = (actor,fn) => services.recovery!.history.around(actor,undefined,fn);
+  jobs.onRecorded = id => services.recovery!.history.record('job',id);
+  jobs.afterFinished = () => services.recovery!.observeJob();
+  jobs.beforeStart = async req => { await services.recovery!.checkpoint('before-exec', req.principal); };
+  jobs.requiresPreparation = () => Boolean(store.db.prepare('SELECT 1 FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(workspaceId));
+  services.recovery.activate();
+
   services.multimodal = new MultimodalService(services, configDir);
   services.resources = new ResourceService(services, configDir, paths.resourceStoreDir, paths.resourceStagingDir, installSecret);
   services.brain = new ProjectBrainService(services, installSecret);
@@ -198,6 +212,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
       if (closed) return;
       closed = true;
       services.schedules.stop();
+      await services.recovery?.close();
       services.memory?.close();
       services.contextEngine?.close();
       services.agentRuntime?.close();

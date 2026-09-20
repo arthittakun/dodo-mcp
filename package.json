@@ -1,8 +1,8 @@
 {
   "name": "dodo-mcp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "author": "Arthittakun",
-  "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
+  "description": "DODO \u2014 local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
   "license": "MIT",
   "engines": {
@@ -37,6 +37,7 @@
     "docs/MEMORY.md",
     "docs/MULTIMODAL.md",
     "docs/PROJECTS.md",
+    "docs/RECOVERY.md",
     "docs/RESOURCES.md",
     "docs/RUNTIME.md",
     "docs/RELEASE_1.0.0.md",
@@ -48,6 +49,7 @@
     "docs/RELEASE_1.0.6.md",
     "docs/RELEASE_1.1.0.md",
     "docs/RELEASE_1.2.0.md",
+    "docs/RELEASE_1.2.1.md",
     "docs/RELEASE_NOTES.md",
     "docs/SCHEDULES.md",
     "docs/SECURITY.md",

@@ -269,8 +269,12 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 `schemas/tools.json` เป็น complete full schema ส่วน compact และ hybrid เป็น schema แยก
 พร้อม metadata ของ optional feature ค่า `exposeSubagentsToMcp=false` จะกรองสี่
 Sub-agent definitions ออกจาก Full และกรองสี่ operation names ออกจาก gateway schemas,
-instructions และ `dodo_discover` ของ Compact/Hybrid โดยจำนวน gateway names ยังคง
-19/49 การเลือก surface หรือ feature exposure ไม่เปลี่ยน permission
+instructions และ `dodo_discover` ของ Compact/Hybrid โดยจำนวน tool definitions ยังคง
+20/49 การตั้งค่า `disabledDiscoverOperations` กรอง operation เพิ่มจาก discover และ
+gateway enum, ตัด Hybrid direct duplicate และไม่สร้าง gateway ที่ว่าง จึงทำให้ catalog
+runtime ต่ำกว่าค่าสูงสุดได้ Full direct catalog ไม่รับผลจากค่านี้ ทุก variant cache ด้วย
+canonical feature key และคำนวณ overview/stats จาก catalog ที่ serve จริง การเลือก
+surface หรือ feature exposure ไม่เปลี่ยน permission
 
 ## Personal และ managed access mode
 
@@ -369,3 +373,60 @@ Owner UI อยู่ `configUi/workbench.js/.css` ใช้ authenticated same-
 `aiAdmin.ts` บน private listener เท่านั้น CLI/advanced web controls ใช้ IPC dispatcher,
 setup/config validation ชุดเดิม ไม่มี secret fallback หรือการเปิด permission อัตโนมัติ
 รายละเอียด [ADR-045](adr/045-ai-providers-multiproject.md)
+
+## Journal write intent and owner recovery (unreleased)
+
+The applier uses one mutation lock for forward and inverse plans. The shared
+project queue also covers private owner rollback. Every original before-image is
+saved and verified before the first source write; sources are checked again
+after backup, before each syscall and before publication where applicable.
+Creation uses exclusive hard-link publication from a same-directory temporary
+file, preventing a late-arriving destination from being replaced. Modification
+uses atomic rename. Neither is a multi-file atomic transaction.
+
+Persisted journal states remain compatible: `pending` → `backed_up` → `written`
+(write intent, recorded **before** syscall) → `done` (verified after-state).
+A syscall can succeed without its next SQLite update succeeding. Compensation
+therefore examines every attempted step, including the currently failing one,
+and restores only a verified owned after-state from verified backups.
+
+A rollback creates a private inverse plan with reversed operation order and
+swapped before/after hashes. Its own backups contain pre-restore bytes.
+`journal-v2:<changesetId>` records direction/source linkage in the existing
+private metadata store; it grants no authority. Boot reconciliation verifies both
+ends of moves, current hashes and backup integrity, then finalizes bookkeeping
+in a transaction. All-before state is failed; mixed/unknown state is blocked for
+recovery. No source bytes are rewritten at startup.
+
+MCP rollback checks changeset ownership in the applier, so Full/Compact/agent
+paths cannot diverge. Authenticated owner administration exposes
+`recover.rollback` through the existing dispatcher, with strict arguments
+`changesetId`, `idempotencyKey`, `workspaceId`, `workspaceEpoch`. Web callers also
+send the selected project's reviewed context headers. The owner session is
+revalidated after queuing. This low-level operation is not a whole-project
+snapshot restore; the reviewed snapshot interface is described by ADR-052 below.
+
+Git staging now holds the real index lock while using a separate candidate
+index. A repository-wide, NUL-delimited staged-path inspection runs before and
+after staging, with relative-diff filtering disabled. Success publishes the
+candidate index only if the original still matches. Normal failure removes the
+candidate; uncertain commit outcomes retain it for owner inspection. No stash,
+reset, clean, remote push or private checkpoint commit is performed.
+
+## Source Recovery foundation (unreleased)
+
+Leased project runtimes own default-on scoped content snapshots, SQLite references
+and reservations, and a CAS independent of resource GC. Source mutations capture
+and verify before effects; protected async job startup holds the shared queue.
+See [ADR-051](adr/051-source-recovery-foundation.md). Reviewed session/restore flow: [ADR-052](adr/052-reviewed-source-restore.md).
+
+## Unreleased Recovery R03
+
+`RecoveryDrift` persists expected manifests independently of snapshots. Applier advances expected entries inside the same transaction as final verified journal commit. Target writes compare hashes; commands scan the source scope; job termination observes changes before releasing its mutation ticket. Idle scans are bounded and coalesced. Private owner acknowledgement uses exact content digest + workspace/epoch and revalidates authority after asynchronous reads.
+
+`RecoveryGitCopies` builds independent bare repositories from verified CAS bytes, private indexes and create-only refs; it never stages or rewrites working Git. Optional owner-selected storage pins canonical directory identity. Git reservations/copies share recovery quotas; source retention prunes matching owned copies. Verification checkpoints require fresh owned verification evidence before publication. See [ADR 053](adr/053-content-drift-and-private-git-recovery.md).
+
+
+## Unreleased Recovery R04
+
+RecoveryEvidence binds pre-run source manifests to existing verify_changes jobs and recipe digests. Live inspection checks the full Recovery source scope and current recipes/runtime; observed stale state is sticky. Safe evidence projections omit logs and environment values. Revisioned owner pointers, tombstones and audit events are separate from immutable manifests and execution permissions. Retention preview and prune use the same protected-reference calculation. The dashboard is bundled as ui/recovery.js. See [ADR 054](adr/054-verified-source-checkpoints.md).

@@ -1,8 +1,8 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.",
   "version": 1,
-  "toolCount": 138,
-  "defaultLiveToolCount": 134,
+  "toolCount": 148,
+  "defaultLiveToolCount": 144,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -32,6 +32,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -163,6 +169,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -331,6 +343,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -511,6 +529,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -665,6 +689,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -814,6 +844,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1047,6 +1083,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1223,6 +1265,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1386,6 +1434,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1580,6 +1634,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1734,6 +1794,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -1917,6 +1983,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2068,6 +2140,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2220,6 +2298,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2367,6 +2451,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2530,6 +2620,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2696,6 +2792,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -2861,6 +2963,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3157,6 +3265,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3304,7 +3418,7 @@
     {
       "name": "rollback_changes",
       "title": "Rollback changes",
-      "description": "Restore the files of a committed changeset to their pre-apply bytes from durable backups. Refused with per-file conflicts if ANY affected file was edited after the apply (human work is never overwritten). Takes the changesetId from apply_changes and a fresh idempotencyKey.",
+      "description": "Restore your own committed changeset to its pre-apply bytes from verified durable backups. Changesets owned by another caller require private owner recovery. Refused if any affected file or backup changed. Takes the changesetId from apply_changes and a fresh idempotencyKey.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -3316,6 +3430,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3470,6 +3590,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3612,6 +3738,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3774,6 +3906,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -3927,6 +4065,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4094,6 +4238,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4286,6 +4436,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4479,6 +4635,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4644,6 +4806,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4821,6 +4989,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -4968,6 +5142,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5138,6 +5318,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5292,6 +5478,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5449,6 +5641,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5596,6 +5794,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5745,6 +5949,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -5887,6 +6097,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6071,6 +6287,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6213,6 +6435,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6375,6 +6603,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6542,6 +6776,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6691,6 +6931,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6838,6 +7084,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -6996,6 +7248,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -7223,6 +7481,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -7365,6 +7629,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -7580,6 +7850,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -7861,6 +8137,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -8055,6 +8337,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -8436,6 +8724,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -8634,6 +8928,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -9056,6 +9356,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -9373,6 +9679,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -9617,6 +9929,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -9932,6 +10250,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -10304,6 +10628,41 @@
                     ],
                     "additionalProperties": false
                   },
+                  "recovery": {
+                    "type": "object",
+                    "properties": {
+                      "checkpointId": {
+                        "type": "string"
+                      },
+                      "manifestHash": {
+                        "type": "string",
+                        "pattern": "^sha256:[a-f0-9]{64}$"
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "VERIFIED",
+                          "FAILED",
+                          "INCONCLUSIVE",
+                          "STALE"
+                        ]
+                      },
+                      "checkedAt": {
+                        "type": "number"
+                      },
+                      "reason": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "checkpointId",
+                      "manifestHash",
+                      "state",
+                      "checkedAt",
+                      "reason"
+                    ],
+                    "additionalProperties": false
+                  },
                   "notRun": {
                     "type": "array",
                     "items": {
@@ -10420,6 +10779,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -12053,6 +12418,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -12411,6 +12782,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -12749,6 +13126,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -13308,6 +13691,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -13726,6 +14115,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -13992,6 +14387,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -14238,6 +14639,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -14465,6 +14872,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -14685,6 +15098,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -15039,6 +15458,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -15251,6 +15676,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -15556,6 +15987,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -15905,6 +16342,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -16073,6 +16516,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -16324,6 +16773,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -16561,6 +17016,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -16808,6 +17269,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -17032,6 +17499,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -17367,6 +17840,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -18011,6 +18490,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -18252,6 +18737,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -18623,6 +19114,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -18983,6 +19480,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -19343,6 +19846,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -19588,6 +20097,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -20011,6 +20526,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -20341,6 +20862,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -20706,6 +21233,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -21078,6 +21611,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -21435,6 +21974,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -21653,6 +22198,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -21866,6 +22417,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -22166,6 +22723,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -22498,6 +23061,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -22659,6 +23228,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -22995,6 +23570,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -23427,6 +24008,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -23780,6 +24367,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -24344,6 +24937,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -24957,6 +25556,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -25643,6 +26248,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -26870,6 +27481,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -27631,6 +28248,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -28863,6 +29486,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -29164,6 +29793,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -29540,6 +30175,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -29924,6 +30565,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -30262,6 +30909,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -30630,6 +31283,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -30930,6 +31589,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -31370,6 +32035,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -31517,6 +32188,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -31834,6 +32511,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -32055,6 +32738,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -32294,6 +32983,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -32516,6 +33211,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -32732,6 +33433,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -32918,6 +33625,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -33117,6 +33830,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -33313,6 +34032,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -33470,6 +34195,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -33639,6 +34370,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -33850,6 +34587,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34060,6 +34803,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34268,6 +35017,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34453,6 +35208,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34656,6 +35417,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34815,6 +35582,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -34969,6 +35742,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35123,6 +35902,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35279,6 +36064,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35421,6 +36212,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35563,6 +36360,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35713,6 +36516,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -35863,6 +36672,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -36018,6 +36833,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -36189,6 +37010,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -36351,6 +37178,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -36514,6 +37347,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -36819,6 +37658,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -37056,6 +37901,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -37238,6 +38089,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -37411,6 +38268,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
           "targetProjectId": {
             "description": "Explicit owner-registered target; use its project_overview context",
             "type": "string",
@@ -37489,6 +38352,1629 @@
           "args",
           "encoding",
           "maxBytes",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "restore_status",
+      "title": "restore status",
+      "description": "Read durable restore plan/journal outcomes after reconnect or uncertain delivery. Never automatically repeats apply.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "scan": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "scan"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "checkpoint_list",
+      "title": "checkpoint list",
+      "description": "List your source checkpoints with bounded pagination. Private owner controls can inspect cross-caller history; IDs never grant access.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "cursor": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "cursor",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "checkpoint_inspect",
+      "title": "checkpoint inspect",
+      "description": "Inspect allowed paths, hashes and coverage of your checkpoint; never returns raw secrets or private backup paths.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "checkpointId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "cursor": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "checkpointId",
+          "cursor",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "checkpoint_create",
+      "title": "checkpoint create",
+      "description": "Capture an independent source checkpoint before work. Includes allowed files only; never captures database/volume/secret data. Requires enabled owner policy.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recovery_session_list",
+      "title": "recovery session list",
+      "description": "List caller-owned recovery sessions, separate from chat memory.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "cursor": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "cursor",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recovery_session_inspect",
+      "title": "recovery session inspect",
+      "description": "Inspect session before-state metadata and ordered journal/job receipts. Shell authorship is unknown; never inferred as exclusive ownership.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "cursor": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "limit": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId",
+          "cursor",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recovery_session_begin",
+      "title": "recovery session begin",
+      "description": "Begin a caller-owned source recovery session. Pass returned sessionId as TOP-LEVEL recoverySessionId on subsequent mutations. Preserves pre-existing dirty/untracked source without changing Git index.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "title",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recovery_session_end",
+      "title": "recovery session end",
+      "description": "Close your session; does not stop jobs or undo anything. Closed/interrupted sessions can still be previewed for recovery.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "restore_preview",
+      "title": "restore preview",
+      "description": "Preview one checkpoint or session undo; no workspace writes. Return a bounded immutable plan/hash or conflicts. Default preserves extra/unrelated files. exactMirror explicitly includes extra source file deletions. Session undo refuses external/interleaved edits and unknown shell authorship.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "checkpointId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "paths": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1024
+            }
+          },
+          "exactMirror": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "exactMirror"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {},
+                "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "restore_apply",
+      "title": "restore apply",
+      "description": "Apply exactly the reviewed restore plan/hash with a durable idempotency key. Rechecks caller, project, epoch, source policy and hashes under the mutation queue, snapshots pre-restore state and uses the journal. Inspect trust still needs owner approval. Never reruns interrupted effects.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "planId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "planHash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "planId",
+          "planHash",
           "idempotencyKey"
         ],
         "additionalProperties": false

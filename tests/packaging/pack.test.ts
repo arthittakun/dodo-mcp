@@ -75,7 +75,7 @@ describe('PACK: npm tarball', () => {
     for (const asset of [
       'dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js', 'dist/server/remoteConfig.js',
       'dist/server/configUi/workbench.js', 'dist/server/configUi/workbench.css',
-      'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
+      'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/recovery.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
       'dist/server/configUi/vendor/sweetalert2.min.js', 'dist/server/configUi/vendor/sweetalert2.min.css',
     ]) {
       expect(fileList, asset).toContain(asset);
@@ -246,7 +246,7 @@ describe('PACK: npm tarball', () => {
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
     expect(compact.defaultLiveToolCount).toBe(20);
-    expect(compact.defaultLiveFullToolCount).toBe(134);
+    expect(compact.defaultLiveFullToolCount).toBe(144);
     expect(compact.optionalMcpFeatures.subagents).toMatchObject({
       default: false,
       operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
@@ -316,6 +316,37 @@ describe('PACK: npm tarball', () => {
       expect(JSON.stringify(result.structuredContent)).toContain('untrusted_content');
     } finally { await client.close(); }
   }, 120_000);
+
+  it('PACK-17: installed compact MCP backs up and restores registered source with retry receipt; no backup state is packaged', async () => {
+    for (const file of ['dist/services/recovery/recoveryService.js','dist/services/recovery/storage.js','dist/services/recovery/contracts.js','dist/services/recovery/evidence.js']) expect(fileList).toContain(file);
+    expect(fileList.some(f => /(?:^|\/)recovery\/(?:objects|staging|manifests)\//.test(f))).toBe(false);
+    const root = fs.mkdtempSync(path.join(workDir,'recovery-root-'));
+    const cfg = fs.mkdtempSync(path.join(workDir,'recovery-config-'));
+    fs.writeFileSync(path.join(root,'sample.txt'),'before');
+    const env = { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string,string>;
+    execFileSync(process.execPath,[installedBin,'project','add',fs.realpathSync(root),'--name','Recovery fixture','--access','full','--json'],{cwd:root,env,stdio:'pipe'});
+    const client = new Client({name:'packed-recovery-client',version:'1'});
+    await client.connect(new StdioClientTransport({command:process.execPath,args:[installedBin,'stdio','--tools','compact'],cwd:root,env,stderr:'pipe'}));
+    try {
+      const context=(await client.callTool({name:'project_overview',arguments:{}})).structuredContent as {workspaceId:string;workspaceEpoch:string};
+      const result=await client.callTool({name:'dodo_write',arguments:{workspaceId:context.workspaceId,workspaceEpoch:context.workspaceEpoch,operation:'edit_file',args:{path:'sample.txt',edits:[{find:'before',replace:'after'}]}}});
+      expect(result.isError,JSON.stringify(result.structuredContent)).not.toBe(true);
+      expect(fs.readFileSync(path.join(root,'sample.txt'),'utf8')).toBe('after');
+      const objects=path.join(cfg,'recovery','objects');
+      expect(fs.readdirSync(objects).some(name=>fs.readFileSync(path.join(objects,name),'utf8')==='before')).toBe(true);
+      const status=(await client.callTool({name:'project_overview',arguments:{}})).structuredContent;
+      expect(status).toMatchObject({ok:true,data:{recovery:{enabled:true,state:'READY',sourceOnly:true}}});
+      const gateway=async(name:string,operation:string,args:Record<string,unknown>)=>{
+        const r=await client.callTool({name,arguments:{workspaceId:context.workspaceId,workspaceEpoch:context.workspaceEpoch,operation,args}});
+        expect(r.isError,JSON.stringify(r.structuredContent)).not.toBe(true);return (r.structuredContent as {data:Record<string,unknown>}).data;
+      };
+      const history=await gateway('dodo_read','checkpoint_list',{}),checkpoint=(history.items as Array<{id:string}>)[0]!;
+      const plan=await gateway('dodo_write','restore_preview',{checkpointId:checkpoint.id});expect(plan.applicable).toBe(true);
+      const args={planId:plan.planId,planHash:plan.planHash,idempotencyKey:'packed-restore-retry'};
+      const restored=await gateway('dodo_write','restore_apply',args);expect(restored.verified).toBe(true);expect(fs.readFileSync(path.join(root,'sample.txt'),'utf8')).toBe('before');
+      expect((await gateway('dodo_write','restore_apply',args)).changesetId).toBe(restored.changesetId);
+    } finally { await client.close(); }
+  },120000);
 
   it('PACK-06: generated schemas match the current handlers (tool count, additionalProperties:false)', () => {
     const schema = JSON.parse(fs.readFileSync(path.join(ROOT, 'schemas/tools.json'), 'utf8')) as { toolCount: number; tools: Array<{ name: string; inputSchema: { additionalProperties: unknown } }> };

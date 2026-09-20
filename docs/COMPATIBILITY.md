@@ -95,10 +95,11 @@ Directory guard ไม่ใช่ OS sandbox, repository instructions ไม่
 ## Evaluation evidence
 
 DodoBench local fixture ใช้ยืนยัน contract บน platform/revision ที่ report ระบุเท่านั้น
-ผลของ macOS ไม่แทน Linux และ Linux Docker ไม่แทน Windows native Release gate ต้องมี
-หลักฐาน macOS local และ Linux Docker ที่ revision/lock digest ตรงกัน Docker image
-ติดตั้ง Playwright Chromium เพื่อรัน browser case จริง Dedicated self-hosted GitHub
-Actions รัน Linux Docker และ Windows native candidate เฉพาะ trusted main/manual
+ผลของ macOS ไม่แทน Linux และ Linux ไม่แทน Windows native Release gate ต้องมี
+หลักฐาน macOS local และ Linux native CI ที่ clean revision/source fingerprint/lock digest ตรงกัน
+Dedicated self-hosted GitHub Actions รัน Linux และ Windows โดยตรงบน Node 22/24
+ไม่ใช้ Docker; ตรวจ Chromium sandbox และ media dependencies บน Linux ก่อนรันทดสอบ
+Workflow รับเฉพาะ trusted main/manual ดู [CI](CI.md) สำหรับ prerequisites และการสั่งรัน
 Windows manual acceptance ยังคง `MANUAL_NOT_RUN` จนกว่าจะทดสอบบน Windows 11 จริง
 
 ## AI Providers / Multi-project

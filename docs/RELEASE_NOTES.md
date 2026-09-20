@@ -1,5 +1,68 @@
 # DODO MCP — Release Notes
 
+## Unreleased — native platform CI
+
+- Linux GitHub Actions now executes directly on the self-hosted runner, alongside
+  native Windows jobs on Node 22/24. No Docker build/run in the platform workflow.
+- Check Linux media prerequisites and a sandboxed Chromium launch before tests;
+  retain private diagnostics and upload only allowlisted summaries.
+- Separate evidence directories by run/attempt; require matching clean source
+  fingerprints and native Linux CI origin when combining release evidence.
+- Workflow validation and gate-evidence unit tests passed locally; native results
+  must come from the actual candidate workflow run. No npm release is implied.
+
+## Unreleased — reviewed source restore
+
+- Caller-owned recovery sessions and checkpoint history, bounded preview/diffs,
+  mandatory pre-restore backup and journaled apply with durable retry receipts.
+- Web/CLI owner review, session/external-edit conflicts, directory identity checks,
+  binary/mode restoration and restart reconciliation without replay.
+- Ten appended Full operations; Compact remains 20. Optional top-level
+  `recoverySessionId` groups edits; gateway nested context overrides are rejected.
+- Read-only tokens cannot restore; source-only scope excludes DBs, secrets,
+  volumes and remote effects. Native Windows/Android and live owner acceptance
+  remain separate manual gates. No release/publish is implied by this entry.
+
+## Unreleased — source Recovery foundation
+
+- Registered projects default to actual source backups before file mutations and
+  commands; owner web/CLI can explicitly disable or re-enable with audit.
+- Independent CAS, immutable manifests, shared quota reservations, drift/integrity
+  checks, retention and restart reconciliation; no automatic command replay.
+- Published 1.2.1 tool-visibility and simpler Agent form behavior retained.
+- This is working source only. R02 reviewed preview/restore is now implemented in this candidate; no release is published.
+
+## Unreleased — recovery safety prerequisite
+
+- `rollback_changes` now requires changeset ownership, consistent with agent
+  rollback; cross-caller recovery uses authenticated owner administration.
+  Existing changesets retain their original principal. OAuth scopes and
+  workspace/path/trust policies are unchanged.
+- Verify backup integrity and write intent before source changes; inverse
+  rollback journals and boot checks preserve conflicting external edits.
+- Inspect all staged Git paths, including pre-existing secrets/out-of-workspace
+  changes; preserve the original index on refused staging or commit.
+- Project-wide default-on snapshots are not part of this prerequisite change.
+  This entry does not indicate a published npm release.
+
+## 1.2.1 — สร้าง Agent แบบง่ายและ error ที่แก้ได้ตรงจุด
+
+- ลดขั้นตอนสร้าง Agent เหลือเลือกประเภท, Provider connection และ Model ID แล้วสร้างได้เลย
+- รายชื่อโมเดลที่โหลดจาก Provider ถูกนำมาให้เลือกใน Agent form ทันที; endpoint ที่ไม่มี
+  model-list ยังพิมพ์ Model ID เองได้
+- เพิ่ม Coding, Review และ Research presets โดยค่าละเอียดอยู่ในส่วนพับได้
+- ตรวจ Model ID, connection และขีดจำกัดตัวเลขใน browser ก่อนส่ง จึงไม่เหลือข้อความ
+  `invalid request` แบบไม่บอกสาเหตุสำหรับกรณีข้อมูลฟอร์มไม่ครบ
+- Owner API คืนเฉพาะชื่อ field ที่ไม่ถูกต้อง ไม่สะท้อน API key หรือค่าที่ผู้ใช้กรอก
+- เพิ่มหน้า Settings สำหรับเปิด/ปิด operation รายตัวใน Compact/Hybrid พร้อมค้นหา,
+  สวิตช์รายรายการ, เปิด/ปิดทั้งหมวด และตัวนับที่มีผลจริง
+- operation ที่ปิดหายจาก `dodo_discover`, gateway enum และ Hybrid direct duplicate;
+  gateway ที่ว่างจะไม่ถูกส่งให้ client ส่วน Full/STDIO ไม่เปลี่ยน
+- การตั้งค่านี้เปลี่ยนเฉพาะ visibility ไม่ grant OAuth scope, project access, trust,
+  approval, sandbox หรือข้าม guards และต้อง restart/rescan หลังบันทึก
+
+รุ่นนี้เตรียมเป็น patch `1.2.1`; การ publish และ live-provider manual test เป็น gate แยก
+
 ## 1.2.0 — Cloudflare Local และสิทธิ์ต่อโปรเจกต์ที่มองเห็นได้
 
 - แยกการเชื่อมต่อเป็นสามโหมด: เฉพาะเครื่อง (Loopback), Cloudflare Local ที่ผู้ใช้
@@ -218,3 +281,15 @@ dodo --version
 ```
 
 หลังติดตั้งให้ restart DODO process และ rescan MCP connection ตามข้อกำหนดของ client
+
+## Unreleased Recovery R03 candidate
+
+Adds content-based external drift checks, exact owner acknowledgement in Web/CLI, unknown-author post-job observations, and independent private Git source copies. Does not increase the MCP catalog count, alter OAuth scopes, automatically approve actions, or publish a version. Automated platform evidence is recorded in TEST_REPORT; live owner data and Windows/Android remain separate manual gates.
+
+
+## Unreleased Recovery R04
+
+- Bind actual verification jobs to before-run source snapshots; expose exact manifest/recipe/parser evidence with stale/inconclusive states.
+- Add private owner revisioned names, pin/unpin, protected retention preview and a separate Recovery UI module.
+- Keep Full 148 / Compact 20 and existing OAuth/ACL/context/approval/path/sandbox checks.
+- Source candidate only; no npm publication or deployment/database protection is claimed.

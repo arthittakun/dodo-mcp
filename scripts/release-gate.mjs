@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { npmInvocation } from './npm-process.mjs';
-import { sourceFingerprint, readTestCounts, readAuditEvidence } from './gate-evidence.mjs';
+import { sourceFingerprint, readTestCounts, readAuditEvidence, matchPlatformEvidence } from './gate-evidence.mjs';
 import { privateCommand } from './gate-command.mjs';
 
 let initializedLog;
@@ -155,30 +155,16 @@ if (!failure && Object.hasOwn(platforms, process.platform)) {
 for (const file of options.platformEvidence) {
   try {
     const evidence = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const platform = evidence.platform ?? evidence.host?.platform;
-    const evidenceRevision = evidence.revision ?? evidence.source?.revision;
-    const evidenceLock = evidence.dependencyLockSha256 ?? evidence.source?.dependencyLockSha256;
-    const expectedProvenance = platform === 'linux' ? 'docker-host-git' : 'local-git';
-    if (
-      requiredPlatforms.includes(platform) &&
-      evidence.status === 'AUTOMATED_PASS' &&
-      evidence.package?.name === pkg.name &&
-      evidence.package?.version === pkg.version &&
-      evidenceRevision === revision &&
-      evidenceLock === `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` &&
-      evidence.source?.dirty === false &&
-      evidence.source?.provenance === expectedProvenance &&
-      typeof evidence.platformPolicy?.githubActionsUsed === 'boolean' &&
-      evidence.freshInstall?.status === 'PASS'
-    ) {
-      platforms[platform] = 'AUTOMATED_PASS';
-      platformOrigins[platform] = evidence.platformOrigins?.[platform]
-        ?? (evidence.platformPolicy.githubActionsUsed ? 'github-actions' : 'local');
-    }
-    else throw new Error('platform evidence does not match package/revision/lock/clean-source/provenance/status');
+    const { platform, origin } = matchPlatformEvidence(evidence, {
+      requiredPlatforms, name: pkg.name, version: pkg.version, revision, fingerprint,
+      dependencyLockSha256: `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}`,
+    });
+    platforms[platform] = 'AUTOMATED_PASS';
+    platformOrigins[platform] = origin;
   } catch (error) { failure ??= `invalid platform evidence ${file}: ${error instanceof Error ? error.message : String(error)}`; }
 }
-const platformComplete = requiredPlatforms.every((platform) => platforms[platform] === 'AUTOMATED_PASS');
+const platformComplete = requiredPlatforms.every((platform) => platforms[platform] === 'AUTOMATED_PASS')
+  && platformOrigins.linux === 'github-actions-native';
 const report = {
   schemaVersion: 1, generatedAt: new Date().toISOString(), package: { name: pkg.name, version: pkg.version },
   source: { revision, dirty, fingerprint, provenance: source.provenance, dependencyLockSha256: `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` },

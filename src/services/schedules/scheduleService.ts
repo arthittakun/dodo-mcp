@@ -122,12 +122,12 @@ export class ScheduleService {
   start(ready: () => boolean) {
     if (this.timer) return;
     this.bootedAt = Date.now();
-    this.timer = setInterval(() => { if (ready()) { try { this.tick(); } catch { this.stop(); console.error('[dodo] scheduler stopped after a state error; inspect schedules locally before restarting'); } } }, 1000);
+    this.timer = setInterval(() => { if (ready()) { void this.tick().catch(() => { this.stop(); console.error('[dodo] scheduler stopped after a state error; inspect schedules locally before restarting'); }); } }, 1000);
     this.timer.unref();
   }
   stop() { if (this.timer) clearInterval(this.timer); this.timer = undefined; }
-  /** Synchronous claim->spawn: revoke cannot race between permission check and launch. */
-  tick(now = Date.now()) {
+  /** Durable claim, source backup, then live approval recheck immediately before spawn. */
+  async tick(now = Date.now()) {
     const rows = this.s.store.db.prepare("SELECT * FROM schedules WHERE workspace_id=? AND status='approved' ORDER BY next_at LIMIT 64").all(this.s.workspaceId) as Row[];
     for (const row of rows) {
       if (row.expires_at <= now) { this.revoke(row.id); continue; }
@@ -154,7 +154,11 @@ export class ScheduleService {
       if (due < this.bootedAt || now - due > 60_000) { finish('skipped_missed'); continue; }
       if (this.s.store.db.prepare("SELECT id FROM jobs WHERE workspace_id=? AND principal=? AND status='running' LIMIT 1").get(this.s.workspaceId,`schedule:${row.id}`)) { finish('skipped_overlap'); continue; }
       try {
-        const job = this.s.jobs.start({workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:`schedule:${row.id}`,kind:'exec',program:p.spec.command,args:[],cwdRel:p.spec.cwd,timeoutMs:p.spec.timeoutMs,shell:true,sandbox:p.spec.sandbox,network:p.spec.network,stdin:false});
+        const job = await this.s.jobs.startProtected({workspaceId:this.s.workspaceId,epoch:this.s.epoch,principal:`schedule:${row.id}`,kind:'exec',program:p.spec.command,args:[],cwdRel:p.spec.cwd,timeoutMs:p.spec.timeoutMs,shell:true,sandbox:p.spec.sandbox,network:p.spec.network,stdin:false}, () => {
+          const live = this.s.store.db.prepare("SELECT * FROM schedules WHERE id=? AND status='approved'").get(row.id) as Row | undefined;
+          if (!live || live.expires_at <= Date.now()) throw new DodoError('FORBIDDEN','schedule was revoked or expired during source backup');
+          this.checked(live);
+        });
         finish('launched',job.jobId);
       } catch { finish('launch_failed',null,'Unable to launch within current limits and sandbox policy'); }
       this.audit(row.id,'schedule.tick');

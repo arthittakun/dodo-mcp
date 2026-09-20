@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import { z } from 'zod';
 import { LimitsSchema, DEFAULT_LIMITS, type Limits } from './limits.js';
 import { DodoError } from '../errors.js';
+import { RecoveryInstallationSchema } from '../services/recovery/contracts.js';
 import { TunnelConfigSchema } from './tunnelConfig.js';
 
 /**
@@ -12,6 +13,7 @@ import { TunnelConfigSchema } from './tunnelConfig.js';
 export const GlobalConfigSchema = z
   .object({
     version: z.literal(1).default(1),
+    recovery: RecoveryInstallationSchema.default(RecoveryInstallationSchema.parse({})),
     /** Public HTTPS origin of the user-managed tunnel, e.g. https://dodo.example.com (no path). */
     publicUrl: z.string().url().optional(),
     port: z.number().int().min(0).max(65535).default(21730),
@@ -74,6 +76,12 @@ export const GlobalConfigSchema = z
      * rescanning the MCP client. This changes exposure only, never authority.
      */
     exposeSubagentsToMcp: z.boolean().default(false),
+    /** Owner catalog preference for discover/Compact/Hybrid; never a permission change. */
+    disabledDiscoverOperations: z
+      .array(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/))
+      .max(200)
+      .refine((values) => new Set(values).size === values.length, 'operation names must be unique')
+      .default([]),
     /** Local-owner Cloudflare Tunnel process configuration; contains no token. */
     tunnel: TunnelConfigSchema.default({ connectionMode: 'local', metricsPort: 21732, maxRestarts: 2 }),
     /** Last owner-selected registry entry. This is a startup preference, never authority. */

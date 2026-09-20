@@ -117,6 +117,7 @@ authorization, DODO ไม่ได้รัน หรือ public OAuth routes
 | ได้ 404 จาก OAuth หรือ discovery | Tunnel route มาเฉพาะ `/mcp`; แก้ให้ route ทุก path เพราะ OAuth ใช้ `/.well-known/...`, `/auth`, `/interaction`, `/token` และ `/jwks` ด้วย |
 | เห็น tools เก่า/เรียกแล้ว not found | เปิด connection ใน ChatGPT แล้ว Refresh; หาก cache ยังไม่เปลี่ยนให้ลบและสร้าง connection ใหม่ |
 | ยังไม่เห็น Sub-agent operations | เปิด **Settings → Sub-agent tools ใน MCP** ใน Local Config แล้ว restart DODO และ rescan/recreate connection |
+| operation ที่ต้องการหายจาก discover/gateway | ตรวจ **Settings → Tools ที่ AI มองเห็น** แล้วเปิด operation, restart DODO และ rescan/recreate connection |
 
 ห้ามส่ง `client_secret`, access token, refresh token, Cloudflare Tunnel token หรือ URL
 ของ Local Config ให้ผู้ช่วย AI เพื่อแก้ปัญหา ใช้เฉพาะสถานะและ redacted logs จาก
@@ -124,9 +125,13 @@ authorization, DODO ไม่ได้รัน หรือ public OAuth routes
 
 ## Compact behavior
 
-HTTP default เป็น Compact surface 19 tools ประกอบด้วย overview, `dodo_discover` และ gateways client จะค้น operation ที่ต้องการจาก discover แล้วเรียก gateway พร้อม top-level workspace context
+HTTP default เป็น Compact surface สูงสุด 20 tools ประกอบด้วย overview, `dodo_discover` และ gateways client จะค้น operation ที่ต้องการจาก discover แล้วเรียก gateway พร้อม top-level workspace context จำนวนจริงอาจต่ำลงเมื่อเจ้าของปิด operations ครบทั้ง gateway
 
 Compact ไม่ลด security และไม่ได้รวมสิทธิ์หลาย operation เป็น approval เดียว target operation ยังคงมี scope, ACL, trust, approval, hash และ path policy ของตัวเอง
+
+เจ้าของซ่อน operation ที่ไม่ใช้จาก **Settings → Tools ที่ AI มองเห็น** ได้ การเปลี่ยนนี้
+ลด schema ของ Compact/Hybrid จริงและเอา direct duplicate ออกจาก Hybrid แต่ไม่เปลี่ยน
+Full/STDIO หรือ permission ใด ๆ ต้อง restart server และ rescan/recreate client หลังบันทึก
 
 ## Client cache
 

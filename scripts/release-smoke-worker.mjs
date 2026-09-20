@@ -164,12 +164,12 @@ try {
     await new Promise(resolve=>setTimeout(resolve,100));
   }
   if(finished.status!=='completed'||modelCalls!==2||!finished.events.some(e=>e.kind==='tool'&&e.payload.operation==='write_file'&&e.payload.ok)||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.existsSync(path.join(workspace,'agent.txt'))) throw new Error('installed agent target/receipt smoke failed');
-  for(const name of ['index.html','app.js','app.css','workbench.js','workbench.css'])if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
+  for(const name of ['index.html','app.js','app.css','workbench.js','workbench.css','ui/recovery.js'])if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
   const report = { schemaVersion: 1, status: 'PASS', package: { name: packageJson.name, version: packageJson.version },
     catalog: { fullToolCount: packagedSurfaces.fullToolCount, compactToolCount: packagedSurfaces.toolCount },
     cliVersion: versionRun.stdout.trim(), stdio: { surface: 'full', toolCount: fullCount, overviewOk: stdioOverview.ok === true },
     http: { transport: 'streamable-http', oauth: true, surface: 'compact', toolCount: compactCount, writeEditReadBack: true, targetRouting:true, subagentWriteReceipt:true },
-    ui: {assets:5}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
+    ui: {assets:6}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
     installation: { source: 'exact-tarball', freshPrefix: true, freshConfig: true }, generatedAt: new Date().toISOString() };
   if (fullCount !== packagedSurfaces.fullToolCount || compactCount !== packagedSurfaces.toolCount) throw new Error(`surface count mismatch: full=${fullCount}/${packagedSurfaces.fullToolCount} compact=${compactCount}/${packagedSurfaces.toolCount}`);
   fs.mkdirSync(path.dirname(args.output), { recursive: true }); fs.writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });

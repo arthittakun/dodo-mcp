@@ -76,6 +76,24 @@ export interface InlineOutput {
 
 export class JobManager {
   mutations?: MutationQueue;
+  withRecovery?: <T>(principal:string,fn:()=>Promise<T>)=>Promise<T>;
+  onRecorded?: (jobId:string) => void;
+  beforeStart?: (req: StartJobRequest) => Promise<void>;
+  afterFinished?: (jobId:string) => Promise<unknown>;
+  requiresPreparation?: () => boolean;
+  private readonly prepared = new WeakSet<StartJobRequest>();
+
+  async startProtected(req: StartJobRequest, revalidate?: () => void): Promise<{ jobId: string; pid: number; sandboxed: string | null }> {
+    const run = async () => {
+      await this.beforeStart?.(req);
+      revalidate?.();
+      this.prepared.add(req);
+      try { return this.start(req); } finally { this.prepared.delete(req); }
+    };
+    const protectedRun=()=>this.withRecovery?this.withRecovery(req.principal,run):run();
+    return this.mutations ? this.mutations.run(protectedRun) : protectedRun();
+  }
+
   private shutdownPromise: Promise<void> | undefined;
   private readonly live = new Map<string, LiveJob>();
   private readonly finishedSpools = new Map<string, { stdout: SegmentedSpool; stderr: SegmentedSpool }>();
@@ -114,6 +132,7 @@ export class JobManager {
   }
 
   start(req: StartJobRequest): { jobId: string; pid: number; sandboxed: string | null } {
+    if (this.requiresPreparation?.() && !this.prepared.has(req)) throw new DodoError('RECOVERY_REQUIRED', 'job requires a source backup before spawn');
     this.mutations?.assertCanStart();
     if (this.shutdownPromise) throw new DodoError('CONFLICT', 'job manager is shutting down');
     if (this.live.size >= this.limits.jobsConcurrentMax) {
@@ -179,6 +198,7 @@ export class JobManager {
       cwd: cwdResolved.rel, recipeId: req.recipeId ?? null, timeoutMs,
     });
 
+    this.onRecorded?.(jobId);
     const releaseMutation = this.mutations?.retainJob();
     let child: ChildProcess;
     let scriptCreated = false;
@@ -208,8 +228,10 @@ export class JobManager {
       throw new DodoError('INTERNAL_ERROR', `spawn failed: ${(err as Error).message}`);
     }
 
-    child.once('close', () => releaseMutation?.());
-    child.once('error', () => releaseMutation?.());
+    let completion:Promise<unknown>|undefined;
+    const observed=()=>{completion??=(this.afterFinished?.(jobId)??Promise.resolve()).catch(()=>undefined).finally(()=>releaseMutation?.());};
+    child.once('close', observed);
+    child.once('error', observed);
     const liveJob: LiveJob = { child, stdout, stderr, timeout: undefined, stdinOpen: req.stdin !== false, scriptPath };
     this.live.set(jobId, liveJob);
 

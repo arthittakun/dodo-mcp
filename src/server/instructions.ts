@@ -9,9 +9,15 @@ export const WORKSPACE_INSTRUCTIONS = COMMON_INSTRUCTIONS + SUBAGENT_INSTRUCTION
 export const COMPACT_INSTRUCTIONS = WORKSPACE_INSTRUCTIONS + COMPACT_SUFFIX;
 export const HYBRID_INSTRUCTIONS = WORKSPACE_INSTRUCTIONS + HYBRID_SUFFIX;
 
-export function instructionsFor(surface: 'compact' | 'full' | 'hybrid', features: { subagents: boolean } = { subagents: true }): string {
+export function instructionsFor(surface: 'compact' | 'full' | 'hybrid', features: { subagents: boolean; disabledDiscoverOperations?: readonly string[] } = { subagents: true }): string {
   const base = COMMON_INSTRUCTIONS + (features.subagents ? SUBAGENT_INSTRUCTIONS : SUBAGENT_HIDDEN_INSTRUCTIONS);
-  if (surface === 'compact') return base + COMPACT_SUFFIX;
-  if (surface === 'hybrid') return base + HYBRID_SUFFIX;
+    const hidden = features.disabledDiscoverOperations?.length ?? 0;
+    const visibility = hidden > 0
+        ? ` The owner has hidden ${hidden} operation${hidden === 1 ? '' : 's'} from this Compact/Hybrid catalog. dodo_discover and each gateway operation enum are authoritative; do not assume a hidden operation is available.`
+        : '';
+    if (surface === 'compact')
+        return base + COMPACT_SUFFIX + visibility;
+    if (surface === 'hybrid')
+        return base + HYBRID_SUFFIX + visibility;
   return base;
 }

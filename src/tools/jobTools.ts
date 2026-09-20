@@ -50,7 +50,7 @@ export const execCommandTool = defineTool({
           cwdRel: args.cwd,
         };
         if (args.timeoutMs !== undefined) req.timeoutMs = args.timeoutMs;
-        return ctx.services.jobs.start(req);
+        return ctx.services.jobs.startProtected(req);
       },
     );
     return { data: { jobId: result.jobId, replayed } };
@@ -106,7 +106,7 @@ export const runTaskTool = defineTool({
           recipeId: recipe.id,
         };
         if (args.timeoutMs !== undefined) req.timeoutMs = args.timeoutMs;
-        return ctx.services.jobs.start(req);
+        return ctx.services.jobs.startProtected(req);
       },
     );
     return { data: { jobId: result.jobId, taskId: recipe.id, replayed } };
@@ -286,7 +286,7 @@ export const runCommandTool = defineTool({
         network: args.network,
       };
       if (args.timeoutMs !== undefined) req.timeoutMs = args.timeoutMs;
-      const started = s.jobs.start(req);
+      const started = await s.jobs.startProtected(req);
       sandboxed = started.sandboxed;
       return started;
     };
@@ -389,7 +389,7 @@ export const runCommandsTool = defineTool({
         network: args.network,
       };
       if (args.timeoutMs !== undefined) req.timeoutMs = args.timeoutMs;
-      const r = s.jobs.start(req);
+      const r = await s.jobs.startProtected(req);
       started.push({ name: c.name ?? `cmd${started.length + 1}`, command: c.command, jobId: r.jobId, sandboxed: r.sandboxed });
     }
     const exits = await Promise.all(started.map((j) => s.jobs.waitForExit(j.jobId, args.waitMs)));
