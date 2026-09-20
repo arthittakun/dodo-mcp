@@ -10,7 +10,7 @@ on:
         type: choice
         required: true
         default: windows
-        options: [windows, linux, all, windows-diagnostics, linux-diagnostics, windows-focus]
+        options: [windows, linux, all, windows-diagnostics, linux-diagnostics, windows-focus, windows-standard-user]
       evidence_run:
         description: Prior run-attempt to inspect (native diagnostics only)
         type: string
@@ -26,6 +26,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  windows-standard-user:
+    name: Windows standard user / Node 24
+    if: github.event_name == 'workflow_dispatch' && inputs.platform == 'windows-standard-user'
+    runs-on: [self-hosted, Windows, X64, "windows-ci 02"]
+    timeout-minutes: 55
+    defaults:
+      run:
+        shell: powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}"
+    env:
+      DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "0"
+      DOTNET_SYSTEM_GLOBALIZATION_PREDEFINEDCULTURESONLY: "true"
+      DODO_CI_EVIDENCE: ${{ github.workspace }}/../.dodo-ci-evidence/${{ github.run_id }}-${{ github.run_attempt }}/windows-standard-user
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Prepare build dependencies
+        shell: cmd
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install and run under a disposable non-administrator account
+        run: ./scripts/windows-standard-user.ps1
+      - name: Upload allowlisted standard-user summary only
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: windows-standard-user-summary
+          path: ${{ env.DODO_CI_EVIDENCE }}/standard-user-summary.json
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+
   linux-diagnostics:
     name: Inspect retained Linux evidence
     if: github.event_name == 'workflow_dispatch' && inputs.platform == 'linux-diagnostics'
