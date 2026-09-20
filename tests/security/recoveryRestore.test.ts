@@ -31,7 +31,10 @@ describe('R02 caller-owned reviewed restore',()=>{
   for(const [p,v]of Object.entries(files))expect(read(p)).toBe(v);
   expect(fs.readFileSync(path.join(f.root,'.git/index'))).toEqual(index);
   const history=await f.call('recovery_session_inspect',{sessionId:session.sessionId});expect((history.dirtyState as {entries:unknown[]}).entries).toHaveLength(15);
- });
+ // This scenario verifies several complete Git/CAS copies of 15 files. Native
+ // Windows ACL and Git process checks still run for every copy; retain all
+ // assertions and per-operation deadlines while bounding the whole scenario.
+ },process.platform==='win32'?180_000:60_000);
  it('move/create/delete undo and partial path restore preserve unrelated extra files',async()=>{
   setup({'a':'alpha','b':'beta'});const session=await begin(),c={recoverySessionId:session.sessionId};
   await f.call('move_path',{...c,path:'a',destPath:'moved'});await f.call('write_file',{...c,path:'new',content:'new'});await f.call('delete_path',{...c,path:'b'});

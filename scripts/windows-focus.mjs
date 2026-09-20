@@ -39,7 +39,7 @@ try {
     console.log('DODO_ACL_BACKEND_BEGIN');console.log(JSON.stringify(windowsPrivateAclDiagnostics()));console.log('DODO_ACL_BACKEND_END');throw error;
   }
   phase = 'focused-tests';
-  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/integration/recoveryDriftHttp.test.ts', 'tests/integration/recoveryDataWorkbench.test.ts', 'tests/security/recoveryDatabase.test.ts', 'tests/security/recoveryConfigVault.test.ts', 'tests/security/recoveryDataOwnerHttp.test.ts', 'tests/security/recoveryKeys.test.ts', 'tests/integration/recoveryOsKeys.test.ts', '--maxWorkers=1'], 20 * 60_000);
+  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/security/recoveryGit.test.ts', 'tests/security/recoveryRestore.test.ts', 'tests/integration/recoveryDriftHttp.test.ts', '--maxWorkers=1'], 20 * 60_000);
   phase = 'report';
   const report = JSON.parse(fs.readFileSync(path.join(directory, 'core-tests.json'), 'utf8'));
   const browserFile = path.join(directory, 'recovery-browser-diagnostics.json');

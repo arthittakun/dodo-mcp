@@ -64,7 +64,23 @@ export class RecoveryGitCopies {
   }
   private seal(dir:string):number {
     ensurePrivateDirectory(dir);let bytes=0;
-    for(const name of fs.readdirSync(dir)){const p=path.join(dir,name),st=fs.lstatSync(p);if(st.isSymbolicLink()||(!st.isFile()&&!st.isDirectory())||(st.isFile()&&st.nlink!==1))throw new DodoError('PATH_DENIED','Git copy has unsafe objects');if(st.isDirectory())bytes+=this.seal(p);else{if(process.platform!=='win32')fs.chmodSync(p,0o600);assertPrivatePath(p);const fd=fs.openSync(p,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}bytes+=st.size;}}
+    for(const name of fs.readdirSync(dir)){
+      const p=path.join(dir,name),st=fs.lstatSync(p);
+      if(st.isSymbolicLink()||(!st.isFile()&&!st.isDirectory())||(st.isFile()&&st.nlink!==1))throw new DodoError('PATH_DENIED','Git copy has unsafe objects');
+      if(st.isDirectory()){bytes+=this.seal(p);continue;}
+      // These are newly created private copies, never working repository files.
+      // Git can mark object files read-only; Windows FlushFileBuffers requires
+      // a write-capable handle. Clear that bit only after verifying the ACL.
+      if(process.platform==='win32')assertPrivatePath(p);
+      fs.chmodSync(p,0o600);assertPrivatePath(p);
+      const fd=fs.openSync(p,fs.constants.O_RDWR|(fs.constants.O_NOFOLLOW??0));
+      try{
+        const opened=fs.fstatSync(fd);
+        if(!opened.isFile()||opened.nlink!==1||opened.dev!==st.dev||opened.ino!==st.ino||opened.size!==st.size)throw new DodoError('PATH_DENIED','Git copy file changed during sealing');
+        fs.fsyncSync(fd);
+      }finally{fs.closeSync(fd);}
+      bytes+=st.size;
+    }
     syncDir(dir);return bytes;
   }
   async capture(m:RecoveryManifest,policy:RecoveryPolicy):Promise<void>{
