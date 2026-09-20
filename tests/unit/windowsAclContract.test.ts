@@ -23,6 +23,10 @@ describe('Windows ACL source contract (not native Windows evidence)', () => {
     expect(protect).toContain("'FullControl', 'ContainerInherit, ObjectInherit'");
     expect(protect).toContain('Set-Acl -LiteralPath $p -AclObject $acl');
     expect(script).toContain("$allowed = @($sid.Value, 'S-1-5-18', $administratorsSid.Value)");
+    expect(protect).toContain('$alreadyPrivate = Test-CanonicalPrivateDirectory $acl');
+    expect(protect).toContain('if (-not $alreadyPrivate) { Set-Acl -LiteralPath $p -AclObject $acl }');
+    expect(script).toContain('$candidate.AreAccessRulesProtected');
+    expect(script).toContain('$remaining.Count -eq 0');
   });
   it('verify checks the existing DACL before any restricted owner repair', () => {
     expect(verify.indexOf('Assert-PrivateDacl $acl')).toBeGreaterThan(-1);

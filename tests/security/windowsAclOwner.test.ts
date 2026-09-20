@@ -94,6 +94,39 @@ $p = [Security.Principal.WindowsPrincipal]::new($i)
     expectPrivate(dir);
   }, T);
 
+  it('repeated protection preserves a canonical ACL and still repairs newly permissive permissions', () => {
+    const dir = directory();ensurePrivateDirectory(dir);
+    const before = security(dir);
+    ensurePrivateDirectory(dir);
+    expect(security(dir)).toEqual(before);
+    const icacls = windowsSystemExecutable('icacls.exe');
+    execFileSync(icacls, [dir, '/grant', '*S-1-1-0:(R)', '/q'], {stdio:'pipe',timeout:15000});
+    expect(()=>assertPrivatePath(dir,true)).toThrow(/ACL could not be established or verified/);
+    ensurePrivateDirectory(dir);
+    expectPrivate(dir);
+    expect(security(dir).dacl).toBe(before.dacl);
+  }, T);
+
+  it('the PowerShell fallback uses the same fresh canonical policy and rejects widened ACLs', () => {
+    const source = fs.readFileSync(new URL('../../src/platform/privateFs.ts', import.meta.url), 'utf8');
+    const script = /const ACL_SCRIPT = String\.raw`([\s\S]*?)`;/u.exec(source)?.[1];
+    expect(script).toBeTruthy();
+    const dir = directory();
+    const run = (mode: 'protect' | 'verify') => execFileSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'),
+      ['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script!, 'utf16le').toString('base64')],
+      {env:{...process.env,DODO_PRIVATE_PATH:dir,DODO_PRIVATE_MODE:mode},stdio:'pipe',encoding:'utf8',timeout:15000});
+    expect(run('protect')).toBe('private');
+    const before = security(dir);
+    expect(run('protect')).toBe('private');
+    expect(security(dir)).toEqual(before);
+    const icacls = windowsSystemExecutable('icacls.exe');
+    execFileSync(icacls,[dir,'/grant','*S-1-1-0:(R)','/q'],{stdio:'pipe',timeout:15000});
+    expect(()=>run('verify')).toThrow();
+    expect(run('protect')).toBe('private');
+    expectPrivate(dir);
+    expect(security(dir).dacl).toBe(before.dacl);
+  }, T);
+
   it.each(['directory', 'file'] as const)('verify repairs an Administrators-owned %s without changing its DACL', kind => {
     const dir = directory(); ensurePrivateDirectory(dir);
     const target = kind === 'directory' ? dir : path.join(dir, "credential 'ไทย'; $data.auth");

@@ -31,6 +31,18 @@ function Assert-PrivateDacl($candidate) {
   if (-not $ownerAllowed) { throw 'owner access missing' }
 }
 
+function Test-CanonicalPrivateDirectory($candidate) {
+  if (-not $candidate.AreAccessRulesProtected -or $candidate.GetOwner([Security.Principal.SecurityIdentifier]).Value -ne $sid.Value) { return $false }
+  $remaining = [Collections.Generic.HashSet[string]]::new()
+  foreach ($id in $allowed) { [void]$remaining.Add($id) }
+  foreach ($rule in $candidate.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+    if ($rule.AccessControlType -ne 'Allow' -or $rule.IsInherited -or $rule.FileSystemRights -ne [Security.AccessControl.FileSystemRights]::FullControl -or
+        $rule.InheritanceFlags -ne ([Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [Security.AccessControl.InheritanceFlags]::ObjectInherit) -or
+        $rule.PropagationFlags -ne [Security.AccessControl.PropagationFlags]::None -or -not $remaining.Remove($rule.IdentityReference.Value)) { return $false }
+  }
+  return $remaining.Count -eq 0
+}
+
 $acl = Get-Acl -LiteralPath $p
 $owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value
 # An enabled Administrators token may normalize Windows' default group owner.
@@ -39,6 +51,7 @@ $repairAdminOwner = ($owner -eq $administratorsSid.Value) -and $principal.IsInRo
 if ($owner -ne $sid.Value -and -not $repairAdminOwner) { throw 'unexpected owner' }
 if ($env:DODO_PRIVATE_MODE -eq 'protect') {
   if (-not $item.PSIsContainer) { throw 'expected directory' }
+  $alreadyPrivate = Test-CanonicalPrivateDirectory $acl
   $acl = New-Object Security.AccessControl.DirectorySecurity
   $acl.SetOwner($sid)
   $acl.SetAccessRuleProtection($true, $false)
@@ -47,7 +60,9 @@ if ($env:DODO_PRIVATE_MODE -eq 'protect') {
     $rule = New-Object Security.AccessControl.FileSystemAccessRule($identity, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')
     $acl.AddAccessRule($rule)
   }
-  Set-Acl -LiteralPath $p -AclObject $acl
+  # Read and verify on every call, but avoid propagating an identical DACL
+  # through descendants concurrently being initialized by another owner CLI.
+  if (-not $alreadyPrivate) { Set-Acl -LiteralPath $p -AclObject $acl }
 } elseif ($env:DODO_PRIVATE_MODE -eq 'verify') {
   # Verify may repair ONLY the admitted group owner, never a permissive DACL.
   # New files (notably IPC descriptors) can receive that default owner too.

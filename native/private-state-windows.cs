@@ -27,6 +27,17 @@ class DodoPrivateState {
     }
     Require(ownerAllowed);
   }
+  static bool CanonicalPrivateDirectory(FileSystemSecurity acl, string sid) {
+    if (!acl.AreAccessRulesProtected || acl.GetOwner(typeof(SecurityIdentifier)).Value != sid) return false;
+    var remaining = new System.Collections.Generic.HashSet<string>(new string[] { sid, "S-1-5-18", "S-1-5-32-544" });
+    foreach (FileSystemAccessRule rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier))) {
+      if (rule.AccessControlType != AccessControlType.Allow || rule.IsInherited
+        || rule.FileSystemRights != FileSystemRights.FullControl
+        || rule.InheritanceFlags != (InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit)
+        || rule.PropagationFlags != PropagationFlags.None || !remaining.Remove(rule.IdentityReference.Value)) return false;
+    }
+    return remaining.Count == 0;
+  }
   static FileAttributes Attributes(string path) {
     FileAttributes value = File.GetAttributes(path);
     Require((value & FileAttributes.ReparsePoint) == 0);
@@ -53,8 +64,13 @@ class DodoPrivateState {
         foreach (string id in new string[] { sid.Value, "S-1-5-18", admin.Value })
           next.AddAccessRule(new FileSystemAccessRule(new SecurityIdentifier(id), FileSystemRights.FullControl,
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
-        stage = "protect-write";
-        Write(path, true, next);
+        // Reapplying an identical inheritable DACL propagates security to live
+        // descendants while another owner CLI may be protecting those paths.
+        // Skip only an EXACT policy match from this fresh read, never a cache.
+        if (!CanonicalPrivateDirectory(acl, sid.Value)) {
+          stage = "protect-write";
+          Write(path, true, next);
+        }
       } else if (mode == "verify") {
         stage = "verify-dacl";
         PrivateDacl(acl, sid.Value);
