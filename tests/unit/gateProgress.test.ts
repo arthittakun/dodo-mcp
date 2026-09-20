@@ -2,8 +2,9 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const { partialTestProgress } = await import(pathToFileURL(path.resolve('scripts/gate-progress.mjs')).href) as {
+const { partialTestProgress, focusedFailureDetails } = await import(pathToFileURL(path.resolve('scripts/gate-progress.mjs')).href) as {
   partialTestProgress: (log: string, root: string) => { complete: boolean; files: Record<string, unknown>[]; truncated: boolean };
+  focusedFailureDetails: (report: unknown, root: string) => { locations: Record<string, unknown>[] };
 };
 const file = 'tests/unit/gateProgress.test.ts';
 describe('bounded partial gate diagnostics', () => {
@@ -18,5 +19,12 @@ describe('bounded partial gate diagnostics', () => {
     const result = partialTestProgress(Array(201).fill(` ✓ ${file} (1 test) 1ms`).join('\n'), process.cwd());
     expect(result.files).toHaveLength(200);
     expect(result.truncated).toBe(true);
+  });
+  it('publishes only declared error codes and existing repository frames', () => {
+    const output = focusedFailureDetails({ testResults: [{ name: path.resolve(file), assertionResults: [{ status: 'failed',
+      failureMessages: [`Error: RECOVERY_REQUIRED SYNTHETIC_SECRET EPERM\n at ${path.resolve('src/services/recovery/storage.ts')}:22:3\n at /private/SYNTHETIC_SECRET:12:3`] }] }] }, process.cwd());
+    expect(output.locations[0]).toMatchObject({ errorCodes: ['RECOVERY_REQUIRED', 'EPERM'], frames: [{ file: 'src/services/recovery/storage.ts', line: 22 }] });
+    expect(JSON.stringify(output)).not.toContain('SYNTHETIC_SECRET');
+    expect(JSON.stringify(output)).not.toContain(process.cwd());
   });
 });

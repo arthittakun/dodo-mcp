@@ -10,7 +10,7 @@ on:
         type: choice
         required: true
         default: windows
-        options: [windows, linux, all, windows-diagnostics]
+        options: [windows, linux, all, windows-diagnostics, windows-focus]
       evidence_run:
         description: Prior run-attempt to inspect (Windows diagnostics only)
         type: string
@@ -174,11 +174,11 @@ jobs:
 
   windows-native:
     name: Windows native / Node ${{ matrix.node }}
-    if: github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'all'
+    if: github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'all' || inputs.platform == 'windows-focus'
     strategy:
       fail-fast: false
       matrix:
-        node: [22, 24]
+        node: ${{ fromJSON(inputs.platform == 'windows-focus' && '[24]' || '[22,24]') }}
     # Select the replacement runner explicitly; runner 01 is retired.
     runs-on: [self-hosted, Windows, X64, "windows-ci 02"]
     timeout-minutes: 90
@@ -269,6 +269,7 @@ jobs:
         shell: cmd
         run: npm ci --ignore-scripts --no-audit --no-fund && npx playwright install chromium
       - name: Run native Windows release candidate gate
+        if: inputs.platform != 'windows-focus'
         shell: cmd
         # The Windows service account can publish %TEMP% through an 8.3 alias
         # (for example ADMINI~1). DODO correctly rejects short-name workspace
@@ -279,6 +280,13 @@ jobs:
         run: >-
           npm run release:gate:ci --
           --output-dir "%DODO_CI_EVIDENCE%"
+      - name: Run focused Windows failure diagnostics
+        if: inputs.platform == 'windows-focus'
+        shell: cmd
+        env:
+          TEMP: ${{ runner.temp }}
+          TMP: ${{ runner.temp }}
+        run: node scripts/windows-focus.mjs
       - name: Summarize Windows evidence
         id: windows_summary
         if: always()
