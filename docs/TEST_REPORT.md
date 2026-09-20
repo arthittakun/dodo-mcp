@@ -16,9 +16,32 @@ titles หรือ expected/actual values และย้าย CI evidence อ
 cleanup ลบ Typecheck/lint/actionlint และ gate-evidence tests **25 passed / 0 failed**
 ผ่านบน macOS หลังแก้ ส่วน native application test results ต้องดูแยกตาม CI run
 
-Native CI ของ candidate นี้: `NOT_RUN` จนกว่า workflow/source จะถูก push และรันจริง
+Native CI [run 35495748297](https://github.com/arthittakun/dodo-mcp/actions/runs/35495748297)
+ทดสอบ clean commit `e0e5f9a9b14d0d2e7f4c776aeaf0e19b621eb8f9`
+และ fingerprint `sha256:83791f00f244466f064ea413494e7555406835b276f562dca809e3c8901ae665`
+โดยตรงบน Linux X64 ไม่มี Docker:
+
+| Gate | Node 22.23.2 | Node 24.21.0 |
+|---|---|---|
+| build/typecheck/lint/full suite | exit 0 | exit 0 |
+| Core / 874 tests | 833 pass / 41 skip / 0 fail | 833 pass / 41 skip / 0 fail |
+| Packaging | 17 pass | 17 pass |
+| DodoBench | 7/7 pass | 7/7 pass |
+| Production audit | 0 vulnerabilities | 0 vulnerabilities |
+| Fresh exact-tarball install | PASS | PASS |
+
+ก่อนหน้านี้ run 35495249409 ที่ commit `723733e` มี Linux Node 24 core failure
+หนึ่งเคส (830 pass / 41 skip) ส่วน Node 22 ผ่านครบ ยังไม่ยืนยันสาเหตุของ failure
+รอบแรก และไม่อ้างว่า diagnostics change แก้ runtime bug ผลรอบล่าสุดข้างบนผ่านจริง
+แต่ไม่ลบหรือแทนที่ประวัติผลล้มเหลว
+
+Windows Node 22/24 ในรอบแรกล้มก่อน step แรกที่ runner `InitializeSecretMasker` /
+`PowerShellPreAmpersandEscape` ไม่มี application tests ได้รัน ดู [CI](CI.md)
+สำหรับการเปิด runner ใหม่ Windows จึงเป็น `RUNNER_BLOCKED` ไม่ใช่ application PASS
+และไม่ได้ rerun ใน Linux-only รอบล่าสุด Manual Windows acceptance ยัง `MANUAL_NOT_RUN`
+
 ผล Recovery/Docker ด้านล่างเป็นหลักฐานของ candidate รอบก่อนตาม fingerprint เดิม
-ไม่ยกให้เป็น native CI evidence ของ source ปัจจุบัน
+ไม่ใช้แทน native CI ข้างบน ไม่มี merge main หรือ npm publish จากผลนี้
 
 ## Unreleased — Source Recovery R00–R02 candidate
 
