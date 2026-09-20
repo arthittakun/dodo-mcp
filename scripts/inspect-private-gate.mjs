@@ -2,8 +2,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { partialTestProgress, freshInstallFailureDetails } from './gate-progress.mjs';
-import { sanitizeGateReport, failureLocations } from './gate-evidence.mjs';
+import { partialTestProgress, freshInstallFailureDetails, focusedFailureDetails } from './gate-progress.mjs';
+import { sanitizeGateReport } from './gate-evidence.mjs';
 
 try {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -22,7 +22,7 @@ try {
     const failures = {};
     for (const suite of ['core', 'packaging']) {
       const file = path.join(directory, `${suite}-tests.json`);
-      if (fs.existsSync(file)) failures[suite] = failureLocations(JSON.parse(fs.readFileSync(file, 'utf8')), root);
+      if (fs.existsSync(file)) failures[suite] = focusedFailureDetails(JSON.parse(fs.readFileSync(file, 'utf8')), root);
     }
     console.log('DODO_DIAGNOSTICS_BEGIN');
     const freshInstall = fs.existsSync(log) && fs.statSync(log).size <= 80 * 1024 * 1024 ? freshInstallFailureDetails(fs.readFileSync(log,'utf8'),root) : null;
