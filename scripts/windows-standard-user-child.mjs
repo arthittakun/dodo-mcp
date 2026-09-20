@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
@@ -25,6 +25,7 @@ fs.writeFileSync(env.npm_config_userconfig, ''); fs.writeFileSync(env.npm_config
 // Deliberately no DODO_CONFIG_DIR for normal tests: exercise the user's default.
 delete env.DODO_CONFIG_DIR;
 function category(text) {
+  if (/ERR_UNSUPPORTED_ESM_URL_SCHEME/.test(text)) return 'fixture_import_url';
   if (/managed-tool ACL verification failed/.test(text)) return 'managed_tool_acl';
   if (/private Windows state ACL could not be established/.test(text)) return 'private_state_acl';
   if (/sandbox.*cancel|provisioning|UAC/i.test(text)) return 'sandbox_provisioning';
@@ -39,7 +40,7 @@ function run(id, args, override = {}, timeout = 600000) {
   const text = `${out.stdout ?? ''}\n${out.stderr ?? ''}`;
   return { out, text, exitCode: out.status, elapsedMs: Date.now() - start };
 }
-const cliArgs = args => ['--import', observer, cli, ...args];
+const cliArgs = args => ['--import', pathToFileURL(observer).href, cli, ...args];
 function record(id, call, extra = {}) {
   const check = { id, passed: call.exitCode === 0, exitCode: call.exitCode, elapsedMs: call.elapsedMs,
     ...(call.exitCode !== 0 ? { category: category(call.text) } : {}), ...extra };
