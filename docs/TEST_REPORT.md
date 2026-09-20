@@ -2,6 +2,23 @@
 
 ## 1.3.0 Recovery — หลักฐานก่อน final platform gate
 
+Windows full [run35510440500](https://github.com/arthittakun/dodo-mcp/actions/runs/35510440500)
+ที่ `66605d9`: 907pass/1fail/38skip ปัญหา atomic edit เดิมผ่านแล้ว เหลือ concurrent
+CLI project registration ถูกปฏิเสธที่ private ACL Native diagnosis
+[run35511792781](https://github.com/arthittakun/dodo-mcp/actions/runs/35511792781)
+ทำซ้ำได้13/15pass,2fail,0skip และระบุ guard `final-owner` ระหว่าง protect
+แพตช์ `d145a3e` ไม่เขียน/propagate ACL ซ้ำเมื่อผลอ่านสดตรง canonical policy
+แต่ยังตรวจ owner, DACL และ reparse ใหม่ทุกครั้ง ไม่มี permission cache
+[run35512074966](https://github.com/arthittakun/dodo-mcp/actions/runs/35512074966)
+ผ่าน17/17,0skip รวม concurrent add6process จำนวน3รอบ, foreign-owner/permissive
+ACL rejection และ PowerShell fallback ผลนี้เป็น focused pass; full gates ต้อง
+ผ่านบน clean candidate หลังแพตช์นี้ก่อน release
+
+macOS และ Linux native Node22/24 full ที่ `66605d9` ผ่านก่อนแพตช์ ACL ล่าสุด:
+macOS910pass/36skip; Linux902pass/44skip ต่อ Node; 946total,0fail,
+packaging17/17, benchmark7/7, audit0 และ fresh install PASS ทั้งหมด
+ไม่ใช้ผล revision ก่อนหน้าแทนการตรวจ candidate หลังแก้
+
 Follow-up Windows หลังแก้ Git/restore: full
 [run35508647355](https://github.com/arthittakun/dodo-mcp/actions/runs/35508647355)
 ที่ `6ff35b8` ได้900pass/1fail/38skip เหลือ atomic modification ของไฟล์ชื่อไทย

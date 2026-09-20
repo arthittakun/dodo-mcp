@@ -35,6 +35,13 @@ move attempt, including compensation. A concurrent external edit stops the retry
 and is preserved for review; the entire tool/action is never repeated implicitly.
 Internal OS error causes remain private and are omitted from MCP error envelopes.
 
+Windows private-directory initialization rereads owner/DACL on each invocation.
+An exact current-user-owned, protected, three-principal FullControl ACL is left
+unchanged instead of re-propagating identical permissions into live descendants
+while other owner CLI processes initialize them. This is not a permission cache;
+unexpected owners and permissive verification paths still fail closed. Native
+and PowerShell implementations apply the same checks, including final revalidation.
+
 Project Registry เป็น owner metadata แยกจาก authority: project ID หรือ readiness
 ไม่ grant OAuth scope, workspace ACL หรือ trust และ AI ไม่มี MCP tool สำหรับเพิ่ม ลบ
 หรือเปลี่ยนรายการโปรเจกต์
