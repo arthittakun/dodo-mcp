@@ -106,7 +106,19 @@ export function ensurePrivateDirectory(directory: string): void {
 export function assertPrivatePath(target: string, directory = false): fs.Stats {
   const stat = fs.lstatSync(target);
   if (stat.isSymbolicLink() || (directory ? !stat.isDirectory() : !stat.isFile() || stat.nlink !== 1)) throw new DodoError('PATH_DENIED', 'refusing non-private or unexpected IPC path');
-  if (process.platform === 'win32') windowsAcl(target, false);
+  if (process.platform === 'win32') {
+    windowsAcl(target, false);
+    // The admitted Administrators-owner repair changes NTFS metadata. Return
+    // the verified state, not a stale ctime that makes journal reads conflict.
+    // A path/content replacement during ACL validation must still fail closed.
+    const verified = fs.lstatSync(target);
+    if (verified.isSymbolicLink() || (directory ? !verified.isDirectory() : !verified.isFile() || verified.nlink !== 1)
+      || verified.dev !== stat.dev || verified.ino !== stat.ino || verified.birthtimeMs !== stat.birthtimeMs
+      || (!directory && (verified.size !== stat.size || verified.mtimeMs !== stat.mtimeMs))) {
+      throw new DodoError('PATH_DENIED', 'private path changed during ACL verification');
+    }
+    return verified;
+  }
   else if (stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0) throw new DodoError('PATH_DENIED', 'refusing non-private or unexpected IPC path');
   return stat;
 }

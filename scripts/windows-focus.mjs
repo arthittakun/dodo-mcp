@@ -25,7 +25,7 @@ try {
   const build = run(['run', 'build'], 5 * 60_000);
   if (build.status !== 0) throw new Error('build failed');
   phase = 'focused-tests';
-  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/security/recoveryBackups.test.ts', 'tests/integration/directTools.test.ts', '--maxWorkers=1'], 10 * 60_000);
+  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/security/recoveryBackups.test.ts', 'tests/integration/directTools.test.ts', 'tests/security/windowsAclOwner.test.ts', '--maxWorkers=1'], 10 * 60_000);
   phase = 'report';
   const report = JSON.parse(fs.readFileSync(path.join(directory, 'core-tests.json'), 'utf8'));
   const summary = { scope: 'focused_diagnostics_only', exitCode: result.status, durationMs: result.durationMs,

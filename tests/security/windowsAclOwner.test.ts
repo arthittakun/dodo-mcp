@@ -81,7 +81,12 @@ $p = [Security.Principal.WindowsPrincipal]::new($i)
     if (kind === 'file') fs.writeFileSync(target, 'synthetic fixture', { flag: 'wx' });
     setOwner(target, ADMIN);
     const before = security(target);
-    assertPrivatePath(target, kind === 'directory');
+    const verified = assertPrivatePath(target, kind === 'directory');
+    // Set-Acl's owner repair may update ctime; consumers must receive the
+    // post-verification metadata used by journal integrity comparisons.
+    const live = fs.lstatSync(target);
+    expect({ dev: verified.dev, ino: verified.ino, ctimeMs: verified.ctimeMs, mtimeMs: verified.mtimeMs, size: verified.size })
+      .toEqual({ dev: live.dev, ino: live.ino, ctimeMs: live.ctimeMs, mtimeMs: live.mtimeMs, size: live.size });
     expectPrivate(target);
     expect(security(target).dacl).toBe(before.dacl);
     assertPrivatePath(target, kind === 'directory'); // idempotent verification
