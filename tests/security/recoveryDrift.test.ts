@@ -59,7 +59,9 @@ describe('R03 persistent content drift',()=>{
  it('job observation runs before releasing the mutation queue, attributes changes as unknown',async()=>{
   const r=await setup({'a':'before'});const scan=vi.spyOn(r,'observeJob');
   const run=await f.call('exec_command',{program:'node',args:['-e',"require('fs').writeFileSync('a','command')"],idempotencyKey:f.key()});await f.ws.services.jobs.waitForExit(run.jobId as string,10000);
-  await expect.poll(()=>f.ws.services.mutations!.busy).toBe(false);expect(scan).toHaveBeenCalled();expect(r.drift.status()).toMatchObject({attribution:'unknown',changedCount:1});
+  // Job exit precedes bounded source observation. Wait for that real lifecycle
+  // completion, not Vitest's default one-second polling window on native NTFS.
+  await expect.poll(()=>f.ws.services.mutations!.busy,{timeout:r.policy().scanMs+5000}).toBe(false);expect(scan).toHaveBeenCalled();expect(r.drift.status()).toMatchObject({attribution:'unknown',changedCount:1});
   await expect(f.call('write_file',{path:'a',content:'overwrite'})).rejects.toThrow('FILE_CHANGED');
  });
  it('verified checkpoints require fresh evidence at publication and deduplicate a verification receipt',async()=>{

@@ -100,4 +100,12 @@ describe('R01 durable default-on source backups',()=>{
     r.storage.prune(f.ws.workspaceId,RecoveryPolicySchema.parse({retainedPoints:1}));r.storage.collectOrphans(Date.now()+2*86400000);
     await expect(r.storage.readVerified(id,f.ws.workspaceId)).resolves.toMatchObject({id});expect(fs.readdirSync(path.join(r.storage.directory,'objects')).length).toBe(1);
   });
+  it('shared-content manifests still reject inconsistent sizes and freshly recheck a previously verified object',async()=>{
+    const r=setup({'a':'shared','b':'shared'});await r.checkpoint('owner-checkpoint','owner');
+    const m=await r.storage.readVerified(latest().id,f.ws.workspaceId);expect(m.entries.map(e=>e.path)).toEqual(['a','b']);
+    const malformed={...m,entries:m.entries.map((e,i)=>i===1?{...e,bytes:e.bytes+1}:e)};
+    await expect(r.storage.publish(malformed)).rejects.toThrow('inconsistent backup object size');
+    fs.writeFileSync(r.storage.objectPath(m.entries[0]!.hash!),'broken');
+    await expect(r.storage.readVerified(m.id,f.ws.workspaceId)).rejects.toThrow('integrity');
+  });
 });
