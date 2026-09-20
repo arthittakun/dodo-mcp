@@ -7,6 +7,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { npmInvocation } from './npm-process.mjs';
+import { restartInitializationFetch } from './release-smoke-fetch.mjs';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
@@ -84,6 +85,7 @@ let running;
 let stdio;
 let httpClient;
 let fixtureProvider;
+let phase = 'install';
 try {
   fs.writeFileSync(path.join(workspace, 'seed.txt'), 'seed\n');
   const npm = npmInvocation(['install', '--prefix', install, '--ignore-scripts', '--no-audit', '--no-fund', args.tarball]);
@@ -102,6 +104,7 @@ try {
   // sub-agent MCP contract end-to-end as well as the default in test suites.
   fs.writeFileSync(path.join(config, 'config.json'), `${JSON.stringify({ version: 1, exposeSubagentsToMcp: true }, null, 2)}\n`, { mode: 0o600 });
 
+  phase='stdio';
   const stdioClient = new Client({ name: 'release-stdio-smoke', version: '1' });
   stdio = new StdioClientTransport({ command: process.execPath, args: [cli, 'stdio'], cwd: workspace, env: { ...process.env, DODO_CONFIG_DIR: config }, stderr: 'pipe' });
   await stdioClient.connect(stdio);
@@ -115,6 +118,7 @@ try {
     import(pathToFileURL(path.join(packageRoot, 'dist/config/paths.js')).href),
     import(pathToFileURL(path.join(packageRoot, 'dist/auth/clients.js')).href),
   ]);
+  phase='http-start';
   const port = await freePort(); const baseUrl = `http://127.0.0.1:${port}`;
   fs.mkdirSync(config, { recursive: true });
   const paths = pathsModule.statePaths(config);
@@ -123,11 +127,13 @@ try {
   try { running = await startServer({ invokedCwd: workspace, portOverride: port, quiet: true, toolSurface: 'compact' }); }
   finally { if (previous === undefined) delete process.env.DODO_CONFIG_DIR; else process.env.DODO_CONFIG_DIR = previous; }
   running.services.store.setTrustMode(running.workspaceId, 'trusted');
+  phase='oauth';
   const { accessToken, clientId } = await oauthToken({ baseUrl, redirectUri: 'http://127.0.0.1:19998/dodo-release-smoke', store: running.services.store, addStaticClient: clientModule.addStaticClient });
   const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`), { authProvider: { token: async () => accessToken } });
   httpClient = new Client({ name: 'release-http-smoke', version: '1' });
-  await httpClient.connect(transport);
+  phase='http-connect';await httpClient.connect(transport);
   const compactCount = (await httpClient.listTools()).tools.length;
+  phase='write-edit';
   const overview = envelope(await httpClient.callTool({ name: 'project_overview', arguments: {} }));
   const context = { workspaceId: overview.workspaceId, workspaceEpoch: overview.workspaceEpoch };
   envelope(await httpClient.callTool({ name: 'dodo_write', arguments: { ...context, operation: 'write_file', args: { path: 'smoke.txt', content: 'alpha\n' } } }));
@@ -136,6 +142,7 @@ try {
   envelope(await httpClient.callTool({ name: 'dodo_write', arguments: { ...context, operation: 'edit_file', args: { path: 'smoke.txt', expectedHash: firstFile.hash ?? firstFile.sha256, edits: [{ find: 'alpha', replace: 'beta' }] } } }));
   const read2 = envelope(await httpClient.callTool({ name: 'dodo_read', arguments: { ...context, operation: 'read_files', args: { files: [{ path: 'smoke.txt' }] } } }));
   if (read2.data.files[0].content !== 'beta\n') throw new Error('installed compact write/edit read-back failed');
+  phase='target-routing';
   const { ProjectRegistry } = await import(pathToFileURL(path.join(packageRoot,'dist/projects/registry.js')).href);
   const secondRoot = path.join(args.fixtureDir,'project-b'); fs.mkdirSync(secondRoot);
   const target = new ProjectRegistry(running.services.store).add(secondRoot,'Installed project B').project;
@@ -146,10 +153,11 @@ try {
   envelope(await httpClient.callTool({name:'dodo_write',arguments:{...targetContext,operation:'write_file',args:{path:'target.txt',content:'B'}}}));
   if(fs.readFileSync(path.join(secondRoot,'target.txt'),'utf8')!=='B'||fs.existsSync(path.join(workspace,'target.txt'))) throw new Error('installed target routing failed');
   const recoveryCall=async(operation,operationArgs={},ctx=targetContext)=>envelope(await httpClient.callTool({name:operation==='restore_status'?'dodo_read':'dodo_write',arguments:{...ctx,operation,args:operationArgs}}));
+  phase='checkpoint';
   const checkpoint=(await recoveryCall('checkpoint_create',{idempotencyKey:'installed-recovery-checkpoint'})).data;
   if(!checkpoint.checkpointId)throw new Error('installed project default Recovery is not active');
   await recoveryCall('write_file',{path:'target.txt',content:'B changed'});
-  let modelCalls=0;
+  phase='agent';let modelCalls=0;
   fixtureProvider=http.createServer(async(req,res)=>{
     for await (const chunk of req) void chunk;
     const output=modelCalls++===0?[{type:'function_call',call_id:'installed-write',name:'write_file',arguments:JSON.stringify({path:'agent.txt',content:'agent B'})}]:[{type:'message',content:[{type:'output_text',text:'File created in B.'}]}];
@@ -168,22 +176,25 @@ try {
     await new Promise(resolve=>setTimeout(resolve,100));
   }
   if(finished.status!=='completed'||modelCalls!==2||!finished.events.some(e=>e.kind==='tool'&&e.payload.operation==='write_file'&&e.payload.ok)||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.existsSync(path.join(workspace,'agent.txt'))) throw new Error('installed agent target/receipt smoke failed');
+  phase='restore';
   const plan=(await recoveryCall('restore_preview',{checkpointId:checkpoint.checkpointId,paths:['target.txt']})).data;
   const restoreArgs={planId:plan.planId,planHash:plan.planHash,idempotencyKey:'installed-recovery-apply'};
   const restored=(await recoveryCall('restore_apply',restoreArgs)).data;
   const replay=(await recoveryCall('restore_apply',restoreArgs)).data;
   if(!restored.verified||replay.changesetId!==restored.changesetId||fs.readFileSync(path.join(secondRoot,'target.txt'),'utf8')!=='B'
     ||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.readFileSync(path.join(workspace,'smoke.txt'),'utf8')!=='beta\n')throw new Error('installed source recovery/replay/isolation smoke failed');
-  await httpClient.close();httpClient=undefined;await running.close();running=undefined;
+  phase='restart';await httpClient.close();httpClient=undefined;await running.close();running=undefined;
   const previousConfig=process.env.DODO_CONFIG_DIR;process.env.DODO_CONFIG_DIR=config;
   try{running=await startServer({invokedCwd:workspace,portOverride:port,quiet:true,toolSurface:'compact'});}
   finally{if(previousConfig===undefined)delete process.env.DODO_CONFIG_DIR;else process.env.DODO_CONFIG_DIR=previousConfig;}
   httpClient=new Client({name:'release-restarted-smoke',version:'1'});
-  await httpClient.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`),{authProvider:{token:async()=>accessToken}}));
+  phase='restart-connect';await httpClient.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`),{authProvider:{token:async()=>accessToken},fetch:restartInitializationFetch()}));
+  phase='restart-context';
   const freshOverview=envelope(await httpClient.callTool({name:'project_overview',arguments:{targetProjectId:target.projectId}}));
   const freshContext={targetProjectId:target.projectId,workspaceId:freshOverview.workspaceId,workspaceEpoch:freshOverview.workspaceEpoch};
   const stale=await httpClient.callTool({name:'dodo_read',arguments:{...targetContext,operation:'restore_status',args:{planId:plan.planId}}});
   if(!['STALE_WORKSPACE','WORKSPACE_MISMATCH'].includes(stale.structuredContent?.error?.code))throw new Error('installed restart accepted stale Recovery context');
+  phase='restart-receipt';
   const recovered=(await recoveryCall('restore_status',{planId:plan.planId},freshContext)).data;
   if(!recovered.plans.some(p=>p.status==='committed'&&p.changesetId===restored.changesetId))throw new Error('installed restore receipt did not survive restart');
   const assets=['index.html','app.js','app.css','workbench.js','workbench.css','ui/recovery.js','ui/deployment.js','ui/dataRecovery.js'];
@@ -197,6 +208,8 @@ try {
     installation: { source: 'exact-tarball', freshPrefix: true, freshConfig: true }, generatedAt: new Date().toISOString() };
   if (fullCount !== packagedSurfaces.fullToolCount || compactCount !== packagedSurfaces.toolCount) throw new Error(`surface count mismatch: full=${fullCount}/${packagedSurfaces.fullToolCount} compact=${compactCount}/${packagedSurfaces.toolCount}`);
   fs.mkdirSync(path.dirname(args.output), { recursive: true }); fs.writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
+} catch(error) {
+  console.error(`[release-smoke-stage] ${phase}`);throw error;
 } finally {
   if (httpClient) await httpClient.close().catch(() => undefined);
   if (stdio) await stdio.close().catch(() => undefined);

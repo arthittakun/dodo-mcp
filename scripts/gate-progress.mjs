@@ -46,7 +46,9 @@ export function focusedFailureDetails(report, root) {
 /** Inspect only the fresh-install section, returning fixed labels/codes and
  * repository line numbers. Never publish a raw stack, message, path or value. */
 export function freshInstallFailureDetails(log, root) {
-  const start = log.lastIndexOf('scripts/release-smoke.mjs --tarball');
+  // The final gate failure repeats the command after its stderr. Start at the
+  // actual invocation, not that trailing summary, or its cause would be lost.
+  const start = log.indexOf('scripts/release-smoke.mjs --tarball');
   if (start < 0) return null;
   const text = stripVTControlCharacters(log.slice(start, start + 160000)).replaceAll('\\', '/');
   const labels = [
@@ -63,5 +65,7 @@ export function freshInstallFailureDetails(log, root) {
   for (const code of ['ECONNRESET','ECONNREFUSED','UND_ERR_SOCKET','EADDRINUSE','ENOENT','EPERM','EACCES','ETIMEDOUT']) allowed.add(code);
   const codes = [...new Set([...text.matchAll(/\b[A-Z][A-Z_]{2,63}\b/g)].map(m=>m[0]).filter(code=>allowed.has(code)))];
   const lines = [...new Set([...text.matchAll(/scripts\/release-smoke-worker\.mjs:(\d+):\d+/g)].map(m=>Number(m[1])))].slice(0,12);
-  return { labels, codes, workerLines: lines };
+  const phases=new Set(['install','stdio','http-start','oauth','http-connect','write-edit','target-routing','checkpoint','agent','restore','restart','restart-connect','restart-context','restart-receipt']);
+  const phase=text.match(/\[release-smoke-stage\] ([a-z-]+)/)?.[1];
+  return { labels, codes, workerLines: lines, ...(phases.has(phase)?{phase}:{}) };
 }

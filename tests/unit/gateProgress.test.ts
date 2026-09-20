@@ -34,5 +34,6 @@ describe('bounded partial gate diagnostics', () => {
     expect(result).toEqual({labels:['connection'],codes:['UND_ERR_SOCKET'],workerLines:[185]});
     expect(JSON.stringify(result)).not.toMatch(/SECRET|private|token/);
     expect(freshInstallFailureDetails('no smoke invocation',process.cwd())).toBeNull();
+    expect(freshInstallFailureDetails(log+'\n[GATE FAILURE] scripts/release-smoke.mjs --tarball /private/SECRET.tgz failed',process.cwd())).toEqual(result);
   });
 });
