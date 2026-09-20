@@ -145,9 +145,9 @@ try {
   failure ??= 'test evidence or source fingerprint validation failed';
   append(`\n[EVIDENCE FAILURE] ${error instanceof Error ? error.message : String(error)}\n`);
 }
-const requiredPlatforms = ['darwin', 'linux'];
-const deferredPlatforms = ['win32'];
-const platforms = { darwin: 'NOT_RUN', linux: 'NOT_RUN', win32: 'DEFERRED_MANUAL_NOT_RUN' };
+const requiredPlatforms = ['darwin', 'linux', 'win32'];
+const deferredPlatforms = [];
+const platforms = { darwin: 'NOT_RUN', linux: 'NOT_RUN', win32: 'NOT_RUN' };
 const platformOrigins = { darwin: null, linux: null, win32: null };
 if (!failure && Object.hasOwn(platforms, process.platform)) {
   platforms[process.platform] = 'AUTOMATED_PASS';
@@ -167,7 +167,8 @@ for (const file of options.platformEvidence) {
   } catch (error) { failure ??= `invalid platform evidence ${file}: ${error instanceof Error ? error.message : String(error)}`; }
 }
 const platformComplete = requiredPlatforms.every((platform) => platforms[platform] === 'AUTOMATED_PASS')
-  && platformOrigins.linux === 'github-actions-native';
+  && platformOrigins.linux === 'github-actions-native'
+  && platformOrigins.win32 === 'github-actions-native';
 const report = {
   schemaVersion: 1, generatedAt: new Date().toISOString(), package: { name: pkg.name, version: pkg.version },
   source: { revision, dirty, fingerprint, provenance: source.provenance, dependencyLockSha256: `sha256:${sha('sha256', path.join(root, 'package-lock.json'))}` },

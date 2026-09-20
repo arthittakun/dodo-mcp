@@ -80,6 +80,16 @@ export function readTestCounts(directory) {
 /** Merge only evidence for the same clean candidate. Linux release evidence
  * must now come from native GitHub Actions, not a previous container run. */
 export function matchPlatformEvidence(evidence, expected) {
+  // CI exports an allowlisted projection, never private test logs or host paths.
+  // Reconstruct only the fields consumed by the SAME validation below.
+  if (evidence.evidenceKind === 'allowlisted-platform-summary') {
+    evidence = { ...evidence,
+      steps: evidence.steps.map(s => ({ id: s.id, status: s.exitCode, durationMs: s.durationMs })),
+      audit: evidence.audit ? { vulnerabilities: evidence.audit } : null,
+      benchmark: evidence.benchmark ? { status: evidence.benchmark.status, aggregate: { eligibleCases: evidence.benchmark.eligibleCases, passedCases: evidence.benchmark.passedCases } } : null,
+      packageArtifact: evidence.artifact, freshInstall: { status: evidence.freshInstall },
+    };
+  }
   const summary = sanitizeGateReport(evidence);
   const platform = evidence.host?.platform;
   const origin = evidence.platformOrigins?.[platform];
@@ -93,7 +103,7 @@ export function matchPlatformEvidence(evidence, expected) {
   requireValue(typeof evidence.platformPolicy?.githubActionsUsed === 'boolean');
   requireValue(origin === 'local' || origin === 'github-actions-native');
   if (origin === 'github-actions-native') requireValue(evidence.platformPolicy.githubActionsUsed);
-  if (platform === 'linux') requireValue(origin === 'github-actions-native');
+  if (platform === 'linux' || platform === 'win32') requireValue(origin === 'github-actions-native');
   return { platform, origin };
 }
 
@@ -151,8 +161,16 @@ export function sanitizeGateReport(report) {
   }
   requireValue(typeof report.source.dirty === 'boolean' && typeof report.releaseReady === 'boolean');
   const artifact = report.packageArtifact;
+  const platform = choice(report.host.platform, ['darwin','linux','win32']);
+  const origin = report.platformOrigins?.[platform] ?? null;
+  if (origin !== null) choice(origin, ['local','local-docker','github-actions-native','github-actions-docker']);
+  requireValue(report.platformPolicy?.githubActionsUsed === undefined || typeof report.platformPolicy.githubActionsUsed === 'boolean');
   return {
     schemaVersion: 1,
+    evidenceKind: 'allowlisted-platform-summary',
+    platforms: { [platform]: choice(report.platforms?.[platform] ?? 'NOT_RUN', ['AUTOMATED_PASS','NOT_RUN','DEFERRED_MANUAL_NOT_RUN']) },
+    platformOrigins: { [platform]: origin },
+    platformPolicy: { githubActionsUsed: report.platformPolicy?.githubActionsUsed ?? false },
     status,
     package: { name: choice(report.package.name, ['dodo-mcp']), version: formatted(report.package.version, /^\d+\.\d+\.\d+$/) },
     source: {

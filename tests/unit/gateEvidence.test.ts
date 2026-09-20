@@ -146,6 +146,21 @@ describe('allowlisted release evidence', () => {
     expect(matchPlatformEvidence(platformReport(), expectedCandidate())).toEqual({ platform: 'linux', origin: 'github-actions-native' });
     expect(matchPlatformEvidence(platformReport('darwin', 'local'), expectedCandidate())).toEqual({ platform: 'darwin', origin: 'local' });
   });
+  it('accepts allowlisted native CI summaries without exporting private logs; Windows requires native CI too', () => {
+    const expected = {...expectedCandidate(),requiredPlatforms:['darwin','linux','win32']};
+    for(const platform of ['linux','win32']){
+      const publicSummary=sanitizeGateReport(platformReport(platform));
+      expect(JSON.stringify(publicSummary)).not.toContain(poison);
+      expect(matchPlatformEvidence(publicSummary,expected)).toEqual({platform,origin:'github-actions-native'});
+      const missing=structuredClone(publicSummary);missing.freshInstall='NOT_RUN';
+      expect(()=>matchPlatformEvidence(missing,expected)).toThrow();
+      const altered=structuredClone(publicSummary);(altered.source as Record<string,unknown>).fingerprint='sha256:'+'e'.repeat(64);
+      expect(()=>matchPlatformEvidence(altered,expected)).toThrow();
+      const forged=structuredClone(publicSummary);(forged.platformPolicy as Record<string,unknown>).githubActionsUsed=false;
+      expect(()=>matchPlatformEvidence(forged,expected)).toThrow();
+    }
+    expect(()=>matchPlatformEvidence(platformReport('win32','local'),expected)).toThrow();
+  });
 
   it('rejects Docker and local Linux reports instead of treating them as native CI', () => {
     for (const origin of ['local', 'local-docker', 'github-actions-docker']) {
