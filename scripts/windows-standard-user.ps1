@@ -42,19 +42,23 @@ try {
   $fixture = Join-Path $env:ProgramData ('dodo-standard-user-' + [Guid]::NewGuid().ToString('N'))
   New-Item -ItemType Directory $fixture | Out-Null
   Protect-Fixture $fixture $account.SID
+  $phase = 'copy-node-toolchain'
   $toolchain = Join-Path $fixture 'node'
   New-Item -ItemType Directory $toolchain | Out-Null
   $nodeExe = (Get-Command node.exe -CommandType Application).Source
   $nodeRoot = Split-Path -Parent $nodeExe
   Copy-Item -LiteralPath $nodeExe -Destination $toolchain
   foreach ($shim in @('npm.cmd','npx.cmd')) { Copy-Item -LiteralPath (Join-Path $nodeRoot $shim) -Destination $toolchain }
+  $phase = 'copy-npm-toolchain'
   New-Item -ItemType Directory (Join-Path $toolchain 'node_modules') | Out-Null
   Copy-Item -LiteralPath (Join-Path $nodeRoot 'node_modules/npm') -Destination (Join-Path $toolchain 'node_modules') -Recurse
+  $phase = 'copy-test-artifact'
   Copy-Item -LiteralPath (Join-Path $evidence $tarball) -Destination (Join-Path $fixture 'package.tgz')
   foreach ($script in @('windows-standard-user-child.ps1','windows-standard-user-child.mjs')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $fixture
   }
   Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../tests/helpers/nativeAclDiagnostics.mjs') -Destination $fixture
+  $phase = 'prepare-admin-owned-fixture'
   # Reproduce a readable, private installation whose owner is Administrators.
   # Standard-user rejection must be reported as a reproduction, not a success.
   $mixed = Join-Path $fixture 'admin-created-state'
@@ -65,6 +69,7 @@ try {
   $manifest.SetOwner([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))
   Set-Acl -LiteralPath (Join-Path $mixed 'managed-tools.json') -AclObject $manifest
   $plan = @{ fixture = $fixture; expectedSid = $account.SID.Value; node = (Join-Path $toolchain 'node.exe'); mixedState = $mixed }
+  $phase = 'write-fixture-plan'
   [IO.File]::WriteAllText((Join-Path $fixture 'plan.json'), ($plan | ConvertTo-Json -Compress))
   $temp = Join-Path $fixture 'temp'
   New-Item -ItemType Directory $temp | Out-Null
@@ -103,7 +108,9 @@ try {
   }
 } catch {
   # No raw exceptions/paths/credentials in public output.
-  $result = @{ scope = 'windows-standard-user'; complete = $false; infrastructurePhase = $phase; hresult = $_.Exception.HResult; cleanup = $false }
+  $result = @{ scope = 'windows-standard-user'; complete = $false; infrastructurePhase = $phase; hresult = $_.Exception.HResult; cleanup = $false;
+    scriptLine = $_.InvocationInfo.ScriptLineNumber; errorType = $_.Exception.GetType().FullName }
+  [IO.File]::WriteAllText((Join-Path $evidence 'harness-private.log'), ($_ | Out-String))
 } finally {
   $cleaned = $true
   if ($created) {
