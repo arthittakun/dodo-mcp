@@ -45,7 +45,10 @@ try {
   $phase = 'copy-node-toolchain'
   $toolchain = Join-Path $fixture 'node'
   New-Item -ItemType Directory $toolchain | Out-Null
-  $nodeExe = (Get-Command node.exe -CommandType Application).Source
+  # A persistent runner can expose several node.exe applications on PATH.
+  # Select the first (setup-node's selected version), never pass an array of
+  # executable paths into Copy-Item/Join-Path/native command invocation.
+  $nodeExe = (Get-Command node.exe -CommandType Application | Select-Object -First 1).Source
   $nodeRoot = Split-Path -Parent $nodeExe
   Copy-Item -LiteralPath $nodeExe -Destination $toolchain
   foreach ($shim in @('npm.cmd','npx.cmd')) { Copy-Item -LiteralPath (Join-Path $nodeRoot $shim) -Destination $toolchain }

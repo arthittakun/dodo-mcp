@@ -16,7 +16,7 @@ const config = path.join(process.env.LOCALAPPDATA, 'dodo');
 const npmCli = path.join(root, 'node/node_modules/npm/bin/npm-cli.js');
 const cli = path.join(prefix, 'node_modules/dodo-mcp/dist/cli/main.js');
 const observer = path.join(root, 'nativeAclDiagnostics.mjs');
-const result = { scope: 'windows-standard-user', identity, checks: [], complete: false, coverage: {
+const result = { scope: 'windows-standard-user', nodeVersion: process.version, identity, checks: [], complete: false, coverage: {
   nativeUacProvisioning: 'NOT_RUN', liveDesktopConsent: 'NOT_RUN', httpOAuth: 'NOT_RUN',
 } };
 const env = { ...process.env, npm_config_cache: path.join(root, 'npm-cache'), npm_config_userconfig: path.join(root, 'empty-npmrc'),
