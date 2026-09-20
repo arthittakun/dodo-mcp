@@ -39,7 +39,7 @@ try {
   Add-LocalGroupMember -SID ([Security.Principal.SecurityIdentifier]::new('S-1-5-32-545')) -Member $account
   if (@(Get-LocalGroupMember -SID ([Security.Principal.SecurityIdentifier]::new('S-1-5-32-544')) | Where-Object { $_.SID -eq $account.SID }).Count) { throw 'fixture is an administrator' }
   $phase = 'prepare-fixture'
-  $fixture = Join-Path $env:ProgramData ('dodo-standard-user-' + [Guid]::NewGuid().ToString('N'))
+  $fixture = Join-Path $env:ProgramData ('ddci-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
   New-Item -ItemType Directory $fixture | Out-Null
   Protect-Fixture $fixture $account.SID
   $phase = 'copy-node-toolchain'
@@ -51,7 +51,9 @@ try {
   foreach ($shim in @('npm.cmd','npx.cmd')) { Copy-Item -LiteralPath (Join-Path $nodeRoot $shim) -Destination $toolchain }
   $phase = 'copy-npm-toolchain'
   New-Item -ItemType Directory (Join-Path $toolchain 'node_modules') | Out-Null
-  Copy-Item -LiteralPath (Join-Path $nodeRoot 'node_modules/npm') -Destination (Join-Path $toolchain 'node_modules') -Recurse
+  # Robocopy handles npm's nested tree without PowerShell 5.1 Copy-Item limits.
+  & (Join-Path $env:SystemRoot 'System32/robocopy.exe') (Join-Path $nodeRoot 'node_modules/npm') (Join-Path $toolchain 'node_modules/npm') /E /COPY:DAT /DCOPY:DA /R:0 /W:0 /XJ /NFL /NDL /NJH /NJS *> (Join-Path $evidence 'toolchain-copy-private.log')
+  if ($LASTEXITCODE -ge 8) { throw 'toolchain copy failed' }
   $phase = 'copy-test-artifact'
   Copy-Item -LiteralPath (Join-Path $evidence $tarball) -Destination (Join-Path $fixture 'package.tgz')
   foreach ($script in @('windows-standard-user-child.ps1','windows-standard-user-child.mjs')) {
