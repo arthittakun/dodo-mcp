@@ -41,7 +41,11 @@ export function focusedFailureDetails(report, root) {
     const internalKind = message.includes('INTERNAL_ERROR: apply failed at ') ? 'apply-compensated'
       : message.includes('INTERNAL_ERROR: audit write failed;') ? 'audit-write'
       : message.includes('INTERNAL_ERROR: internal error') ? 'untyped' : null;
-    return { ...location, errorCodes, frames, ...(internalKind ? { internalKind } : {}) };
+    const pathDenialKind = message.includes('private Windows state ACL could not be established or verified') ? 'windows-private-acl'
+      : message.includes('private path changed during ACL verification') ? 'private-path-changed'
+      : message.includes('Windows short-name aliases are refused') ? 'windows-short-name'
+      : message.includes('Windows native workspaces require a local drive path') ? 'windows-nonlocal-path' : null;
+    return { ...location, errorCodes, frames, ...(internalKind ? { internalKind } : {}), ...(pathDenialKind ? { pathDenialKind } : {}) };
   });
   return { locations, truncated: allowed.truncated };
 }

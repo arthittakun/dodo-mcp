@@ -30,6 +30,9 @@ describe('bounded partial gate diagnostics', () => {
     const classified=focusedFailureDetails({testResults:[{name:path.resolve(file),assertionResults:[{status:'failed',failureMessages:['INTERNAL_ERROR: apply failed at PRIVATE_SECRET_PATH']}]}]},process.cwd());
     expect(classified.locations[0]).toMatchObject({internalKind:'apply-compensated'});
     expect(JSON.stringify(classified)).not.toContain('PRIVATE_SECRET_PATH');
+    const denied=focusedFailureDetails({testResults:[{name:path.resolve(file),assertionResults:[{status:'failed',failureMessages:['PATH_DENIED: private Windows state ACL could not be established or verified PRIVATE_SECRET_PATH']}]}]},process.cwd());
+    expect(denied.locations[0]).toMatchObject({pathDenialKind:'windows-private-acl'});
+    expect(JSON.stringify(denied)).not.toContain('PRIVATE_SECRET_PATH');
   });
   it('classifies installed-package failures without exporting private diagnostics',()=>{
     const log='earlier MCP tool failed: FORBIDDEN\nnode scripts/release-smoke.mjs --tarball /private/SECRET.tgz\nTypeError: fetch failed\n at /private/SECRET/scripts/release-smoke-worker.mjs:185:3\n cause: UND_ERR_SOCKET private-token-value\n';
