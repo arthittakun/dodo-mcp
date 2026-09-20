@@ -11,6 +11,7 @@ import { ipcSocketPath } from '../../src/config/paths.js';
 import { credentialPath } from '../../src/ipc/authentication.js';
 import { startIpcServer } from '../../src/ipc/server.js';
 import { ipcCall } from '../../src/ipc/client.js';
+import { windowsPrivateAclDiagnostics } from '../../src/platform/windowsPrivateAcl.js';
 
 const ADMIN = 'S-1-5-32-544';
 const FOREIGN = 'S-1-5-18'; // SYSTEM is permitted as a trustee, NOT as an initial owner.
@@ -65,6 +66,24 @@ $p = [Security.Principal.WindowsPrincipal]::new($i)
     expect(actual.allowed).toContain(sid);
     expect(actual.allowed.every(value => [sid, ADMIN, FOREIGN].includes(value))).toBe(true);
   }
+
+  it('rereads every DACL using the compiled inbox helper, without starting PowerShell for each check', () => {
+    const dir = directory();ensurePrivateDirectory(dir);
+    const file = path.join(dir,'fresh-dacl.txt');fs.writeFileSync(file,'fixture');
+    const before = windowsPrivateAclDiagnostics(), started = Date.now();
+    for(let n=0;n<20;n++)assertPrivatePath(file);
+    const after = windowsPrivateAclDiagnostics();
+    expect(after.backend, JSON.stringify(after)).toBe('native-dotnet');
+    expect(after.nativeCalls-before.nativeCalls).toBe(20);
+    expect(after.bootstrapCalls).toBe(before.bootstrapCalls);
+    console.log(JSON.stringify({privateAclProbe:{checks:20,elapsedMs:Date.now()-started,backend:after.backend}}));
+    // The next call must notice changed permissions immediately, not a TTL cache.
+    const icacls=windowsSystemExecutable('icacls.exe');
+    execFileSync(icacls,[file,'/grant','*S-1-1-0:(R)','/q'],{stdio:'pipe',timeout:15000});
+    try{expect(()=>assertPrivatePath(file)).toThrow(/ACL could not be established or verified/);}
+    finally{execFileSync(icacls,[file,'/remove:g','*S-1-1-0','/q'],{stdio:'pipe',timeout:15000});}
+    assertPrivatePath(file);
+  }, T);
 
   it('protect normalizes an initial Administrators owner and establishes the private DACL', () => {
     const dir = directory();
