@@ -31,14 +31,25 @@ describe('R03 owner drift review through real HTTP and browser',()=>{
  it.skipIf(!fs.existsSync(chromium.executablePath()))('desktop and narrow browser scan, compare and owner confirmation actually change the drift baseline',async()=>{
   const p=await setup(),browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.name));
   const out=path.resolve('release-evidence/recovery/R04/20260920/browser');fs.mkdirSync(out,{recursive:true});
+  const started=Date.now();let phase='navigate';const phases:{phase:string;elapsedMs:number}[]=[];
+  const mark=(value:string)=>{phase=value;phases.push({phase,elapsedMs:Date.now()-started});};
+  const responses:{operation:string;status:number}[]=[];
+  page.on('response',response=>{const request=response.request();if(!request.url().endsWith('/api/admin/action'))return;try{const op=request.postDataJSON()?.operation;if(['recovery.status','recovery.drift.scan','recovery.evidence.list','recovery.restore_list'].includes(op))responses.push({operation:op,status:response.status()});}catch{/* Never record request contents. */}});
   try{
-    await page.goto(c.configUrl!);await page.getByRole('button',{name:'โปรเจกต์',exact:true}).click();await page.locator('#wb-project').selectOption(p.projectId);
-    await page.getByRole('button',{name:'ตรวจไฟล์และเปรียบเทียบ',exact:true}).click();await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).waitFor();
+    await page.goto(c.configUrl!);mark('projects');await page.getByRole('button',{name:'โปรเจกต์',exact:true}).click();mark('select');await page.locator('#wb-project').selectOption(p.projectId);
+    mark('scan-click');await page.getByRole('button',{name:'ตรวจไฟล์และเปรียบเทียบ',exact:true}).click();mark('scan-result');await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).waitFor();mark('screenshots');
     expect(c.server.services.recovery!.drift.status().changedCount).toBe(1);await page.screenshot({path:path.join(out,'drift-desktop.png'),fullPage:true});
     await page.setViewportSize({width:390,height:844});expect(await page.evaluate('document.documentElement.scrollWidth<=innerWidth')).toBe(true);await page.screenshot({path:path.join(out,'drift-narrow.png'),fullPage:true});
-    await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).click();await page.getByRole('button',{name:'ยอมรับสถานะ',exact:true}).click();await page.getByText('ไม่พบการเปลี่ยนจากสถานะที่บันทึก',{exact:true}).waitFor();
+    mark('acknowledge');await page.getByRole('button',{name:'ยอมรับสถานะที่ตรวจนี้',exact:true}).click();await page.getByRole('button',{name:'ยอมรับสถานะ',exact:true}).click();await page.getByText('ไม่พบการเปลี่ยนจากสถานะที่บันทึก',{exact:true}).waitFor();mark('verify');
     expect((await c.server.services.recovery!.scanDrift()).changedCount).toBe(0);expect(fs.readFileSync(path.join(c.fixtureDir,'a.txt'),'utf8')).toBe('outside');expect(errors).toEqual([]);
-  }finally{await browser.close();}
+  }finally{
+    const diagnostics=process.env['DODO_TEST_REPORT_DIR'];
+    if(diagnostics){
+      const state=await page.evaluate("({loading:document.getElementById('workbench')?.getAttribute('aria-busy')==='true',selected:Boolean(document.getElementById('wb-root')?.textContent),error:document.getElementById('wb-notice')?.dataset.error==='true',recoveryError:document.body.textContent?.includes('ตรวจสอบ Recovery ไม่สำเร็จ')===true})").catch(()=>null);
+      fs.mkdirSync(diagnostics,{recursive:true});fs.writeFileSync(path.join(diagnostics,'recovery-browser-diagnostics.json'),JSON.stringify({phase,phases,responses,state}),{mode:0o600});
+    }
+    await browser.close();
+  }
  },60000);
  it.skipIf(!fs.existsSync(chromium.executablePath()))('a delayed initial overview cannot replace the project controls being used by the owner',async()=>{
   const p=await setup(),browser=await chromium.launch({headless:true}),page=await browser.newPage();
