@@ -108,4 +108,15 @@ describe('R01 durable default-on source backups',()=>{
     fs.writeFileSync(r.storage.objectPath(m.entries[0]!.hash!),'broken');
     await expect(r.storage.readVerified(m.id,f.ws.workspaceId)).rejects.toThrow('integrity');
   });
+  it('selecting a runtime with an existing checkpoint never repeats activation or hides external drift',async()=>{
+    const r=setup({'a.txt':'before'});await r.checkpoint('owner-checkpoint','owner');
+    const before=r.status();expect(before.awaitingActivation).toBe(false);
+    const count=()=>f.ws.store.db.prepare('SELECT COUNT(*) n FROM recovery_snapshots').get();const saved=count();
+    fs.writeFileSync(path.join(f.root,'a.txt'),'outside');r.activate();r.activate();
+    expect(f.ws.services.mutations!.busy).toBe(false);expect(count()).toEqual(saved);
+    expect(r.status().baselineId).toBe(before.baselineId);
+    expect((await r.scanDrift()).changes).toEqual([expect.objectContaining({path:'a.txt',change:'modified'})]);
+    await expect(f.call('write_file',{path:'a.txt',content:'must not overwrite'})).rejects.toThrow('FILE_CHANGED');
+    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('outside');
+  });
 });

@@ -1,8 +1,9 @@
-# Source Recovery (unreleased working source)
+# Recovery: source, deployments and private configuration
 
-This describes the R01–R04 implementation in the development checkout. It is not
-a claim that the published npm package includes it. Reviewed restore is implemented;
-release still requires final gates and an explicit owner release request.
+This documents the 1.3.0 source candidate. Publication and supported-platform
+results are recorded separately in [release notes](RELEASE_1.3.0.md) and
+[the test report](TEST_REPORT.md). Source backup is default-on for registered
+projects; deployment/database/config adapters require separate owner opt-in.
 
 Registered projects default to automatic source backups on first activation.
 Existing projects without a Recovery policy also default to enabled; an explicit
@@ -108,7 +109,7 @@ MCP full operations: `checkpoint_list`, `checkpoint_inspect`, `checkpoint_create
 `recovery_session_list`, `recovery_session_inspect`, `recovery_session_begin`,
 `recovery_session_end`, `restore_preview`, `restore_apply`, `restore_status`.
 Use the existing `dodo_read` and `dodo_write` compact gateways and discover schemas.
-Full catalog: 148 capabilities (144 with sub-agents hidden); Compact remains 20.
+Full catalog: 158 capabilities (154 with sub-agents hidden); Compact remains 20.
 Gateway arguments cannot override top-level workspace/project/recovery context.
 
 For several edits belonging to one task, call `recovery_session_begin`, then pass
@@ -137,7 +138,7 @@ a key with uncertain outcome reports recovery-required without repeating writes.
 Closed history obeys retention, while open/interrupted sessions, unresolved changes,
 active jobs, pinned points and unexpired plans retain their backup references.
 
-## External changes and Git copies (unreleased R03 candidate)
+## External changes and Git copies
 
 DODO now keeps the **expected source state** separately from its snapshots. When a mutation target was changed outside the journal, the write fails with `FILE_CHANGED` even when the caller rereads its new hash. Other non-conflicting file edits remain possible. Significant source drift blocks new commands until the owner reviews it. Defaults: at least 20 changed files and more than 20% of the baseline, or 10 deletions. Commands still run under the existing exec/sandbox policy; backups cannot undo database or volume effects.
 
@@ -163,7 +164,7 @@ The advanced Recovery settings can require Git copies and select a separate back
 
 If `.git` and source files are deleted but the registered root directory remains, preview/restore still uses the independent source checkpoint. If the entire root or installation state was lost, automatic restore cannot validate its old identity. Inspect the separately stored bare copy and `dodo-source-manifest.json` locally, extract approved files to a new directory, review it, then register that directory. For a single reviewed file, an owner may use `git --git-dir=/absolute/backup/snap_ID.git show refs/dodo/snapshots/snap_ID:path/to/file` to inspect the independent bytes. Do not pipe an unreviewed archive over an existing project. Git copies do not back up Git history, external LFS objects, databases or volumes.
 
-## Test evidence and named checkpoints (unreleased R04 candidate)
+## Test evidence and named checkpoints
 
 The Recovery dashboard now separates three things:
 
@@ -220,7 +221,7 @@ database row rollback remains **NOT_SUPPORTED**. Optional adapters are described
 production recovery require their own acceptance; results from macOS/Linux
 fixtures are not substitutes.
 
-## Reviewed Docker deployment (unreleased working source)
+## Reviewed Docker deployment
 
 Source backup continues to work without a deployment target. To opt in, open
 **Projects → Deployment · Docker → เพิ่มหรือแก้ปลายทาง**. Select the Docker context,
@@ -323,7 +324,7 @@ external CI can still change production independently. Historical known-good is
 not a continuous live health monitor. No live owner production deployment or
 manual platform acceptance is implied by disposable automated fixtures.
 
-## Database awareness and encrypted private config (unreleased working source)
+## Database awareness and encrypted private config
 
 Source recovery remains enabled by default for registered projects. **Database
 inspection and secret-file backup remain separate owner opt-ins.** Nothing connects

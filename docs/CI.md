@@ -30,8 +30,8 @@ gh run list --workflow platform-gates.yml --limit 5
 ผลแสดงเฉพาะชื่อไฟล์ทดสอบที่อยู่ใน repo และตัวเลข ไม่ส่ง log ทั้งก้อนออกมา
 คำสั่งตรวจหลักฐานสำเร็จไม่ได้แปลว่า application tests ผ่าน
 
-`windows-focus` ใช้ Node 24 และ worker เดียว ทดสอบเฉพาะ source backup, direct
-coding tools และ native ACL owner เพื่อวินิจฉัย Windows failures ผ่าน npm script `ci:windows:focus`
+`windows-focus` ใช้ Node 24 และ worker เดียว ทดสอบชุดที่เลือกใน `scripts/windows-focus.mjs`
+พร้อม native ACL preflight เพื่อวินิจฉัย Windows failures ผ่าน npm script `ci:windows:focus`
 ผลนี้ไม่แทน `windows` ซึ่งยังต้องรัน full gate ทั้ง Node 22/24 ก่อนรับรอง candidate
 
 ## เตรียม Linux runner
@@ -101,3 +101,11 @@ expected/actual values, ข้อความ error หรือ stack ของ
 Linux Docker evidence เดิมยังเป็นประวัติการทดสอบเดิม ไม่ใช้แทน native Linux CI
 ตามนโยบายปัจจุบัน Strict gate รวมได้เฉพาะ clean revision/lock/source fingerprint
 ตรงกัน และ Linux origin เป็น `github-actions-native`
+
+## Release evidence
+
+Strict release gate ต้องมี macOS, native Linux และ native Windows ที่ตรง version,
+clean revision, source fingerprint และ lockfile ไม่รับผล Docker แทน native CI
+ใช้ allowlisted summary จาก workflow ได้โดยไม่ต้องคัดลอก private logs ออกมา
+Windows รัน dedicated random-item Credential Manager fixture และลบเฉพาะ item นั้น
+Linux Secret Service บนเครื่อง headless ที่ไม่ได้เปิด fixture ยังคง NOT_RUN

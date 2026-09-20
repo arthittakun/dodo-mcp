@@ -1,5 +1,40 @@
 # DODO MCP — Test Report
 
+## 1.3.0 Recovery — หลักฐานก่อน final platform gate
+
+ผลแต่ละรอบอ้างเฉพาะ source fingerprint/revision ที่ระบุ ไม่ใช่ผล npm รุ่นก่อน
+และไม่รวม skipped tests เป็น pass ต้องใช้ final native Windows/Linux และ macOS
+ที่ตรง clean candidate ก่อน publish ดู [workflow](https://github.com/arthittakun/dodo-mcp/actions/workflows/platform-gates.yml)
+และ [วิธีอ่านหลักฐาน](CI.md)
+
+ชุดรวม macOS วันที่ 2026-09-20 ก่อนแก้ duplicate activation:
+`sha256:b75f20c8669d7a7fbd2e16d80104d1ef6dce4b36855a2ab039ae0d2d475d47e2`
+
+- AUTOMATED_PASS: core141files / 933total / 895pass / 0fail / 38skip;
+  packaging17/17; build/typecheck/lint/test:all/benchmark/audit/fresh install exit0
+- Production dependency audit0; DodoBench7/7
+- Fresh exact-tarball: OAuth + Compact20, Full158 with explicit Sub-agent exposure,
+  write/edit/readback, A/B routing, agent receipt; Recovery checkpoint, reviewed restore,
+  hash readback, idempotent retry, unrelated-file preservation, restart receipt and stale-context denial
+- Actual browser desktop/narrow uses isolated state; config plaintext never appears in UI
+- Actual macOS Keychain and Windows Credential Manager random-item put/read/delete passed
+  (AUTOMATED_PASS); no owner credentials touched
+
+Windows focused [run35505588240](https://github.com/arthittakun/dodo-mcp/actions/runs/35505588240)
+passed78/79,0skip and confirmed the native ACL backend (20freshchecks715ms).
+Remaining browser scan returned409 while duplicate project activation held the queue.
+Follow-up [run35506319903](https://github.com/arthittakun/dodo-mcp/actions/runs/35506319903)
+passed23/24,0skip, including all R06 security/browser/native credential tests;
+scalar diagnostics isolated the same409. The candidate now marks a checkpointed
+runtime active and avoids re-activation, with a regression that keeps external drift
+visible and source writes blocked until reviewed. These focused failures remain
+recorded; neither is a full Windows PASS. Final full gates must certify the fix.
+
+MANUAL_NOT_RUN: owner production restore, live external ChatGPT, Android hardware,
+and Linux Secret Service on a logged-in desktop. SQLite metadata fixtures do not
+claim generic database rollback/PITR. Actual disposable Docker product-adapter
+acceptance is separate from native CI and preserves database rows/volumes/config.
+
 ## Unreleased — native CI workflow (2026-09-20)
 
 Linux platform gate เปลี่ยนเป็น self-hosted native เช่นเดียวกับ Windows โดยไม่ใช้

@@ -1,49 +1,26 @@
 # DODO MCP — Release Notes
 
-## Unreleased — native platform CI
+## 1.3.0 — Recovery & Local Git Safety (release candidate)
 
-- Linux GitHub Actions now executes directly on the self-hosted runner, alongside
-  native Windows jobs on Node 22/24. No Docker build/run in the platform workflow.
-- Check Linux media prerequisites and a sandboxed Chromium launch before tests;
-  retain private diagnostics and upload only allowlisted summaries.
-- Separate evidence directories by run/attempt; require matching clean source
-  fingerprints and native Linux CI origin when combining release evidence.
-- Workflow validation and gate-evidence unit tests passed locally; native results
-  must come from the actual candidate workflow run. No npm release is implied.
+- Default-on independent source backups for registered projects, with caller-owned
+  sessions, reviewed previews, journaled restore and durable retry/restart receipts.
+- Detect external content drift; preserve separate emergency copies and private Git
+  checkpoints without changing the owner's index/branch. Named/pinned checkpoints,
+  evidence-bound verification and reviewed retention are available in Web/CLI.
+- Owner-registered Docker Compose deployment with sealed build source, image/container
+  provenance, health/stabilization, known-good pointers, exact reviewed image rollback,
+  guarded source recovery and bounded image/probe cleanup.
+- Read-only SQLite migration compatibility rules. Separate owner-opt-in encrypted
+  private configuration backups with OS-held keys, redacted preview, rotation and
+  before-restore ciphertext. No generic database rollback or secret exposure to MCP.
+- Full158 (default154 when Sub-agents are hidden), Compact20, Hybrid49. OAuth, target
+  ACL, context, approval, sandbox, secret/path/hash guards remain authoritative.
+- Windows private ACL checks use an inbox .NET helper when available, rereading actual
+  permissions on every invocation; fallback preserves the same fail-closed policy.
+- Native Linux/Windows CI and macOS release gates, immutable tarball and fresh install
+  verification. Detailed [scope and upgrade notes](RELEASE_1.3.0.md).
 
-## Unreleased — reviewed source restore
-
-- Caller-owned recovery sessions and checkpoint history, bounded preview/diffs,
-  mandatory pre-restore backup and journaled apply with durable retry receipts.
-- Web/CLI owner review, session/external-edit conflicts, directory identity checks,
-  binary/mode restoration and restart reconciliation without replay.
-- Ten appended Full operations; Compact remains 20. Optional top-level
-  `recoverySessionId` groups edits; gateway nested context overrides are rejected.
-- Read-only tokens cannot restore; source-only scope excludes DBs, secrets,
-  volumes and remote effects. Native Windows/Android and live owner acceptance
-  remain separate manual gates. No release/publish is implied by this entry.
-
-## Unreleased — source Recovery foundation
-
-- Registered projects default to actual source backups before file mutations and
-  commands; owner web/CLI can explicitly disable or re-enable with audit.
-- Independent CAS, immutable manifests, shared quota reservations, drift/integrity
-  checks, retention and restart reconciliation; no automatic command replay.
-- Published 1.2.1 tool-visibility and simpler Agent form behavior retained.
-- This is working source only. R02 reviewed preview/restore is now implemented in this candidate; no release is published.
-
-## Unreleased — recovery safety prerequisite
-
-- `rollback_changes` now requires changeset ownership, consistent with agent
-  rollback; cross-caller recovery uses authenticated owner administration.
-  Existing changesets retain their original principal. OAuth scopes and
-  workspace/path/trust policies are unchanged.
-- Verify backup integrity and write intent before source changes; inverse
-  rollback journals and boot checks preserve conflicting external edits.
-- Inspect all staged Git paths, including pre-existing secrets/out-of-workspace
-  changes; preserve the original index on refused staging or commit.
-- Project-wide default-on snapshots are not part of this prerequisite change.
-  This entry does not indicate a published npm release.
+Publication is pending the final native gates; this heading is not a publish receipt.
 
 ## 1.2.1 — สร้าง Agent แบบง่ายและ error ที่แก้ได้ตรงจุด
 
@@ -281,15 +258,3 @@ dodo --version
 ```
 
 หลังติดตั้งให้ restart DODO process และ rescan MCP connection ตามข้อกำหนดของ client
-
-## Unreleased Recovery R03 candidate
-
-Adds content-based external drift checks, exact owner acknowledgement in Web/CLI, unknown-author post-job observations, and independent private Git source copies. Does not increase the MCP catalog count, alter OAuth scopes, automatically approve actions, or publish a version. Automated platform evidence is recorded in TEST_REPORT; live owner data and Windows/Android remain separate manual gates.
-
-
-## Unreleased Recovery R04
-
-- Bind actual verification jobs to before-run source snapshots; expose exact manifest/recipe/parser evidence with stale/inconclusive states.
-- Add private owner revisioned names, pin/unpin, protected retention preview and a separate Recovery UI module.
-- Keep Full 148 / Compact 20 and existing OAuth/ACL/context/approval/path/sandbox checks.
-- Source candidate only; no npm publication or deployment/database protection is claimed.

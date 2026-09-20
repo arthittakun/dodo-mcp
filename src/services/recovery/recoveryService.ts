@@ -176,7 +176,9 @@ export class RecoveryService {
       await this.s.mutations!.run(async()=>{
         const prior=this.s.store.db.prepare("SELECT id FROM recovery_snapshots WHERE workspace_id=? AND state='READY' ORDER BY created_at DESC LIMIT 1").get(this.s.workspaceId) as {id:string}|undefined;
         if(prior){const m=await this.storage.readVerified(prior.id,this.s.workspaceId);if(m.rootIdentity!==this.identity)throw new DodoError('PATH_DENIED','backup belongs to a previous root identity; owner review is required');}
-        await this.capture('activation','system:activation');
+        // A queued writer may already have established this runtime's baseline.
+        // Attaching/selecting the project must not start a second activation.
+        if(!this.baseline)await this.capture('activation','system:activation');
         this.startScanner();
       });
     })().catch(e=>{this.fail(e);});
@@ -200,7 +202,7 @@ export class RecoveryService {
         await this.storage.readVerified(this.baseline!,this.s.workspaceId);
         if(!this.reviewedRestore.getStore()&&(trigger==='before-write'||trigger==='before-exec'))try{await this.deadline.run(Date.now()+this.policy().scanMs,()=>this.drift.guard(targets));}catch(e){guardRejected=e instanceof DodoError&&['FILE_CHANGED','CONFLICT'].includes(e.code);throw e;}
         const id = await this.capture(trigger,actor,targets);
-        this.startScanner();
+        this.activated=true;this.startScanner();
         this.authority.getStore()?.();
         try{await this.reviewedRestore.getStore()?.();}catch(e){guardRejected=true;throw e;}
         return id;

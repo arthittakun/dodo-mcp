@@ -296,10 +296,10 @@ manual external-client acceptance
 Automated catalog/API/Chromium/fresh-package fixtures: **AUTOMATED_PASS**
 
 1. เปิด Local Config → Settings และตรวจว่าสวิตช์ “เปิดให้ MCP clients เห็น Sub-agent tools” ปิดเป็นค่าเริ่มต้น
-2. ตรวจ Full live catalog มี 121 tools; Compact/Hybrid มี 19/49 ชื่อและ discover หา `subagent_spawn` ไม่พบ
+2. ตรวจ Full live catalog มี 154 tools; Compact/Hybrid มี 20/49 ชื่อและ discover หา `subagent_spawn` ไม่พบ
 3. ตรวจ Chat & Tasks ยังสร้างและดูงานได้จากหน้าเว็บ
 4. เปิดสวิตช์ ยืนยันผ่าน dialog แล้วตรวจข้อความว่าต้อง restart/rescan
-5. restart fixture เท่านั้น แล้วตรวจ Full มี 125 และ Compact discover/gateway มี `subagent_spawn/status/result/control`
+5. restart fixture เท่านั้น แล้วตรวจ Full มี 158 และ Compact discover/gateway มี `subagent_spawn/status/result/control`
 6. ปิดสวิตช์อีกครั้ง restart และตรวจว่า run history ยังอยู่ แต่ MCP definitions ถูกซ่อน
 
 การ restart server จริงและ rescan ผ่าน ChatGPT/remote client จริง: **MANUAL_NOT_RUN**
@@ -364,7 +364,7 @@ Live OpenAI, Gemini, Claude, MiniMax, GLM, Kimi, Ollama: MANUAL_NOT_RUN สำ�
 จนกว่าจะมีหลักฐานจาก account/model จริง Browser automation และ synthetic Keychain
 round-trip เป็น AUTOMATED_PASS ไม่ใช้แทน MANUAL_PASS ของ provider
 
-## Unreleased Recovery R00–R02
+## Recovery R00–R02
 
 Automation uses separate fixture projects, including Chromium desktop/narrow
 owner policy controls. Manual owner-device use and native Windows are
@@ -375,16 +375,16 @@ read-back, and inspect journal status after reconnect. Test backup opt-out,
 external-edit conflict and restart with fresh context. Do not exercise this manual
 gate on a production database or count automated browser tests as MANUAL_PASS.
 
-## Unreleased R03 — MANUAL_NOT_RUN on owner projects
+## R03 — MANUAL_NOT_RUN on owner projects
 
 In disposable projects: capture dirty/staged/untracked source; externally overwrite files while preserving size/mtime; verify target writes refuse and unrelated edits remain available. Review paginated drift, reject stale digest/epoch, then explicitly acknowledge or preview/restore. Verify emergency snapshots do not replace the baseline. Run a command that changes source and check unknown-author attribution after job completion. Confirm independent Git refs/objects, unchanged working index/HEAD/branch, and no hooks/filter markers. Remove the selected backup volume: expect refusal without fallback. Delete source and working `.git` while retaining root identity: preview/restore source only. Root replacement, real removable volumes, native Windows/Android and owner live projects require separate manual acceptance. Browser fixture automation is reported as AUTOMATED_PASS only after it runs.
 
 
-## Unreleased Recovery R04
+## Recovery R04
 
 Fixture browser automation covers project registration, default-on recovery, actual recipe evidence, owner names/pins, stale files, restore read-back and quota-blocked UI on desktop/narrow screens. Before a release, an owner should separately test their own project/storage and restart/reconnect workflow, inspect retained pins/names, and re-run required recipes after source/config changes. Live owner projects, Windows/Android and production/database recovery are MANUAL_NOT_RUN for this phase. Do not label a manual owner name as tested or production-known-good.
 
-## Unreleased Docker deployment and recovery
+## Docker deployment and recovery
 
 AUTOMATED_PASS (disposable local daemon fixture, native Node): real build/image
 source verification, deploy/health/stabilization, failure preserving known-good,
@@ -399,7 +399,7 @@ in, review the target's daemon authority and use a disposable project/service to
 exercise interrupted build/deploy, live observation, probe cleanup, reconnect,
 expired approval and reviewed rollback. Source/database recovery remain distinct.
 
-## Unreleased database/config recovery — MANUAL_NOT_RUN on owner data
+## database/config recovery — MANUAL_NOT_RUN on owner data
 
 Use disposable SQLite and a synthetic private `.env`, never production secrets.
 Enable the migration adapter through the project page; verify unbound UNKNOWN,

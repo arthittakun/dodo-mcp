@@ -145,6 +145,10 @@ try {
   const targetContext = {targetProjectId:target.projectId,workspaceId:targetOverview.workspaceId,workspaceEpoch:targetOverview.workspaceEpoch};
   envelope(await httpClient.callTool({name:'dodo_write',arguments:{...targetContext,operation:'write_file',args:{path:'target.txt',content:'B'}}}));
   if(fs.readFileSync(path.join(secondRoot,'target.txt'),'utf8')!=='B'||fs.existsSync(path.join(workspace,'target.txt'))) throw new Error('installed target routing failed');
+  const recoveryCall=async(operation,operationArgs={},ctx=targetContext)=>envelope(await httpClient.callTool({name:operation==='restore_status'?'dodo_read':'dodo_write',arguments:{...ctx,operation,args:operationArgs}}));
+  const checkpoint=(await recoveryCall('checkpoint_create',{idempotencyKey:'installed-recovery-checkpoint'})).data;
+  if(!checkpoint.checkpointId)throw new Error('installed project default Recovery is not active');
+  await recoveryCall('write_file',{path:'target.txt',content:'B changed'});
   let modelCalls=0;
   fixtureProvider=http.createServer(async(req,res)=>{
     for await (const chunk of req) void chunk;
@@ -164,12 +168,32 @@ try {
     await new Promise(resolve=>setTimeout(resolve,100));
   }
   if(finished.status!=='completed'||modelCalls!==2||!finished.events.some(e=>e.kind==='tool'&&e.payload.operation==='write_file'&&e.payload.ok)||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.existsSync(path.join(workspace,'agent.txt'))) throw new Error('installed agent target/receipt smoke failed');
-  for(const name of ['index.html','app.js','app.css','workbench.js','workbench.css','ui/recovery.js'])if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
+  const plan=(await recoveryCall('restore_preview',{checkpointId:checkpoint.checkpointId,paths:['target.txt']})).data;
+  const restoreArgs={planId:plan.planId,planHash:plan.planHash,idempotencyKey:'installed-recovery-apply'};
+  const restored=(await recoveryCall('restore_apply',restoreArgs)).data;
+  const replay=(await recoveryCall('restore_apply',restoreArgs)).data;
+  if(!restored.verified||replay.changesetId!==restored.changesetId||fs.readFileSync(path.join(secondRoot,'target.txt'),'utf8')!=='B'
+    ||fs.readFileSync(path.join(secondRoot,'agent.txt'),'utf8')!=='agent B'||fs.readFileSync(path.join(workspace,'smoke.txt'),'utf8')!=='beta\n')throw new Error('installed source recovery/replay/isolation smoke failed');
+  await httpClient.close();httpClient=undefined;await running.close();running=undefined;
+  const previousConfig=process.env.DODO_CONFIG_DIR;process.env.DODO_CONFIG_DIR=config;
+  try{running=await startServer({invokedCwd:workspace,portOverride:port,quiet:true,toolSurface:'compact'});}
+  finally{if(previousConfig===undefined)delete process.env.DODO_CONFIG_DIR;else process.env.DODO_CONFIG_DIR=previousConfig;}
+  httpClient=new Client({name:'release-restarted-smoke',version:'1'});
+  await httpClient.connect(new StreamableHTTPClientTransport(new URL(`${baseUrl}/mcp`),{authProvider:{token:async()=>accessToken}}));
+  const freshOverview=envelope(await httpClient.callTool({name:'project_overview',arguments:{targetProjectId:target.projectId}}));
+  const freshContext={targetProjectId:target.projectId,workspaceId:freshOverview.workspaceId,workspaceEpoch:freshOverview.workspaceEpoch};
+  const stale=await httpClient.callTool({name:'dodo_read',arguments:{...targetContext,operation:'restore_status',args:{planId:plan.planId}}});
+  if(!['STALE_WORKSPACE','WORKSPACE_MISMATCH'].includes(stale.structuredContent?.error?.code))throw new Error('installed restart accepted stale Recovery context');
+  const recovered=(await recoveryCall('restore_status',{planId:plan.planId},freshContext)).data;
+  if(!recovered.plans.some(p=>p.status==='committed'&&p.changesetId===restored.changesetId))throw new Error('installed restore receipt did not survive restart');
+  const assets=['index.html','app.js','app.css','workbench.js','workbench.css','ui/recovery.js','ui/deployment.js','ui/dataRecovery.js'];
+  for(const name of assets)if(!fs.statSync(path.join(packageRoot,'dist/server/configUi',name)).isFile())throw new Error('installed UI asset missing');
   const report = { schemaVersion: 1, status: 'PASS', package: { name: packageJson.name, version: packageJson.version },
     catalog: { fullToolCount: packagedSurfaces.fullToolCount, compactToolCount: packagedSurfaces.toolCount },
     cliVersion: versionRun.stdout.trim(), stdio: { surface: 'full', toolCount: fullCount, overviewOk: stdioOverview.ok === true },
     http: { transport: 'streamable-http', oauth: true, surface: 'compact', toolCount: compactCount, writeEditReadBack: true, targetRouting:true, subagentWriteReceipt:true },
-    ui: {assets:6}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
+    recovery:{defaultEnabled:true,checkpoint:true,reviewedRestore:true,hashVerified:true,idempotentReplay:true,unrelatedFilesPreserved:true,restartReceipt:true,staleEpochDenied:true},
+    ui: {assets:assets.length}, provider:{kind:'protocol-fixture',liveIntegration:false}, mcpSubagentsEnabled:true,
     installation: { source: 'exact-tarball', freshPrefix: true, freshConfig: true }, generatedAt: new Date().toISOString() };
   if (fullCount !== packagedSurfaces.fullToolCount || compactCount !== packagedSurfaces.toolCount) throw new Error(`surface count mismatch: full=${fullCount}/${packagedSurfaces.fullToolCount} compact=${compactCount}/${packagedSurfaces.toolCount}`);
   fs.mkdirSync(path.dirname(args.output), { recursive: true }); fs.writeFileSync(args.output, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });

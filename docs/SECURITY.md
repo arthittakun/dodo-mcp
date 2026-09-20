@@ -342,7 +342,7 @@ Admin API ไม่อยู่บน public MCP Events ใช้ authenticated 
 อยู่ใน reviewed OS store/reference และไม่ถูกส่งกลับให้ browser การเริ่ม DODO,
 ปลดล็อก Keychain และให้ macOS permissions ต้องผ่านเจ้าของ
 
-## Verified recovery and staged-index boundaries (unreleased)
+## Verified recovery and staged-index boundaries
 
 `rollback_changes` is restricted to the principal that owns the committed
 changeset. A write scope alone does not authorize another caller's undo. This
@@ -374,9 +374,9 @@ package installs, directory creation, browser/desktop/device actions, databases
 or external editors. File mode bits are preserved where supported; this is not
 a full ACL/xattr/ownership backup. Portable path rechecks reduce races but do not
 provide filesystem confinement against a hostile process with the same OS user.
-The unreleased source snapshot/session UI uses the boundaries below.
+The source snapshot/session UI uses the boundaries below.
 
-## Automatic source snapshots (unreleased)
+## Automatic source snapshots
 
 Recovery policy is private owner state; repository settings, MCP calls, discover
 visibility and trust overrides cannot disable it. Explicit opt-out is confirmed
@@ -387,7 +387,7 @@ See [Recovery boundaries](RECOVERY.md): this does not restore DBs, secrets, remo
 effects or all metadata, and same-user TOCTOU and tampering limits still apply.
 
 
-Reviewed restore (unreleased) binds plans to caller/project/root identity/epoch and
+Reviewed restore binds plans to caller/project/root identity/epoch and
 requires write scope plus the existing exact-action approval in inspect mode.
 Source selection, backup integrity and current hashes are checked again under the
 shared mutation queue. Private owner cross-caller access is not an MCP argument.
@@ -395,16 +395,16 @@ Session receipt chains reject interleaved edits; unknown shell authorship is nev
 claimed as exclusively owned. Restore status and durable idempotency support
 reconnect without repeating uncertain effects. See [ADR-052](adr/052-reviewed-source-restore.md).
 
-## Unreleased Recovery R03
+## Recovery R03
 
 Expected source state is separate from observed backups. External target drift fails closed; only verified committed journals or exact, live owner acknowledgement can advance the baseline. MCP read access cannot acknowledge drift. Acknowledgement never grants OAuth/trust/exec authority. Private Git copies use captured bytes and an empty private index; no working Git history/config, hooks, filters, remotes or helpers are imported. Selected backup paths must be dedicated private directories, outside project/state/credential namespaces, with pinned identity; unavailable volumes do not fall back. Content and Git bytes share quotas. Job observations remain unknown-author data and hold the mutation ticket until their bounded scan finishes. See ADR 053 for scope and root-replacement limits.
 
 
-## Unreleased Recovery R04
+## Recovery R04
 
 Recovery names/pins are private owner actions, with current project/epoch, confirmation and live authority checks. They never promote test results or grant permissions. No public mark/purge endpoint exists. Caller-owned evidence retains target ACL checks; current inspection compares snapshot/recipes/runtime and never consumes model-supplied success. Truncated/unknown/skipped test evidence cannot certify a snapshot. Raw test logs and environment values are excluded from Recovery metadata. Source integrity, expected hashes, approvals and sandbox remain unchanged. Names and diffs use text-only DOM rendering. Production/DB protection is not implied.
 
-## Unreleased registered deployment adapters
+## registered deployment adapters
 
 Docker daemon access is explicitly owner registered and still subject to target
 OAuth scope/ACL, current workspace/epoch, exec approval, source hashes and the
@@ -422,7 +422,7 @@ performed. Private job output is not exposed through normal job output tools.
 Generic shell/other daemon clients remain outside this adapter's deployment guard;
 a workspace boundary is not an OS or Docker security sandbox.
 
-## Unreleased private data recovery
+## private data recovery
 
 Database/config opt-ins do not inherit from default-on source backup. Read-only
 SQLite metadata and owner-authored compatibility rules never execute migrations

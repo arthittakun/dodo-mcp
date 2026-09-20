@@ -261,8 +261,8 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 
 ## Tool surfaces
 
-- Complete capability catalog 138 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13)
-- Full live catalog ค่าเริ่มต้น 134 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 138
+- Complete capability catalog 158 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13 + Source Recovery 10 + Deployment 10)
+- Full live catalog ค่าเริ่มต้น 154 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 158
 - Compact catalog 20 definitions: overview, discover และ gateways รวม `dodo_mobile`
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 
@@ -374,7 +374,7 @@ Owner UI อยู่ `configUi/workbench.js/.css` ใช้ authenticated same-
 setup/config validation ชุดเดิม ไม่มี secret fallback หรือการเปิด permission อัตโนมัติ
 รายละเอียด [ADR-045](adr/045-ai-providers-multiproject.md)
 
-## Journal write intent and owner recovery (unreleased)
+## Journal write intent and owner recovery
 
 The applier uses one mutation lock for forward and inverse plans. The shared
 project queue also covers private owner rollback. Every original before-image is
@@ -413,25 +413,25 @@ candidate index only if the original still matches. Normal failure removes the
 candidate; uncertain commit outcomes retain it for owner inspection. No stash,
 reset, clean, remote push or private checkpoint commit is performed.
 
-## Source Recovery foundation (unreleased)
+## Source Recovery foundation
 
 Leased project runtimes own default-on scoped content snapshots, SQLite references
 and reservations, and a CAS independent of resource GC. Source mutations capture
 and verify before effects; protected async job startup holds the shared queue.
 See [ADR-051](adr/051-source-recovery-foundation.md). Reviewed session/restore flow: [ADR-052](adr/052-reviewed-source-restore.md).
 
-## Unreleased Recovery R03
+## Recovery R03
 
 `RecoveryDrift` persists expected manifests independently of snapshots. Applier advances expected entries inside the same transaction as final verified journal commit. Target writes compare hashes; commands scan the source scope; job termination observes changes before releasing its mutation ticket. Idle scans are bounded and coalesced. Private owner acknowledgement uses exact content digest + workspace/epoch and revalidates authority after asynchronous reads.
 
 `RecoveryGitCopies` builds independent bare repositories from verified CAS bytes, private indexes and create-only refs; it never stages or rewrites working Git. Optional owner-selected storage pins canonical directory identity. Git reservations/copies share recovery quotas; source retention prunes matching owned copies. Verification checkpoints require fresh owned verification evidence before publication. See [ADR 053](adr/053-content-drift-and-private-git-recovery.md).
 
 
-## Unreleased Recovery R04
+## Recovery R04
 
 RecoveryEvidence binds pre-run source manifests to existing verify_changes jobs and recipe digests. Live inspection checks the full Recovery source scope and current recipes/runtime; observed stale state is sticky. Safe evidence projections omit logs and environment values. Revisioned owner pointers, tombstones and audit events are separate from immutable manifests and execution permissions. Retention preview and prune use the same protected-reference calculation. The dashboard is bundled as ui/recovery.js. See [ADR 054](adr/054-verified-source-checkpoints.md).
 
-## Unreleased deployment provenance
+## deployment provenance
 
 `RecoveryDeployments` binds immutable plans to verified manifests, recipe evidence,
 project/epoch and owner target revisions. `DockerDeploymentAdapter` uses protected
@@ -440,9 +440,9 @@ Docker argv never consumes repo Compose hooks. `DeploymentMaintenance` is privat
 owner administration with durable preview hashes, re-observation and uncertain
 receipts; it is not an MCP definition. HTTP/CLI reuse the same service and live
 context checks. See [ADR 055](adr/055-reviewed-docker-deployments.md) and the
-[usage and limits](RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).
+[usage and limits](RECOVERY.md#reviewed-docker-deployment).
 
-## Unreleased database/config recovery
+## database/config recovery
 
 `RecoveryDatabases` adds owner-registered SQLite migration metadata and explicit
 manifest-bound compatibility rules. `RecoveryHistory` checks them at preview,
@@ -452,4 +452,4 @@ in separate private tables; `OSRecoveryKeys` stores only keys in OS credential
 providers. Owner IPC, HTTP and CLI share the same services/queue/context checks.
 Bundled `ui/dataRecovery.js` handles both opt-ins without changing MCP catalog or
 source-secret guards. See [ADR 056](adr/056-owner-data-recovery.md) and
-[usage/limits](RECOVERY.md#database-awareness-and-encrypted-private-config-unreleased-working-source).
+[usage/limits](RECOVERY.md#database-awareness-and-encrypted-private-config).

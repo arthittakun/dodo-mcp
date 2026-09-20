@@ -93,6 +93,8 @@ describe('PACK: npm tarball', () => {
 
   it('PACK-08: ships the desktop helper source without installing or enabling desktop access', () => {
     expect(fileList).toContain('native/desktop.swift');
+    expect(fileList).toContain('native/private-state-windows.cs');
+    expect(fileList).toContain('dist/platform/windowsPrivateAcl.js');
     expect(fileList.some(f => /^native\/.*(?:arm64|x64)$/.test(f))).toBe(false);
   });
 

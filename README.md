@@ -7,7 +7,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 138 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 134 tools
+- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 158 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 154 tools
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -608,30 +608,20 @@ npm pack
 
 โปรเจกต์นี้ใช้ GitHub repository [arthittakun/dodo-mcp](https://github.com/arthittakun/dodo-mcp) และ package `dodo-mcp`
 
-### Source Recovery ใน working source (ยังไม่ release)
+### Recovery — สำรองและกู้คืนงาน
 
-สำรอง source เป็นค่าเริ่มต้นเฉพาะโปรเจกต์ที่เจ้าของลงทะเบียน ก่อนแก้ไฟล์หรือรันคำสั่ง
-ตั้งค่าในหน้า Projects → Recovery หรือ `dodo recovery status`
-อ่าน [ขอบเขตและวิธีใช้](docs/RECOVERY.md) ระบบ snapshot มี preview/restore ใน source แล้ว แต่ยังไม่เผยแพร่บน npm
-ก่อนปล่อยให้ผู้ใช้ทั่วไป ไม่ใช่การอ้างว่ารุ่น npm ปัจจุบันมีฟังก์ชันนี้แล้ว
+โปรเจกต์ที่ลงทะเบียนเปิด source backup เป็นค่าเริ่มต้น ก่อนแก้ไฟล์หรือรันคำสั่ง
+หน้า **Projects → Recovery** ใช้ตรวจประวัติ เปรียบเทียบ และยืนยันแผนกู้คืนได้จริง
+หรือใช้ `dodo recovery --help` ผ่าน terminal สำเนาอยู่ใน private state แยกจาก Git
+ของโปรเจกต์ และไม่ push ขึ้น GitHub อัตโนมัติ
 
-Recovery development candidate: external file changes are detected by content hashes; owner review is available in the project Recovery card or `dodo recovery scan`. Independent Git copies preserve approved source without changing your index or branch. See [Recovery](docs/RECOVERY.md). This source work is not a published release.
+- กู้คืน checkpoint หรือ session ที่เลือก พร้อม expected hashes, สำเนาก่อนกู้ และ receipt หลัง reconnect
+- ตรวจไฟล์ที่ถูกแก้จากภายนอก และแยก `SAVED`, `VERIFIED`, `FAILED`, `INCONCLUSIVE`, `STALE` ให้เห็นตามหลักฐาน
+- ตั้งชื่อ/pin จุดกู้คืน และตรวจ retention ก่อนล้าง โดยรักษางานที่ไม่เกี่ยวข้อง
+- เพิ่ม Docker deployment target ได้โดยเจ้าของ: source ที่ตรวจแล้ว → image → health/stabilization → known-good พร้อม reviewed rollback
+- ตรวจ SQLite migration compatibility แบบอ่านอย่างเดียว และสำรอง private config แบบเข้ารหัสเมื่อเจ้าของเปิดแยก
 
-Recovery R04 ใน working source: หน้าโปรเจกต์แยกสำเนา `SAVED`, หลักฐาน
-`VERIFIED / FAILED / INCONCLUSIVE / STALE` และชื่อ `stable` ที่เจ้าของเลือกเอง
-มี Pin, ประวัติงาน, preview retention และ `dodo recovery evidence`
-ยังไม่ใช่ release และไม่ครอบคลุม production/ฐานข้อมูล ดู [คู่มือ Recovery](docs/RECOVERY.md).
-
-Recovery development candidate also includes owner-registered Docker deployment:
-verified source → reviewed build → immutable image → health/stabilization →
-known-good. The project dashboard and `dodo deployment --help` expose configuration,
-inspection, reviewed rollback and image retention. Source-only restore never
-reverses database changes or copies volume data. This remains unreleased work;
-see [deployment and recovery usage](docs/RECOVERY.md#reviewed-docker-deployment-unreleased-working-source).
-
-Private data recovery in the working source is separate opt-in: the project page
-can inspect an owner-selected SQLite migration table and bind checkpoint rules,
-and back up an explicitly registered private config file with OS-held encryption
-keys. AI cannot read or restore those secret copies. Database row rollback is not
-supported; config restore requires owner review and manual service restart.
-See [Database/config recovery](docs/RECOVERY.md#database-awareness-and-encrypted-private-config-unreleased-working-source).
+**Source restore ไม่ย้อนฐานข้อมูล, secrets, volumes หรือระบบภายนอก** การสำรอง config
+ใช้กุญแจจาก OS credential store และไม่ส่งเนื้อหาให้ AI; ไม่มี generic database rollback
+หรือการ restart service อัตโนมัติ ดู [คู่มือ Recovery](docs/RECOVERY.md),
+[การเปลี่ยนแปลง 1.3.0](docs/RELEASE_1.3.0.md) และ [ผลตรวจรับจริง](docs/TEST_REPORT.md)

@@ -29,10 +29,10 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 20 tools
-- STDIO default: Full 134 tools; เปิด Sub-agent MCP exposure แล้วเป็น 138
+- STDIO default: Full 154 tools; เปิด Sub-agent MCP exposure แล้วเป็น 158
 - explicit Hybrid: 49 tools
 
-Complete capability schema มี 138 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
+Complete capability schema มี 158 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
 ซ่อน `subagent_spawn/status/result/control` จาก MCP เท่านั้น หน้าเว็บ Chat & Tasks ยัง
 ใช้ได้ Compact/Hybrid คงจำนวน 20/49 tool names แต่กรอง operation enum, instructions
 และ discover index ให้ตรงกับ live runtime หลังเปลี่ยนค่าต้อง restart และให้ client
