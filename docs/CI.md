@@ -25,6 +25,15 @@ gh run list --workflow platform-gates.yml --limit 5
 โค้ดที่ยังไม่ commit/push ในเครื่องจะไม่อยู่ใน CI เลือกสาขาทดสอบที่ push แล้วได้ด้วย
 `--ref <reviewed-branch>` แทน main อย่านำผลคนละ revision มาอ้างแทนกัน
 
+เมื่อ full gate timeout ก่อนสร้าง JSON report สามารถเลือก `windows-diagnostics`
+พร้อม `evidence_run` เช่น `35496561994-1` เพื่ออ่านความคืบหน้าที่เก็บไว้บน runner
+ผลแสดงเฉพาะชื่อไฟล์ทดสอบที่อยู่ใน repo และตัวเลข ไม่ส่ง log ทั้งก้อนออกมา
+คำสั่งตรวจหลักฐานสำเร็จไม่ได้แปลว่า application tests ผ่าน
+
+`windows-focus` ใช้ Node 24 และ worker เดียว ทดสอบเฉพาะ source backup, direct
+coding tools และ native ACL owner เพื่อวินิจฉัย Windows failures ผ่าน npm script `ci:windows:focus`
+ผลนี้ไม่แทน `windows` ซึ่งยังต้องรัน full gate ทั้ง Node 22/24 ก่อนรับรอง candidate
+
 ## เตรียม Linux runner
 
 ใช้บัญชี non-root และต้องมี Git, Python 3, make, g++, ffmpeg, ffprobe และ espeak-ng
@@ -69,6 +78,9 @@ Windows gate ต้องใช้ enabled Administrator token เพื่อ�
 
 Gate รัน build, typecheck, lint, full tests, packaging, DodoBench, production audit,
 immutable tarball และ fresh install โดยไม่เผยแพร่ npm
+`test:all` มีเวลา aggregate สูงสุด 60 นาทีบน Windows และ 30 นาทีบนระบบอื่น เพราะ
+native Windows มีต้นทุนตรวจ NTFS ACL และชุด Recovery เพิ่มขึ้น ไม่เปลี่ยน timeout
+ราย test/hook ไม่ลด assertions และ failure ใด ๆ ยังคงทำให้ gate ไม่ผ่าน
 ผลละเอียดอยู่บน runner ใน `<runner-workspace>/.dodo-ci-evidence/<run-id>-<attempt>/<platform>-node-<major>/`
 นอก checkout เพื่อไม่ถูก checkout cleanup ลบ จึงไม่ push/pack การ rerun ใช้ directory
 ใหม่ ไม่เขียนทับ report เก่า Linux ย้ายสำเนา evidence แบบเก่าที่อยู่ใน checkout

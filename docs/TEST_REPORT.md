@@ -37,8 +37,39 @@ Native CI [run 35495748297](https://github.com/arthittakun/dodo-mcp/actions/runs
 
 Windows Node 22/24 ในรอบแรกล้มก่อน step แรกที่ runner `InitializeSecretMasker` /
 `PowerShellPreAmpersandEscape` ไม่มี application tests ได้รัน ดู [CI](CI.md)
-สำหรับการเปิด runner ใหม่ Windows จึงเป็น `RUNNER_BLOCKED` ไม่ใช่ application PASS
-และไม่ได้ rerun ใน Linux-only รอบล่าสุด Manual Windows acceptance ยัง `MANUAL_NOT_RUN`
+สำหรับการเปิด runner ใหม่ สถานะรอบแรกเป็น `RUNNER_BLOCKED` ไม่ใช่ application PASS
+และไม่ได้ rerun ใน Linux-only รอบดังกล่าว
+
+หลังเจ้าของเปิด runner ใหม่ [Windows run 35496561994](https://github.com/arthittakun/dodo-mcp/actions/runs/35496561994)
+ที่ clean commit `1739646f0678a6e1c29bc92c8eba6cd1a017f0df` ผ่าน startup แล้ว
+Node 24.21.0 ผ่าน build/typecheck/lint แต่ `test:all` หมดเวลา 30 นาที
+(1,800,010 ms) จึงเป็น `AUTOMATED_FAIL` ไม่มี complete core JSON report และยังไม่ถึง
+packaging/benchmark/audit/fresh install Node 22 ถูกยกเลิกก่อนทดสอบเพื่อวินิจฉัย
+ไม่ถือเป็น PASS หรือ application failure ของ Node 22
+
+[การอ่านหลักฐานเดิม](https://github.com/arthittakun/dodo-mcp/actions/runs/35498195971)
+พบ reporter output ของ 49 ไฟล์ / 490 tests / 47 failures / 29 skipped ก่อน timeout
+เป็น **ผลบางส่วนเท่านั้น** ไม่ใช่ยอดรวม full suite มี failures ใน Recovery และ
+integration อื่น จึงห้ามสรุปว่าเพิ่ม timeout อย่างเดียวจะผ่าน หรือยกเลิก backup/ACL
+เพื่อให้ผลเขียว งานตรวจเฉพาะกลุ่มมี scope `focused_diagnostics_only` ไม่ใช่ release gate
+Manual Windows acceptance ยัง `MANUAL_NOT_RUN`
+
+Focused reproduction [run 35498746408](https://github.com/arthittakun/dodo-mcp/actions/runs/35498746408)
+จบจริง: **17 pass / 8 fail / 0 skip** ใน 2 ไฟล์ (236,088 ms)
+พบ private ACL verifier คืน metadata ก่อน Windows ปรับ Administrators owner
+ขณะที่ journal ตรวจ ctime จาก file descriptor หลังปรับ จึงเกิด `CONFLICT` ทั้งที่
+backup ถูกต้อง แพตช์คืน metadata หลังตรวจ ACL พร้อมปฏิเสธ identity/type/content
+ที่เปลี่ยนระหว่างตรวจ ไม่ลบ hash/ACL/owner/reparse guards
+
+หลังแก้ที่ `89b762b` [Windows focused run 35499178559](https://github.com/arthittakun/dodo-mcp/actions/runs/35499178559)
+**34 pass / 0 fail / 0 skip** ใน 3 ไฟล์ (302,245 ms): recoveryBackups, directTools
+และ windowsAclOwner รวม native owner/DACL/junction checks และการอ่าน metadata
+หลัง owner repair ผลนี้เป็น `AUTOMATED_PASS` เฉพาะชุดย่อย ไม่ใช่ full Windows gate
+
+Local macOS สำหรับแพตช์: typecheck/lint ผ่าน, 31 focused tests pass / 9 native
+Windows tests skipped ไม่อ้าง skips เป็น Windows evidence Windows full gate
+รอบต่อไปใช้ aggregate `test:all` budget 60 นาที โดยคง timeout ราย test/hook และ
+assertions เดิม ผล full gate หลังแพตช์ยังรอยืนยัน
 
 ผล Recovery/Docker ด้านล่างเป็นหลักฐานของ candidate รอบก่อนตาม fingerprint เดิม
 ไม่ใช้แทน native CI ข้างบน ไม่มี merge main หรือ npm publish จากผลนี้

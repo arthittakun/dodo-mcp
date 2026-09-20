@@ -173,7 +173,7 @@ jobs:
           retention-days: 7
 
   windows-native:
-    name: Windows native / Node ${{ matrix.node }}
+    name: ${{ inputs.platform == 'windows-focus' && 'Windows focused diagnostics' || 'Windows native' }} / Node ${{ matrix.node }}
     if: github.event_name == 'push' || inputs.platform == 'windows' || inputs.platform == 'all' || inputs.platform == 'windows-focus'
     strategy:
       fail-fast: false

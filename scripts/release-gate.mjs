@@ -90,7 +90,10 @@ try {
   npm(['run', 'build']);
   npm(['run', 'typecheck']);
   npm(['run', 'lint']);
-  npm(['run', 'test:all'], { timeout: 30 * 60 * 1000, env: { DODO_TEST_REPORT_DIR: outputDir } });
+  // Native NTFS ACL checks launch PowerShell and the expanded Recovery suite
+  // exceeded the old aggregate budget. Keep individual test deadlines and all
+  // assertions intact; allow the complete Windows report to be produced.
+  npm(['run', 'test:all'], { timeout: (process.platform === 'win32' ? 60 : 30) * 60 * 1000, env: { DODO_TEST_REPORT_DIR: outputDir } });
   const testEvidence = readTestCounts(outputDir);
   if (!Object.values(testEvidence).every(t => t?.success && t.passed > 0 && t.failed === 0)) throw new Error('missing, inconsistent or failed test evidence');
 
