@@ -39,7 +39,7 @@ try {
     console.log('DODO_ACL_BACKEND_BEGIN');console.log(JSON.stringify(windowsPrivateAclDiagnostics()));console.log('DODO_ACL_BACKEND_END');throw error;
   }
   phase = 'focused-tests';
-  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/security/recoveryGit.test.ts', '--maxWorkers=1'], 20 * 60_000);
+  const result = run(['exec', '--no', '--', 'vitest', 'run', 'tests/integration/windowsRuntime.test.ts', '--maxWorkers=1'], 20 * 60_000);
   phase = 'report';
   const report = JSON.parse(fs.readFileSync(path.join(directory, 'core-tests.json'), 'utf8'));
   const browserFile = path.join(directory, 'recovery-browser-diagnostics.json');
@@ -51,7 +51,10 @@ try {
     responses: (browser.responses || []).filter(r=>['recovery.status','recovery.drift.scan','recovery.evidence.list','recovery.restore_list'].includes(r.operation) && Number.isSafeInteger(r.status)).slice(0,30).map(r=>({operation:r.operation,status:r.status})),
     state: browser.state ? Object.fromEntries(['loading','selected','error','recoveryError'].map(k=>[k,browser.state[k]===true])) : null,
   } : null;
-  const summary = { scope: 'focused_diagnostics_only', exitCode: result.status, durationMs: result.durationMs,
+  const runtimeFile=path.join(directory,'native-runtime-private.jsonl');
+  const runtime=fs.existsSync(runtimeFile)?fs.readFileSync(runtimeFile,'utf8').slice(0,32000).trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)):[];
+  const runtimeDiagnostics=focusedFailureDetails({testResults:[{name:path.join(root,'tests/integration/windowsRuntime.test.ts'),assertionResults:runtime.slice(0,20).map(item=>({status:'failed',failureMessages:[String(item.code??'')+'\n'+String(item.stack??'')]}))}]},root);
+  const summary = { scope: 'focused_diagnostics_only', exitCode: result.status, durationMs: result.durationMs, runtimeDiagnostics,
     browserDiagnostics, tests: testCounts(report), failures: focusedFailureDetails(report, root) };
   fs.writeFileSync(path.join(directory, 'focus-summary.json'), JSON.stringify(summary, null, 2), { flag: 'wx', mode: 0o600 });
   console.log('DODO_FOCUS_BEGIN');

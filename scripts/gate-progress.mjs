@@ -38,7 +38,10 @@ export function focusedFailureDetails(report, root) {
       if (fs.existsSync(path.join(root, frame[1]))) frames.push({ file: frame[1], line: Number(frame[2]) });
     }
     const errorCodes = [...new Set([...message.matchAll(/\b[A-Z][A-Z_]{2,63}\b/g)].map(m => m[0]).filter(code => codes.has(code)))];
-    return { ...location, errorCodes, frames };
+    const internalKind = message.includes('INTERNAL_ERROR: apply failed at ') ? 'apply-compensated'
+      : message.includes('INTERNAL_ERROR: audit write failed;') ? 'audit-write'
+      : message.includes('INTERNAL_ERROR: internal error') ? 'untyped' : null;
+    return { ...location, errorCodes, frames, ...(internalKind ? { internalKind } : {}) };
   });
   return { locations, truncated: allowed.truncated };
 }

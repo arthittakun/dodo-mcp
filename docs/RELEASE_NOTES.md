@@ -1,6 +1,6 @@
 # DODO MCP — Release Notes
 
-## 1.3.0 — Recovery & Local Git Safety (release candidate)
+## 1.3.0 — Recovery & Local Git Safety
 
 - Default-on independent source backups for registered projects, with caller-owned
   sessions, reviewed previews, journaled restore and durable retry/restart receipts.
@@ -20,7 +20,8 @@
 - Native Linux/Windows CI and macOS release gates, immutable tarball and fresh install
   verification. Detailed [scope and upgrade notes](RELEASE_1.3.0.md).
 
-Publication is pending the final native gates; this heading is not a publish receipt.
+Verify publication through the npm registry and revision-bound native gate evidence;
+release notes describe scope and are not a publish receipt.
 
 ## 1.2.1 — สร้าง Agent แบบง่ายและ error ที่แก้ได้ตรงจุด
 

@@ -27,6 +27,9 @@ describe('bounded partial gate diagnostics', () => {
     expect(output.locations[0]).toMatchObject({ errorCodes: ['RECOVERY_REQUIRED', 'EPERM'], frames: [{ file: 'src/services/recovery/storage.ts', line: 22 }] });
     expect(JSON.stringify(output)).not.toContain('SYNTHETIC_SECRET');
     expect(JSON.stringify(output)).not.toContain(process.cwd());
+    const classified=focusedFailureDetails({testResults:[{name:path.resolve(file),assertionResults:[{status:'failed',failureMessages:['INTERNAL_ERROR: apply failed at PRIVATE_SECRET_PATH']}]}]},process.cwd());
+    expect(classified.locations[0]).toMatchObject({internalKind:'apply-compensated'});
+    expect(JSON.stringify(classified)).not.toContain('PRIVATE_SECRET_PATH');
   });
   it('classifies installed-package failures without exporting private diagnostics',()=>{
     const log='earlier MCP tool failed: FORBIDDEN\nnode scripts/release-smoke.mjs --tarball /private/SECRET.tgz\nTypeError: fetch failed\n at /private/SECRET/scripts/release-smoke-worker.mjs:185:3\n cause: UND_ERR_SOCKET private-token-value\n';

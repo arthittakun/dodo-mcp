@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import * as errors from '../../src/errors.js';
 import { platformFixture } from '../helpers/platform.js';
 import { sha256Bytes } from '../../src/util/hash.js';
 import { shellSpec } from '../../src/platform/shell.js';
@@ -9,8 +10,22 @@ import { shellSpec } from '../../src/platform/shell.js';
 // mocks. On Windows they exercise CreateProcess, cmd/Git Bash and NTFS.
 describe('native runtime contracts in a Thai/spaced workspace', () => {
   let f: ReturnType<typeof platformFixture>;
-  beforeAll(() => { f = platformFixture(); }, 120000);
-  afterAll(async () => { if (f) await f.close(); }, 120000);
+  beforeAll(() => {
+    f = platformFixture();
+    const directory=process.env['DODO_TEST_REPORT_DIR'];
+    if(directory){
+      const original=errors.toDodoError;
+      vi.spyOn(errors,'toDodoError').mockImplementation(error=>{
+        // Capture unexpected fixture failures before production sanitization.
+        // This file remains private; CI emits only allowlisted codes/frames.
+        if(!(error instanceof errors.DodoError))try{
+          fs.appendFileSync(path.join(directory,'native-runtime-private.jsonl'),JSON.stringify({stack:error instanceof Error?error.stack:'unknown',code:(error as NodeJS.ErrnoException)?.code})+'\n',{mode:0o600});
+        }catch{/* Diagnostics must not change the original tool response. */}
+        return original(error);
+      });
+    }
+  }, 120000);
+  afterAll(async () => { vi.restoreAllMocks();if (f) await f.close(); }, 120000);
 
   it('round-trips BOM, CRLF and Unicode through read/edit with hash protection', async () => {
     const file = 'เอกสาร space.txt', original = '\uFEFFfirst ไทย\r\nsecond\r\n';
