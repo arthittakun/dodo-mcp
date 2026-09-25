@@ -1,6 +1,6 @@
 {
   "name": "dodo-mcp",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "author": "Arthittakun",
   "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
@@ -53,6 +53,7 @@
     "docs/RELEASE_1.2.1.md",
     "docs/RELEASE_1.3.0.md",
     "docs/RELEASE_1.3.1.md",
+    "docs/RELEASE_1.3.2.md",
     "docs/RELEASE_NOTES.md",
     "docs/SCHEDULES.md",
     "docs/SECURITY.md",

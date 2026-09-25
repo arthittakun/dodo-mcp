@@ -15,6 +15,7 @@ export const RecoveryPolicySchema = z.object({
   retainedPoints: z.number().int().min(1).max(10000).default(200),
   fileBytes: z.number().int().min(1024).max(GiB).default(64 * 1024 * 1024),
   maxEntries: z.number().int().min(1).max(1000000).default(100000),
+  excludePaths: z.array(z.string().trim().min(1).max(1024)).max(100).default([]),
   dataRoots: z.array(z.string().min(1).max(1024)).max(100).default([]),
 }).strict();
 export type RecoveryPolicy = z.infer<typeof RecoveryPolicySchema>;

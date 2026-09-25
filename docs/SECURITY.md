@@ -464,3 +464,20 @@ in a remote URL or returned by state APIs. AI owner principals, streaming reques
 and queued owner revalidation use the authenticated request session, not the
 server start time. Loopback, Host/Origin, proxy-header rejection, rate limits,
 workspace/epoch checks and public MCP OAuth remain enforced.
+
+### Reviewed Recovery maintenance
+
+Storage status and previews are bounded and reveal no credentials or private backup
+paths. MCP checkpoint access remains caller-owned and workspace-bound. Cleanup/settings
+apply requires `dodo:write`, live ACL/context and a separate exact owner approval even
+in trusted mode. A review or discover result does not authorize apply. Settings are
+limited to project quota, retention and canonical relative exclusions; they cannot
+turn off Recovery, acknowledge drift or change private storage/installation authority.
+
+The private owner dashboard requires its authenticated, expiring session and current
+workspace context for confirmed apply. Public MCP has no administration endpoints.
+Cleanup protects current baselines, pins, names and active references, and never edits
+source files. Pending cleanup only processes stored private references, not paths
+supplied by callers. Shared objects and active installation captures block reclamation;
+I/O failure is reported as pending rather than successful deletion. No integrity
+failure is silently repaired by accepting the current source.

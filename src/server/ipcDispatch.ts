@@ -226,17 +226,18 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         const limit = Math.max(1, Math.min(Number(args['limit'] ?? 50), 500));
         return store.recentAudit(workspaceId, limit);
       }
+      case 'recovery.recovery_storage_status': case 'recovery.recovery_cleanup_preview': case 'recovery.recovery_settings_preview': case 'recovery.recovery_maintenance_apply':
       case 'recovery.restore_status': case 'recovery.checkpoint_list': case 'recovery.checkpoint_inspect': case 'recovery.checkpoint_create':
       case 'recovery.recovery_session_list': case 'recovery.recovery_session_inspect': case 'recovery.recovery_session_begin': case 'recovery.recovery_session_end':
       case 'recovery.restore_preview': case 'recovery.restore_apply': {
         const operation = cmd.slice('recovery.'.length) as RecoveryOperation;
         const shape = RECOVERY_INPUTS[operation];
-        const input = z.object({...shape, ...(operation === 'restore_apply' ? {confirm:z.literal(true),workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch)} : {})}).strict().parse(args) as Record<string,unknown>;
+        const input = z.object({...shape, ...((operation === 'restore_apply'||operation === 'recovery_maintenance_apply') ? {confirm:z.literal(true),workspaceId:z.literal(workspaceId),workspaceEpoch:z.literal(epoch)} : {})}).strict().parse(args) as Record<string,unknown>;
         const raw = Object.fromEntries(Object.keys(shape).map(k => [k,input[k]]));
         const principal = {grantId:'local-config-owner',clientId:'local-owner',sub:'owner',scopes:['dodo:read','dodo:write','dodo:exec']};
         const execute = async () => {
           ctx.revalidateOwner?.();
-          const result = await performRecovery(operation,raw,{services,principal,trustMode:services.trustMode()},true);
+          const result = await performRecovery(operation,raw,{services,principal,trustMode:services.trustMode(),revalidate:()=>ctx.revalidateOwner?.()},true);
           ctx.revalidateOwner?.();
           store.audit({principal:principal.grantId,workspaceId,tool:cmd,result:'ok'});
           return result;

@@ -113,3 +113,12 @@ Protocol fixtures ครอบคลุม Responses, Gemini Interactions, Anthr
 และ Ollama Native ทั้งเจ็ด presets ซึ่งไม่เท่ากับ live API/model compatibility ของแต่ละ
 account Session credentials ใช้ได้โดยไม่ต้อง Keychain; persistent Keychain ตรวจบน macOS
 Linux Docker และ live providers ต้องดูผลแยกใน TEST_REPORT ไม่ใช้ผล macOS แทน
+
+## 1.3.2 validation scope
+
+Recovery maintenance was validated on macOS with the complete core suite, real
+Chromium desktop/narrow fixtures and freshly installed npm tarballs. Native
+Linux/Windows CI for this patch is deferred to the next release by owner decision;
+prior platform results are not evidence for these new maintenance paths.
+No platform/security checks were disabled in code. Compact remains 20 tools;
+Full exposes 158 by default or 162 when sub-agent tools are enabled.

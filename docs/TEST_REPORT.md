@@ -1,5 +1,33 @@
 # DODO MCP — Test Report
 
+## 1.3.2 Recovery maintenance — macOS release gate, 2026-09-25
+
+`AUTOMATED_PASS` on macOS: build, typecheck and lint; full core suite **926 passed,
+40 skipped, 0 failed** across 145 files (140 passed, 5 skipped). Packaging **17
+passed**, including fresh tarball install and real Compact MCP calls that request
+owner approval, approve via the installed CLI, clean a checkpoint, set an exclusion
+and read the resulting policy. `npm run test:all` exited 0; the extended packaging
+smoke, typecheck and lint were rerun successfully afterward.
+
+The 13 new security/integration cases cover CAS reuse with integrity checking,
+logical versus unique storage, actual reclamation including independent Git copies,
+protected/current checkpoints, caller ownership, partial closed sessions, read-only
+OAuth refusal, stale context, nested override, live ACL revocation, exact approvals,
+receipt replay, explicit exclusions, pending unlink retry, cross-project sharing,
+active reservations, unsafe hardlinks and queued authority changes. Existing migration
+fixtures retain assertions for scope/revocation preservation across old schemas.
+
+Real Chromium exercised the owner UI on desktop and 390px screens with private
+fixtures, confirming checkpoint deletion and `models/` policy persistence. CSP was
+kept unchanged. Tarball checks include the new UI/service and exclude private state,
+credentials, development documents and release evidence. Complete Full capability
+count is **162**, default Full **158**, Compact **20**, Hybrid **49**.
+
+`MANUAL_NOT_RUN`: production checkpoint cleanup, actual AI-client interaction, and
+native Linux/Windows CI for this change. The owner explicitly accepted the completed
+macOS gate and deferred the remaining platform tests to the next release. No production
+server was restarted. Automated fixture approval is not approval for production.
+
 ## 1.3.1 Config regression coverage
 
 `tests/security/remoteConfig.test.ts` reproduces the previous HTTP 401 after advancing

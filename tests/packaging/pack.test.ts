@@ -75,7 +75,7 @@ describe('PACK: npm tarball', () => {
     for (const asset of [
       'dist/server/configUi/index.html', 'dist/server/configUi/app.css', 'dist/server/configUi/app.js', 'dist/server/remoteConfig.js',
       'dist/server/configUi/workbench.js', 'dist/server/configUi/workbench.css',
-      'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/recovery.js', 'dist/server/configUi/ui/deployment.js', 'dist/server/configUi/ui/dataRecovery.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
+      'dist/server/configUi/ui/dom.js', 'dist/server/configUi/ui/recoveryMaintenance.js', 'dist/server/configUi/ui/recovery.js', 'dist/server/configUi/ui/deployment.js', 'dist/server/configUi/ui/dataRecovery.js', 'dist/server/configUi/ui/tooltips.js', 'dist/server/configUi/ui/alerts.js',
       'dist/server/configUi/vendor/sweetalert2.min.js', 'dist/server/configUi/vendor/sweetalert2.min.css',
     ]) {
       expect(fileList, asset).toContain(asset);
@@ -248,7 +248,7 @@ describe('PACK: npm tarball', () => {
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
     expect(compact.defaultLiveToolCount).toBe(20);
-    expect(compact.defaultLiveFullToolCount).toBe(154);
+    expect(compact.defaultLiveFullToolCount).toBe(158);
     expect(compact.optionalMcpFeatures.subagents).toMatchObject({
       default: false,
       operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
@@ -320,7 +320,7 @@ describe('PACK: npm tarball', () => {
   }, 120_000);
 
   it('PACK-17: installed compact MCP backs up and restores registered source with retry receipt; no backup state is packaged', async () => {
-    for (const file of ['dist/services/recovery/recoveryService.js','dist/services/recovery/storage.js','dist/services/recovery/contracts.js','dist/services/recovery/evidence.js']) expect(fileList).toContain(file);
+    for (const file of ['dist/services/recovery/recoveryService.js','dist/services/recovery/storage.js','dist/services/recovery/contracts.js','dist/services/recovery/evidence.js','dist/services/recovery/maintenance.js']) expect(fileList).toContain(file);
     expect(fileList.some(f => /(?:^|\/)recovery\/(?:objects|staging|manifests)\//.test(f))).toBe(false);
     const root = fs.mkdtempSync(path.join(workDir,'recovery-root-'));
     const cfg = fs.mkdtempSync(path.join(workDir,'recovery-config-'));
@@ -347,6 +347,23 @@ describe('PACK: npm tarball', () => {
       const args={planId:plan.planId,planHash:plan.planHash,idempotencyKey:'packed-restore-retry'};
       const restored=await gateway('dodo_write','restore_apply',args);expect(restored.verified).toBe(true);expect(fs.readFileSync(path.join(root,'sample.txt'),'utf8')).toBe('before');
       expect((await gateway('dodo_write','restore_apply',args)).changesetId).toBe(restored.changesetId);
+      const old=await gateway('dodo_write','checkpoint_create',{idempotencyKey:'packed-maintenance-old'});
+      await gateway('dodo_write','checkpoint_create',{idempotencyKey:'packed-maintenance-current'});
+      const cleanup=await gateway('dodo_write','recovery_cleanup_preview',{checkpointIds:[old.checkpointId]});
+      const approvedApply=async(p:Record<string,unknown>,key:string)=>{
+        const input={workspaceId:context.workspaceId,workspaceEpoch:context.workspaceEpoch,operation:'recovery_maintenance_apply',args:{planId:p.planId,planHash:p.planHash,idempotencyKey:key}};
+        const denied=await client.callTool({name:'dodo_write',arguments:input});
+        expect(denied.structuredContent).toMatchObject({ok:false,error:{code:'APPROVAL_REQUIRED'}});
+        const approval=(denied.structuredContent as {error:{detail:{approvalId:string}}}).error.detail.approvalId;
+        execFileSync(process.execPath,[installedBin,'approve',approval],{cwd:root,env,stdio:'pipe',timeout:20000});
+        return gateway('dodo_write','recovery_maintenance_apply',input.args);
+      };
+      expect(await approvedApply(cleanup,'packed-maintenance-cleanup')).toMatchObject({deletedCheckpoints:[old.checkpointId],physicalCleanup:'complete'});
+      const settings=await gateway('dodo_write','recovery_settings_preview',{changes:{excludePaths:['models/']}});
+      expect(await approvedApply(settings,'packed-maintenance-settings')).toMatchObject({settingsSaved:true});
+      expect(await gateway('dodo_read','recovery_storage_status',{})).toMatchObject({settings:{excludePaths:['models']}});
+      expect(fs.readFileSync(path.join(root,'sample.txt'),'utf8')).toBe('before');
+
     } finally { await client.close(); }
   },120000);
 

@@ -1,3 +1,4 @@
+import { RecoveryMaintenance } from './maintenance.js';
 import { RecoveryConfigVault } from './configVault.js';
 import { RecoveryDatabases } from './databaseAwareness.js';
 import { RecoveryEvidence } from './evidence.js';
@@ -27,6 +28,7 @@ type CaptureFile={entry:RecoveryEntry; signature:string};
 
 /** Owned by a leased runtime. Reads remain available while this async service captures source. */
 export class RecoveryService {
+  readonly maintenance:RecoveryMaintenance;
   readonly storage:RecoveryStorage;
   readonly history:RecoveryHistory;
   readonly drift:RecoveryDrift;
@@ -99,6 +101,7 @@ export class RecoveryService {
     this.deployments=new RecoveryDeployments(s,this);
     this.databases=new RecoveryDatabases(s,this);
     this.configVault=new RecoveryConfigVault(s,this);
+    this.maintenance=new RecoveryMaintenance(s,this);
   }
   private project():RegisteredProject|undefined {
     const row=this.s.store.db.prepare('SELECT id FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(this.s.workspaceId) as {id:string}|undefined;
@@ -141,7 +144,7 @@ export class RecoveryService {
   async configure(input:unknown,confirmed:boolean,revalidate?:()=>void):Promise<ReturnType<RecoveryService['status']>> {
     if(!confirmed)throw new DodoError('INVALID_INPUT','confirm the Recovery policy change');
     const policy=RecoveryPolicySchema.parse(input);if(!this.project())throw new DodoError('NOT_FOUND','register this project first');
-    for(const p of policy.dataRoots){const rel=this.s.wfs.normalizeRel(p);if(rel==='.'||rel!==p)throw new DodoError('INVALID_INPUT','data roots must be canonical relative subdirectories');}
+    for(const p of [...policy.dataRoots,...policy.excludePaths]){const rel=this.s.wfs.normalizeRel(p);if(rel==='.'||rel!==p)throw new DodoError('INVALID_INPUT','data roots must be canonical relative subdirectories');}
     if(this.s.jobs.runningCount()||this.s.mutations?.busy)throw new DodoError('CONFLICT','wait for active mutations and jobs before changing Recovery policy');
     await this.initialization;
     if(this.s.jobs.runningCount()||this.s.mutations?.busy)throw new DodoError('CONFLICT','project became busy while reviewing Recovery policy');
@@ -154,6 +157,12 @@ export class RecoveryService {
     this.baseline=undefined;this.activated=false;this.state=policy.enabled?'INITIALIZING':'DISABLED_BY_OWNER';this.errorCode=null;
     this.activate();return this.status();
   }
+  updateMaintenancePolicy(policy:RecoveryPolicy):void {
+    this.assertProject();this.s.mutations!.assertCanStart();
+    if(this.s.jobs.runningCount())throw new DodoError('CONFLICT','wait for running jobs before changing Recovery policy');
+    this.s.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?) ON CONFLICT(workspace_id) DO UPDATE SET payload=excluded.payload').run(this.s.workspaceId,JSON.stringify(policy));
+  }
+  protectedCheckpointIds():Array<string|undefined>{return [this.baseline,this.latest];}
   summary(){
     const {enabled,state,registered,awaitingActivation,sourceOnly,lastCheckedAt,errorCode,progress,projectBytes}=this.status();
     const drift=this.drift.status();return {enabled,state,registered,awaitingActivation,sourceOnly,lastCheckedAt,errorCode,progress,projectBytes,drift:{state:drift.state,changedCount:drift.changedCount,critical:drift.critical,errorCode:drift.errorCode},git:this.git.status(),verification:this.evidence.summary()};
@@ -212,7 +221,7 @@ export class RecoveryService {
   private signature(st:fs.Stats):string {return `${st.dev}:${st.ino}:${st.nlink}:${st.size}:${st.mtimeMs}:${st.ctimeMs}:${st.mode}`;}
   private excluded(rel:string,dir:boolean,policy:RecoveryPolicy):boolean {
     if(rel==='.')return false;
-    return rel.split('/').some(p=>OMIT_DIR.has(p))||DATA_EXTENSION.test(rel)||policy.dataRoots.some(r=>r===rel||rel.startsWith(r+'/'))||this.s.wfs.ignores.isSecret(rel)||this.s.wfs.ignores.isProtected(rel)||(dir&&this.s.wfs.ignores.isSecret(rel+'/'));
+    return rel.split('/').some(p=>OMIT_DIR.has(p))||DATA_EXTENSION.test(rel)||[...policy.dataRoots,...policy.excludePaths].some(r=>r===rel||rel.startsWith(r+'/'))||this.s.wfs.ignores.isSecret(rel)||this.s.wfs.ignores.isProtected(rel)||(dir&&this.s.wfs.ignores.isSecret(rel+'/'));
   }
   private async inventory(policy:RecoveryPolicy,targets?:string[]):Promise<{files:CaptureFile[];excluded:number}> {
     this.project();const files:CaptureFile[]=[];let excluded=0,visited=0;
@@ -275,10 +284,12 @@ export class RecoveryService {
       // Hash before reserving: unchanged objects cost logical references, not duplicate disk bytes.
       const expectedHashes=new Map<string,string>();
       for(const f of inventory.files)if(f.entry.kind==='file')expectedHashes.set(f.entry.path,await this.readFile(f));
-      const estimate=this.storage.estimate(this.s.workspaceId,inventory.files.filter(f=>f.entry.kind==='file').map(f=>({hash:expectedHashes.get(f.entry.path)!,bytes:f.entry.bytes})));
       this.storage.prune(this.s.workspaceId,policy);
       this.storage.collectOrphans();
-      this.storage.reserve(id,this.s.workspaceId,estimate.physical,policy,estimate.logical,estimate.staging);
+      this.s.store.db.transaction(()=>{
+        const estimate=this.storage.estimate(this.s.workspaceId,inventory.files.filter(f=>f.entry.kind==='file').map(f=>({hash:expectedHashes.get(f.entry.path)!,bytes:f.entry.bytes})));
+        this.storage.reserve(id,this.s.workspaceId,estimate.physical,policy,estimate.logical,estimate.staging);
+      }).immediate();
       this.s.store.db.prepare("INSERT INTO recovery_snapshots (id,workspace_id,project_id,state,scope,created_at) VALUES (?,?,?,'PREPARING',?,?)").run(id,this.s.workspaceId,project.projectId,targets?'targets':'source',createdAt);
       const entries:RecoveryEntry[]=[],published=new Set<string>();
       for(const f of inventory.files){
@@ -286,7 +297,7 @@ export class RecoveryService {
           // Rehash every source file even for identical content. Within this
           // capture only, one CAS publication suffices per hash; publish()
           // freshly verifies every distinct object before recording READY.
-          const duplicate=published.has(expectedHashes.get(entry.path)!);
+          const duplicate=published.has(expectedHashes.get(entry.path)!)||this.storage.hasObject(expectedHashes.get(entry.path)!);
           staging=duplicate?undefined:this.storage.stagePath();entry.hash=await this.readFile(f,staging);
           if(entry.hash!==expectedHashes.get(entry.path))throw new DodoError('FILE_CHANGED','source changed after space reservation');
           if(staging)await this.storage.publishObject(staging,entry.hash,entry.bytes);staging=undefined;published.add(entry.hash);

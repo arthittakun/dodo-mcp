@@ -679,6 +679,12 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
      target_id TEXT NOT NULL REFERENCES recovery_config_targets(id), snapshot_id TEXT NOT NULL REFERENCES recovery_config_backups(id),
      before_id TEXT REFERENCES recovery_config_backups(id), payload TEXT NOT NULL, hash TEXT NOT NULL,
      state TEXT NOT NULL, result TEXT);`,
+  `CREATE TABLE recovery_maintenance_plans (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL,
+     actor TEXT NOT NULL, owner INTEGER NOT NULL, epoch TEXT NOT NULL, payload TEXT NOT NULL,
+     digest TEXT NOT NULL, expires_at INTEGER NOT NULL, result_json TEXT);
+   CREATE TABLE recovery_cleanup_files (workspace_id TEXT NOT NULL, actor TEXT NOT NULL,
+     kind TEXT NOT NULL CHECK(kind IN ('manifest','object')), reference TEXT NOT NULL,
+     PRIMARY KEY(workspace_id,kind,reference));`,
 ];
 
 /**

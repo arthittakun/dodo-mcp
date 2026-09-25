@@ -433,3 +433,31 @@ or disaster-recovery success is implied.
 - Real external AI accounts, physical eight-hour waiting and real Cloudflare
   routes are MANUAL_NOT_RUN for this patch unless separately recorded. Automated
   tests advance the server clock and use isolated HTTP/browser fixtures.
+
+## 1.3.2 Recovery maintenance
+
+Use a disposable registered project and separate private state. Never test cleanup
+against production backup history.
+
+- Create several checkpoints with an unchanged large fixture under `models/`.
+  Compare logical checkpoint totals to unique source objects and separate Git copies.
+- Select an old unprotected checkpoint. Preview, cancel confirmation, and verify
+  no deletion. Confirm a fresh preview and verify its manifest/history are removed,
+  current source is unchanged, and actual reclaimed bytes match deleted files.
+- Pin a point or prepare a restore after preview: applying the old preview must fail.
+  Latest/baseline/named/deployment/database-linked points must remain protected.
+- Set an exclusion `models/` and a project quota through the policy preview. Verify
+  old checkpoints remain intact and a new checkpoint omits the directory. Inspect
+  project/installation/free-floor limits separately if capture still refuses quota.
+- Simulate a locked backup file in fixture state. Logical cleanup must report pending
+  physical cleanup; unlock and explicitly review pending cleanup to reclaim it.
+- From MCP, discover the four `recovery_*` maintenance operations. Read-only tokens
+  cannot preview/apply writes, other callers cannot delete each other's checkpoints,
+  and write-capable trusted callers still require exact owner approval for apply.
+- Retry the same idempotency key and inspect the plan receipt after reconnect.
+  Do not infer success or repeat side effects after an uncertain response.
+- Check desktop/narrow layout, keyboard focus, error and empty states. Verify the
+  private UI remains authenticated and no public admin endpoint is introduced.
+
+Automated Chromium coverage is distinct from a manual test in an actual AI client.
+Native Windows/Linux and production project cleanup are not certified by macOS tests.

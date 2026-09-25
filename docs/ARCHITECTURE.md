@@ -261,8 +261,8 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 
 ## Tool surfaces
 
-- Complete capability catalog 158 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13 + Source Recovery 10 + Deployment 10)
-- Full live catalog ค่าเริ่มต้น 154 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 158
+- Complete capability catalog 162 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13 + Source Recovery 14 + Deployment 10)
+- Full live catalog ค่าเริ่มต้น 158 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 162
 - Compact catalog 20 definitions: overview, discover และ gateways รวม `dodo_mobile`
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 
@@ -463,3 +463,19 @@ through public HTTP. A WeakMap binds each authenticated Express request to its
 session; `aiAdmin` resolves that session again for queued actions and event streams.
 The gateway strips incoming credentials, injects only its own capability on the
 loopback hop, and revokes it on close/renewal. Local expiry is independent.
+
+### Recovery storage maintenance
+
+`RecoveryMaintenance` shares validation between private owner administration and
+MCP invocation. Four new operations use existing read/write compact gateways.
+A durable review binds project, caller/owner role, epoch, root identity, policy and
+selection. Apply runs in the project mutation queue and rechecks protected references
+under the SQLite write lock. AI apply requires a scoped owner approval regardless
+of trust. Review/result state and pending cleanup files have separate durable tables.
+
+Logical deletion and pending file tasks commit together before physical cleanup.
+Cleanup removes only private, unreferenced manifests/objects; installation reservations
+protect concurrent publishers. Failures retain tasks and accounting, and explicit
+pending cleanup retries do not repeat logical deletion. CAS reuse skips staging of
+unchanged content but retains fresh source/object verification. Reservation estimation
+and reservation insertion hold one installation write lock against concurrent GC.

@@ -68,11 +68,33 @@ export class RecoveryStorage {
   estimate(workspaceId:string,entries:Array<{hash:string;bytes:number}>):{physical:number;logical:number;staging:number} {
     const unique=new Map(entries.map(e=>[e.hash,e.bytes]));let physical=0,logical=0,staging=0;
     for(const [hash,bytes]of unique){
-      if(!this.store.db.prepare('SELECT 1 FROM recovery_objects WHERE hash=?').get(hash))physical+=bytes;
+      if(!this.hasObject(hash)){physical+=bytes;staging=Math.max(staging,bytes);}
       if(!this.store.db.prepare('SELECT 1 FROM recovery_refs r JOIN recovery_snapshots s ON s.id=r.snapshot_id WHERE s.workspace_id=? AND r.object_hash=? LIMIT 1').get(workspaceId,hash))logical+=bytes;
-      staging=Math.max(staging,bytes);
     }
     return {physical,logical,staging};
+  }
+  hasObject(hash:string):boolean {return Boolean(this.store.db.prepare('SELECT 1 FROM recovery_objects WHERE hash=?').get(hash));}
+  /** Only delete retired, unreferenced files. SQLite serialization + reservations
+   * protect publishers in other project runtimes/processes. Tasks survive I/O failures. */
+  cleanupRetired(workspaceId:string,actor?:string) {
+    let reclaimedObjectBytes=0,removedManifests=0;
+    const rows=this.store.db.prepare(`SELECT kind,reference FROM recovery_cleanup_files WHERE workspace_id=? ${actor?'AND actor=?':''} LIMIT 500`).all(workspaceId,...(actor?[actor]:[])) as Array<{kind:'manifest'|'object';reference:string}>;
+    for(const task of rows){
+      try {this.store.db.transaction(()=>{
+        if(task.kind==='object'&&this.usage('SELECT COUNT(*) n FROM recovery_reservations'))return;
+        const referenced=task.kind==='object'?this.store.db.prepare('SELECT 1 FROM recovery_refs WHERE object_hash=? LIMIT 1').get(task.reference):this.store.db.prepare('SELECT 1 FROM recovery_snapshots WHERE id=?').get(task.reference);
+        if(!referenced){
+          const file=task.kind==='object'?this.objectPath(task.reference):this.manifestPath(task.reference);
+          let exists=true;try{assertPrivatePath(file);}catch(e){if((e as NodeJS.ErrnoException).code==='ENOENT')exists=false;else throw e;}
+          const bytes=task.kind==='object'?(this.store.db.prepare('SELECT bytes FROM recovery_objects WHERE hash=?').get(task.reference) as {bytes:number}|undefined)?.bytes??0:0;
+          if(exists)fs.unlinkSync(file);
+          if(task.kind==='object'){this.store.db.prepare('DELETE FROM recovery_objects WHERE hash=?').run(task.reference);if(exists)reclaimedObjectBytes+=bytes;}else if(exists)removedManifests++;
+        }
+        this.store.db.prepare('DELETE FROM recovery_cleanup_files WHERE workspace_id=? AND kind=? AND reference=?').run(workspaceId,task.kind,task.reference);
+      }).immediate();}catch{/* Retain the durable task; never claim failed unlink freed space. */}
+    }
+    const pending=(this.store.db.prepare(`SELECT COUNT(*) n FROM recovery_cleanup_files WHERE workspace_id=? ${actor?'AND actor=?':''}`).get(workspaceId,...(actor?[actor]:[])) as {n:number}).n;
+    return {reclaimedObjectBytes,removedManifests,pendingFiles:pending};
   }
   release(id:string):void {this.store.db.prepare('DELETE FROM recovery_reservations WHERE id=?').run(id);}
   async verifyObject(hash:string,expectedBytes:number):Promise<void> {

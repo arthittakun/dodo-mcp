@@ -1,5 +1,15 @@
 # DODO MCP — Release Notes
 
+## 1.3.2 — Recovery storage management
+
+Adds owner-reviewed checkpoint cleanup, pending-file retry, project quotas and
+explicit exclusions in the web dashboard. Four caller-bound MCP maintenance
+operations use existing Compact gateways; destructive/settings apply still needs
+owner approval. Shows unique source objects separately from Git copies and logical
+checkpoint sizes. Reuses verified unchanged CAS objects without restaging them.
+See [Recovery usage](RECOVERY.md), [upgrade details](RELEASE_1.3.2.md) and [validation results](TEST_REPORT.md).
+This patch uses the completed macOS gate; native Linux/Windows CI is explicitly deferred to the next release.
+
 ## 1.3.1 — Independent Remote Config sessions
 
 `dodo --web` now creates an independent one-hour owner session even after the local

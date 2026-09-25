@@ -1,7 +1,8 @@
 # Recovery: source, deployments and private configuration
 
-This documents the 1.3.0 source candidate. Publication and supported-platform
-results are recorded separately in [release notes](RELEASE_1.3.0.md) and
+This documents Recovery including the 1.3.2 storage-maintenance additions.
+Publication and platform results are recorded separately in
+[release notes](RELEASE_NOTES.md) and
 [the test report](TEST_REPORT.md). Source backup is default-on for registered
 projects; deployment/database/config adapters require separate owner opt-in.
 
@@ -111,7 +112,7 @@ MCP full operations: `checkpoint_list`, `checkpoint_inspect`, `checkpoint_create
 `recovery_session_list`, `recovery_session_inspect`, `recovery_session_begin`,
 `recovery_session_end`, `restore_preview`, `restore_apply`, `restore_status`.
 Use the existing `dodo_read` and `dodo_write` compact gateways and discover schemas.
-Full catalog: 158 capabilities (154 with sub-agents hidden); Compact remains 20.
+Full catalog: 162 capabilities (158 with sub-agents hidden); Compact remains 20.
 Gateway arguments cannot override top-level workspace/project/recovery context.
 
 For several edits belonging to one task, call `recovery_session_begin`, then pass
@@ -200,10 +201,74 @@ refused rather than overwritten. Pins and active names both protect retention.
 Unpinning a named point alone will not delete it. Old/new name changes appear in
 owner history. Naming never rewrites source or the snapshot manifest.
 
-Advanced settings include **ดู preview การล้างตาม retention**. It shows eligible
-points and why others are retained without deleting anything. Shared objects,
-Git copies and orphan grace periods mean the logical byte total is not immediate
-free disk space. This version does not expose a manual destructive purge.
+The **จัดการพื้นที่ Recovery** panel provides reviewed manual cleanup, retention
+cleanup and retry of pending physical cleanup. It reports unique source object
+bytes separately from Git copies and the logical checkpoint total. Checkpoints
+with unchanged content share objects; adding their logical sizes does not measure
+actual disk use. Unchanged objects are freshly verified and reused without writing
+another staging copy. Git copies are separate and can consume additional space.
+
+To manage a project such as `my-project`:
+
+1. Open the private Config link, select the registered project, then Recovery.
+2. Inspect actual source/Git usage and project/installation quotas. A quota refusal
+   can also mean the installation limit or minimum free disk space was reached.
+3. Select old checkpoints, click **ตรวจแผนลบสำเนาที่เลือก**, review the exact IDs
+   and closed sessions, then confirm. This permanently removes those backups and
+   their closed session history, never the current project files.
+4. For future backups, expand **โควตา ระยะเก็บ และโฟลเดอร์ที่ไม่สำรอง**. Increase
+   the project quota or put `models/` on its own exclusion line, review and confirm.
+   Exclusions are literal relative file/directory prefixes, not glob patterns.
+5. Create a checkpoint and inspect its coverage. Old backups still contain the
+   previously included files until separately deleted. Changing settings alone
+   does not certify readiness, acknowledge drift or repair a corrupt backup.
+
+Excluded files are not restorable from future checkpoints. When an operation
+requires a before-image of an excluded file, DODO refuses it rather than silently
+editing without protection. Shell commands can still change excluded data; a
+source checkpoint is not a full machine/data backup or an OS sandbox.
+
+Current/latest source checkpoints, drift baselines, pins, names, active captures,
+open sessions, unfinished work, live restore plans, deployment provenance and
+DB compatibility bindings remain protected. Deleting a closed session requires
+selecting all its checkpoints. Retention cleanup remains subject to the same
+protections. Lowering retention can remove older eligible history at a later
+capture; it is not a guarantee to keep exactly N points.
+
+Cleanup previews expire after 15 minutes and are bound to project, epoch, caller,
+policy and the reviewed selection. Changes to protection/history require a fresh
+preview. File deletion failures retain durable cleanup tasks. **เก็บกวาดไฟล์ค้าง**
+retries those tasks explicitly; shared objects are never removed while referenced
+or while an installation capture is active. Results separate logical deletion,
+source bytes freed, Git bytes freed and pending files. Accounting excludes filesystem
+overhead and temporary staging; it is not a claim about total disk free space.
+
+### AI-assisted storage maintenance
+
+Four Full operations are also available through existing Compact gateways:
+
+| Operation | Gateway | Scope / authority |
+| --- | --- | --- |
+| `recovery_storage_status` | `dodo_read` | Read; caller-owned checkpoint metadata, quota/storage totals, or a plan receipt |
+| `recovery_cleanup_preview` | `dodo_write` | Write; selected IDs, retention, or pending-file cleanup; no deletion |
+| `recovery_settings_preview` | `dodo_write` | Write; project quota, retention and exclusions only; no policy change |
+| `recovery_maintenance_apply` | `dodo_write` | Write plus exact owner approval, including in trusted mode |
+
+Use `project_overview` and `dodo_discover` to obtain current context and schemas.
+For example, `dodo_write` with `operation: "recovery_settings_preview"` and
+`args: {"changes":{"excludePaths":["models/"],"projectBytes":8589934592}}` proposes
+an 8 GiB quota and exclusion. It grants no permission. Review the returned plan,
+then apply with its exact `planId`, `planHash` and an `idempotencyKey` after owner
+approval. Keep project/workspace context at the gateway top level.
+
+An MCP caller can delete only its own checkpoint history; the authenticated owner
+web UI can manage all checkpoints in the selected project. AI cannot unpin points,
+remove names, disable Recovery, change storage destinations, approve its own action,
+relax secret/path guards or accept corruption as a new baseline. Approved plan
+retries return a durable receipt. Query `recovery_storage_status` with `planId`
+after an uncertain response; never silently repeat destructive operations.
+A crash after logical deletion may leave physical cleanup pending; review pending
+cleanup explicitly. Recovery maintenance never reruns a failed source command.
 
 Owner CLI, in the registered project's directory:
 
@@ -218,7 +283,7 @@ dodo recovery mark stable SNAPSHOT_ID --revision REVIEWED_REVISION --workspace W
 
 After browser reconnect, refresh evidence and query the existing restore receipt.
 Do not repeat uncertain effects. These are private owner controls; MCP/public
-HTTP has no mark/pin/purge endpoint. Without an owner-registered deployment target its state is **NOT_CONFIGURED**;
+HTTP has no public owner mark/pin/admin endpoint; reviewed MCP maintenance remains caller-bound and owner-approved. Without an owner-registered deployment target its state is **NOT_CONFIGURED**;
 database row rollback remains **NOT_SUPPORTED**. Optional adapters are described below. Windows/Android and live
 production recovery require their own acceptance; results from macOS/Linux
 fixtures are not substitutes.

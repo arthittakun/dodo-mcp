@@ -15,7 +15,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 158 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 154 tools
+- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 162 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 158 tools
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -633,3 +633,13 @@ npm pack
 ใช้กุญแจจาก OS credential store และไม่ส่งเนื้อหาให้ AI; ไม่มี generic database rollback
 หรือการ restart service อัตโนมัติ ดู [คู่มือ Recovery](docs/RECOVERY.md),
 [การเปลี่ยนแปลง 1.3.0](docs/RELEASE_1.3.0.md) และ [ผลตรวจรับจริง](docs/TEST_REPORT.md)
+
+### จัดการพื้นที่สำรอง Recovery
+
+ในหน้าเว็บเลือกโปรเจกต์ → Recovery → **จัดการพื้นที่ Recovery** เพื่อดูพื้นที่ source
+ที่เก็บจริงแยกจาก Git copies, ลบ checkpoint เก่าหลังตรวจแผนและยืนยัน, ปรับโควตา
+หรือยกเว้น `models/` สำหรับสำเนาครั้งถัดไป สำเนาที่ใช้ร่วมกันตาม hash ไม่ได้กินพื้นที่
+ซ้ำตามผลรวมขนาด checkpoint และจุดล่าสุด/ที่ถูกป้องกันจะลบไม่ได้
+AI ตรวจพื้นที่และเสนอแผนผ่าน `recovery_storage_status`, `recovery_cleanup_preview`
+และ `recovery_settings_preview` ได้; `recovery_maintenance_apply` ต้องได้รับอนุมัติ
+จากเจ้าของ แม้ใช้ trusted mode ดู [วิธีใช้และข้อจำกัด](docs/RECOVERY.md#ai-assisted-storage-maintenance)

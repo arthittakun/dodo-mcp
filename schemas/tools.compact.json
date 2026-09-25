@@ -3,8 +3,8 @@
   "version": 1,
   "toolCount": 20,
   "defaultLiveToolCount": 20,
-  "fullToolCount": 158,
-  "defaultLiveFullToolCount": 154,
+  "fullToolCount": 162,
+  "defaultLiveFullToolCount": 158,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -21,15 +21,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 63349
+      "schemaBytes": 63565
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 144231
+      "schemaBytes": 144447
     },
     "full": {
-      "toolCount": 158,
-      "schemaBytes": 572388
+      "toolCount": 162,
+      "schemaBytes": 582689
     }
   },
   "tools": [
@@ -360,7 +360,7 @@
     {
       "name": "dodo_read",
       "title": "Read workspace state",
-      "description": "Gateway: read-only workspace access: files, search, symbols, jobs, history and agent notes. Set operation to one of: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, diagnostics, change_history, approval_status, environment_info, todo_read, handoff_read, job_status, job_output, job_wait, list_jobs, restore_status, checkpoint_list, checkpoint_inspect, recovery_session_list, recovery_session_inspect, deployment_targets, deployment_list, deployment_inspect, deployment_compare. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: read-only workspace access: files, search, symbols, jobs, history and agent notes. Set operation to one of: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, diagnostics, change_history, approval_status, environment_info, todo_read, handoff_read, job_status, job_output, job_wait, list_jobs, recovery_storage_status, restore_status, checkpoint_list, checkpoint_inspect, recovery_session_list, recovery_session_inspect, deployment_targets, deployment_list, deployment_inspect, deployment_compare. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -388,6 +388,7 @@
         "job_output",
         "job_wait",
         "list_jobs",
+        "recovery_storage_status",
         "restore_status",
         "checkpoint_list",
         "checkpoint_inspect",
@@ -452,6 +453,7 @@
               "job_output",
               "job_wait",
               "list_jobs",
+              "recovery_storage_status",
               "restore_status",
               "checkpoint_list",
               "checkpoint_inspect",
@@ -582,7 +584,7 @@
     {
       "name": "dodo_write",
       "title": "Change workspace files",
-      "description": "Gateway: hash-verified, journaled file changes: write/edit/patch, preview→apply→rollback, todos and handoff. Set operation to one of: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_changes, apply_changes, rollback_changes, preview_rename, todo_write, handoff_write, agent_write, agent_snapshot_rollback, checkpoint_create, recovery_session_begin, recovery_session_end, restore_preview, restore_apply. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: hash-verified, journaled file changes: write/edit/patch, preview→apply→rollback, todos and handoff. Set operation to one of: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_changes, apply_changes, rollback_changes, preview_rename, todo_write, handoff_write, agent_write, agent_snapshot_rollback, recovery_cleanup_preview, recovery_settings_preview, recovery_maintenance_apply, checkpoint_create, recovery_session_begin, recovery_session_end, restore_preview, restore_apply. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -607,6 +609,9 @@
         "handoff_write",
         "agent_write",
         "agent_snapshot_rollback",
+        "recovery_cleanup_preview",
+        "recovery_settings_preview",
+        "recovery_maintenance_apply",
         "checkpoint_create",
         "recovery_session_begin",
         "recovery_session_end",
@@ -664,6 +669,9 @@
               "handoff_write",
               "agent_write",
               "agent_snapshot_rollback",
+              "recovery_cleanup_preview",
+              "recovery_settings_preview",
+              "recovery_maintenance_apply",
               "checkpoint_create",
               "recovery_session_begin",
               "recovery_session_end",

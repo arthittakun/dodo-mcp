@@ -36,17 +36,14 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
       card.append(el('p',`รวม ${data.counts.included} รายการ · ยกเว้นตามนโยบาย ${data.counts.excludedByPolicy} รายการ · เหตุการณ์ล่าสุด ${data.lastTrigger||'ยังไม่มี'}`));
       const enabled=check(card,'เปิดการสำรองอัตโนมัติ','recoveryEnabled',data.enabled);enabled.setAttribute('role','switch');
       const advanced=el('details');advanced.append(el('summary','ขอบเขตและพื้นที่สำรอง'));card.append(advanced);
-      await cleanupPanel(advanced,act);
-      const quota=field(advanced,'พื้นที่สูงสุดต่อโปรเจกต์ (GiB)','recoveryQuota',String(data.policy.projectBytes/1073741824),'number');quota.min='0.001';quota.step='0.1';
-      const days=field(advanced,'เก็บกี่วัน (ยกเว้นจุดล่าสุด/ที่ pin)','recoveryDays',String(data.policy.retentionDays),'number');
-      const count=field(advanced,'จำนวนจุดที่ไม่ได้ pin','recoveryCount',String(data.policy.retainedPoints),'number');
+      await window.DodoRecoveryMaintenance({parent:card,act,selected,el,section,button,field,check,notice,confirmDanger,refresh});
       const gitRequired=check(advanced,'ต้องมี Git recovery copy ก่อนทำงาน','recoveryGitRequired',data.policy.gitRequired);
       const gitDirectory=field(advanced,'ที่เก็บ Git สำรอง (absolute path; เว้นว่างใช้ private state)','recoveryGitDirectory',data.policy.gitDirectory||'');
       advanced.append(el('p','โฟลเดอร์สำรองต้องมีอยู่แล้ว เป็น private ของเจ้าของ และอยู่นอกโปรเจกต์ หากถอดดิสก์จะหยุด ไม่เปลี่ยนปลายทางเอง','muted'));
       const roots=field(advanced,'โฟลเดอร์ข้อมูล runtime ที่ไม่สำรอง (relative path หนึ่งรายการต่อบรรทัด)','recoveryDataRoots',data.policy.dataRoots.join('\n'),'textarea');
       card.append(button('บันทึกการสำรอง',async()=>{
         if(!enabled.checked&&!await confirmDanger('ปิดการสำรองอัตโนมัติ?', 'การแก้ไฟล์และคำสั่งหลังจากนี้จะไม่มี source checkpoint ใหม่ สำเนาเดิมและ file journal ยังอยู่','ปิดการสำรอง'))return;
-        const result=await act('recovery.configure',{confirm:true,policy:{...data.policy,enabled:enabled.checked,gitRequired:gitRequired.checked,gitDirectory:gitDirectory.value.trim()||null,projectBytes:Math.round(Number(quota.value)*1073741824),retentionDays:Number(days.value),retainedPoints:Number(count.value),dataRoots:roots.value.split('\n').map(s=>s.trim()).filter(Boolean)}});
+        const result=await act('recovery.configure',{confirm:true,policy:{...data.policy,enabled:enabled.checked,gitRequired:gitRequired.checked,gitDirectory:gitDirectory.value.trim()||null,dataRoots:roots.value.split('\n').map(s=>s.trim()).filter(Boolean)}});
         notice(result.enabled?'บันทึกแล้ว กำลังตรวจความพร้อม':'บันทึกแล้ว เจ้าของปิดการสำรอง');await refresh();
       }));
       card.append(button('สร้างจุดกู้คืนตอนนี้',async()=>{await act('recovery.checkpoint');await refresh();}));
@@ -119,18 +116,6 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
   }
 
 
-  async function cleanupPanel(parent,act){
-    const result=el('div');parent.append(button('ดู preview การล้างตาม retention',async()=>{
-      const render=async(cursor=0)=>{
-        result.replaceChildren(el('p','กำลังคำนวณรายการ…'));
-        try{const d=await act('recovery.cleanup.preview',{cursor,limit:20});result.replaceChildren(el('p',`ล้างได้ ${d.eligiblePoints} สำเนา · ${d.closedSessions} session ที่ปิดแล้ว · ยังไม่ได้ลบข้อมูล`));
-          result.append(el('p','พื้นที่ไฟล์อาจใช้ร่วมกัน จึงยังระบุพื้นที่ดิสก์ที่จะคืนจริงไม่ได้','muted'));
-          for(const p of d.items)result.append(el('p',`${p.checkpointId} · ${p.eligible?'เข้าเกณฑ์ล้าง':'เก็บไว้'} · ${p.reason}`));
-          if(d.nextCursor!==null)result.append(button('ดู retention หน้าถัดไป',()=>render(d.nextCursor)));
-        }catch(e){result.replaceChildren(el('p','ตรวจ retention ไม่สำเร็จ: '+e.message,'wb-status'));throw e;}
-      };await render();
-    }),result);
-  }
   async function verificationPanel(parent,act,selected){
     const box=section('หลักฐานและชื่อสำเนา','SAVED คือมีสำเนา · VERIFIED คือ checks ที่เลือกผ่าน · stable เป็นชื่อที่เจ้าของตั้ง');parent.append(box);
     box.append(help('ผลทดสอบอ้างเฉพาะ source และ recipes ที่ตรวจในเวลานั้น ไม่ครอบคลุม environment ภายนอก การแก้แล้วเปลี่ยนกลับระหว่าง checks หรือความถูกต้องทุกกรณี','ขอบเขตหลักฐาน'));

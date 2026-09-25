@@ -93,7 +93,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'job_output',
       'job_wait',
       'list_jobs',
-      'restore_status', 'checkpoint_list', 'checkpoint_inspect', 'recovery_session_list', 'recovery_session_inspect',
+      'recovery_storage_status', 'restore_status', 'checkpoint_list', 'checkpoint_inspect', 'recovery_session_list', 'recovery_session_inspect',
       'deployment_targets', 'deployment_list', 'deployment_inspect', 'deployment_compare',
     ],
   },
@@ -118,7 +118,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'handoff_write',
       'agent_write',
       'agent_snapshot_rollback',
-      'checkpoint_create', 'recovery_session_begin', 'recovery_session_end', 'restore_preview', 'restore_apply',
+      'recovery_cleanup_preview', 'recovery_settings_preview', 'recovery_maintenance_apply', 'checkpoint_create', 'recovery_session_begin', 'recovery_session_end', 'restore_preview', 'restore_apply',
     ],
   },
   {
