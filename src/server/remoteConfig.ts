@@ -3,6 +3,8 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { Express, NextFunction, Request, Response } from 'express';
 import express from 'express';
 import { DodoError } from '../errors.js';
+import type { LocalConfigServer } from './localConfig.js';
+import type { ConfigSession } from './configSession.js';
 
 const DEFAULT_LEASE_MS = 60 * 60 * 1000;
 const PAIRING_TTL_MS = 10 * 60 * 1000;
@@ -23,10 +25,7 @@ export interface RemoteConfigStatus {
   expiresAt: number | null;
 }
 
-interface LocalConfigTarget {
-  origin: string;
-  capability: string;
-}
+type LocalConfigTarget = Pick<LocalConfigServer, 'origin' | 'createRemoteSession'>;
 
 function digest(value: string): Buffer {
   return createHash('sha256').update(value).digest();
@@ -71,7 +70,7 @@ function safeHeader(req: Request, name: string, max: number): string | undefined
 }
 
 const LOGIN_HTML = Buffer.from(`<!doctype html>
-<html lang="th" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="referrer" content="no-referrer"><title>DODO Remote Config</title><link rel="stylesheet" href="/config/login.css"></head><body><main><section><div class="logo" aria-hidden="true">DD</div><h1>DODO Remote Config</h1><p>หน้าเจ้าของเครื่องแบบชั่วคราว กรุณากรอก pairing code ที่แสดงใน terminal ของ DODO</p><form id="pair" novalidate><label for="code">Pairing code</label><input id="code" name="code" type="text" autocomplete="one-time-code" spellcheck="false" maxlength="32" required autofocus><button type="submit">เชื่อมต่อ</button><p id="status" role="alert" aria-live="polite"></p></form><p class="note">Code ใช้ได้ครั้งเดียว หน้า Config จะปิดอัตโนมัติภายใน 1 ชั่วโมง และไม่มี credential อยู่ใน URL</p></section></main><script src="/config/login.js"></script></body></html>`);
+<html lang="th" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="referrer" content="no-referrer"><title>DODO Remote Config</title><link rel="stylesheet" href="/config/login.css"></head><body><main><section><div class="logo" aria-hidden="true">DD</div><h1>DODO Remote Config</h1><p>หน้าเจ้าของเครื่องแบบชั่วคราว กรุณากรอก pairing code ที่แสดงใน terminal ของ DODO</p><form id="pair" novalidate><label for="code">Pairing code</label><input id="code" name="code" type="text" autocomplete="one-time-code" spellcheck="false" maxlength="32" required autofocus><button type="submit">เชื่อมต่อ</button><p id="status" role="alert" aria-live="polite"></p></form><p class="note">Code ใช้ได้ครั้งเดียว หน้า Config จะปิดภายใน 1 ชั่วโมง เปิดใหม่ด้วย dodo --web ได้โดยไม่ต้อง restart และไม่ผูกกับลิงก์ Local Config 8 ชั่วโมง</p></section></main><script src="/config/login.js"></script></body></html>`);
 const LOGIN_CSS = Buffer.from(`:root{color-scheme:dark;background:#0f141b;color:#e8edf4;font:16px/1.6 system-ui,-apple-system,"Noto Sans Thai",sans-serif}*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px}main{width:min(100%,480px)}section{background:#171e28;border:1px solid #303a48;border-radius:14px;padding:28px;box-shadow:0 18px 45px #0005}.logo{display:grid;place-items:center;width:48px;height:48px;border-radius:10px;background:#2c78c8;color:white;font-weight:800}h1{margin:18px 0 4px;font-size:1.55rem}p{color:#b7c1ce}label{display:block;margin:20px 0 7px;font-weight:700}input,button{width:100%;min-height:46px;border-radius:9px;font:inherit}input{border:1px solid #526074;background:#0e141c;color:#fff;padding:10px 12px;text-transform:uppercase;letter-spacing:.08em}input:focus{outline:3px solid #4c9cff55;border-color:#65aaff}button{margin-top:12px;border:0;background:#2877c7;color:white;font-weight:750;cursor:pointer}button:disabled{opacity:.6;cursor:wait}#status{min-height:1.6em;color:#ff9e9e}.note{font-size:.9rem;color:#93a0b1}@media(prefers-color-scheme:light){:root{background:#eef2f7;color:#17202b}section{background:#fff;border-color:#ccd5e1;box-shadow:0 18px 45px #34405422}p{color:#566274}input{background:#fff;color:#17202b;border-color:#8794a6}.note{color:#657286}}`);
 const LOGIN_JS = Buffer.from(`'use strict';(()=>{const form=document.getElementById('pair'),input=document.getElementById('code'),status=document.getElementById('status'),button=form.querySelector('button');form.addEventListener('submit',async event=>{event.preventDefault();if(button.disabled)return;status.textContent='';button.disabled=true;button.textContent='กำลังตรวจ…';try{const response=await fetch('/config/pair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:input.value}),credentials:'same-origin',cache:'no-store'});let result={};try{result=await response.json()}catch{}if(!response.ok)throw new Error(result.error||('HTTP '+response.status));input.value='';location.replace('/config');}catch(error){input.value='';status.textContent='✕ '+error.message;input.focus();}finally{button.disabled=false;button.textContent='เชื่อมต่อ';}});})();`);
 
@@ -79,10 +78,12 @@ const LOGIN_JS = Buffer.from(`'use strict';(()=>{const form=document.getElementB
  * A process-only, one-hour bridge from the public listener to the existing
  * loopback Local Config server. It grants no authority itself: after a
  * one-time pairing exchange every request is re-authenticated here and then
- * forwarded through Local Config's original capability and policy routes.
+ * forwarded through a separate, revocable one-hour owner capability and
+ * Local Config's original policy routes. The local browser token is untouched.
  */
 export class RemoteConfigGateway {
   private target: LocalConfigTarget | undefined;
+  private ownerSession: ConfigSession | undefined;
   private pairingHash: Buffer | undefined;
   private pairingExpiresAt = 0;
   private sessionHash: Buffer | undefined;
@@ -96,14 +97,12 @@ export class RemoteConfigGateway {
     private readonly defaultLeaseMs = DEFAULT_LEASE_MS,
   ) {}
 
-  attachLocal(url: string): void {
-    const parsed = new URL(url);
-    const capability = parsed.hash.slice(1);
-    if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1' || !capability) {
+  attachLocal(target: LocalConfigTarget): void {
+    const parsed = new URL(target.origin);
+    if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1' || parsed.username || parsed.password || parsed.hash || parsed.search) {
       throw new DodoError('INTERNAL_ERROR', 'Local Config target is not an owner-private loopback capability');
     }
-    parsed.hash = '';
-    this.target = { origin: parsed.origin, capability };
+    this.target = target;
   }
 
   open(leaseMs = this.defaultLeaseMs): RemoteConfigLease {
@@ -112,9 +111,11 @@ export class RemoteConfigGateway {
       throw new DodoError('INVALID_INPUT', 'Remote Config lifetime must not exceed 1 hour');
     }
     this.close();
+    const expiresAt = Date.now() + leaseMs;
+    this.ownerSession = this.target.createRemoteSession(expiresAt);
     const code = pairingCode();
     this.pairingHash = digest(code);
-    this.expiresAt = Date.now() + leaseMs;
+    this.expiresAt = expiresAt;
     this.pairingExpiresAt = Math.min(this.expiresAt, Date.now() + PAIRING_TTL_MS);
     this.attemptWindow = Date.now();
     this.timer = setTimeout(() => this.close(), leaseMs);
@@ -123,6 +124,8 @@ export class RemoteConfigGateway {
   }
 
   close(): void {
+    this.ownerSession?.revoke();
+    this.ownerSession = undefined;
     if (this.timer) clearTimeout(this.timer);
     this.timer = undefined;
     this.pairingHash = undefined;
@@ -180,7 +183,7 @@ export class RemoteConfigGateway {
   }
 
   private active(): boolean {
-    if (this.expiresAt > Date.now()) return true;
+    if (this.expiresAt > Date.now() && this.ownerSession?.active()) return true;
     if (this.expiresAt !== 0) this.close();
     return false;
   }
@@ -220,11 +223,12 @@ export class RemoteConfigGateway {
 
   private proxy(req: Request, res: Response, upstreamPath: string, transform: boolean): void {
     const target = this.target;
-    if (!target) { securityHeaders(res); res.status(503).json({ error: 'Local Config is unavailable' }); return; }
+    const session = this.ownerSession;
+    if (!target || !session?.active()) { securityHeaders(res); res.status(401).json({ error: 'Remote Config หมดอายุหรือปิดแล้ว — รัน dodo --web แล้วจับคู่ใหม่', code: 'REMOTE_CONFIG_AUTH_REQUIRED' }); return; }
     const local = new URL(target.origin);
     const headers: Record<string, string> = {
       Host: local.host,
-      Authorization: `Bearer ${target.capability}`,
+      Authorization: `Bearer ${session.capability}`,
     };
     for (const [name, max] of [['content-type', 100], ['x-dodo-workspace', 256], ['x-dodo-epoch', 256]] as const) {
       const value = safeHeader(req, name, max);
@@ -244,6 +248,11 @@ export class RemoteConfigGateway {
       securityHeaders(res);
       res.status(status);
       if (type) res.setHeader('Content-Type', type);
+      if (status === 401) {
+        response.resume();
+        res.json({ error: 'Remote Config หมดอายุหรือปิดแล้ว — รัน dodo --web แล้วจับคู่ใหม่', code: 'REMOTE_CONFIG_AUTH_REQUIRED' });
+        return;
+      }
       if (!transform || status !== 200) { response.pipe(res); return; }
       const chunks: Buffer[] = [];
       let size = 0;

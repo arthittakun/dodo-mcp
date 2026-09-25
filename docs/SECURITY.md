@@ -453,3 +453,14 @@ UNKNOWN receipt. A crash may leave partial bytes; it never silently retries or
 restarts services. Owner/context/content checks and same-user filesystem race
 limits apply. Key rotation retains old references; retention protects referenced
 backups and does not promise physical secure erasure. See [ADR 056](adr/056-owner-data-recovery.md).
+
+## Config session isolation (1.3.1)
+
+Local Config retains its eight-hour process capability. Each owner CLI opening of
+Remote Config creates a distinct, random internal capability bounded by that
+one-hour lease. It never renews or reuses the local browser token. Closing, expiry
+or reopening revokes the old remote capability and cookie. No credential is sent
+in a remote URL or returned by state APIs. AI owner principals, streaming requests
+and queued owner revalidation use the authenticated request session, not the
+server start time. Loopback, Host/Origin, proxy-header rejection, rate limits,
+workspace/epoch checks and public MCP OAuth remain enforced.

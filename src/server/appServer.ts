@@ -510,7 +510,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         log,
       });
       installation.ai.settings.ports.push(Number(new URL(localConfig.url).port));
-      remoteConfigGateway?.attachLocal(localConfig.url);
+      remoteConfigGateway?.attachLocal(localConfig);
       remoteConfigReady = Boolean(remoteConfigGateway);
       if (opts.remoteConfig) initialRemoteConfig = remoteConfigGateway?.open(opts.remoteConfigLeaseMs) ?? null;
     }

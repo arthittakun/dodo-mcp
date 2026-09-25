@@ -1,21 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import type { RemoteConfigLease } from '../../src/server/remoteConfig.js';
 import { installationIpcCall } from '../../src/ipc/installationClient.js';
 import type { TunnelRuntime } from '../../src/tunnel/runtime.js';
 import { launch } from '../helpers/testServer.js';
 
 describe.skipIf(!fs.existsSync(chromium.executablePath()))('temporary Remote Config in Chromium', () => {
-  it('pairs in the browser, loads the real dashboard at desktop/mobile widths, then closes immediately', async () => {
+  it('opens after nine hours, loads desktop/mobile dashboards, then closes and reopens without restarting', async () => {
     const tunnelRuntime = {
       status: () => ({ available: true as const, running: true, current: null, lastKnown: null }),
     } as unknown as TunnelRuntime;
-    const ctx = await launch({ trust: 'trusted', configPort: 0, remoteConfig: true, remoteConfigLeaseMs: 30_000, tunnelRuntime, connectionMode: 'tunnel' });
-    const lease = ctx.server.remoteConfig;
-    if (!lease) throw new Error('missing Remote Config lease');
+    const ctx = await launch({ trust: 'trusted', configPort: 0, tunnelRuntime, connectionMode: 'tunnel' });
+    const time = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9 * 60 * 60 * 1000);
+    const lease = await installationIpcCall(ctx.configDir, 'remoteConfig.open') as RemoteConfigLease;
     const browser = await chromium.launch({ headless: true });
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await page.clock.setFixedTime(Date.now());
     const problems: string[] = [];
     page.on('pageerror', error => problems.push(`pageerror:${error.name}`));
     page.on('console', message => {
@@ -49,7 +51,15 @@ describe.skipIf(!fs.existsSync(chromium.executablePath()))('temporary Remote Con
       await page.reload();
       expect((await page.locator('body').textContent()) ?? '').not.toContain('DODO Remote Config');
       expect(page.url()).toBe(lease.url);
+      const renewed = await installationIpcCall(ctx.configDir, 'remoteConfig.open') as RemoteConfigLease;
+      await page.goto(renewed.url);
+      await page.getByLabel('Pairing code', { exact: true }).fill(renewed.pairingCode);
+      await page.getByRole('button', { name: 'เชื่อมต่อ', exact: true }).click();
+      await page.locator('#chip-config').getByText('Remote Config', { exact: true }).waitFor();
+      await page.getByText(/โหมดส่วนตัว|โหมดแยกสิทธิ์/).first().waitFor();
+      expect(await page.locator('body').textContent()).not.toContain('expires after 8 hours');
     } finally {
+      time.mockRestore();
       await browser.close();
       await ctx.cleanup();
     }

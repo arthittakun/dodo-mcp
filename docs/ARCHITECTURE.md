@@ -453,3 +453,13 @@ providers. Owner IPC, HTTP and CLI share the same services/queue/context checks.
 Bundled `ui/dataRecovery.js` handles both opt-ins without changing MCP catalog or
 source-secret guards. See [ADR 056](adr/056-owner-data-recovery.md) and
 [usage/limits](RECOVERY.md#database-awareness-and-encrypted-private-config).
+
+## Independent Config sessions (1.3.1)
+
+`configSession.ts` defines revocable process-private owner capabilities. Local
+Config holds one local browser session and at most one remote bridge session.
+`RemoteConfigGateway.open` issues the latter through an in-process function, never
+through public HTTP. A WeakMap binds each authenticated Express request to its
+session; `aiAdmin` resolves that session again for queued actions and event streams.
+The gateway strips incoming credentials, injects only its own capability on the
+loopback hop, and revokes it on close/renewal. Local expiry is independent.

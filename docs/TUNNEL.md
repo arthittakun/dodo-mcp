@@ -143,6 +143,12 @@ query/fragment secret Pairing code มีอายุสั้นและใช
 cookie แบบ `Secure`, `HttpOnly`, `SameSite=Strict`, `Path=/config` Lease ปิดเองภายใน
 หนึ่งชั่วโมง การเปิดใหม่ยกเลิก code/session เดิม
 
+ตั้งแต่ 1.3.1 session ของ Remote Config แยกจาก Local Config 8 ชั่วโมงโดยสมบูรณ์
+รัน `dodo --web` หลัง DODO เปิดเกิน 8 ชั่วโมงได้ทันที ไม่ต้อง restart หรือเปิด Local link
+ก่อน การเปิดรอบใหม่ไม่ต่ออายุ Local link เดิม และไม่เปลี่ยน workspace epoch
+AI/Projects, streaming และ owner action ที่รอคิวใช้ session ของคำขอนั้นจริง
+ดู [วิธีเชื่อม AI clients](MCP_CONNECTIONS.md) สำหรับ MCP URL กับ OAuth callback
+
 Remote Config proxy ไปยัง Local Config loopback โดยคง Host/Origin/proxy-header checks,
 private capability, rate limit, workspace ID/epoch และ owner policy เดิม การปิด lease
 ไม่หยุด MCP หรือ Tunnel และไม่มี MCP tool สำหรับเปิดหน้า owner นี้

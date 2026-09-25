@@ -420,3 +420,16 @@ Keychain fixture round-trip is not a manual Windows Credential Manager or Linux
 Secret Service pass. Android encryption-provider support is NOT_SUPPORTED. Record
 each OS and owner-production/manual case independently; no generic DB rollback
 or disaster-recovery success is implied.
+
+## 1.3.1 Config renewal and AI clients
+
+- Keep an isolated fixture running over eight hours. Verify the old Local Config
+  link denies API access, then run `dodo --web`, pair, open Projects/AI settings and
+  save a fixture setting. MCP must retain its workspace epoch.
+- Close/reopen from CLI; old code/cookie must fail, new pairing must work.
+- Repeat in Cloudflare Local and DODO Tunnel with a real HTTPS route.
+- Follow [MCP connections](MCP_CONNECTIONS.md) per client: overview, fixture
+  create/read/edit/read-back/delete. Record each client and version separately.
+- Real external AI accounts, physical eight-hour waiting and real Cloudflare
+  routes are MANUAL_NOT_RUN for this patch unless separately recorded. Automated
+  tests advance the server clock and use isolated HTTP/browser fixtures.

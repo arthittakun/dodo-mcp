@@ -1,5 +1,13 @@
 # DODO MCP — Release Notes
 
+## 1.3.1 — Independent Remote Config sessions
+
+`dodo --web` now creates an independent one-hour owner session even after the local
+eight-hour link expires. No MCP restart is needed to reopen the domain dashboard.
+AI owner requests and queued actions use the same remote session deadline and
+revocation. Adds [AI platform connection instructions](MCP_CONNECTIONS.md) and
+[upgrade details](RELEASE_1.3.1.md).
+
 ## 1.3.0 — Recovery & Local Git Safety
 
 - Default-on independent source backups for registered projects, with caller-owned

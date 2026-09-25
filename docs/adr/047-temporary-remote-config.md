@@ -45,3 +45,14 @@ expiry still affects only Remote Config; MCP, OAuth and Tunnel continue running.
 - `tests/security/remoteConfig.test.ts`
 - `tests/integration/remoteConfigUi.test.ts`
 - `tests/integration/cli.test.ts`
+
+## 1.3.1 — independent owner sessions
+
+The original bridge reused the eight-hour Local Config capability. After eight
+hours a fresh one-hour CLI lease could pair but all upstream API calls failed.
+The bridge now obtains a separate capability with exactly its own lease deadline
+through the in-process Local Config handle. Reopening revokes the old capability;
+local browser expiry is unchanged. Request-bound session validation also governs
+AI owner principals, event streams and queued owner actions. The one-hour public
+lease and one-time pairing remain mandatory. Both owner-managed Cloudflare Local
+and DODO-managed Tunnel modes can open this lease. No server restart is needed.

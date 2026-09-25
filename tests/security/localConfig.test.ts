@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { bootstrapWorkspace } from '../../src/server/bootstrap.js';
@@ -22,6 +22,32 @@ async function setup(runMode?: 'allow-all' | 'bypass', info: LocalConfigInfo = {
 }
 
 describe('local config boundary', () => {
+  it('keeps bridge capabilities separate, bounded and revocable without renewing local access', async () => {
+    const s = await setup();
+    const time = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+    try {
+      const expiry = Date.now() + 1000;
+      const remote = s.admin.createRemoteSession(expiry);
+      expect(remote.capability).not.toBe(s.token);
+      expect(() => s.admin.createRemoteSession(Date.now() + 3_600_001)).toThrow(/one hour/);
+      const get = (capability: string, extra: Record<string, string> = {}) => fetch(`${s.url.origin}/api/state`, { headers: { authorization: `Bearer ${capability}`, ...extra } });
+      const initial = await get(remote.capability);
+      expect(initial.status).toBe(200);
+      expect((await initial.json() as { connection: { expiresAt: number } }).connection.expiresAt).toBe(expiry);
+      for (const header of ['forwarded', 'x-forwarded-for', 'cf-connecting-ip']) {
+        expect((await get(remote.capability, { [header]: '127.0.0.1' })).status).toBe(403);
+      }
+      expect((await get(remote.capability, { origin: 'https://foreign.example' })).status).toBe(403);
+      remote.revoke();
+      expect(() => remote.assertActive()).toThrow(/expired or closed/);
+      expect((await get(remote.capability)).status).toBe(401);
+      expect((await get(s.token)).status).toBe(200);
+      const next = s.admin.createRemoteSession(expiry);
+      time.mockReturnValue(expiry);
+      expect((await get(next.capability)).status).toBe(401);
+      expect((await get(s.token)).status).toBe(200);
+    } finally { time.mockRestore(); await s.close(); }
+  });
   it('requires a private token, rejects foreign origins/hosts and proxy headers even with the token', async () => {
     const s = await setup();
     try {

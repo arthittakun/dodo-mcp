@@ -2,6 +2,14 @@
 
 **DODO MCP** คือ MCP server แบบ local-first สำหรับให้ AI ช่วยพัฒนา software โดยทำงานกับ workspace ที่เจ้าของเลือก ค่าเริ่มต้นเป็นโหมดส่วนตัวแบบเพิ่มโปรเจกต์แล้วใช้ได้ทันที และยังมีโหมด managed สำหรับแยก workspace ACL/trust แบบละเอียด
 
+## เชื่อมต่อ AI ของคุณ
+
+[คู่มือเชื่อม ChatGPT, Claude, Claude Code, Codex, Gemini CLI, Cursor และ VS Code](docs/MCP_CONNECTIONS.md)
+มีคำสั่งลงทะเบียน OAuth, ตารางกรอกฟอร์ม และตัวอย่าง STDIO สำหรับแต่ละ client
+
+**Config บนโดเมน:** รัน `dodo --web` เพื่อเปิด session ใหม่ได้ทุกครั้ง แม้ Local Config
+8 ชั่วโมงหมดอายุแล้ว ไม่ต้อง restart MCP เพื่อเปิดใหม่ แต่ละรอบเปิด 1 ชั่วโมงและใช้ pairing code ใหม่
+
 ## จุดเด่น
 
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE

@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { launch, rawHttp } from '../helpers/testServer.js';
 import { installationIpcCall } from '../../src/ipc/installationClient.js';
 import type { TunnelRuntime } from '../../src/tunnel/runtime.js';
+import { ProjectRegistry } from '../../src/projects/registry.js';
 
 function sessionCookie(headers: import('node:http').IncomingHttpHeaders): string {
   const raw = headers['set-cookie'];
@@ -14,6 +15,75 @@ describe('temporary Remote Config on the public MCP listener', () => {
   const runningTunnel = {
     status: () => ({ available: true as const, running: true, current: null, lastKnown: null }),
   } as unknown as TunnelRuntime;
+  it('opens a fresh remote owner session after the local eight-hour link expires', async () => {
+    const ctx = await launch({ configPort: 0, connectionMode: 'external' });
+    const project = new ProjectRegistry(ctx.server.services.store).add(ctx.fixtureDir).project;
+    const local = new URL(ctx.configUrl!);
+    const localHeaders = { authorization: `Bearer ${local.hash.slice(1)}` };
+    const time = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 9 * 60 * 60 * 1000);
+    try {
+      expect((await fetch(`${local.origin}/api/state`, { headers: localHeaders })).status).toBe(401);
+      const opened = await installationIpcCall(ctx.configDir, 'remoteConfig.open') as { pairingCode: string; expiresAt: number };
+      const pair = await rawHttp(ctx, { method: 'POST', path: '/config/pair', headers: { origin: ctx.baseUrl }, body: JSON.stringify({ code: opened.pairingCode }) });
+      expect(pair.status).toBe(200);
+      const cookie = sessionCookie(pair.headers);
+      const remote = await rawHttp(ctx, { method: 'GET', path: '/config/api/state', headers: { cookie } });
+      expect(remote.status).toBe(200);
+      const state = JSON.parse(remote.body);
+      expect(state.connection.expiresAt).toBe(opened.expiresAt);
+      const context = { cookie, origin: ctx.baseUrl, 'x-dodo-workspace': state.controlContext.workspaceId, 'x-dodo-epoch': state.controlContext.epoch };
+      const list = vi.spyOn(ctx.server.services.installation!.ai, 'list');
+      const ai = await rawHttp(ctx, { method: 'GET', path: '/config/api/ai/state', headers: { cookie } });
+      expect(ai.status).toBe(200);
+      expect(list.mock.lastCall?.[0].expiresAt).toBe(opened.expiresAt / 1000);
+      list.mockRestore();
+      const openProject = await rawHttp(ctx, { method: 'POST', path: '/config/api/ai/project', headers: context, body: JSON.stringify({ projectId: project.projectId }) });
+      expect(openProject.status).toBe(200);
+      const saved = await rawHttp(ctx, { method: 'POST', path: '/config/api/config', headers: context, body: JSON.stringify({ mode: 'edit' }) });
+      expect(saved.status).toBe(200);
+      expect(ctx.server.services.trustMode()).toBe('edit');
+      expect(remote.body + ai.body).not.toContain(local.hash.slice(1));
+      expect(remote.body + ai.body).not.toContain(opened.pairingCode);
+      // Opening a domain session must never resurrect the expired local URL.
+      expect((await fetch(`${local.origin}/api/state`, { headers: localHeaders })).status).toBe(401);
+      time.mockReturnValue(opened.expiresAt);
+      expect((await rawHttp(ctx, { method: 'GET', path: '/config/api/state', headers: { cookie } })).status).toBe(404);
+      const renewed = await installationIpcCall(ctx.configDir, 'remoteConfig.open') as { pairingCode: string };
+      expect((await rawHttp(ctx, { method: 'GET', path: '/config/api/state', headers: { cookie } })).status).toBe(401);
+      expect((await rawHttp(ctx, { method: 'POST', path: '/config/pair', body: JSON.stringify({ code: opened.pairingCode }) })).status).toBe(401);
+      const nextPair = await rawHttp(ctx, { method: 'POST', path: '/config/pair', body: JSON.stringify({ code: renewed.pairingCode }) });
+      expect(nextPair.status).toBe(200);
+      expect((await rawHttp(ctx, { method: 'GET', path: '/config/api/state', headers: { cookie: sessionCookie(nextPair.headers) } })).status).toBe(200);
+    } finally { time.mockRestore(); await ctx.cleanup(); }
+  });
+  it('revokes a remote owner request waiting for project acquisition when CLI reopens Config', async () => {
+    const ctx = await launch({ configPort: 0, connectionMode: 'external', remoteConfig: true });
+    const manager = ctx.server.services.installation!;
+    const project = new ProjectRegistry(ctx.server.services.store).add(ctx.fixtureDir).project;
+    const pair = await rawHttp(ctx, { method: 'POST', path: '/config/pair', body: JSON.stringify({ code: ctx.server.remoteConfig!.pairingCode }) });
+    const cookie = sessionCookie(pair.headers);
+    let acquired!: () => void, unblock!: () => void;
+    const started = new Promise<void>(resolve => { acquired = resolve; });
+    const blocked = new Promise<void>(resolve => { unblock = resolve; });
+    const original = manager.acquire.bind(manager);
+    const acquire = vi.spyOn(manager, 'acquire').mockImplementationOnce(async (...args) => {
+      const lease = await original(...args);
+      acquired(); await blocked; return lease;
+    });
+    const pending = rawHttp(ctx, { method: 'POST', path: '/config/api/admin/action', headers: {
+      cookie, origin: ctx.baseUrl, 'x-dodo-workspace': ctx.server.workspaceId, 'x-dodo-epoch': ctx.server.epoch,
+    }, body: JSON.stringify({ projectId: project.projectId, operation: 'recovery.restore_status' }) });
+    try {
+      await started;
+      await installationIpcCall(ctx.configDir, 'remoteConfig.open');
+      unblock();
+      const denied = await pending;
+      expect(denied.status).toBe(401);
+      expect(JSON.parse(denied.body).code).toBe('REMOTE_CONFIG_AUTH_REQUIRED');
+      expect(denied.body).not.toContain('8 hours');
+      expect(ctx.server.services.store.recentAudit(ctx.server.workspaceId, 20).some(row => row.tool === 'web.recovery.restore_status')).toBe(false);
+    } finally { unblock(); acquire.mockRestore(); await pending; await ctx.cleanup(); }
+  });
   it('is absent by default and exposes no owner API', async () => {
     const ctx = await launch({ configPort: 0, tunnelRuntime: runningTunnel, connectionMode: 'tunnel' });
     try {

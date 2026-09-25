@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { z } from 'zod';
 import type { WorkspaceHost } from './workspaceHost.js';
 import type { LocalConfigInfo } from './localConfig.js';
+import type { ConfigSession } from './configSession.js';
 import { DodoError, toDodoError } from '../errors.js';
 import { createIpcDispatcher } from './ipcDispatch.js';
 import { GlobalConfigSchema, loadGlobalConfig, saveGlobalConfig } from '../config/globalConfig.js';
@@ -28,24 +29,25 @@ function invalidOwnerRequest(error: z.ZodError): DodoError {
     });
 }
 /** Mounted only after Local Config's owner auth + origin checks, never on public MCP. */
-export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalConfigInfo, expiresAt: number): void {
+export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalConfigInfo, ownerSession: (req: Request) => ConfigSession): void {
   const manager = () => { const m = host.current().services.installation; if (!m) throw new DodoError('NOT_SUPPORTED', 'installation runtime is unavailable'); return m; };
-  const owner = () => ({ ...manager().owner(), expiresAt: expiresAt / 1000 });
+  const owner = (req: Request) => ({ ...manager().owner(), expiresAt: ownerSession(req).expiresAt / 1000 });
   const route = (method: 'get' | 'post', url: string, fn: (req: Request, res: Response) => Promise<unknown> | unknown) => app[method](url, async (req, res) => {
     try { const data = await fn(req, res); if (!res.headersSent) res.json({ ok: true, data }); }
     catch (error) { const e = error instanceof z.ZodError ? invalidOwnerRequest(error) : toDodoError(error); if (!res.headersSent) res.status(e.code === 'FORBIDDEN' ? 403 : e.code === 'AUTH_REQUIRED' ? 401 : e.code === 'CONFLICT' || e.code === 'STALE_WORKSPACE' ? 409 : 400).json({ ok: false, error: e.message, code: e.code, ...(e.detail ? { detail: e.detail } : {}), ...(e.recovery ? { recovery: e.recovery } : {}) }); }
   });
   const reviewed = (req: Request, workspaceId = host.current().workspaceId, epoch = host.current().epoch) => {
+    ownerSession(req).assertActive();
     if (req.headers['x-dodo-workspace'] !== workspaceId || req.headers['x-dodo-epoch'] !== epoch) throw new DodoError('STALE_WORKSPACE', 'refresh the selected project before making changes');
   };
-  route('get', '/api/ai/state', () => ({ ...manager().ai.settings.state(), accessMode: accessMode(manager().store), projects: new ProjectRegistry(manager().store).list(), runtimes: manager().status(), runs: manager().ai.list(owner()), controlContext: { workspaceId: host.current().workspaceId, workspaceEpoch: host.current().epoch }, ownerActions: ACTIONS }));
+  route('get', '/api/ai/state', req => ({ ...manager().ai.settings.state(), accessMode: accessMode(manager().store), projects: new ProjectRegistry(manager().store).list(), runtimes: manager().status(), runs: manager().ai.list(owner(req)), controlContext: { workspaceId: host.current().workspaceId, workspaceEpoch: host.current().epoch }, ownerActions: ACTIONS }));
   route('post','/api/ai/knowledge',async req=>{
     const b=z.object({projectId:z.string(),operation:z.enum(['brain_status','context_status','memory_status','memory_search','agent_skill_search']),query:z.string().min(1).max(1000).optional()}).strict().parse(req.body);
-    const lease=await manager().acquire(b.projectId,owner());
+    const lease=await manager().acquire(b.projectId,owner(req));
     try {
       reviewed(req,lease.services.workspaceId,lease.services.epoch);
       const def=[...CORE_TOOL_CATALOG,...AGENT_RUNTIME_TOOLS].find(t=>t.name===b.operation)!;
-      const result=await invokeToolDefinition({def,services:lease.services,principal:owner,args:{workspaceId:lease.services.workspaceId,workspaceEpoch:lease.services.epoch,...(b.query?{query:b.query}:{})}});
+      const result=await invokeToolDefinition({def,services:lease.services,principal:()=>owner(req),args:{workspaceId:lease.services.workspaceId,workspaceEpoch:lease.services.epoch,...(b.query?{query:b.query}:{})}});
       return result.envelope;
     } finally {lease.release();}
   });
@@ -78,13 +80,13 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   route('post', '/api/ai/project', async req => {
     reviewed(req); const b = z.object({ projectId: z.string(), action: z.enum(['open','close']).default('open') }).strict().parse(req.body);
     if (b.action === 'close') return { closed: await manager().closeProject(b.projectId) };
-    const lease = await manager().acquire(b.projectId, owner());
+    const lease = await manager().acquire(b.projectId, owner(req));
     try { return { projectId: b.projectId, workspaceId: lease.services.workspaceId, workspaceEpoch: lease.services.epoch, root: lease.services.wfs.root, savedTrust: lease.services.store.trustMode(lease.services.workspaceId), effectiveTrust: lease.services.trustMode(), jobs: lease.services.jobs.list(lease.services.workspaceId, 50) }; }
     finally { lease.release(); }
   });
   route('post', '/api/ai/project/access', async req => {
     const b = z.object({projectId:z.string(),clientId:z.string().min(1).max(128),scopes:z.array(z.enum(['dodo:read','dodo:write','dodo:exec'])).max(3),confirmRevoke:z.boolean().default(false)}).strict().parse(req.body);
-    const lease = await manager().acquire(b.projectId,owner());
+    const lease = await manager().acquire(b.projectId,owner(req));
     try {
       reviewed(req,lease.services.workspaceId,lease.services.epoch);
       const store = manager().store;
@@ -96,27 +98,26 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
     } finally {lease.release();}
   });
   route('post', '/api/ai/project/clients', async req => {
-    reviewed(req);const b=z.object({projectId:z.string()}).strict().parse(req.body),lease=await manager().acquire(b.projectId,owner());
+    reviewed(req);const b=z.object({projectId:z.string()}).strict().parse(req.body),lease=await manager().acquire(b.projectId,owner(req));
     try {return manager().store.listOAuthClients().slice(0,100).map(c=>({clientId:c.clientId,name:typeof c.payload.client_name === 'string' ? c.payload.client_name : c.clientId,scopes:manager().store.clientAccess(lease.services.workspaceId,c.clientId)}));} finally {lease.release();}
   });
   route('post', '/api/ai/runs', async req => {
     const b = z.object({ projectId: z.string(), profileId: z.string(), task: z.string(), idempotencyKey: z.string(), parentRunId:z.string().optional(), images: z.array(z.object({ path: z.string() }).strict()).max(4).optional() }).strict().parse(req.body);
-    const lease = await manager().acquire(b.projectId, owner());
-    try { reviewed(req,lease.services.workspaceId,lease.services.epoch); return await manager().ai.spawn(b, owner(), lease.services); }
+    const lease = await manager().acquire(b.projectId, owner(req));
+    try { reviewed(req,lease.services.workspaceId,lease.services.epoch); return await manager().ai.spawn(b, owner(req), lease.services); }
     finally { lease.release(); }
   });
-  route('get', '/api/ai/runs', req => manager().ai.list(owner(), String(req.query.search ?? '').slice(0, 100)));
-  route('get', '/api/ai/runs/:id', req => manager().ai.status(String(req.params.id), owner()));
-  route('post', '/api/ai/runs/:id/control', req => { reviewed(req); const b = z.object({ action: z.enum(['pause','resume','cancel','delete']) }).strict().parse(req.body); return manager().ai.control(String(req.params.id), b.action, owner()); });
+  route('get', '/api/ai/runs', req => manager().ai.list(owner(req), String(req.query.search ?? '').slice(0, 100)));
+  route('get', '/api/ai/runs/:id', req => manager().ai.status(String(req.params.id), owner(req)));
+  route('post', '/api/ai/runs/:id/control', req => { reviewed(req); const b = z.object({ action: z.enum(['pause','resume','cancel','delete']) }).strict().parse(req.body); return manager().ai.control(String(req.params.id), b.action, owner(req)); });
   route('get', '/api/ai/runs/:id/events', (req,res) => {
     const id = String(req.params.id); let cursor = Number(req.query.after ?? 0);
     if (!Number.isSafeInteger(cursor) || cursor < 0) throw new DodoError('INVALID_INPUT', 'invalid event cursor');
-    manager().ai.status(id, owner());
+    manager().ai.status(id, owner(req));
     res.setHeader('content-type','text/event-stream'); res.setHeader('connection','keep-alive'); res.flushHeaders();
     const send = () => {
-      if (Date.now() >= expiresAt) { res.end(); return; }
       try {
-        const events = manager().ai.events(id, owner(), cursor);
+        const events = manager().ai.events(id, owner(req), cursor);
         for (const event of events) { cursor = event.seq; if (!res.write(`id: ${event.seq}\ndata: ${JSON.stringify(event)}\n\n`)) { res.end(); return; } }
         res.write(': keepalive\n\n');
       } catch { res.end(); }
@@ -125,10 +126,10 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   });
   route('post', '/api/admin/action', async req => {
     const b = z.object({ projectId: z.string(), operation: z.enum(ACTIONS), args: z.record(z.string(),z.unknown()).default({}) }).strict().parse(req.body);
-    const lease = await manager().acquire(b.projectId, owner());
+    const lease = await manager().acquire(b.projectId, owner(req));
     try {
       reviewed(req,lease.services.workspaceId,lease.services.epoch);
-      const dispatch = createIpcDispatcher({ ws: lease.workspace, transport: { kind: 'http', port: info.transport?.port ?? 0, locked: info.transport?.locked ?? true, publicUrl: info.transport?.publicUrl ?? null }, requestStop: () => undefined, revalidateOwner: () => { if (Date.now() >= expiresAt) throw new DodoError('AUTH_REQUIRED', 'owner session expired while queued'); reviewed(req, lease.services.workspaceId, lease.services.epoch); } });
+      const dispatch = createIpcDispatcher({ ws: lease.workspace, transport: { kind: 'http', port: info.transport?.port ?? 0, locked: info.transport?.locked ?? true, publicUrl: info.transport?.publicUrl ?? null }, requestStop: () => undefined, revalidateOwner: () => { ownerSession(req).assertActive(); reviewed(req, lease.services.workspaceId, lease.services.epoch); } });
       const result = await dispatch(b.operation,b.args);
       manager().store.audit({ principal: 'local-config-owner', workspaceId: lease.services.workspaceId, tool: `web.${b.operation}`, result: 'ok' });
       return result;

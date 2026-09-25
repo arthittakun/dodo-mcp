@@ -1,5 +1,17 @@
 # DODO MCP — Test Report
 
+## 1.3.1 Config regression coverage
+
+`tests/security/remoteConfig.test.ts` reproduces the previous HTTP 401 after advancing
+the server clock nine hours, then verifies an independent CLI-created session,
+AI owner expiry, settings writes, renewal and queued-request revocation.
+`tests/security/localConfig.test.ts` checks distinct capabilities, local expiry,
+remote revocation and Host/Origin/proxy-header enforcement.
+`tests/integration/remoteConfigUi.test.ts` exercises desktop/mobile Chromium after
+local expiry and re-pairs after closing without restarting the fixture process.
+External AI clients and real Cloudflare remain MANUAL_NOT_RUN; the connection guide
+is based on client documentation and is not a live platform certification.
+
 ## 1.3.0 Recovery — หลักฐานก่อน final platform gate
 
 Windows full [run35510440500](https://github.com/arthittakun/dodo-mcp/actions/runs/35510440500)

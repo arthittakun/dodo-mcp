@@ -615,6 +615,7 @@ function printRemoteConfig(result: RemoteConfigCliResult): void {
   console.log(`Remote Config: ${result.url}`);
   console.log(`Pairing code (shown once): ${result.pairingCode}`);
   console.log(`Expires: ${new Date(result.expiresAt).toISOString()} (ไม่เกิน 1 ชั่วโมง)`);
+  console.log('Session นี้แยกจาก Local Config 8 ชั่วโมง — เปิดรอบใหม่ด้วย dodo --web ได้โดยไม่ต้อง restart MCP');
   console.log('เปิด URL แล้วกรอก code นี้ ระบบจะแลกเป็น Secure/HttpOnly cookie; ไม่มี secret อยู่ใน URL');
 }
 

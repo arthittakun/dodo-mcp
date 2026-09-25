@@ -4,7 +4,7 @@ import { reviewClientDeletion, deleteReviewedClients, DeleteClientsInput } from 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { createConfigSession, type ConfigSession } from './configSession.js';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import type { BootstrappedWorkspace } from './bootstrap.js';
@@ -56,6 +56,8 @@ export interface LocalConfigServer {
   url: string;
   /** Origin without the capability (safe to display). */
   origin: string;
+  /** Internal bridge only; independent of the local browser's eight-hour link. */
+  createRemoteSession(expiresAt: number): ConfigSession;
   close(): Promise<void>;
 }
 
@@ -110,8 +112,16 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   const host: WorkspaceHost = isHost(target) ? target : staticHost(target);
   const switchSupported = isHost(target);
   const hasWorkspace = () => info.workspaceSelected?.() ?? true;
-  const token = randomBytes(32).toString('hex');
-  const expiresAt = Date.now() + TOKEN_TTL_MS;
+  const localSession = createConfigSession(Date.now() + TOKEN_TTL_MS);
+  let remoteSession: ConfigSession | undefined;
+  let closed = false;
+  const requestSessions = new WeakMap<Request, ConfigSession>();
+  const ownerSession = (req: Request): ConfigSession => {
+    const session = requestSessions.get(req);
+    if (!session) throw new DodoError('AUTH_REQUIRED', 'Config owner authentication required');
+    session.assertActive();
+    return session;
+  };
   const assets = { html: loadAsset('index.html'), css: loadAsset('app.css'), js: loadAsset('app.js') };
   // Fail fast at startup when the shipped UI is incomplete (broken install).
   for (const critical of ['workbench.js', 'workbench.css', 'ui/dom.js', 'ui/recovery.js', 'ui/deployment.js', 'ui/dataRecovery.js', 'ui/tooltips.js', 'ui/alerts.js', 'vendor/sweetalert2.min.js', 'vendor/sweetalert2.min.css']) loadAsset(critical);
@@ -182,17 +192,18 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       res.status(429).json({ error: 'Too many requests; wait a minute' });
       return;
     }
-    const supplied = Buffer.from(req.headers.authorization?.replace(/^Bearer /, '') ?? '');
-    const expected = Buffer.from(token);
-    if (Date.now() > expiresAt || supplied.length !== expected.length || !timingSafeEqual(supplied, expected)) {
+    const supplied = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
+    const session = [localSession, remoteSession].find(candidate => candidate?.accepts(supplied));
+    if (!session) {
       res.status(401).json({ error: 'Open the private Config URL printed in the DODO terminal. It expires after 8 hours; restart DODO to renew.' });
       return;
     }
+    requestSessions.set(req, session);
     next();
   });
   app.use('/api', express.json({ limit: 32 * 1024 }));
 
-  registerAIAdmin(app, host, info, expiresAt);
+  registerAIAdmin(app, host, info, ownerSession);
 
   // Bind every mutation to the workspace the owner actually reviewed.
   app.use('/api', (req, res, next) => {
@@ -205,7 +216,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   });
 
   // ---- state ----
-  app.get('/api/state', (_req, res) => {
+  app.get('/api/state', (req, res) => {
     const ws = host.current();
     const cfg = loadGlobalConfig(ws.paths.configFile);
     const transport = info.transport;
@@ -260,7 +271,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
           || (cfg.tunnel.connectionMode !== 'local' && (cfg.publicUrl ?? null) !== (transport.publicUrl ?? null))
         ),
         localConfigOrigin: `http://127.0.0.1:${actualPort}`,
-        expiresAt,
+        expiresAt: ownerSession(req).expiresAt,
       },
       tunnel: {
         connectionMode: cfg.tunnel.connectionMode,
@@ -576,10 +587,22 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   actualPort = (server.address() as { port: number }).port;
   const origin = `http://127.0.0.1:${actualPort}`;
   return {
-    url: `${origin}/#${token}`,
+    url: `${origin}/#${localSession.capability}`,
     origin,
+    createRemoteSession(expiresAt) {
+      if (closed) throw new DodoError('CONFLICT', 'Local Config is closed');
+      if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now() || expiresAt > Date.now() + 60 * 60 * 1000) {
+        throw new DodoError('INVALID_INPUT', 'Remote Config session must expire within one hour');
+      }
+      remoteSession?.revoke();
+      remoteSession = createConfigSession(expiresAt);
+      return remoteSession;
+    },
     close: () =>
       new Promise((resolve) => {
+        closed = true;
+        localSession.revoke();
+        remoteSession?.revoke();
         server.close(() => resolve());
         server.closeAllConnections();
       }),

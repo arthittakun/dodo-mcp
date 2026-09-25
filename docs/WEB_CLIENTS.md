@@ -1,5 +1,8 @@
 # DODO MCP — เชื่อม ChatGPT และ Web Clients
 
+ดู [คู่มือทุก AI platform](MCP_CONNECTIONS.md) สำหรับ Claude พร้อมตัวเลือก
+Sign in now / Use your own OAuth client และตัวอย่าง Claude Code, Codex, Gemini CLI, Cursor, VS Code
+
 ## สิ่งที่ต้องแยกให้ออกก่อน
 
 | ค่า | ใช้ตรงไหน | ตัวอย่าง |
