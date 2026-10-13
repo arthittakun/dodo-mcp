@@ -113,7 +113,7 @@
     "zod": "^4.2.0"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.2.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
     "@types/express": "^5.0.0",
