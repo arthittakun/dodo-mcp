@@ -94,7 +94,7 @@
     "test:desktop:native": "npm run build && node scripts/test-desktop-native.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/express": "2.0.0",
+    "@modelcontextprotocol/express": "2.0.2",
     "@modelcontextprotocol/node": "2.0.0",
     "@modelcontextprotocol/server": "2.0.0",
     "better-sqlite3": "13.0.3",
