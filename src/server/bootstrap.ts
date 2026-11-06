@@ -61,6 +61,7 @@ export interface BootstrappedWorkspace {
   configDir: string;
   configDirSource: 'env' | 'platform';
   configDirEnvVar?: 'DODO_CONFIG_DIR';
+  runMode?: 'allow-all' | 'bypass';
   paths: StatePaths;
   config: GlobalConfig;
   db: Database.Database;
@@ -200,6 +201,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     configDir,
     configDirSource,
     ...(configDirEnvVar ? { configDirEnvVar } : {}),
+    ...(opts.runMode ? { runMode: opts.runMode } : {}),
     paths,
     config,
     db,

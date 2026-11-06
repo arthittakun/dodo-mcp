@@ -133,6 +133,9 @@
 .wb-subtab-btn { font:inherit;font-size:.86rem;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--border-strong);background:var(--panel);color:var(--muted);cursor:pointer;transition:all .15s ease; }
 .wb-subtab-btn:hover { color:var(--text);border-color:var(--accent); }
 .wb-subtab-btn.active,.wb-subtab-btn[aria-selected="true"] { background:var(--accent);color:var(--accent-fg,#fff);border-color:var(--accent); }
+.wb-project-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:10px;min-width:0; }
+.wb-project-item { border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;background:var(--panel);display:flex;flex-direction:column;gap:8px;min-width:0; }
+.wb-project-item[data-active="true"] { border-color:var(--accent);background:color-mix(in srgb,var(--accent) 6%,var(--panel)); }
 
 @media(max-width:860px) { .rec-settings-grid,.rec-git-columns { grid-template-columns:1fr; } }
 @media(max-width:640px) { .wb-form,.rec-two-col,.rec-three-col { grid-template-columns:1fr; } .wb-section { padding:12px; } .workbench-nav { padding:10px 12px; } .wb-toolbar { align-items:stretch; } .wb-tool-controls { grid-template-columns:1fr; } .wb-tool-row { grid-template-columns:1fr; } .wb-tool-row-state { max-width:none;text-align:left;padding-left:52px; } .wb-tool-group > summary { align-items:flex-start; } }

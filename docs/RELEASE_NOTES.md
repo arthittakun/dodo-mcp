@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.4.1 — Immediate Upgrade Unblock, Full Edit Defaults & Concurrent Multi-Project UI
+
+- Automatically clears pre-existing write blocks (`recovery_required` changesets, `PREPARING` snapshots, `recovery_drift`, strict `recovery_policies`, `read`/`inspect` defaults, and read-only OAuth grants/tokens) immediately upon upgrading and opening `state.db`.
+- Sets default permissions across projects, OAuth consent/token verification fallbacks, and AI profiles to full edit/write/exec (`full`, `dodo:read dodo:write dodo:exec`), and ensures `edit_file` honors `relaxExpectedHash`.
+- Propagates `runMode` across concurrent project runtimes and auto-loads the active project in the Projects workbench with a Multi-Project Switcher and always-visible File Access & Secret Policy controls on both local and `/config` links.
+- See [upgrade details](RELEASE_1.4.1.md) and [Recovery usage](RECOVERY.md).
+
 ## 1.4.0 — Non-blocking Recovery, Git Recovery & Configurable File Access Policy
 
 - Recovery is now non-blocking by default (`strictEnforcement: false`, `skipSecretContentFiles: true`), automatically skipping credential-like example files and generated framework directories (`.next`, `.nuxt`, `.svelte-kit`, `.turbo`, etc.) instead of locking projects in `BLOCKED (SECRET_PATH_DENIED)`.

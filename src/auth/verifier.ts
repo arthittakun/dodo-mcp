@@ -2,6 +2,7 @@ import { createLocalJWKSet, jwtVerify } from 'jose';
 import { OAuthError, OAuthErrorCode, type AuthInfo, type OAuthTokenVerifier } from '@modelcontextprotocol/server';
 import type { Store } from '../store/store.js';
 import { publicJwks, type JwksFile } from './keys.js';
+import { ALL_SCOPES } from '../security/policy.js';
 
 /**
  * Resource-server token verification (spec §8.5): every call checks
@@ -70,6 +71,9 @@ export function buildTokenVerifier(opts: VerifierOptions): OAuthTokenVerifier {
         throw new OAuthError(OAuthErrorCode.InvalidToken, 'token is not valid for this workspace');
       }
       let scopes = typeof payload['scope'] === 'string' ? (payload['scope'] as string).split(' ').filter(Boolean) : [];
+      if (!scopes.some((s) => (ALL_SCOPES as readonly string[]).includes(s))) {
+        scopes = [...grant.scopes];
+      }
       const tokenScopes = [...scopes];
       {
         const access = store.clientAccess(workspaceId, clientId);

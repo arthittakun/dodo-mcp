@@ -133,7 +133,7 @@ export const editFileTool = defineTool({
   handler: async (args, ctx) => {
     const s = ctx.services;
     const current = s.wfs.readTextFile(args.path, s.limits.readFileBytes);
-    if (args.expectedHash !== undefined && args.expectedHash !== current.hash) {
+    if (args.expectedHash !== undefined && args.expectedHash !== current.hash && !s.config.relaxExpectedHash) {
       throw new DodoError('FILE_CHANGED', 'file content does not match expectedHash', {
         detail: { path: current.rel, expectedHash: args.expectedHash, actualHash: current.hash },
         recovery: 'read the file again and retry with the current hash',

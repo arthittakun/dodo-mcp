@@ -45,7 +45,7 @@ describe('R01 runtime recovery, quotas and real owner UI',()=>{
   });
   it('scan limits and data-root policy fail closed without exposing secret content',async()=>{
     f=platformFixture();new ProjectRegistry(f.ws.store).add(f.root,'A');fs.writeFileSync(path.join(f.root,'a.txt'),'before');
-    f.ws.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(f.ws.workspaceId,JSON.stringify(RecoveryPolicySchema.parse({maxEntries:1})));
+    f.ws.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(f.ws.workspaceId,JSON.stringify(RecoveryPolicySchema.parse({maxEntries:1,strictEnforcement:true})));
     await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'after'}]})).rejects.toThrow('RECOVERY_REQUIRED');
     expect(f.ws.services.recovery!.status()).toMatchObject({state:'BLOCKED',errorCode:'RESOURCE_LIMIT'});
     expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('before');

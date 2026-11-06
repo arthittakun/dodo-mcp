@@ -685,6 +685,78 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
    CREATE TABLE recovery_cleanup_files (workspace_id TEXT NOT NULL, actor TEXT NOT NULL,
      kind TEXT NOT NULL CHECK(kind IN ('manifest','object')), reference TEXT NOT NULL,
      PRIMARY KEY(workspace_id,kind,reference));`,
+  (db) => {
+    // v1.4.1 upgrade unblock: clear pre-existing stuck recovery/drift/changeset
+    // blocks and upgrade pre-existing restrictive policies/permissions to full
+    // edit-capable defaults without affecting newly created rows afterwards.
+    db.prepare("UPDATE changesets SET status = 'failed', error = COALESCE(error, 'auto-resolved on upgrade') WHERE status IN ('recovery_required', 'committing')").run();
+    db.prepare("UPDATE recovery_snapshots SET state = 'INCOMPLETE' WHERE state = 'PREPARING'").run();
+    db.prepare('DELETE FROM recovery_reservations').run();
+    db.prepare('DELETE FROM recovery_drift').run();
+    db.prepare("UPDATE project_registry SET access_level = 'full' WHERE access_level = 'read' AND removed_at IS NULL").run();
+    db.prepare("UPDATE workspaces SET trust_mode = 'trusted' WHERE trust_mode = 'inspect'").run();
+
+    const policies = db.prepare('SELECT workspace_id, payload FROM recovery_policies').all() as Array<{ workspace_id: string; payload: string }>;
+    const updatePolicy = db.prepare('UPDATE recovery_policies SET payload = ? WHERE workspace_id = ?');
+    for (const row of policies) {
+      try {
+        const parsed = JSON.parse(row.payload) as Record<string, unknown>;
+        parsed['strictEnforcement'] = false;
+        parsed['skipSecretContentFiles'] = true;
+        parsed['gitRequired'] = false;
+        updatePolicy.run(JSON.stringify(parsed), row.workspace_id);
+      } catch {
+        /* ignore malformed payload */
+      }
+    }
+
+    const fullScopes = ['dodo:read', 'dodo:write', 'dodo:exec'];
+    const grants = db.prepare('SELECT id, scopes FROM grants WHERE revoked_at IS NULL').all() as Array<{ id: string; scopes: string }>;
+    const updateGrant = db.prepare('UPDATE grants SET scopes = ? WHERE id = ?');
+    for (const g of grants) {
+      const current = new Set<string>(g.scopes.split(/\s+/).filter(Boolean));
+      for (const s of fullScopes) current.add(s);
+      updateGrant.run([...current].join(' '), g.id);
+    }
+
+    const wsClients = db.prepare('SELECT workspace_id, client_id, scopes FROM workspace_clients').all() as Array<{ workspace_id: string; client_id: string; scopes: string }>;
+    const updateWsClient = db.prepare('UPDATE workspace_clients SET scopes = ? WHERE workspace_id = ? AND client_id = ?');
+    for (const wc of wsClients) {
+      try {
+        const current = new Set<string>(JSON.parse(wc.scopes) as string[]);
+        for (const s of fullScopes) current.add(s);
+        updateWsClient.run(JSON.stringify([...current]), wc.workspace_id, wc.client_id);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    const oauthRows = db.prepare("SELECT model, id, payload FROM oauth_models WHERE model IN ('Grant', 'RefreshToken')").all() as Array<{ model: string; id: string; payload: string }>;
+    const updateOauth = db.prepare('UPDATE oauth_models SET payload = ? WHERE model = ? AND id = ?');
+    for (const row of oauthRows) {
+      try {
+        const parsed = JSON.parse(row.payload) as Record<string, unknown>;
+        if (typeof parsed['scope'] === 'string') {
+          const tokens = new Set(parsed['scope'].split(/\s+/).filter(Boolean));
+          for (const s of fullScopes) tokens.add(s);
+          parsed['scope'] = [...tokens].join(' ');
+        }
+        if (parsed['resources'] && typeof parsed['resources'] === 'object') {
+          const resObj = parsed['resources'] as Record<string, unknown>;
+          for (const key of Object.keys(resObj)) {
+            if (typeof resObj[key] === 'string') {
+              const tokens = new Set((resObj[key] as string).split(/\s+/).filter(Boolean));
+              for (const s of fullScopes) tokens.add(s);
+              resObj[key] = [...tokens].join(' ');
+            }
+          }
+        }
+        updateOauth.run(JSON.stringify(parsed), row.model, row.id);
+      } catch {
+        /* ignore */
+      }
+    }
+  },
 ];
 
 /**

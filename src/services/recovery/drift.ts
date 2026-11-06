@@ -21,7 +21,13 @@ export class RecoveryDrift {
     const row=this.s.store.db.prepare('SELECT payload FROM recovery_drift WHERE workspace_id=?').get(this.s.workspaceId) as {payload:string}|undefined;
     if(!row)return undefined;
     const state=JSON.parse(row.payload) as State;
-    if(state.rootIdentity!==rootIdentity(this.s.wfs.root))throw new DodoError('PATH_DENIED','expected source belongs to a different root identity');
+    if(state.rootIdentity!==rootIdentity(this.s.wfs.root)){
+      if(!this.recovery.policy().strictEnforcement){
+        this.s.store.db.prepare('DELETE FROM recovery_drift WHERE workspace_id=?').run(this.s.workspaceId);
+        return undefined;
+      }
+      throw new DodoError('PATH_DENIED','expected source belongs to a different root identity');
+    }
     return state;
   }
   initialize(m:RecoveryManifest):void {
@@ -98,18 +104,22 @@ export class RecoveryDrift {
   /** Called inside the SAME transaction as journal commit, after byte verification.
    * No asynchronous reread can accidentally adopt another writer's contents. */
   committed(files:PlanFileChange[]):void {
-    const state=this.load();if(!state)return;const entries=new Map(state.entries.map(e=>[e.path,e]));
-    const set=(p:string,kind:RecoveryEntry['kind'],hash:string|null,bytes:number)=>{
-      const st=kind==='absent'?undefined:fs.lstatSync(this.s.wfs.resolve(p).abs);
-      entries.set(p,{path:p,kind,hash:hash?.replace(/^sha256:/,'')??null,bytes,mode:st?st.mode&0o777:null,...(kind==='directory'?{identity:rootIdentity(this.s.wfs.resolve(p).abs)}:{})});
-    };
-    for(const f of files){
-      for(const p of f.createParents??[])if(!entries.has(p))set(p,'directory',null,0);
-      if(f.action==='move'){set(f.path,'absent',null,0);set(f.destPath!,'file',f.afterHash,f.bytesAfter);}
-      else if(f.action==='delete'||f.action==='rmdir')set(f.path,'absent',null,0);
-      else if(f.action==='mkdir')set(f.path,'directory',null,0);
-      else set(f.path,'file',f.afterHash,f.bytesAfter);
+    try {
+      const state=this.load();if(!state)return;const entries=new Map(state.entries.map(e=>[e.path,e]));
+      const set=(p:string,kind:RecoveryEntry['kind'],hash:string|null,bytes:number)=>{
+        const st=kind==='absent'?undefined:fs.lstatSync(this.s.wfs.resolve(p).abs);
+        entries.set(p,{path:p,kind,hash:hash?.replace(/^sha256:/,'')??null,bytes,mode:st?st.mode&0o777:null,...(kind==='directory'?{identity:rootIdentity(this.s.wfs.resolve(p).abs)}:{})});
+      };
+      for(const f of files){
+        for(const p of f.createParents??[])if(!entries.has(p))set(p,'directory',null,0);
+        if(f.action==='move'){set(f.path,'absent',null,0);set(f.destPath!,'file',f.afterHash,f.bytesAfter);}
+        else if(f.action==='delete'||f.action==='rmdir')set(f.path,'absent',null,0);
+        else if(f.action==='mkdir')set(f.path,'directory',null,0);
+        else set(f.path,'file',f.afterHash,f.bytesAfter);
+      }
+      state.entries=[...entries.values()].sort((a,b)=>a.path.localeCompare(b.path));state.revision++;this.save(state);this.observation=undefined;
+    } catch (e) {
+      if (this.recovery.policy().strictEnforcement) throw e;
     }
-    state.entries=[...entries.values()].sort((a,b)=>a.path.localeCompare(b.path));state.revision++;this.save(state);this.observation=undefined;
   }
 }

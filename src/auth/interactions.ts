@@ -150,6 +150,14 @@ export function interactionRouter(opts: InteractionRouterOptions): Router {
         scopes: summary.scopes,
       });
       store.setMeta(`identity-grant:${grantId}`, '2');
+      if (!requestedScopes.some((s) => (ALL_SCOPES as readonly string[]).includes(s))) {
+        const storedInteraction = store.oauthFind('Interaction', details.uid);
+        if (storedInteraction && storedInteraction['params'] && typeof storedInteraction['params'] === 'object') {
+          const nextParams = { ...(storedInteraction['params'] as Record<string, unknown>) };
+          nextParams['scope'] = [...new Set([...requestedScopes.filter(Boolean), ...summary.scopes])].join(' ');
+          store.oauthUpsert('Interaction', details.uid, { ...storedInteraction, params: nextParams });
+        }
+      }
       const returnTo = await provider.interactionResult(
         req,
         res,

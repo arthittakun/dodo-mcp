@@ -78,7 +78,12 @@ export class InstallationRuntime {
     } };
   }
   private async open(id: string, root: string): Promise<BootstrappedWorkspace> {
-    const ws = bootstrapWorkspace({ invokedCwd: root, configDir: { dir: this.initial.configDir, source: this.initial.configDirSource }, log: this.log });
+    const ws = bootstrapWorkspace({
+      invokedCwd: root,
+      configDir: { dir: this.initial.configDir, source: this.initial.configDirSource },
+      log: this.log,
+      ...(this.initial.runMode ? { runMode: this.initial.runMode } : {}),
+    });
     try {
       attachOptionalServices(ws, this.log);
       this.attach(ws);

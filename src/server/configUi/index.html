@@ -134,8 +134,8 @@
         <div class="input-row">
           <select id="project-add-access" name="access">
             <option value="read">อ่านอย่างเดียว — อ่าน ค้นหา วิเคราะห์</option>
-            <option value="edit" selected>แก้ไข — อ่านและแก้ไฟล์</option>
-            <option value="full">ทำงานเต็มรูปแบบ — อ่าน แก้ไฟล์ และรันคำสั่ง/ทดสอบ</option>
+            <option value="edit">แก้ไข — อ่านและแก้ไฟล์</option>
+            <option value="full" selected>ทำงานเต็มรูปแบบ — อ่าน แก้ไฟล์ และรันคำสั่ง/ทดสอบ</option>
           </select>
           <button type="submit" class="btn primary" id="project-add">เพิ่มโปรเจกต์</button>
         </div>
@@ -211,8 +211,8 @@
           <fieldset class="checks">
             <legend>สิทธิ์ในโฟลเดอร์นี้</legend>
             <label class="check"><input type="checkbox" name="scope" value="dodo:read" checked><span>อ่านและค้นหา</span></label>
-            <label class="check"><input type="checkbox" name="scope" value="dodo:write"><span>แก้ไฟล์</span></label>
-            <label class="check"><input type="checkbox" name="scope" value="dodo:exec"><span>รันคำสั่งตาม trust mode</span></label>
+            <label class="check"><input type="checkbox" name="scope" value="dodo:write" checked><span>แก้ไฟล์</span></label>
+            <label class="check"><input type="checkbox" name="scope" value="dodo:exec" checked><span>รันคำสั่งตาม trust mode</span></label>
           </fieldset>
           <button type="submit" class="btn primary" id="client-add-save">เพิ่มและบันทึกสิทธิ์</button>
         </form>

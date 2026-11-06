@@ -541,7 +541,19 @@
           await loadProjects(true);
         } catch (error) { notify('error', `นำโปรเจกต์ออกไม่สำเร็จ: ${error.message}`); }
       }));
-      actions.append(switchButton, removeButton);
+      const wbButton = document.createElement('button'); wbButton.type = 'button'; wbButton.className = 'btn small'; wbButton.textContent = 'ตั้งค่า Recovery / สิทธิ์ไฟล์';
+      wbButton.disabled = !project.available;
+      wbButton.addEventListener('click', () => {
+        const picker = $('wb-project');
+        const selectBtn = $('wb-select');
+        if (picker && selectBtn) {
+          picker.value = project.projectId;
+          selectBtn.click();
+          const wbEl = $('workbench');
+          if (wbEl && typeof wbEl.scrollIntoView === 'function') wbEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+      actions.append(switchButton, wbButton, removeButton);
       article.append(head, root, accessRow, description, details, actions);
       list.append(article);
     }

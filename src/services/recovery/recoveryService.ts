@@ -334,9 +334,19 @@ export class RecoveryService {
   }
   async checkpoint(trigger:RecoveryTrigger,actor:string,targets?:string[]):Promise<string|undefined>{
     if(this.closed)throw new DodoError('CONFLICT','Recovery runtime is closing');
-    if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
     const policy=this.policy();
+    try{
+      if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
+    }catch(e){
+      if(!policy.strictEnforcement&&(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')){
+        this.fail(e,false);
+        this.authority.getStore()?.();
+        await this.reviewedRestore.getStore()?.();
+        return undefined;
+      }
+      throw e;
+    }
+    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
     if(!policy.enabled||policy.mode==='off'){this.state='DISABLED_BY_OWNER';return undefined;}
     if(policy.mode==='git'){
       return this.s.mutations!.run(async()=>{
@@ -365,10 +375,25 @@ export class RecoveryService {
       try{
         if(!this.baseline){
           const prior=this.s.store.db.prepare("SELECT id FROM recovery_snapshots WHERE workspace_id=? AND state='READY' ORDER BY created_at DESC LIMIT 1").get(this.s.workspaceId) as {id:string}|undefined;
-          if(prior){const m=await this.storage.readVerified(prior.id,this.s.workspaceId);if(m.rootIdentity!==this.identity)throw new DodoError('PATH_DENIED','backup belongs to a previous root identity; owner review is required');}
+          if(prior){
+            try{
+              const m=await this.storage.readVerified(prior.id,this.s.workspaceId);
+              if(m.rootIdentity!==this.identity)throw new DodoError('PATH_DENIED','backup belongs to a previous root identity; owner review is required');
+            }catch(e){
+              if(policy.strictEnforcement)throw e;
+              this.lastWarning=e instanceof Error?e.message:String(e);
+            }
+          }
           await this.capture('activation','system:activation');
         }
-        await this.storage.readVerified(this.baseline!,this.s.workspaceId);
+        try{
+          await this.storage.readVerified(this.baseline!,this.s.workspaceId);
+        }catch(e){
+          if(policy.strictEnforcement)throw e;
+          this.lastWarning=e instanceof Error?e.message:String(e);
+          this.baseline=undefined;
+          await this.capture('activation','system:activation');
+        }
         if(policy.checkDrift&&!this.reviewedRestore.getStore()&&(trigger==='before-write'||trigger==='before-exec')){
           try{await this.deadline.run(Date.now()+policy.scanMs,()=>this.drift.guard(targets));}
           catch(e){
@@ -387,7 +412,7 @@ export class RecoveryService {
       }catch(e){
         if(guardRejected||e instanceof DodoError && (['FORBIDDEN','AUTH_REQUIRED'].includes(e.code)))throw e;
         const criticalIdentity=e instanceof DodoError&&e.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(e.message);
-        const mustBlock=criticalIdentity||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint';
+        const mustBlock=(criticalIdentity&&policy.strictEnforcement)||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint'||trigger==='owner-checkpoint';
         this.fail(e,mustBlock);
         if(!mustBlock&&(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')){
           this.authority.getStore()?.();
@@ -434,7 +459,7 @@ export class RecoveryService {
       }else{
         this.s.wfs.assertRegularFileForDirectAccess(r);
         if(st.size>policy.fileBytes){
-          if(!policy.strictEnforcement&&!target){
+          if(!policy.strictEnforcement){
             this.lastWarning=`ข้ามไฟล์ขนาดใหญ่เกินขีดจำกัด (${rel})`;
             excluded++;return;
           }
@@ -552,7 +577,7 @@ export class RecoveryService {
       this.lastCheckedAt=Date.now();this.state='READY';this.errorCode=null;this.errorDetail=null;this.blockedPath=null;
       this.s.store.audit({principal:actor,workspaceId:this.s.workspaceId,tool:'recovery.checkpoint',result:'ready',inputDigest:digestOf({id,trigger})});
       this.storage.prune(this.s.workspaceId,policy);this.git.prune();return id;
-    }catch(e){this.s.store.db.prepare("UPDATE recovery_snapshots SET state='INCOMPLETE' WHERE id=? AND state='PREPARING'").run(id);const mustBlock=(e instanceof DodoError&&e.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(e.message))||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint';this.fail(e,mustBlock);throw e;}
+    }catch(e){this.s.store.db.prepare("UPDATE recovery_snapshots SET state='INCOMPLETE' WHERE id=? AND state='PREPARING'").run(id);const mustBlock=((e instanceof DodoError&&e.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(e.message))&&policy.strictEnforcement)||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint'||trigger==='owner-checkpoint';this.fail(e,mustBlock);throw e;}
     finally{this.storage.release(id);if(staging)fs.rmSync(staging,{force:true});}
   }
   async close():Promise<void>{this.closed=true;if(this.scanTimer)clearInterval(this.scanTimer);await this.background;await Promise.allSettled(this.observations);await this.initialization;}

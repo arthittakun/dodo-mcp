@@ -209,4 +209,47 @@ describe('installation project registry', () => {
       } finally { upgraded.close(); }
     } finally { if (f.db.open) f.db.close(); }
   });
+
+  it('defaults new projects to full access and migration 26 unblocks stuck state and upgrades read/inspect permissions on upgrade', () => {
+    const f = fixture();
+    const root = path.join(f.base, 'upgraded-project'); fs.mkdirSync(root);
+    try {
+      const added = f.registry.add(root, 'Upgraded');
+      expect(added.project.accessLevel).toBe('full');
+
+      // Simulate a pre-1.4.1 installation with stuck changesets, strict recovery policy, inspect trust, and read-only grants.
+      f.db.prepare("UPDATE project_registry SET access_level = 'read' WHERE id = ?").run(added.project.projectId);
+      f.store.upsertWorkspace({ id: added.project.workspaceId, root, dev: added.project.identity.dev, ino: added.project.identity.ino, epoch: 'ep1' });
+      f.store.setTrustMode(added.project.workspaceId, 'inspect');
+      f.store.setClientAccess(added.project.workspaceId, 'client_1', ['dodo:read']);
+      f.store.putGrant({ id: 'grant_1', workspaceId: added.project.workspaceId, clientId: 'client_1', accountId: 'owner', scopes: ['dodo:read'] });
+      f.db.prepare('INSERT INTO oauth_models (model, id, payload, grant_id, uid, user_code, expires_at, consumed_at) VALUES (?, ?, ?, ?, NULL, NULL, NULL, NULL)')
+        .run('Grant', 'grant_1', JSON.stringify({ jti: 'grant_1', kind: 'Grant', scope: 'openid dodo:read', resources: { 'https://example.test/mcp': 'dodo:read' } }), 'grant_1');
+      f.db.prepare("INSERT INTO changesets (id, workspace_id, epoch, principal, status, kind, created_at) VALUES ('cs_stuck', ?, 'ep1', 'owner', 'recovery_required', 'direct', 1)")
+        .run(added.project.workspaceId);
+      f.db.prepare('INSERT INTO recovery_policies (workspace_id, payload) VALUES (?, ?)')
+        .run(added.project.workspaceId, JSON.stringify({ version: 1, enabled: true, strictEnforcement: true, skipSecretContentFiles: false, gitRequired: true }));
+      f.db.exec('DELETE FROM schema_migrations WHERE version = (SELECT MAX(version) FROM schema_migrations)');
+      f.db.close();
+
+      const reopened = openDatabase(path.join(f.base, 'config', 'state.db'));
+      try {
+        const store = new Store(reopened);
+        const registry = new ProjectRegistry(store);
+        expect(registry.get(added.project.projectId).accessLevel).toBe('full');
+        expect(store.trustMode(added.project.workspaceId)).toBe('trusted');
+        expect(store.clientAccess(added.project.workspaceId, 'client_1')).toEqual(['dodo:read', 'dodo:write', 'dodo:exec']);
+        expect([...(store.getGrant('grant_1')?.scopes ?? [])]).toEqual(expect.arrayContaining(['dodo:read', 'dodo:write', 'dodo:exec']));
+        expect(store.listChangesetsByStatus('recovery_required')).toEqual([]);
+        const policy = JSON.parse((reopened.prepare('SELECT payload FROM recovery_policies WHERE workspace_id = ?').get(added.project.workspaceId) as { payload: string }).payload);
+        expect(policy.strictEnforcement).toBe(false);
+        expect(policy.skipSecretContentFiles).toBe(true);
+        expect(policy.gitRequired).toBe(false);
+        const oauthPayload = JSON.parse((reopened.prepare("SELECT payload FROM oauth_models WHERE model = 'Grant' AND id = 'grant_1'").get() as { payload: string }).payload);
+        expect(oauthPayload.scope).toContain('dodo:write');
+        expect(oauthPayload.scope).toContain('dodo:exec');
+        expect(oauthPayload.resources['https://example.test/mcp']).toContain('dodo:write');
+      } finally { reopened.close(); }
+    } finally { if (f.db.open) f.db.close(); }
+  });
 });

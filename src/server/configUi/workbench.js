@@ -96,7 +96,7 @@
     try {
       if(!await reload(generation))return;
       if(view==='overview')overview(body);
-      if(view==='projects')await projects(body);
+      if(view==='projects')await projects(body,generation);
       if(view==='providers'){providers(body);profiles(body);}
       if(view==='chat')chat(body);
       if(view==='runs')runs(body);
@@ -301,12 +301,83 @@
     return card;
   }
 
-  async function projects(body) {
+  async function projects(body,generation) {
     const personal=state.accessMode==='personal';
     const s=section('โปรเจกต์พร้อมกัน',personal?'เพิ่ม path แล้วใช้ได้ทันที ไม่ต้องอนุญาต client หรือ profile ซ้ำ งานต่างโปรเจกต์ทำพร้อมกันได้':'เปิด runtime แยกโปรเจกต์และกำหนด ACL/trust ของแต่ละโปรเจกต์เอง');body.append(s);
     const name=field(s,'ชื่อโปรเจกต์','projectName'),root=field(s,'Absolute path ในเครื่อง','projectRoot');
-    s.append(button(personal?'เพิ่มและพร้อมใช้':'เพิ่ม path',async()=>{await api('projects/add',{path:root.value,...(name.value?{displayName:name.value}:{})});notice(personal?'เพิ่มโปรเจกต์แล้ว พร้อมใช้งานทันที':'เพิ่มในทะเบียนแล้ว ตั้งค่าสิทธิ์ก่อนใช้งาน');await show('projects');}));
-    if(!selected){s.append(el('p',personal?'เพิ่มหรือเลือกโปรเจกต์จากรายการด้านบน':'เลือกโปรเจกต์จากรายการด้านบนเพื่อจัดการสิทธิ์','wb-empty'));return;}
+    s.append(button(personal?'เพิ่มและพร้อมใช้':'เพิ่ม path',async()=>{
+      const added=await api('projects/add',{path:root.value,access:'full',...(name.value?{displayName:name.value}:{})});
+      if(added?.project?.projectId){try{selected=await api('ai/project',{projectId:added.project.projectId});}catch{}}
+      notice(personal?'เพิ่มโปรเจกต์แล้ว พร้อมใช้งานทันที':'เพิ่มในทะเบียนแล้ว ตั้งค่าสิทธิ์ก่อนใช้งาน');
+      await show('projects');
+    }));
+
+    if(!selected){
+      const autoTarget=state.projects.find(p=>p.workspaceId===state.controlContext?.workspaceId&&p.available)||state.projects.find(p=>p.available);
+      if(autoTarget){
+        try{
+          const fetched=await api('ai/project',{projectId:autoTarget.projectId});
+          if((generation===undefined||generation===renderGeneration)&&!selected){
+            selected=fetched;
+            $('wb-root').textContent=personal?`${selected.root} · พร้อมใช้ทันทีในโหมดส่วนตัว`:`${selected.root} · บันทึก ${selected.savedTrust} / มีผล ${selected.effectiveTrust}`;
+          }
+        }catch{}
+      }
+    }
+
+    if(state.projects.length>0){
+      const multiCard=el('div',undefined,'rec-setting-group');
+      multiCard.append(
+        el('h4',`โปรเจกต์ทั้งหมดในเครื่อง (${state.projects.length} โปรเจกต์ · รันหลายโปรเจกต์พร้อมกันได้)`),
+        el('p','เลือกโปรเจกต์ที่ต้องการตั้งค่า Recovery / การอนุญาตไฟล์ หรือปรับระดับการเข้าถึงของแต่ละโปรเจกต์ได้ทันทีโดยไม่รบกวนโปรเจกต์อื่นที่กำลังทำงานอยู่','muted')
+      );
+      const listGrid=el('div',undefined,'wb-project-grid');
+      const runtimeSet=new Set((state.runtimes||[]).map(r=>r.projectId));
+      for(const proj of state.projects){
+        const isCurrent=selected?.projectId===proj.projectId;
+        const isRunning=runtimeSet.has(proj.projectId)||proj.workspaceId===state.controlContext?.workspaceId;
+        const item=el('div',undefined,'wb-project-item');
+        if(isCurrent)item.dataset.active='true';
+        const itemHead=el('div',undefined,'rec-item-head');
+        const titleBox=el('div');
+        titleBox.append(el('b',proj.displayName),el('span',` (${proj.projectId})`,'muted'));
+        const statusBadge=el('span',isCurrent?'● กำลังตั้งค่าอยู่':isRunning?'● เปิด Runtime พร้อมใช้งาน':proj.available?'พร้อมใช้งาน':'ไม่พร้อม','rec-badge');
+        statusBadge.dataset.tone=isCurrent?'ok':isRunning?'info':proj.available?'ok':'warn';
+        itemHead.append(titleBox,statusBadge);
+        const pathLine=el('code',proj.root,'rec-path-pill');
+        const actionsRow=el('div',undefined,'rec-item-actions');
+        const selectBtn=button(isCurrent?'กำลังแสดงการตั้งค่าโปรเจกต์นี้':'จัดการตั้งค่าโปรเจกต์นี้',async()=>{
+          $('wb-project').value=proj.projectId;
+          await selectProject();
+          await show('projects');
+        },isCurrent?'btn small':'btn primary small');
+        selectBtn.disabled=isCurrent||!proj.available;
+        const accessSelect=el('select');
+        accessSelect.style.width='auto';
+        accessSelect.style.maxWidth='100%';
+        for(const [val,lbl] of [['full','ทำงานเต็มรูปแบบ (อ่าน/แก้ไฟล์/รันคำสั่ง)'],['edit','แก้ไขไฟล์ (อ่าน/แก้ไฟล์)'],['read','อ่านอย่างเดียว']]){
+          const opt=el('option',lbl);opt.value=val;accessSelect.append(opt);
+        }
+        accessSelect.value=proj.accessLevel||'full';
+        accessSelect.onchange=()=>busy(selectBtn,async()=>{
+          await api('projects/access',{projectId:proj.projectId,access:accessSelect.value});
+          notice(`เปลี่ยนสิทธิ์ของ ${proj.displayName} เป็น ${accessSelect.value} แล้ว`);
+          await show('projects');
+        });
+        actionsRow.append(selectBtn,accessSelect);
+        item.append(itemHead,pathLine,actionsRow);
+        listGrid.append(item);
+      }
+      multiCard.append(listGrid);
+      s.append(multiCard);
+    }
+
+    if(!selected){
+      const config=await api('admin/config');
+      renderFileAccessPolicyCard(s,config,()=>show('projects'));
+      s.append(el('p',personal?'เพิ่มหรือเลือกโปรเจกต์จากรายการด้านบนเพื่อตั้งค่า Recovery รายโปรเจกต์':'เลือกโปรเจกต์จากรายการด้านบนเพื่อจัดการสิทธิ์และตั้งค่า Recovery','wb-empty'));
+      return;
+    }
 
     const [config,stuckChangesets]=await Promise.all([
       api('admin/config'),

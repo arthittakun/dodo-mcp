@@ -10,7 +10,7 @@ import { ProjectRegistry } from '../../src/projects/registry.js';
 describe('R03 owner drift review through real HTTP and browser',()=>{
  let c:TestContext;
  afterEach(async()=>await c?.cleanup());
- const setup=async()=>{c=await launch({configPort:0,trust:'edit',fixtureFiles:{'a.txt':'before'}});const p=new ProjectRegistry(c.server.services.store).add(c.fixtureDir,'Drift fixture').project;await c.server.services.recovery!.checkpoint('owner-checkpoint','local-config-owner');fs.writeFileSync(path.join(c.fixtureDir,'a.txt'),'outside');return p;};
+ const setup=async()=>{c=await launch({configPort:0,trust:'edit',fixtureFiles:{'a.txt':'before'}});c.server.services.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(c.server.workspaceId,JSON.stringify({version:1,enabled:true,strictEnforcement:true,skipSecretContentFiles:false}));const p=new ProjectRegistry(c.server.services.store).add(c.fixtureDir,'Drift fixture').project;await c.server.services.recovery!.checkpoint('owner-checkpoint','local-config-owner');fs.writeFileSync(path.join(c.fixtureDir,'a.txt'),'outside');return p;};
  it('OAuth can inspect drift but cannot acknowledge; private owner requires exact context, digest and confirmation',async()=>{
   const p=await setup(),token=await obtainToken(c),url=new URL(c.configUrl!);
   const post=(operation:string,args:unknown,auth?:string,base=url.origin)=>fetch(base+'/api/admin/action',{method:'POST',headers:{'content-type':'application/json','x-dodo-workspace':c.server.workspaceId,'x-dodo-epoch':c.server.epoch,...(auth?{authorization:'Bearer '+auth}:{})},body:JSON.stringify({projectId:p.projectId,operation,args})});
