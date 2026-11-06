@@ -108,7 +108,7 @@
     "oidc-provider": "9.12.2",
     "picomatch": "^4.0.7",
     "playwright": "1.63.0",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "tar-stream": "3.2.1",
     "typescript": "5.9.3",
     "zod": "^4.2.0"
