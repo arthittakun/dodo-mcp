@@ -67,7 +67,7 @@ describe('Recovery maintenance: durable, caller-bound, reviewed cleanup',()=>{
   });
   it('keeps a durable cleanup task when unlink fails; explicit pending cleanup retries without deleting more checkpoints',async()=>{
     const r=setup();await snap();fs.writeFileSync(path.join(f.root,'temp.txt'),'unique');const old=await snap();fs.rmSync(path.join(f.root,'temp.txt'));await snap();
-    const original=fs.unlinkSync;const unlink=vi.spyOn(fs,'unlinkSync').mockImplementation(p=>{if(String(p).includes('/objects/'))throw Object.assign(new Error('busy'),{code:'EBUSY'});original(p);});
+    const original=fs.unlinkSync;const unlink=vi.spyOn(fs,'unlinkSync').mockImplementation(p=>{if(String(p).replace(/\\/g,'/').includes('/objects/'))throw Object.assign(new Error('busy'),{code:'EBUSY'});original(p);});
     const result=await apply(r.maintenance.previewCleanup(owner,{mode:'selected',checkpointIds:[old]}));expect(result).toMatchObject({physicalCleanup:'pending',reclaimedObjectBytes:0});
     expect(r.maintenance.status(owner).pendingFiles).toBeGreaterThan(0);unlink.mockRestore();
     const retry=await apply(r.maintenance.previewCleanup(owner,{mode:'pending',checkpointIds:[]}));expect(retry).toMatchObject({deletedCheckpoints:[],reclaimedObjectBytes:6,physicalCleanup:'complete'});

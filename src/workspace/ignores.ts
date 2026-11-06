@@ -51,6 +51,21 @@ const DEFAULT_SECRET_PATTERNS = [
 
 const PROTECTED_PATTERNS = ['.git/', '.dodo-dev-state/'];
 
+const SAFE_TEMPLATE_ALLOW_PATTERNS = [
+  '!.env.example',
+  '!.env.sample',
+  '!.env.template',
+  '!.env.dist',
+  '!.env.defaults',
+  '!*.env.example',
+  '!*.env.sample',
+  '!*.env.template',
+  '!*.env.dist',
+  '!*.env.defaults',
+];
+
+export type SecretPolicyMode = 'standard' | 'strict' | 'off';
+
 const DEFAULT_ORDINARY_PATTERNS = [
   'node_modules/',
   'dist/',
@@ -74,6 +89,7 @@ const DEFAULT_ORDINARY_PATTERNS = [
 
 export interface IgnoreEngineOptions {
   root: string;
+  secretPolicyMode?: SecretPolicyMode;
   extraSecretPatterns?: string[];
   /** Owner-configured exceptions to the secret deny (negations appended after the defaults). */
   secretAllow?: string[];
@@ -90,7 +106,7 @@ const MAX_NESTED_IGNORE_FILES = 200;
 
 export class IgnoreEngine {
   private readonly root: string;
-  private readonly secret: Ignore;
+  private secret: Ignore;
   private readonly protected_: Ignore;
   private readonly ordinaryBase: Ignore;
   private readonly nested = new Map<string, DirRules | null>();
@@ -98,10 +114,7 @@ export class IgnoreEngine {
 
   constructor(opts: IgnoreEngineOptions) {
     this.root = opts.root;
-    this.secret = ignore().add(DEFAULT_SECRET_PATTERNS);
-    if (opts.extraSecretPatterns?.length) this.secret.add(opts.extraSecretPatterns);
-    // Explicit owner exceptions only — never derived from repo config.
-    if (opts.secretAllow?.length) this.secret.add(opts.secretAllow.map((p) => (p.startsWith('!') ? p : `!${p}`)));
+    this.secret = this.buildSecretMatcher(opts);
     this.protected_ = ignore().add(PROTECTED_PATTERNS);
     this.ordinaryBase = ignore().add(DEFAULT_ORDINARY_PATTERNS);
     for (const file of ['.gitignore', '.dodoignore']) {
@@ -109,6 +122,33 @@ export class IgnoreEngine {
       if (content !== undefined) this.ordinaryBase.add(content);
     }
     if (opts.projectExcludes?.length) this.ordinaryBase.add(opts.projectExcludes);
+  }
+
+  private buildSecretMatcher(opts: {
+    secretPolicyMode?: SecretPolicyMode;
+    extraSecretPatterns?: string[];
+    secretAllow?: string[];
+  }): Ignore {
+    const mode = opts.secretPolicyMode ?? 'strict';
+    const matcher = ignore();
+    if (mode !== 'off') {
+      matcher.add(DEFAULT_SECRET_PATTERNS);
+      if (mode === 'standard') {
+        matcher.add(SAFE_TEMPLATE_ALLOW_PATTERNS);
+      }
+    }
+    if (opts.extraSecretPatterns?.length) matcher.add(opts.extraSecretPatterns);
+    // Explicit owner exceptions only — never derived from repo config.
+    if (opts.secretAllow?.length) matcher.add(opts.secretAllow.map((p) => (p.startsWith('!') ? p : `!${p}`)));
+    return matcher;
+  }
+
+  configure(opts: {
+    secretPolicyMode?: SecretPolicyMode;
+    extraSecretPatterns?: string[];
+    secretAllow?: string[];
+  }): void {
+    this.secret = this.buildSecretMatcher(opts);
   }
 
   private readIgnoreFile(absFile: string): string | undefined {

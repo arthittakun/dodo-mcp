@@ -7,8 +7,8 @@ window.DodoRecoveryMaintenance=async({parent,act,selected,el,section,button,fiel
   const quota=field(settings,'โควตา Recovery ของโปรเจกต์ (GiB)','maintenanceQuota','','number');quota.min='0.001';quota.max='100';quota.step='0.1';
   const days=field(settings,'ระยะเก็บสำรอง (วัน)','maintenanceDays','','number');days.min='1';days.max='3650';
   const count=field(settings,'จำนวนสำเนาที่เก็บตาม retention','maintenanceCount','','number');count.min='1';count.max='10000';
-  const excludes=field(settings,'ไม่สำรองไฟล์หรือโฟลเดอร์ (relative path บรรทัดละรายการ)','maintenanceExcludes','','textarea');excludes.placeholder='models/';
-  settings.append(el('p','เช่น models/ — ใช้กับสำเนาใหม่เท่านั้น สำเนาเก่ายังคงอยู่ การแก้ไฟล์ที่ยกเว้นผ่าน DODO จะถูกปฏิเสธเมื่อจำเป็นต้องสำรองก่อนแก้ ไม่รองรับ wildcard','muted'));
+  const excludes=field(settings,'ไม่สำรองไฟล์หรือโฟลเดอร์ (relative path บรรทัดละรายการ)','maintenanceExcludes','','textarea');excludes.placeholder='models/\nnode_modules/\n.next/\nenv.example';
+  settings.append(el('p','เช่น models/, node_modules/, .next/, env.example — ใช้กับสำเนาใหม่เท่านั้น สำเนาเก่ายังคงอยู่ ในโหมดไม่บังคับบล็อกสามารถแก้ไฟล์ที่ยกเว้นได้ตามปกติ','muted'));
   let cursor=0;const chosen=new Set();const size=n=>(n/1048576).toFixed(2)+' MiB';
   const reasons={active_baseline:'จุดปัจจุบัน',latest_backup:'สำเนาล่าสุด',pinned:'Pin ไว้',drift_baseline:'ใช้ตรวจไฟล์เปลี่ยน',named_checkpoint:'มีชื่ออ้างถึง',deployment_provenance:'ใช้กับ deployment',database_compatibility_rule:'ผูกกติกาฐานข้อมูล',reviewed_restore_plan:'มีแผนกู้คืนใช้อยู่',open_session:'session ยังเปิด',unfinished_work:'งานยังไม่จบ',select_complete_session:'ต้องเลือกสำเนาของ session ให้ครบ',other_caller_session:'ประวัติของผู้เรียกอื่น',active_capture:'กำลังสำรอง'};
   const review=async(operation,args)=>{

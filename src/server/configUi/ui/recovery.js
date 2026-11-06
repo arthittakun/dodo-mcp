@@ -1,6 +1,172 @@
 /* Owner Recovery dashboard. All untrusted values use textContent; no HTML injection. */
 'use strict';
 window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,help,api,refresh,getSelected})=>{
+  function groupCard(step,title,desc){
+    const box=el('div',undefined,'rec-group');
+    const head=el('div',undefined,'rec-group-head');
+    const h=el('h3',undefined,'rec-group-title');
+    h.append(el('span',String(step),'rec-group-step'),document.createTextNode(title));
+    head.append(h);
+    if(desc)head.append(el('p',desc,'rec-group-desc'));
+    box.append(head);
+    return box;
+  }
+
+  function statCard(label,val,sub){
+    const box=el('div',undefined,'rec-stat');
+    box.append(el('div',label,'rec-stat-label'),el('div',String(val),'rec-stat-val'));
+    if(sub)box.append(el('div',sub,'rec-stat-sub'));
+    return box;
+  }
+
+  async function gitRecoverySection(parent,act,data,selected){
+    const box=section('การกู้คืนจาก Git · Git Recovery','เมื่อโปรเจกต์เชื่อม Git ระบบสามารถสร้างจุดกู้คืน ดู Diff และย้อนไฟล์จาก Git Checkpoint หรือ Git Commit ได้โดยตรง โดยไม่กระทบ branch หรือ .git/index ของคุณ');
+    parent.append(box);
+    const body=el('div');box.append(body);
+    const previewBox=el('div');box.append(previewBox);
+
+    const loadGit=async()=>{
+      body.replaceChildren(el('p','กำลังตรวจสอบสถานะ Git ของโปรเจกต์…','wb-status'));
+      previewBox.replaceChildren();
+      try{
+        const g=await act('recovery.git.status',{limit:20});
+        body.replaceChildren();
+        if(!g.isRepo){
+          const empty=el('div',undefined,'rec-alert');
+          empty.dataset.tone='info';
+          empty.append(
+            el('p','โปรเจกต์นี้ยังไม่ได้เชื่อมต่อ Git (.git)','rec-alert-title'),
+            el('p','ระบบจึงใช้โหมด DODO Snapshot อัตโนมัติ หากคุณเริ่มต้นใช้งาน Git (git init) ในโฟลเดอร์โปรเจกต์ ระบบจะเปิดใช้งาน Git Recovery ให้ทันที','muted')
+          );
+          body.append(empty);
+          return;
+        }
+        const stats=el('div',undefined,'rec-stats');
+        stats.append(
+          statCard('Branch ปัจจุบัน',g.branch||'Detached HEAD',g.head?`HEAD: ${g.head.slice(0,12)}`:'ยังไม่มี commit แรก'),
+          statCard('ไฟล์ที่แก้ไขค้าง (Modified)',`${g.dirtyCount} ไฟล์`,g.untrackedCount?`ไฟล์ใหม่ยังไม่อ้างอิง (Untracked): ${g.untrackedCount} ไฟล์`:'ไม่มีไฟล์ Untracked'),
+          statCard('DODO Git Checkpoints',`${g.checkpoints.length} จุดกู้คืน`,'เก็บใน refs/dodo/checkpoints/* แยกจาก branch'),
+          statCard('Git Commits ล่าสุด',`${g.commits.length} รายการ`,'สามารถเลือกดู Diff หรือกู้คืนไฟล์จาก commit ใดก็ได้')
+        );
+        body.append(stats);
+
+        if(g.entries&&g.entries.length){
+          const dirtyDetails=el('details',undefined,'details');
+          dirtyDetails.append(el('summary',`ดูรายการไฟล์ที่กำลังเปลี่ยนแปลงใน Working Tree (${g.entries.length} รายการ)`));
+          const pillList=el('ul',undefined,'rec-path-list');
+          for(const item of g.entries){
+            pillList.append(el('li',`${item.status} · ${item.path}`,'rec-path-pill'));
+          }
+          dirtyDetails.append(pillList);
+          body.append(dirtyDetails);
+        }
+
+        const pathFilter=field(body,'ระบุไฟล์หรือโฟลเดอร์ที่ต้องการกู้คืนจาก Git (เว้นว่างเพื่อกู้คืนทุกไฟล์ที่ต่างกัน)','gitRestorePath','');
+        pathFilter.placeholder='เช่น src/lib/env.ts หรือเว้นว่างเพื่อเลือกทั้งหมด';
+
+        const actions=el('div',undefined,'rec-action-bar');
+        actions.append(
+          button('สร้าง Git Checkpoint ตอนนี้',async()=>{
+            const cp=await act('recovery.git.checkpoint');
+            notice(`สร้าง Git Checkpoint สำเร็จ (${cp.id})`);
+            await loadGit();
+          },'btn primary'),
+          button('รีเฟรชข้อมูล Git',loadGit)
+        );
+        body.append(actions);
+
+        const showGitPreview=async(ref,label)=>{
+          previewBox.replaceChildren(el('p',`กำลังเปรียบเทียบไฟล์ปัจจุบันกับ ${label} (${ref})…`,'wb-status'));
+          try{
+            const rawPaths=pathFilter.value.split('\n').flatMap(s=>s.split(',')).map(s=>s.trim()).filter(Boolean);
+            const p=await act('recovery.git.preview',{ref,...(rawPaths.length?{paths:rawPaths}:{})});
+            const boxView=el('div',undefined,'rec-diff-box');
+            boxView.append(
+              el('h4',`ตรวจสอบ Diff ก่อนกู้คืนจาก Git: ${label}`),
+              el('p',`Commit SHA: ${p.resolvedSha} · พบไฟล์ที่ต่างจากสถานะปัจจุบัน ${p.changedFiles.length} ไฟล์`,'muted')
+            );
+            if(!p.changedFiles.length){
+              boxView.append(el('p','ไฟล์ในโปรเจกต์ปัจจุบันตรงกับจุดกู้คืน Git นี้อยู่แล้ว ไม่มีการเปลี่ยนแปลงที่ต้องกู้คืน','wb-status'));
+              previewBox.replaceChildren(boxView);
+              return;
+            }
+            const filePills=el('ul',undefined,'rec-path-list');
+            for(const f of p.changedFiles){
+              filePills.append(el('li',`${f.status} · ${f.path}`,'rec-path-pill'));
+            }
+            boxView.append(filePills);
+            if(p.diff){
+              boxView.append(el('pre',p.diff));
+            }
+            const restoreBtn=button('ยืนยันกู้คืนไฟล์จาก Git จุดนี้',async()=>{
+              if(!await confirmDanger('กู้คืนไฟล์จาก Git?',`ระบบจะสร้าง Git Checkpoint สำรองสถานะปัจจุบันให้อัตโนมัติก่อน แล้วจึงย้อนไฟล์ ${p.changedFiles.length} รายการกลับไปยัง ${label} (${p.resolvedSha.slice(0,10)})`,'กู้คืนจาก Git'))return;
+              const res=await act('recovery.git.restore',{
+                ref:p.resolvedSha,
+                ...(rawPaths.length?{paths:rawPaths}:{}),
+                workspaceId:selected.workspaceId,
+                workspaceEpoch:selected.workspaceEpoch,
+                confirm:true,
+              });
+              notice(`กู้คืนไฟล์จาก Git สำเร็จ (${res.restoredFiles.length} ไฟล์) · สำรองก่อนกู้ไว้ที่ ${res.backupCheckpointId}`);
+              await loadGit();
+            },'btn primary');
+            boxView.append(restoreBtn);
+            previewBox.replaceChildren(boxView);
+            restoreBtn.focus();
+          }catch(e){
+            previewBox.replaceChildren(el('p','ตรวจสอบ Diff จาก Git ไม่สำเร็จ: '+e.message,'wb-status'));
+          }
+        };
+
+        const cols=el('div',undefined,'rec-git-columns');
+        const cpCol=el('div',undefined,'rec-group');
+        cpCol.append(el('h4','DODO Git Checkpoints (จุดกู้คืนอัตโนมัติ/กดสร้างเอง)'));
+        const cpList=el('div',undefined,'rec-git-list');
+        if(!g.checkpoints.length){
+          cpList.append(el('p','ยังไม่มี Git Checkpoint — กดปุ่ม “สร้าง Git Checkpoint ตอนนี้” เพื่อสร้างจุดกู้คืนแรกได้เลย','muted'));
+        }
+        for(const cp of g.checkpoints){
+          const item=el('div',undefined,'rec-item-card');
+          const head=el('div',undefined,'rec-item-head');
+          head.append(el('b',cp.id),el('code',cp.sha.slice(0,10)));
+          item.append(
+            head,
+            el('p',`${cp.subject||'DODO Git checkpoint'} · ${cp.date?new Date(cp.date).toLocaleString('th-TH'):''}`,'muted'),
+            el('div',undefined,'rec-item-actions')
+          );
+          item.lastChild.append(button('ดู Diff & กู้คืน',()=>showGitPreview(cp.ref,cp.id),'btn small'));
+          cpList.append(item);
+        }
+        cpCol.append(cpList);
+
+        const commitCol=el('div',undefined,'rec-group');
+        commitCol.append(el('h4','Git Commits ล่าสุดของโปรเจกต์ (git log)'));
+        const commitList=el('div',undefined,'rec-git-list');
+        if(!g.commits.length){
+          commitList.append(el('p','ยังไม่มีประวัติ git commit ใน branch ปัจจุบัน','muted'));
+        }
+        for(const c of g.commits){
+          const item=el('div',undefined,'rec-item-card');
+          const head=el('div',undefined,'rec-item-head');
+          head.append(el('b',c.subject||'(ไม่มีข้อความ commit)'),el('code',c.sha.slice(0,10)));
+          item.append(
+            head,
+            el('p',`${c.author} · ${c.date?new Date(c.date).toLocaleString('th-TH'):''}`,'muted'),
+            el('div',undefined,'rec-item-actions')
+          );
+          item.lastChild.append(button('ดู Diff & กู้คืน',()=>showGitPreview(c.sha,`Commit ${c.sha.slice(0,8)}`),'btn small'));
+          commitList.append(item);
+        }
+        commitCol.append(commitList);
+        cols.append(cpCol,commitCol);
+        body.append(cols);
+      }catch(e){
+        body.replaceChildren(el('p','โหลดข้อมูล Git Recovery ไม่สำเร็จ: '+e.message,'wb-status'));
+      }
+    };
+    await loadGit();
+  }
+
   async function recoveryDrift(parent,act,data,selected){
     const box=section('การเปลี่ยนไฟล์นอก journal','เปรียบเทียบ hash จริง ไม่ระบุว่าใครแก้จากเวลาไฟล์ การยอมรับสถานะไม่ใช่ผลทดสอบและไม่เพิ่มสิทธิ์');parent.append(box);
     const view=el('div');box.append(view);
@@ -21,34 +187,264 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
   }
 
   async function recoveryPanel(parent) {
-    const card=section('Recovery · สำรอง source','สำรองไฟล์จริงนอกโปรเจกต์ก่อนแก้ไฟล์หรือรันคำสั่ง ไม่รวม secrets, ฐานข้อมูล และ generated files');parent.append(card);
+    const card=section('Recovery · ระบบสำรองและกู้คืนโปรเจกต์','ตั้งค่าโหมดกู้คืน การใช้ Git อัตโนมัติ การไม่บล็อกงานเมื่อพบไฟล์ติดปัญหา และกำหนดขอบเขตการสำรองทั้งหมดผ่าน UI');parent.append(card);
     const status=el('p','กำลังตรวจสอบจุดกู้คืน…','wb-status');status.setAttribute('role','status');card.append(status);
     const selected={...getSelected()};
     const act=(operation,args={})=>api('admin/action',{projectId:selected.projectId,operation,args},true);
     try {
       const data=await act('recovery.status');
-      const labels={INITIALIZING:'กำลังเตรียมสำเนา — ยังไม่อนุญาตการเปลี่ยน source จนสำรองสำเร็จ',READY:'SAVED · มีสำเนาที่ตรวจ integrity แล้ว',BLOCKED:'สำรองไม่ได้ — หยุดการเปลี่ยน source',DISABLED_BY_OWNER:'เจ้าของปิดการสำรองอัตโนมัติ'};
+      const effectiveMode=data.effectiveMode||(data.hasGitRepo?'git':'snapshot');
+      const labels={
+        INITIALIZING:'กำลังเตรียมสำเนา — พร้อมใช้งานโดยไม่บล็อกการทำงาน',
+        READY:effectiveMode==='git'?'SAVED · พร้อมใช้งาน (โหมด Git Recovery)':'SAVED · มีสำเนาที่ตรวจ integrity แล้ว (โหมด Snapshot)',
+        BLOCKED:'สำรองไม่ได้ — หยุดการเปลี่ยน source (สามารถกดล้างสถานะบล็อกหรือปิด Strict Mode ด้านล่าง)',
+        DISABLED_BY_OWNER:'เจ้าของปิดการสำรองอัตโนมัติ',
+      };
       status.textContent=labels[data.state]||data.state;
-      if(data.awaitingActivation)status.textContent='เปิดการป้องกันไว้ — รอสร้างจุดกู้คืนแรก';
-      if(data.errorCode){status.dataset.kind='error';card.append(el('p',`เหตุผล: ${data.errorCode} · ตรวจพื้นที่ดิสก์ quota, ไฟล์ที่ถูกปฏิเสธ หรือความสมบูรณ์ของ backup แล้วลองสร้างจุดกู้คืนอีกครั้ง`));}
-      card.append(el('p',data.lastCheckedAt?`ตรวจล่าสุด ${new Date(data.lastCheckedAt).toLocaleString('th-TH')} · ใช้พื้นที่โปรเจกต์ ${(data.projectBytes/1048576).toFixed(2)} MiB`:'ยังไม่มีสำเนาที่ตรวจสอบแล้ว'));
-      card.append(el('p',data.verification.lastVerifiedAt?`เคยตรวจ checks ผ่านล่าสุด ${new Date(data.verification.lastVerifiedAt).toLocaleString('th-TH')} · ตรวจความสดอีกครั้งด้านล่าง`:'ยังไม่มีหลักฐาน checks ผ่านกับ snapshot'));
-      card.append(el('p',`รวม ${data.counts.included} รายการ · ยกเว้นตามนโยบาย ${data.counts.excludedByPolicy} รายการ · เหตุการณ์ล่าสุด ${data.lastTrigger||'ยังไม่มี'}`));
-      const enabled=check(card,'เปิดการสำรองอัตโนมัติ','recoveryEnabled',data.enabled);enabled.setAttribute('role','switch');
-      const advanced=el('details');advanced.append(el('summary','ขอบเขตและพื้นที่สำรอง'));card.append(advanced);
-      await window.DodoRecoveryMaintenance({parent:card,act,selected,el,section,button,field,check,notice,confirmDanger,refresh});
+      if(data.awaitingActivation&&data.enabled)status.textContent='เปิดการป้องกันไว้ — รอสร้างจุดกู้คืนแรก';
+
+      const headerBar=el('div',undefined,'rec-header');
+      const headerCopy=el('div',undefined,'rec-header-copy');
+      headerCopy.append(
+        el('strong',data.hasGitRepo?'ตรวจพบ Git Repository ในโปรเจกต์นี้ (.git)':'โปรเจกต์ทั่วไป (ยังไม่ได้เชื่อม Git)'),
+        el('span',data.policy.strictEnforcement?'โหมดเข้มงวด (Strict Blocking เปิดอยู่)':'โหมดไม่บังคับบล็อก (แก้ไฟล์และรันคำสั่งได้ตลอดเวลา ไม่ติด RECOVERY_REQUIRED)','muted')
+      );
+      const badge=el('span',
+        data.state==='BLOCKED'?`ติดบล็อก · ${data.errorCode||'BLOCKED'}`:
+        data.state==='DISABLED_BY_OWNER'?'ปิดการใช้งาน':
+        effectiveMode==='git'?'พร้อมใช้งาน · Git Recovery':'พร้อมใช้งาน · DODO Snapshot',
+        'rec-badge'
+      );
+      badge.dataset.tone=data.state==='BLOCKED'?'danger':data.state==='DISABLED_BY_OWNER'?'muted':'ok';
+      headerBar.append(headerCopy,badge);
+      card.append(headerBar);
+
+      const metricGrid=el('div',undefined,'rec-stats');
+      metricGrid.append(
+        statCard(
+          'โหมดที่ใช้งานจริง',
+          effectiveMode==='git'?'Git Recovery':effectiveMode==='off'?'ปิดการใช้งาน':'DODO Snapshot',
+          `ตั้งค่า: ${(data.policy.mode||'auto').toUpperCase()} · ${data.policy.strictEnforcement?'บล็อกเมื่อพบปัญหา':'ไม่บล็อกงาน'}`
+        ),
+        statCard(
+          'การตรวจสอบล่าสุด',
+          data.lastCheckedAt?new Date(data.lastCheckedAt).toLocaleTimeString('th-TH'):'ยังไม่มี',
+          data.lastCheckedAt?new Date(data.lastCheckedAt).toLocaleDateString('th-TH'):`เหตุการณ์: ${data.lastTrigger||'ยังไม่มี'}`
+        ),
+        statCard(
+          'ไฟล์ที่คุ้มครอง / ยกเว้น',
+          `${data.counts.included} ไฟล์`,
+          `ยกเว้นตามนโยบาย ${data.counts.excludedByPolicy} รายการ · ข้าม Secret ${(data.skippedSecretFiles||[]).length} ไฟล์`
+        ),
+        statCard(
+          'พื้นที่จัดเก็บโปรเจกต์',
+          `${(data.projectBytes/1048576).toFixed(2)} MiB`,
+          `โควตา ${(data.policy.projectBytes/1073741824).toFixed(1)} GiB · สแกนแล้ว ${data.progress.scanned} รายการ`
+        )
+      );
+      card.append(metricGrid);
+
+      // Diagnostic & Quick-Fix Callout for blockedPath, errorCode, skippedSecretFiles, or lastWarning
+      const problemPaths=[
+        ...(data.blockedPath?[data.blockedPath]:[]),
+        ...(Array.isArray(data.skippedSecretFiles)?data.skippedSecretFiles:[]),
+      ].filter((v,i,a)=>Boolean(v)&&a.indexOf(v)===i);
+
+      if(data.state==='BLOCKED'||data.errorCode||data.lastWarning||problemPaths.length){
+        const alertBox=el('div',undefined,'rec-alert');
+        alertBox.dataset.tone=data.state==='BLOCKED'?'danger':'warn';
+        alertBox.append(
+          el('p',
+            data.state==='BLOCKED'
+              ?`พบปัญหาที่ทำให้ Recovery ติดสถานะ BLOCKED (${data.errorCode||'UNKNOWN'})`
+              :`คำเตือนจากระบบ Recovery (ไม่บล็อกการแก้ไฟล์หรือรันคำสั่ง)`,
+            'rec-alert-title'
+          )
+        );
+        if(data.errorDetail||data.lastWarning){
+          alertBox.append(el('p',data.errorDetail||data.lastWarning,'muted'));
+        }
+        if(problemPaths.length){
+          alertBox.append(el('p','ไฟล์ที่เป็นต้นเหตุ (เช่น มีข้อความคล้าย API key / Private key หรือขนาดเกินขีดจำกัด):'));
+          const ul=el('ul',undefined,'rec-path-list');
+          for(const p of problemPaths)ul.append(el('li',p,'rec-path-pill'));
+          alertBox.append(ul);
+        }else if(data.errorCode==='SECRET_PATH_DENIED'){
+          alertBox.append(el('p','คำแนะนำ: มักเกิดจากไฟล์ตัวอย่างที่มีรูปแบบคีย์ เช่น env.example, scripts/setup-env.sh หรือ src/lib/env.ts คุณสามารถกดปุ่มด้านล่างเพื่อล้างสถานะบล็อก หรือเพิ่มไฟล์เข้า Exclude ได้ทันที','muted'));
+        }
+        const quickActions=el('div',undefined,'rec-action-bar');
+        if(problemPaths.length){
+          quickActions.append(button('เพิ่มไฟล์ต้นเหตุเข้า Exclude ทันที',async()=>{
+            const merged=[...new Set([...(data.policy.excludePaths||[]),...problemPaths])];
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,skipSecretContentFiles:true,excludePaths:merged}});
+            await act('recovery.reset');
+            notice(`เพิ่ม ${problemPaths.join(', ')} เข้า Exclude และปลดบล็อกเรียบร้อยแล้ว`);
+            await refresh();
+          },'btn primary'));
+          quickActions.append(button('อนุญาตไฟล์ต้นเหตุในสิทธิ์ไฟล์ (Secret Allow)',async()=>{
+            const cfg=await api('admin/config');
+            const nextAllow=[...new Set([...(cfg.secretAllow||[]),...problemPaths])];
+            await api('admin/config',{secretAllow:nextAllow});
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,skipSecretContentFiles:true}});
+            await act('recovery.reset');
+            notice(`อนุญาต ${problemPaths.join(', ')} ในสิทธิ์ไฟล์และปลดบล็อกเรียบร้อยแล้ว`);
+            await refresh();
+          },'btn'));
+        }
+        if(data.errorCode==='SECRET_PATH_DENIED'||problemPaths.length){
+          quickActions.append(button('อนุญาตทุกไฟล์ (ปิดการบล็อก SECRET_PATH_DENIED)',async()=>{
+            if(!await confirmDanger('ยืนยันอนุญาตให้เข้าถึงทุกไฟล์?','ระบบจะเปิดโหมดอนุญาตทุกไฟล์ (Allow All) และปิดการบล็อก SECRET_PATH_DENIED ทั้งชื่อไฟล์และเนื้อหา เพื่อให้คุณและ AI แก้ไขได้ทุกไฟล์','ยืนยันอนุญาตทุกไฟล์'))return;
+            await api('admin/config',{secretPolicyMode:'off'});
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,scanContentSecrets:false,skipSecretContentFiles:true}});
+            await act('recovery.reset');
+            notice('เปิดโหมดอนุญาตทุกไฟล์และปลดบล็อกเรียบร้อยแล้ว');
+            await refresh();
+          },'btn'));
+        }
+        if(data.hasGitRepo&&data.policy.mode!=='git'){
+          quickActions.append(button('สลับใช้ Git Recovery ล้วน (ไม่สแกนไฟล์ CAS)',async()=>{
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,enabled:true,mode:'git',strictEnforcement:false}});
+            await act('recovery.reset');
+            notice('สลับเป็นโหมด Git Recovery เรียบร้อยแล้ว');
+            await refresh();
+          },'btn'));
+        }
+        quickActions.append(button('ล้างสถานะบล็อก / สแกนใหม่ทันที',async()=>{
+          await act('recovery.reset');
+          notice('ล้างสถานะบล็อกและสแกนใหม่เรียบร้อยแล้ว');
+          await refresh();
+        },'btn'));
+        alertBox.append(quickActions);
+        card.append(alertBox);
+      }
+
+      // ---- Git Recovery Section ----
+      await gitRecoverySection(card,act,data,selected);
+
+      // ---- Categorized 4-Group Settings Dashboard ----
+      const settingsHeader=el('h3','ตั้งค่าระบบ Recovery ทั้งหมด (แยกตามหมวดหมู่)');
+      card.append(settingsHeader);
+      const settingsGrid=el('div',undefined,'rec-settings-grid');
+      card.append(settingsGrid);
+
+      // Group 1: Mode & Blocking Behavior
+      const g1=groupCard(1,'โหมดการทำงานและการบล็อกงาน','กำหนดว่าจะใช้ Git หรือ Snapshot และป้องกันไม่ให้ระบบบล็อกการแก้ไฟล์/รันคำสั่ง');
+      const modeSelect=choice(g1,'โหมดการสำรองและกู้คืน (Recovery Mode)','recoveryMode',[
+        ['auto','Auto (แนะนำ — ใช้ Git อัตโนมัติถ้าโปรเจกต์มี .git)'],
+        ['git','Git เท่านั้น (ใช้ Git ล้วน ไม่สแกนไฟล์ CAS ของ DODO)'],
+        ['snapshot','DODO Snapshot (สำรองไฟล์เข้าคลัง CAS ของ DODO)'],
+        ['off','ปิดการใช้งาน Recovery'],
+      ],data.policy.mode||'auto');
+      const enabled=check(g1,'เปิดการสำรองอัตโนมัติ','recoveryEnabled',data.enabled);enabled.setAttribute('role','switch');
+      const strictEnforcement=check(g1,'บังคับบล็อกการแก้ไฟล์/รันคำสั่งเมื่อสำรองไม่สำเร็จ (Strict Mode — แนะนำให้ปิด)','recoveryStrict',Boolean(data.policy.strictEnforcement));
+      strictEnforcement.setAttribute('role','switch');
+      g1.append(el('p','เมื่อปิด Strict Mode: ต่อให้ไฟล์ติด SECRET_PATH_DENIED หรือเกิดข้อผิดพลาดระหว่างสำรอง คุณยังสามารถแก้ไฟล์และรันคำสั่งได้ตามปกติ','muted'));
+      settingsGrid.append(g1);
+
+      // Group 2: Secret Content Screening & Drift Policy
+      const g2=groupCard(2,'การตรวจไฟล์ความลับและไฟล์เปลี่ยนภายนอก','จัดการการตรวจจับคีย์ตัวอย่างในโค้ด (เช่น env.example) และการแก้ไฟล์จากภายนอก');
+      const scanContentSecrets=check(g2,'สแกนหาคีย์ความลับในเนื้อหาไฟล์ระหว่างสำรอง Snapshot','recoveryScanSecrets',data.policy.scanContentSecrets!==false);
+      scanContentSecrets.setAttribute('role','switch');
+      const skipSecretContentFiles=check(g2,'ข้ามไฟล์ที่พบเนื้อหาคล้าย Secret อัตโนมัติ (ไม่ให้ติดบล็อก SECRET_PATH_DENIED)','recoverySkipSecrets',data.policy.skipSecretContentFiles!==false);
+      skipSecretContentFiles.setAttribute('role','switch');
+      const checkDrift=check(g2,'ตรวจจับการแก้ไฟล์จากภายนอก DODO (Drift Detection)','recoveryCheckDrift',data.policy.checkDrift!==false);
+      checkDrift.setAttribute('role','switch');
+      const driftCols=el('div',undefined,'rec-three-col');
+      const massFilesInput=field(driftCols,'จำนวนไฟล์เปลี่ยนเตือน (ไฟล์)','recoveryMassFiles',data.policy.massFiles??20,'number');massFilesInput.min='1';massFilesInput.max='100000';
+      const massPercentInput=field(driftCols,'สัดส่วนไฟล์เปลี่ยน (%)','recoveryMassPercent',data.policy.massPercent??20,'number');massPercentInput.min='0';massPercentInput.max='100';
+      const deletedFilesInput=field(driftCols,'จำนวนไฟล์ถูกลบเตือน','recoveryDeletedFiles',data.policy.deletedFiles??10,'number');deletedFilesInput.min='1';deletedFilesInput.max='100000';
+      g2.append(driftCols);
+      settingsGrid.append(g2);
+
+      // Group 3: Exclusions & Data Roots
+      const g3=groupCard(3,'ไฟล์และโฟลเดอร์ที่ยกเว้น (Exclusions)','ระบุไฟล์หรือโฟลเดอร์ที่ไม่ต้องการให้ DODO สแกนสำรอง (เช่น node_modules, .next, env.example)');
+      const excludePathsField=field(g3,'รายการไฟล์/โฟลเดอร์ที่ยกเว้น (บรรทัดละ 1 รายการ)','recoveryExcludePaths',(data.policy.excludePaths||[]).join('\n'),'textarea');
+      excludePathsField.placeholder='node_modules\n.next\nenv.example\nscripts/setup-env.sh';
+      const chipBar=el('div',undefined,'rec-chip-bar');
+      chipBar.append(el('span','เพิ่มด่วน:','muted'));
+      for(const preset of ['node_modules','.next','dist','build','models','env.example','scripts/setup-env.sh','src/lib/env.ts','.env.docker']){
+        const chip=el('button',`+ ${preset}`,'rec-chip-btn');
+        chip.type='button';
+        chip.onclick=()=>{
+          const lines=excludePathsField.value.split('\n').map(s=>s.trim()).filter(Boolean);
+          if(!lines.includes(preset)){
+            lines.push(preset);
+            excludePathsField.value=lines.join('\n');
+          }
+        };
+        chipBar.append(chip);
+      }
+      g3.append(chipBar);
+      const roots=field(g3,'โฟลเดอร์ข้อมูล runtime ที่ไม่สำรอง (relative path หนึ่งรายการต่อบรรทัด)','recoveryDataRoots',(data.policy.dataRoots||[]).join('\n'),'textarea');
+      roots.placeholder='data\nuploads';
+      settingsGrid.append(g3);
+
+      // Group 4: Quotas, Scan Limits & Retention
+      const g4=groupCard(4,'โควตาพื้นที่ ขีดจำกัดการสแกน และระยะเวลาเก็บ','ปรับแต่งขนาดพื้นที่สำรอง ขีดจำกัดขนาดไฟล์ เวลาสแกน และจำนวนจุดกู้คืน');
+      const quotaCols=el('div',undefined,'rec-two-col');
+      const projectGiBInput=field(quotaCols,'โควตาโปรเจกต์ (GiB)','recoveryProjectGiB',Number((data.policy.projectBytes/1073741824).toFixed(2)),'number');projectGiBInput.min='0.01';projectGiBInput.max='100';projectGiBInput.step='0.1';
+      const fileMiBInput=field(quotaCols,'ขนาดไฟล์สูงสุด (MiB)','recoveryFileMiB',Number((data.policy.fileBytes/1048576).toFixed(2)),'number');fileMiBInput.min='1';fileMiBInput.max='1024';fileMiBInput.step='1';
+      const maxEntriesInput=field(quotaCols,'จำนวนไฟล์สูงสุดที่สแกน','recoveryMaxEntries',data.policy.maxEntries??100000,'number');maxEntriesInput.min='100';maxEntriesInput.max='1000000';
+      const scanMsInput=field(quotaCols,'เวลาสแกนสูงสุด (ms)','recoveryScanMs',data.policy.scanMs??15000,'number');scanMsInput.min='500';scanMsInput.max='60000';
+      const retentionDaysInput=field(quotaCols,'ระยะเวลาเก็บสำเนา (วัน)','recoveryRetentionDays',data.policy.retentionDays??30,'number');retentionDaysInput.min='1';retentionDaysInput.max='3650';
+      const retainedPointsInput=field(quotaCols,'จำนวนจุดกู้คืนสูงสุด','recoveryRetainedPoints',data.policy.retainedPoints??200,'number');retainedPointsInput.min='1';retainedPointsInput.max='10000';
+      g4.append(quotaCols);
+
+      const advanced=el('details',undefined,'details');advanced.append(el('summary','ขอบเขตและพื้นที่สำรอง (Git Copy แยกโฟลเดอร์ขั้นสูง)'));
       const gitRequired=check(advanced,'ต้องมี Git recovery copy ก่อนทำงาน','recoveryGitRequired',data.policy.gitRequired);
       const gitDirectory=field(advanced,'ที่เก็บ Git สำรอง (absolute path; เว้นว่างใช้ private state)','recoveryGitDirectory',data.policy.gitDirectory||'');
-      advanced.append(el('p','โฟลเดอร์สำรองต้องมีอยู่แล้ว เป็น private ของเจ้าของ และอยู่นอกโปรเจกต์ หากถอดดิสก์จะหยุด ไม่เปลี่ยนปลายทางเอง','muted'));
-      const roots=field(advanced,'โฟลเดอร์ข้อมูล runtime ที่ไม่สำรอง (relative path หนึ่งรายการต่อบรรทัด)','recoveryDataRoots',data.policy.dataRoots.join('\n'),'textarea');
-      card.append(button('บันทึกการสำรอง',async()=>{
-        if(!enabled.checked&&!await confirmDanger('ปิดการสำรองอัตโนมัติ?', 'การแก้ไฟล์และคำสั่งหลังจากนี้จะไม่มี source checkpoint ใหม่ สำเนาเดิมและ file journal ยังอยู่','ปิดการสำรอง'))return;
-        const result=await act('recovery.configure',{confirm:true,policy:{...data.policy,enabled:enabled.checked,gitRequired:gitRequired.checked,gitDirectory:gitDirectory.value.trim()||null,dataRoots:roots.value.split('\n').map(s=>s.trim()).filter(Boolean)}});
-        notice(result.enabled?'บันทึกแล้ว กำลังตรวจความพร้อม':'บันทึกแล้ว เจ้าของปิดการสำรอง');await refresh();
-      }));
-      card.append(button('สร้างจุดกู้คืนตอนนี้',async()=>{await act('recovery.checkpoint');await refresh();}));
-      card.append(button('ตรวจสถานะใหม่',async()=>refresh()));
+      advanced.append(el('p','โฟลเดอร์สำรองต้องมีอยู่แล้ว เป็น private ของเจ้าของ และอยู่นอกโปรเจกต์','muted'));
+      g4.append(advanced);
+      settingsGrid.append(g4);
+
+      modeSelect.onchange=()=>{
+        if(modeSelect.value==='off')enabled.checked=false;
+        else enabled.checked=true;
+      };
+      enabled.onchange=()=>{
+        if(!enabled.checked&&modeSelect.value!=='off')modeSelect.value='off';
+        else if(enabled.checked&&modeSelect.value==='off')modeSelect.value='auto';
+      };
+
+      const mainActions=el('div',undefined,'rec-action-bar');
+      mainActions.append(
+        button('บันทึกการสำรอง',async()=>{
+          const isEnabled=enabled.checked&&modeSelect.value!=='off';
+          if(!isEnabled&&!await confirmDanger('ปิดการสำรองอัตโนมัติ?','การแก้ไฟล์และคำสั่งหลังจากนี้จะไม่มี source checkpoint ใหม่ สำเนาเดิมและ file journal ยังอยู่','ปิดการสำรอง'))return;
+          const nextPolicy={
+            ...data.policy,
+            enabled:isEnabled,
+            mode:isEnabled?(modeSelect.value==='off'?'auto':modeSelect.value):'off',
+            strictEnforcement:strictEnforcement.checked,
+            scanContentSecrets:scanContentSecrets.checked,
+            skipSecretContentFiles:skipSecretContentFiles.checked,
+            checkDrift:checkDrift.checked,
+            massFiles:Math.max(1,Math.round(Number(massFilesInput.value)||20)),
+            massPercent:Math.min(100,Math.max(0,Number(massPercentInput.value)||20)),
+            deletedFiles:Math.max(1,Math.round(Number(deletedFilesInput.value)||10)),
+            projectBytes:Math.max(1048576,Math.round((Number(projectGiBInput.value)||5)*1073741824)),
+            fileBytes:Math.max(1024,Math.round((Number(fileMiBInput.value)||64)*1048576)),
+            maxEntries:Math.max(1,Math.round(Number(maxEntriesInput.value)||100000)),
+            scanMs:Math.min(60000,Math.max(100,Math.round(Number(scanMsInput.value)||15000))),
+            retentionDays:Math.max(1,Math.round(Number(retentionDaysInput.value)||30)),
+            retainedPoints:Math.max(1,Math.round(Number(retainedPointsInput.value)||200)),
+            gitRequired:gitRequired.checked,
+            gitDirectory:gitDirectory.value.trim()||null,
+            excludePaths:excludePathsField.value.split('\n').map(s=>s.trim()).filter(Boolean),
+            dataRoots:roots.value.split('\n').map(s=>s.trim()).filter(Boolean),
+          };
+          const result=await act('recovery.configure',{confirm:true,policy:nextPolicy});
+          notice(result.enabled?'บันทึกการตั้งค่า Recovery ทั้งหมดเรียบร้อยแล้ว':'บันทึกแล้ว เจ้าของปิดการสำรองอัตโนมัติ');
+          await refresh();
+        },'btn primary'),
+        button('สร้างจุดกู้คืนตอนนี้',async()=>{await act('recovery.checkpoint');notice('สร้างจุดกู้คืนเรียบร้อยแล้ว');await refresh();}),
+        button('ล้างสถานะบล็อก / สแกนใหม่',async()=>{await act('recovery.reset');notice('ล้างสถานะบล็อกและสแกนใหม่แล้ว');await refresh();}),
+        button('ตรวจสถานะใหม่',async()=>refresh())
+      );
+      card.append(mainActions);
       card.append(el('p','กู้คืนเฉพาะ source ที่แสดงในแผน ไม่รวมฐานข้อมูล secrets, volumes หรือผลภายนอก และไม่ใช่ OS sandbox','muted'));
+
+      await window.DodoRecoveryMaintenance({parent:card,act,selected,el,section,button,field,check,notice,confirmDanger,refresh});
       await verificationPanel(card,act,selected);
       await recoveryDrift(card,act,data,selected);
       await recoveryHistory(card,act,selected);
@@ -114,7 +510,6 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
     history.append(button('ตรวจแผนล่าสุด / หลังเชื่อมต่อใหม่',()=>showStatus()));
     await load();
   }
-
 
   async function verificationPanel(parent,act,selected){
     const box=section('หลักฐานและชื่อสำเนา','SAVED คือมีสำเนา · VERIFIED คือ checks ที่เลือกผ่าน · stable เป็นชื่อที่เจ้าของตั้ง');parent.append(box);

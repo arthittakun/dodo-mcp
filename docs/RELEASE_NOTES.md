@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.4.0 — Non-blocking Recovery, Git Recovery & Configurable File Access Policy
+
+- Recovery is now non-blocking by default (`strictEnforcement: false`, `skipSecretContentFiles: true`), automatically skipping credential-like example files and generated framework directories (`.next`, `.nuxt`, `.svelte-kit`, `.turbo`, etc.) instead of locking projects in `BLOCKED (SECRET_PATH_DENIED)`.
+- Added native Git Recovery mode (`auto`, `git`, `snapshot`, `off`) with private Git checkpoint refs (`refs/dodo/checkpoints/*`), diff preview, and 1-click restore in the web UI.
+- Added live-configurable File Access & Secret Policy (`standard`, `off` / Allow All, `strict`) with `secretAllow` / `secretDeny` quick-add chips, `relaxEpochCheck`, `relaxExpectedHash`, 1-click stuck changeset resolution, and categorized Project sub-tabs.
+- See [upgrade details](RELEASE_1.4.0.md) and [Recovery usage](RECOVERY.md).
+
 ## 1.3.2 — Recovery storage management
 
 Adds owner-reviewed checkpoint cleanup, pending-file retry, project quotas and

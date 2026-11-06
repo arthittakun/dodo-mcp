@@ -290,6 +290,23 @@
         "maxLength": 256
       }
     },
+    "secretPolicyMode": {
+      "default": "standard",
+      "type": "string",
+      "enum": [
+        "standard",
+        "strict",
+        "off"
+      ]
+    },
+    "relaxEpochCheck": {
+      "default": false,
+      "type": "boolean"
+    },
+    "relaxExpectedHash": {
+      "default": false,
+      "type": "boolean"
+    },
     "commandSandbox": {
       "default": "off",
       "type": "string",
@@ -520,6 +537,9 @@
     "secretDeny",
     "searchBackend",
     "secretAllow",
+    "secretPolicyMode",
+    "relaxEpochCheck",
+    "relaxExpectedHash",
     "commandSandbox",
     "sandboxWritablePaths",
     "allowWebFetch",

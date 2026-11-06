@@ -327,6 +327,43 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         await services.recovery.checkpoint('owner-checkpoint', 'local-config-owner');
         return services.recovery.status();
       }
+      case 'recovery.reset': {
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.resetBlockedState(() => ctx.revalidateOwner?.());
+      }
+      case 'recovery.git.status': {
+        const body = z.object({ limit: z.number().int().min(1).max(100).default(20) }).strict().parse(args);
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.gitRecoveryStatus(body.limit);
+      }
+      case 'recovery.git.checkpoint': {
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.createGitCheckpoint('owner-checkpoint', 'local-config-owner');
+      }
+      case 'recovery.git.preview': {
+        const body = z.object({ ref: z.string().min(1).max(256), paths: z.array(z.string().min(1).max(1024)).max(100).optional() }).strict().parse(args);
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.previewGitRestore(body.paths ? { ref: body.ref, paths: body.paths } : { ref: body.ref });
+      }
+      case 'recovery.git.restore': {
+        const body = z.object({
+          ref: z.string().min(1).max(256),
+          paths: z.array(z.string().min(1).max(1024)).max(100).optional(),
+          workspaceId: z.string(),
+          workspaceEpoch: z.string(),
+          confirm: z.literal(true),
+        }).strict().parse(args);
+        if (body.workspaceId !== workspaceId || body.workspaceEpoch !== epoch) {
+          throw new DodoError('STALE_WORKSPACE', 'review the current project and epoch again');
+        }
+        ctx.revalidateOwner?.();
+        if (!services.recovery) throw new DodoError('NOT_SUPPORTED', 'Recovery is unavailable');
+        return services.recovery.applyGitRestore(body.paths ? { ref: body.ref, paths: body.paths } : { ref: body.ref }, () => ctx.revalidateOwner?.());
+      }
       case 'recover.list': {
         return store.listChangesetsByStatus('recovery_required').filter(c => c.workspaceId === workspaceId).map((c) => ({
           changesetId: c.id,
@@ -337,15 +374,22 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
         }));
       }
       case 'recover.resolve': {
-        const id = String(args['changesetId']);
-        const action = String(args['action']);
+        const id = String(args['changesetId'] ?? '');
+        const action = String(args['action'] ?? '');
+        if (action === 'resolve-all' || id === '*') {
+          const list = store.listChangesetsByStatus('recovery_required').filter(c => c.workspaceId === workspaceId);
+          for (const cs of list) {
+            store.setChangesetStatus(cs.id, 'failed', 'manually resolved by owner');
+          }
+          return { resolvedCount: list.length, resolvedIds: list.map(c => c.id), resolved: true };
+        }
         const cs = store.getChangeset(id);
         if (!cs || cs.workspaceId !== workspaceId || cs.status !== 'recovery_required') throw new Error('changeset is not in recovery_required state');
         if (action === 'mark-resolved') {
           store.setChangesetStatus(id, 'failed', 'manually resolved by owner');
           return { changesetId: id, resolved: true };
         }
-        throw new Error('unknown recovery action (supported: mark-resolved after fixing files manually; backups are in the DODO state directory)');
+        throw new Error('unknown recovery action (supported: mark-resolved, resolve-all; backups are in the DODO state directory)');
       }
       case 'recover.rollback': {
         const input = z.object({

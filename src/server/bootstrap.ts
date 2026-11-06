@@ -116,6 +116,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
   const projectConfig = loadProjectConfig(rootInfo.root);
   const ignores = new IgnoreEngine({
     root: rootInfo.root,
+    secretPolicyMode: config.secretPolicyMode,
     extraSecretPatterns: config.secretDeny,
     secretAllow: config.secretAllow,
     projectExcludes: projectConfig.config.exclude,
@@ -155,7 +156,7 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
     readService: new ReadService(wfs, limits),
     listService,
     search: new SearchService(wfs, limits, config.searchBackend),
-    planner: new Planner(wfs, limits, store),
+    planner: new Planner(wfs, limits, store, () => config.relaxExpectedHash),
     applier,
     jobs,
     git,

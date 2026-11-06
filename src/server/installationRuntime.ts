@@ -94,6 +94,7 @@ export class InstallationRuntime {
     return !this.closed && Boolean(this.store.db.prepare("SELECT 1 FROM ai_runs WHERE workspace_id=? AND status NOT IN ('completed','failed','canceled') LIMIT 1").get(workspaceId));
   }
   status() { return [...this.runtimes].map(([projectId, w]) => ({ projectId, state:this.closing.has(projectId)?'closing':'ready', workspaceId: w.workspaceId, workspaceEpoch: w.epoch, jobs: w.services.jobs.runningCount(), requests: this.users.get(w.workspaceId) ?? 0 })); }
+  allWorkspaces(): BootstrappedWorkspace[] { return [this.current(), ...this.runtimes.values()]; }
   async closeProject(id: string): Promise<boolean> {
     if (this.opening.has(id)) throw new DodoError('CONFLICT', 'project is opening');
     if (this.closing.has(id)) throw new DodoError('CONFLICT', 'project is closing');

@@ -14,7 +14,7 @@ import { AGENT_RUNTIME_TOOLS } from '../tools/agentRuntimeTools.js';
 import { accessMode, setAccessMode } from '../security/accessMode.js';
 import { discoverExposure, normalizeDisabledDiscoverOperations } from '../tools/surface.js';
 
-const ACTIONS = ['status','trust.set','schedule.list','schedule.propose','schedule.show','schedule.history','schedule.approve','schedule.revoke','memory.pending','memory.show','memory.list','memory.approve','memory.reject','memory.reverify','memory.prune','memory.learning.pending','memory.learning.show','memory.learning.review','agent.skill.pending','agent.skill.show','agent.skill.review','desktop.status','desktop.policy','approvals.pending','approvals.approve','approvals.deny','auth.pending','auth.approve','auth.deny','auth.addClient','auth.listClients','auth.grants','auth.revoke','audit.recent','recover.list','recover.resolve','recover.rollback','deployment.targets','deployment.configure','deployment.prepare','deployment.list','deployment.inspect','deployment.compare','deployment.build','deployment.apply','deployment.observe','deployment.source_preview','deployment.rollback_prepare','deployment.maintenance','recovery.status','recovery.config.list','recovery.config.configure','recovery.config.backup','recovery.config.preview','recovery.config.apply','recovery.config.rotate','recovery.database.list','recovery.database.configure','recovery.database.inspect','recovery.database.bind','recovery.database.unbind','recovery.evidence.list','recovery.evidence.inspect','recovery.mark','recovery.pin','recovery.cleanup.preview','recovery.drift.scan','recovery.drift.acknowledge','recovery.configure','recovery.checkpoint','recovery.recovery_storage_status','recovery.recovery_cleanup_preview','recovery.recovery_settings_preview','recovery.recovery_maintenance_apply','recovery.restore_status','recovery.checkpoint_list','recovery.checkpoint_inspect','recovery.checkpoint_create','recovery.recovery_session_list','recovery.recovery_session_inspect','recovery.recovery_session_begin','recovery.recovery_session_end','recovery.restore_preview','recovery.restore_apply'] as const;
+const ACTIONS = ['status','trust.set','schedule.list','schedule.propose','schedule.show','schedule.history','schedule.approve','schedule.revoke','memory.pending','memory.show','memory.list','memory.approve','memory.reject','memory.reverify','memory.prune','memory.learning.pending','memory.learning.show','memory.learning.review','agent.skill.pending','agent.skill.show','agent.skill.review','desktop.status','desktop.policy','approvals.pending','approvals.approve','approvals.deny','auth.pending','auth.approve','auth.deny','auth.addClient','auth.listClients','auth.grants','auth.revoke','audit.recent','recover.list','recover.resolve','recover.rollback','deployment.targets','deployment.configure','deployment.prepare','deployment.list','deployment.inspect','deployment.compare','deployment.build','deployment.apply','deployment.observe','deployment.source_preview','deployment.rollback_prepare','deployment.maintenance','recovery.status','recovery.reset','recovery.git.status','recovery.git.checkpoint','recovery.git.preview','recovery.git.restore','recovery.config.list','recovery.config.configure','recovery.config.backup','recovery.config.preview','recovery.config.apply','recovery.config.rotate','recovery.database.list','recovery.database.configure','recovery.database.inspect','recovery.database.bind','recovery.database.unbind','recovery.evidence.list','recovery.evidence.inspect','recovery.mark','recovery.pin','recovery.cleanup.preview','recovery.drift.scan','recovery.drift.acknowledge','recovery.configure','recovery.checkpoint','recovery.recovery_storage_status','recovery.recovery_cleanup_preview','recovery.recovery_settings_preview','recovery.recovery_maintenance_apply','recovery.restore_status','recovery.checkpoint_list','recovery.checkpoint_inspect','recovery.checkpoint_create','recovery.recovery_session_list','recovery.recovery_session_inspect','recovery.recovery_session_begin','recovery.recovery_session_end','recovery.restore_preview','recovery.restore_apply'] as const;
 /**
  * Local Config is an owner-only surface, so naming the invalid form fields is
  * both safe and much more useful than returning the old generic
@@ -137,7 +137,7 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   });
     route('get', '/api/admin/config', () => {
         const c = loadGlobalConfig(host.current().paths.configFile);
-        return { recovery: c.recovery, limits: c.limits, accessMode: c.accessMode, commandSandbox: c.commandSandbox, sandboxWritablePaths: c.sandboxWritablePaths, allowWebFetch: c.allowWebFetch, lsp: c.lsp, logRetentionDays: c.logRetentionDays, toolSurface: c.toolSurface, exposeSubagentsToMcp: c.exposeSubagentsToMcp, disabledDiscoverOperations: c.disabledDiscoverOperations, envAllowlist: c.envAllowlist, secretDeny: c.secretDeny, secretAllow: c.secretAllow };
+        return { recovery: c.recovery, limits: c.limits, accessMode: c.accessMode, commandSandbox: c.commandSandbox, sandboxWritablePaths: c.sandboxWritablePaths, allowWebFetch: c.allowWebFetch, lsp: c.lsp, logRetentionDays: c.logRetentionDays, toolSurface: c.toolSurface, exposeSubagentsToMcp: c.exposeSubagentsToMcp, disabledDiscoverOperations: c.disabledDiscoverOperations, envAllowlist: c.envAllowlist, secretDeny: c.secretDeny, secretAllow: c.secretAllow, secretPolicyMode: c.secretPolicyMode, relaxEpochCheck: c.relaxEpochCheck, relaxExpectedHash: c.relaxExpectedHash };
     });
     route('get', '/api/admin/discover-exposure', () => {
         const c = loadGlobalConfig(host.current().paths.configFile);
@@ -148,15 +148,30 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
     });
     route('post', '/api/admin/config', req => {
         reviewed(req);
-        const patch = GlobalConfigSchema.pick({ recovery: true, limits: true, accessMode: true, commandSandbox: true, sandboxWritablePaths: true, allowWebFetch: true, lsp: true, logRetentionDays: true, toolSurface: true, exposeSubagentsToMcp: true, disabledDiscoverOperations: true, envAllowlist: true, secretDeny: true, secretAllow: true }).partial().strict().parse(req.body);
+        const patch = GlobalConfigSchema.pick({ recovery: true, limits: true, accessMode: true, commandSandbox: true, sandboxWritablePaths: true, allowWebFetch: true, lsp: true, logRetentionDays: true, toolSurface: true, exposeSubagentsToMcp: true, disabledDiscoverOperations: true, envAllowlist: true, secretDeny: true, secretAllow: true, secretPolicyMode: true, relaxEpochCheck: true, relaxExpectedHash: true }).partial().strict().parse(req.body);
         const normalizedPatch = patch.disabledDiscoverOperations === undefined
             ? patch
             : { ...patch, disabledDiscoverOperations: normalizeDisabledDiscoverOperations(patch.disabledDiscoverOperations) };
         const file = host.current().paths.configFile;
-        saveGlobalConfig(file, GlobalConfigSchema.parse({ ...loadGlobalConfig(file), ...normalizedPatch }));
+        const nextConfig = GlobalConfigSchema.parse({ ...loadGlobalConfig(file), ...normalizedPatch });
+        saveGlobalConfig(file, nextConfig);
         if (normalizedPatch.accessMode)
             setAccessMode(manager().store, normalizedPatch.accessMode);
-        return { saved: true, restartRequired: Object.keys(normalizedPatch).some(key => key !== 'accessMode') };
+        const workspaces = host.current().services.installation ? host.current().services.installation!.allWorkspaces() : [host.current()];
+        for (const ws of workspaces) {
+            ws.config.secretPolicyMode = nextConfig.secretPolicyMode;
+            ws.config.secretDeny = nextConfig.secretDeny;
+            ws.config.secretAllow = nextConfig.secretAllow;
+            ws.config.relaxEpochCheck = nextConfig.relaxEpochCheck;
+            ws.config.relaxExpectedHash = nextConfig.relaxExpectedHash;
+            ws.services.wfs.ignores.configure({
+                secretPolicyMode: nextConfig.secretPolicyMode,
+                extraSecretPatterns: nextConfig.secretDeny,
+                secretAllow: nextConfig.secretAllow,
+            });
+        }
+        const liveKeys = new Set(['accessMode', 'secretPolicyMode', 'secretDeny', 'secretAllow', 'relaxEpochCheck', 'relaxExpectedHash']);
+        return { saved: true, restartRequired: Object.keys(normalizedPatch).some(key => !liveKeys.has(key)) };
     });
   route('post', '/api/admin/setup', async req => {
     reviewed(req); const b = z.object({ mode: z.enum(['check','plan','install']), components: z.array(z.enum(COMPONENTS)).min(1), confirmInstall: z.boolean().default(false) }).strict().parse(req.body);

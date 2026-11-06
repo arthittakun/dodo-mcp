@@ -32,6 +32,26 @@ describe('IgnoreEngine classification', () => {
     expect(eng.isSecret('.env.example')).toBe(true);
   });
 
+  it('secretPolicyMode standard allows template files (.env.example, .env.sample) while blocking real secrets (.env)', () => {
+    const std = new IgnoreEngine({ root, secretPolicyMode: 'standard' });
+    expect(std.isSecret('.env')).toBe(true);
+    expect(std.isSecret('.env.local')).toBe(true);
+    expect(std.isSecret('deploy.pem')).toBe(true);
+    expect(std.isSecret('.env.example')).toBe(false);
+    expect(std.isSecret('.env.sample')).toBe(false);
+    expect(std.isSecret('.env.template')).toBe(false);
+    expect(std.isSecret('.env.dist')).toBe(false);
+  });
+
+  it('secretPolicyMode off and live configure() allow all files unless explicitly in secretDeny', () => {
+    eng.configure({ secretPolicyMode: 'off', extraSecretPatterns: ['company-secret.txt'], secretAllow: [] });
+    expect(eng.isSecret('.env')).toBe(false);
+    expect(eng.isSecret('.env.production')).toBe(false);
+    expect(eng.isSecret('id_rsa')).toBe(false);
+    expect(eng.isSecret('deploy.pem')).toBe(false);
+    expect(eng.isSecret('company-secret.txt')).toBe(true);
+  });
+
   it('FS-09: ordinary ignores are skipped by default and re-added by includeIgnored', () => {
     expect(eng.classify('build/out.js', false, false)).toBe('ignored');
     expect(eng.classify('build/out.js', false, true)).toBe('ok');

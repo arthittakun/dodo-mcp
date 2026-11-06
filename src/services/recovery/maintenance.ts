@@ -102,9 +102,10 @@ export class RecoveryMaintenance {
   private settings(changes:RecoverySettings):RecoveryPolicy {
     const parsed=RecoverySettingsSchema.parse(changes);
     if(parsed.excludePaths)parsed.excludePaths=[...new Set(parsed.excludePaths.map(p=>{
-      const candidate=p.replace(/\/+$/,'');const rel=this.s.wfs.normalizeRel(candidate);
+      const candidate=p.trim().replace(/\\/g,'/').replace(/^\.\/+/,'').replace(/\/+$/,'');const rel=this.s.wfs.normalizeRel(candidate);
       if(rel==='.'||rel!==candidate||/[?*\[\]]/.test(rel))throw new DodoError('INVALID_INPUT','exclusions must be relative file/directory paths, without wildcards or traversal');
-      this.s.wfs.resolve(rel,{allowMissing:true});return rel;
+      try{this.s.wfs.resolve(rel,{allowMissing:true});}catch(e){if(!(e instanceof DodoError&&e.code==='SECRET_PATH_DENIED'))throw e;}
+      return rel;
     }))].sort();
     return RecoveryPolicySchema.parse({...this.r.policy(),...parsed});
   }

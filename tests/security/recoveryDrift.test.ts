@@ -8,7 +8,7 @@ import { RecoveryService } from '../../src/services/recovery/recoveryService.js'
 describe('R03 persistent content drift',()=>{
  let f:ReturnType<typeof platformFixture>;
  afterEach(async()=>{vi.restoreAllMocks();await f?.close();});
- const setup=async(files:Record<string,string>)=>{f=platformFixture();for(const [p,v]of Object.entries(files)){fs.mkdirSync(path.dirname(path.join(f.root,p)),{recursive:true});fs.writeFileSync(path.join(f.root,p),v);}new ProjectRegistry(f.ws.store).add(f.root,'Drift');const r=f.ws.services.recovery!;await r.checkpoint('owner-checkpoint','owner');return r;};
+ const setup=async(files:Record<string,string>)=>{f=platformFixture();for(const [p,v]of Object.entries(files)){fs.mkdirSync(path.dirname(path.join(f.root,p)),{recursive:true});fs.writeFileSync(path.join(f.root,p),v);}f.ws.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(f.ws.workspaceId,JSON.stringify({version:1,enabled:true,strictEnforcement:true,skipSecretContentFiles:false}));new ProjectRegistry(f.ws.store).add(f.root,'Drift');const r=f.ws.services.recovery!;await r.checkpoint('owner-checkpoint','owner');return r;};
  it('detects 54 overwrites + 2 deletions, preserves old bytes, blocks exec and rejects stale owner review',async()=>{
   const r=await setup(Object.fromEntries(Array.from({length:100},(_,i)=>[`f${i}`,'before'])));
   const baseline=r.status().baselineId!;

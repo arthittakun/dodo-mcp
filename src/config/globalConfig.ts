@@ -30,6 +30,23 @@ export const GlobalConfigSchema = z
     /** Explicit exceptions to the secret deny list (gitignore syntax), e.g. ".env.example". */
     secretAllow: z.array(z.string().min(1).max(256)).max(50).default([]),
     /**
+     * File access & secret path protection mode:
+     * - 'standard': block real secret files (.env, *.pem, *.key, etc.) while automatically allowing template files (.env.example, .env.sample, .env.template, .env.dist).
+     * - 'strict': block all default secret patterns including .env.example unless explicitly listed in secretAllow.
+     * - 'off': disable default secret path blocking (allow all files unless explicitly listed in secretDeny).
+     */
+    secretPolicyMode: z.enum(['standard', 'strict', 'off']).default('standard'),
+    /**
+     * When true, tool calls with a matching workspaceId and a valid previous boot_* workspaceEpoch
+     * are accepted after a server restart instead of failing with STALE_WORKSPACE.
+     */
+    relaxEpochCheck: z.boolean().default(false),
+    /**
+     * When true, replace_exact (edit_file) tolerates an expectedHash mismatch when the target
+     * find snippet still matches uniquely in the current file.
+     */
+    relaxExpectedHash: z.boolean().default(false),
+    /**
      * OS sandbox for run_command / run_commands (macOS sandbox-exec, Linux bwrap):
      * 'off' = never; 'prefer' = use when available; 'require' = refuse when unavailable.
      */

@@ -1,9 +1,17 @@
 import { z } from 'zod';
 
 const GiB = 1024 ** 3;
+export const RecoveryModeSchema = z.enum(['auto', 'git', 'snapshot', 'off']);
+export type RecoveryMode = z.infer<typeof RecoveryModeSchema>;
+
 export const RecoveryPolicySchema = z.object({
   version: z.literal(1).default(1),
   enabled: z.boolean().default(true),
+  mode: RecoveryModeSchema.default('auto'),
+  strictEnforcement: z.boolean().default(false),
+  scanContentSecrets: z.boolean().default(true),
+  skipSecretContentFiles: z.boolean().default(true),
+  checkDrift: z.boolean().default(true),
   scanMs: z.number().int().min(100).max(60000).default(15000),
   massFiles: z.number().int().min(1).max(100000).default(20),
   massPercent: z.number().min(0).max(100).default(20),

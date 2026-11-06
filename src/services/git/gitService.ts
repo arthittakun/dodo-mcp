@@ -51,6 +51,14 @@ export interface GitLogEntry {
   subject: string;
 }
 
+export interface GitRecoveryCheckpointEntry {
+  id: string;
+  ref: string;
+  sha: string;
+  date: string;
+  subject: string;
+}
+
 const GIT_TIMEOUT_MS = 15_000;
 const COMMIT_TIMEOUT_MS = 120_000; // hooks may run tests/linters
 const MAX_STATUS_ENTRIES = 500;
@@ -446,6 +454,270 @@ export class GitService {
       if (!this.visible(rel)) throw new DodoError('SECRET_PATH_DENIED', 'staged index contains denied paths; index preserved');
       const resolved = this.wfs.resolve(rel, { allowMissing: true });
       if (resolved.stat?.isFile()) this.wfs.assertRegularFileForDirectAccess(resolved);
+    }
+  }
+
+  /** Fast synchronous check whether the workspace (or an ancestor) has a .git directory/file. */
+  hasGitMarker(): boolean {
+    let cur = this.wfs.root;
+    for (let depth = 0; depth < 32; depth++) {
+      try {
+        if (fs.existsSync(path.join(cur, '.git'))) return true;
+      } catch {
+        /* ignore */
+      }
+      const parent = path.dirname(cur);
+      if (parent === cur) break;
+      cur = parent;
+    }
+    return false;
+  }
+
+  /** List DODO recovery checkpoints stored under refs/dodo/checkpoints/*. */
+  async listRecoveryCheckpoints(limit = 30): Promise<GitRecoveryCheckpointEntry[]> {
+    if (!(await this.isRepo())) return [];
+    const max = Math.max(1, Math.min(limit, 100));
+    const res = await this.run([
+      'for-each-ref',
+      `--count=${max}`,
+      '--sort=-creatordate',
+      '--format=%(refname)\t%(objectname)\t%(creatordate:iso-strict)\t%(subject)',
+      'refs/dodo/checkpoints',
+    ]);
+    if (res.code !== 0) return [];
+    const items: GitRecoveryCheckpointEntry[] = [];
+    for (const line of res.stdout.toString('utf8').split(/\r?\n/)) {
+      if (!line.trim()) continue;
+      const [ref, sha, date, ...subjectParts] = line.split('\t');
+      if (!ref || !sha) continue;
+      const id = ref.replace(/^refs\/dodo\/checkpoints\//, '');
+      items.push({ id, ref, sha, date: date ?? '', subject: subjectParts.join('\t').slice(0, 300) });
+    }
+    return items;
+  }
+
+  /** Detailed Git recovery status for the Local Config UI. */
+  async gitRecoveryStatus(limit = 20): Promise<{
+    isRepo: boolean;
+    branch: string | null;
+    head: string | null;
+    dirtyCount: number;
+    untrackedCount: number;
+    entries: Array<{ path: string; status: string }>;
+    truncated: boolean;
+    checkpoints: GitRecoveryCheckpointEntry[];
+    commits: GitLogEntry[];
+  }> {
+    if (!(await this.isRepo())) {
+      return { isRepo: false, branch: null, head: null, dirtyCount: 0, untrackedCount: 0, entries: [], truncated: false, checkpoints: [], commits: [] };
+    }
+    const [meta, st, logRes, checkpoints] = await Promise.all([
+      this.recoveryMetadata(),
+      this.status(),
+      this.log({ limit }),
+      this.listRecoveryCheckpoints(limit),
+    ]);
+    return {
+      isRepo: true,
+      branch: (meta.isRepo ? meta.branch : null) ?? st.branch ?? null,
+      head: meta.isRepo ? (meta.head ?? null) : null,
+      dirtyCount: st.entries.filter((e) => e.status !== '??').length,
+      untrackedCount: st.entries.filter((e) => e.status === '??').length,
+      entries: st.entries.slice(0, 100),
+      truncated: st.truncated,
+      checkpoints,
+      commits: logRes.commits,
+    };
+  }
+
+  /**
+   * Create a lightweight Git checkpoint ref (refs/dodo/checkpoints/<id>) using a
+   * temporary index file. Never modifies .git/index, HEAD, or the working tree,
+   * and never runs repository hooks.
+   */
+  async createRecoveryCheckpoint(opts: {
+    trigger: string;
+    actor: string;
+    indexStagingDir: string;
+    excludePaths?: string[];
+  }): Promise<{
+    id: string;
+    ref: string;
+    commitSha: string;
+    treeSha: string;
+    headSha: string | null;
+    dirtyCount: number;
+    createdAt: number;
+    subject: string;
+  }> {
+    if (!(await this.isRepo())) throw new DodoError('NOT_FOUND', 'not a git repository');
+    fs.mkdirSync(opts.indexStagingDir, { recursive: true, mode: 0o700 });
+    const tempIndex = path.join(opts.indexStagingDir, `git-cp-idx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    try {
+      const headRes = await this.run(['rev-parse', '--verify', 'HEAD']);
+      const headSha = headRes.code === 0 && /^[a-f0-9]{40,64}$/.test(headRes.stdout.toString('utf8').trim())
+        ? headRes.stdout.toString('utf8').trim()
+        : null;
+      if (headSha) {
+        await this.run(['read-tree', headSha], { indexFile: tempIndex });
+      } else {
+        await this.run(['read-tree', '--empty'], { indexFile: tempIndex });
+      }
+      const st = await this.status();
+      const excludes = (opts.excludePaths ?? []).map((p) => p.replace(/^\.\/+/, '').replace(/\/+$/, '')).filter(Boolean);
+      const visibleEntries = st.entries.filter((e) => !excludes.some((ex) => e.path === ex || e.path.startsWith(`${ex}/`)));
+      if (visibleEntries.length > 0) {
+        const pathspecs = visibleEntries.map((e) => `./${e.path}`);
+        await this.run(['add', '-A', '--pathspec-from-file=-', '--pathspec-file-nul'], {
+          indexFile: tempIndex,
+          stdin: Buffer.from(pathspecs.join('\0') + '\0', 'utf8'),
+        });
+      }
+      const treeRes = await this.run(['write-tree'], { indexFile: tempIndex });
+      if (treeRes.code !== 0) throw new DodoError('INTERNAL_ERROR', 'git write-tree failed');
+      const treeSha = treeRes.stdout.toString('utf8').trim();
+      const createdAt = Date.now();
+      const subject = `DODO checkpoint (${opts.trigger}) by ${opts.actor}`;
+      const commitArgs = [
+        '-c', 'user.name=DODO Recovery',
+        '-c', 'user.email=recovery@dodo.local',
+        'commit-tree',
+        treeSha,
+        ...(headSha ? ['-p', headSha] : []),
+        '-m', subject,
+      ];
+      const commitRes = await this.run(commitArgs, { indexFile: tempIndex });
+      if (commitRes.code !== 0) throw new DodoError('INTERNAL_ERROR', 'git commit-tree failed');
+      const commitSha = commitRes.stdout.toString('utf8').trim();
+      const id = `gitcp_${createdAt}_${commitSha.slice(0, 8)}`;
+      const ref = `refs/dodo/checkpoints/${id}`;
+      const upRes = await this.run(['update-ref', ref, commitSha]);
+      if (upRes.code !== 0) throw new DodoError('INTERNAL_ERROR', 'git update-ref failed');
+      return { id, ref, commitSha, treeSha, headSha, dirtyCount: visibleEntries.length, createdAt, subject };
+    } finally {
+      try { fs.rmSync(tempIndex, { force: true }); } catch { /* ignore */ }
+    }
+  }
+
+  private async resolveCommitRef(ref: string): Promise<string> {
+    const trimmed = ref.trim();
+    if (!trimmed || trimmed.length > 256 || trimmed.startsWith('-')) {
+      throw new DodoError('INVALID_INPUT', 'invalid Git reference');
+    }
+    const verify = await this.run(['rev-parse', '--verify', `${trimmed}^{commit}`]);
+    if (verify.code !== 0) {
+      throw new DodoError('NOT_FOUND', `Git commit or checkpoint not found: ${trimmed}`);
+    }
+    return verify.stdout.toString('utf8').trim();
+  }
+
+  /** Preview restoring files from a Git commit or DODO Git checkpoint ref. */
+  async previewRecoveryRestore(opts: { ref: string; paths?: string[] }): Promise<{
+    ref: string;
+    resolvedSha: string;
+    changedFiles: Array<{ path: string; status: string }>;
+    diff: string;
+    truncated: boolean;
+    filteredSecretPaths: number;
+  }> {
+    if (!(await this.isRepo())) throw new DodoError('NOT_FOUND', 'not a git repository');
+    const resolvedSha = await this.resolveCommitRef(opts.ref);
+    let filtered = 0;
+    let pathspecs: string[] = ['.'];
+    if (opts.paths && opts.paths.length > 0) {
+      const r = this.toPathspecs(opts.paths);
+      filtered = r.filtered;
+      pathspecs = r.pathspecs;
+      if (pathspecs.length === 0) {
+        return { ref: opts.ref, resolvedSha, changedFiles: [], diff: '', truncated: false, filteredSecretPaths: filtered };
+      }
+    }
+    const prefix = await this.repoPrefix();
+    const nameStatusRes = await this.run(['diff', '--no-ext-diff', '--no-textconv', '--no-color', '--name-status', '-z', resolvedSha, '--', ...pathspecs]);
+    const changedFiles: Array<{ path: string; status: string }> = [];
+    if (nameStatusRes.code === 0 || nameStatusRes.code === 1) {
+      const tokens = nameStatusRes.stdout.toString('utf8').split('\0').filter(Boolean);
+      for (let i = 0; i < tokens.length; i++) {
+        const status = tokens[i] ?? '';
+        const rawPath = status.startsWith('R') || status.startsWith('C') ? (tokens[i += 2] ?? '') : (tokens[++i] ?? '');
+        const scoped = this.scopeToRoot(rawPath, prefix);
+        if (!scoped) continue;
+        if (!this.visible(scoped)) {
+          filtered += 1;
+          continue;
+        }
+        changedFiles.push({ path: scoped, status: status.slice(0, 1) || 'M' });
+      }
+    }
+    const diffRes = await this.run(['diff', '--no-ext-diff', '--no-textconv', '--no-color', '-U3', resolvedSha, '--', ...pathspecs]);
+    const rawDiff = diffRes.code === 0 || diffRes.code === 1 ? diffRes.stdout.toString('utf8') : '';
+    const { kept, dropped } = this.filterDiffSections(rawDiff);
+    const { text, truncated } = truncateUtf8(kept, this.limits.toolContentBytes - 4 * 1024);
+    return {
+      ref: opts.ref,
+      resolvedSha,
+      changedFiles,
+      diff: text,
+      truncated,
+      filteredSecretPaths: filtered + dropped,
+    };
+  }
+
+  /**
+   * Restore working tree files from a Git commit or DODO Git checkpoint ref.
+   * Automatically creates a before-restore Git checkpoint and uses a temporary
+   * index file so the user's .git/index and HEAD remain untouched.
+   */
+  async applyRecoveryRestore(opts: {
+    ref: string;
+    paths?: string[];
+    indexStagingDir: string;
+    excludePaths?: string[];
+  }): Promise<{
+    restoredRef: string;
+    resolvedSha: string;
+    backupCheckpointId: string;
+    backupCheckpointRef: string;
+    restoredFiles: string[];
+  }> {
+    if (!(await this.isRepo())) throw new DodoError('NOT_FOUND', 'not a git repository');
+    const resolvedSha = await this.resolveCommitRef(opts.ref);
+    const preview = await this.previewRecoveryRestore(opts.paths ? { ref: resolvedSha, paths: opts.paths } : { ref: resolvedSha });
+    const backup = await this.createRecoveryCheckpoint({
+      trigger: 'before-git-restore',
+      actor: 'local-config-owner',
+      indexStagingDir: opts.indexStagingDir,
+      ...(opts.excludePaths ? { excludePaths: opts.excludePaths } : {}),
+    });
+    const toCheckout = preview.changedFiles.filter((f) => f.status !== 'A').map((f) => `./${f.path}`);
+    const toRemove = preview.changedFiles.filter((f) => f.status === 'A').map((f) => f.path);
+    const tempIndex = path.join(opts.indexStagingDir, `git-restore-idx-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`);
+    try {
+      await this.run(['read-tree', resolvedSha], { indexFile: tempIndex });
+      if (toCheckout.length > 0) {
+        const co = await this.run(['checkout', resolvedSha, '--', ...toCheckout], { indexFile: tempIndex });
+        if (co.code !== 0) {
+          throw new DodoError('CONFLICT', `git checkout failed: ${co.stderr.slice(0, 300)}`);
+        }
+      }
+      if (opts.paths && opts.paths.length > 0 && toRemove.length > 0) {
+        for (const rel of toRemove) {
+          if (!this.visible(rel)) continue;
+          const resolved = this.wfs.resolve(rel, { allowMissing: true });
+          if (resolved.stat?.isFile()) {
+            fs.rmSync(resolved.abs, { force: true });
+          }
+        }
+      }
+      return {
+        restoredRef: opts.ref,
+        resolvedSha,
+        backupCheckpointId: backup.id,
+        backupCheckpointRef: backup.ref,
+        restoredFiles: preview.changedFiles.map((f) => f.path),
+      };
+    } finally {
+      try { fs.rmSync(tempIndex, { force: true }); } catch { /* ignore */ }
     }
   }
 

@@ -9,7 +9,7 @@ import { RecoveryStorage } from '../../src/services/recovery/storage.js';
 describe('R01 durable default-on source backups',()=>{
   let f:ReturnType<typeof platformFixture>;
   afterEach(async()=>{vi.restoreAllMocks();await f?.close();});
-  const setup=(files:Record<string,string>={})=>{f=platformFixture();for(const [name,text]of Object.entries(files)){fs.mkdirSync(path.dirname(path.join(f.root,name)),{recursive:true});fs.writeFileSync(path.join(f.root,name),text);}new ProjectRegistry(f.ws.store).add(f.root,'Fixture');return f.ws.services.recovery!;};
+  const setup=(files:Record<string,string>={},strict=true)=>{f=platformFixture();for(const [name,text]of Object.entries(files)){fs.mkdirSync(path.dirname(path.join(f.root,name)),{recursive:true});fs.writeFileSync(path.join(f.root,name),text);}if(strict)f.ws.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(f.ws.workspaceId,JSON.stringify(RecoveryPolicySchema.parse({strictEnforcement:true,skipSecretContentFiles:false})));new ProjectRegistry(f.ws.store).add(f.root,'Fixture');return f.ws.services.recovery!;};
   const latest=()=>f.ws.store.db.prepare("SELECT id FROM recovery_snapshots WHERE workspace_id=? AND state='READY' ORDER BY created_at DESC,rowid DESC LIMIT 1").get(f.ws.workspaceId) as {id:string};
   it('defaults enabled for a dirty non-Git registered project; immutable actual bytes survive deleting source',async()=>{
     const r=setup({'a.txt':'original','untracked.txt':'untracked'});expect(r.status()).toMatchObject({enabled:true,state:'INITIALIZING',awaitingActivation:true});
@@ -118,5 +118,16 @@ describe('R01 durable default-on source backups',()=>{
     expect((await r.scanDrift()).changes).toEqual([expect.objectContaining({path:'a.txt',change:'modified'})]);
     await expect(f.call('write_file',{path:'a.txt',content:'must not overwrite'})).rejects.toThrow('FILE_CHANGED');
     expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('outside');
+  });
+  it('default non-blocking policy skips credential-like example files, ignores .next, and never blocks edits',async()=>{
+    const r=setup({'a.txt':'original','env.example':'OPENAI_KEY=sk-'+'A'.repeat(40),'.next/build.js':'compiled'},false);
+    expect(r.policy()).toMatchObject({mode:'auto',strictEnforcement:false,skipSecretContentFiles:true});
+    await f.call('edit_file',{path:'a.txt',edits:[{find:'original',replace:'updated'}]});
+    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('updated');
+    const st=r.status();
+    expect(st.state).toBe('READY');
+    expect(st.skippedSecretFiles).toContain('env.example');
+    await f.call('write_file',{path:'env.example',content:'OPENAI_KEY=placeholder'});
+    expect(fs.readFileSync(path.join(f.root,'env.example'),'utf8')).toBe('OPENAI_KEY=placeholder');
   });
 });

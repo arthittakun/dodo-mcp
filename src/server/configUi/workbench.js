@@ -183,12 +183,188 @@
     }
   }
 
+  let activeProjectTab = 'all';
+
+  function renderFileAccessPolicyCard(parent, config, onSaved) {
+    const card=section(
+      'การอนุญาตเข้าถึงไฟล์และไฟล์ความลับ (File Access & Secret Policy)',
+      'กำหนดระดับการอนุญาตไฟล์ทั้งหมดในที่เดียว เช่น อนุญาตไฟล์ตัวอย่าง (.env.example), อนุญาตเฉพาะไฟล์ที่ระบุ หรือยืนยันเพื่ออนุญาตทุกไฟล์โดยไม่บล็อก SECRET_PATH_DENIED มีผลทันทีโดยไม่ต้องรีสตาร์ต'
+    );
+    parent.append(card);
+
+    const grid=el('div',undefined,'rec-settings-grid');
+    card.append(grid);
+
+    const gMode=el('div',undefined,'rec-setting-group');
+    gMode.append(el('h4','1. โหมดการอนุญาตไฟล์ความลับ (Secret Policy Mode)'));
+    const modeSelect=choice(
+      gMode,
+      'ระดับการป้องกันไฟล์ความลับ',
+      'secretPolicyMode',
+      [
+        ['standard','มาตรฐาน (แนะนำ — บล็อก .env จริง แต่อนุญาต .env.example / .env.sample อัตโนมัติ)'],
+        ['off','อนุญาตทุกไฟล์ (Allow All — ปิดการบล็อก SECRET_PATH_DENIED ทั้งหมด เข้าถึงและแก้ไขได้ทุกไฟล์)'],
+        ['strict','เข้มงวดสูงสุด (Strict — บล็อกทุกไฟล์ที่ตรงรูปแบบ .env* รวมถึงไฟล์ตัวอย่าง เว้นแต่ระบุในรายการอนุญาต)'],
+      ],
+      config.secretPolicyMode||'standard'
+    );
+    const confirmAllowAll=check(
+      gMode,
+      'ยืนยันว่าต้องการเปิดโหมดอนุญาตทุกไฟล์ (Allow All) เพื่อให้เข้าถึงและแก้ไขได้ทุกไฟล์รวมถึง .env และไฟล์ความลับ',
+      'confirmAllowAllFiles',
+      config.secretPolicyMode==='off'
+    );
+    const presetRow=el('div',undefined,'rec-chip-row');
+    presetRow.append(
+      button('ตั้งเป็นมาตรฐาน (แนะนำ)',()=>{modeSelect.value='standard';confirmAllowAll.checked=false;},'btn small'),
+      button('อนุญาตทุกไฟล์ (ไม่บล็อกเลย)',()=>{modeSelect.value='off';confirmAllowAll.checked=true;},'btn small'),
+      button('ตั้งเป็นเข้มงวดสูงสุด',()=>{modeSelect.value='strict';confirmAllowAll.checked=false;},'btn small')
+    );
+    gMode.append(presetRow);
+    grid.append(gMode);
+
+    const gAllow=el('div',undefined,'rec-setting-group');
+    gAllow.append(el('h4','2. รายการไฟล์ที่อนุญาตพิเศษ (Secret Allow)'));
+    const allowField=field(
+      gAllow,
+      'ไฟล์หรือรูปแบบที่อนุญาตให้อ่าน/แก้ไขได้เสมอ (หนึ่งรายการต่อบรรทัด)',
+      'secretAllow',
+      (config.secretAllow||[]).join('\n'),
+      'textarea'
+    );
+    allowField.rows=4;
+    const allowChips=el('div',undefined,'rec-chip-row');
+    for(const item of ['.env.example','.env.sample','.env.template','.env.development','.env.docker','.env.local','.env','*.pem','*.key']){
+      allowChips.append(button(`+ ${item}`,()=>{
+        const cur=allowField.value.split('\n').map(v=>v.trim()).filter(Boolean);
+        if(!cur.includes(item))allowField.value=[...cur,item].join('\n');
+      },'btn small'));
+    }
+    gAllow.append(allowChips);
+    grid.append(gAllow);
+
+    const gDeny=el('div',undefined,'rec-setting-group');
+    gDeny.append(el('h4','3. รายการไฟล์ที่ไม่อนุญาตเพิ่มเติม (Secret Deny)'));
+    const denyField=field(
+      gDeny,
+      'ไฟล์หรือรูปแบบที่ต้องการบล็อกเสมอ (มีผลแม้เปิดโหมดอนุญาตทุกไฟล์)',
+      'secretDeny',
+      (config.secretDeny||[]).join('\n'),
+      'textarea'
+    );
+    denyField.rows=4;
+    const denyChips=el('div',undefined,'rec-chip-row');
+    for(const item of ['.env.production','secrets/**','*.secret','credentials.json']){
+      denyChips.append(button(`+ ${item}`,()=>{
+        const cur=denyField.value.split('\n').map(v=>v.trim()).filter(Boolean);
+        if(!cur.includes(item))denyField.value=[...cur,item].join('\n');
+      },'btn small'));
+    }
+    gDeny.append(denyChips);
+    grid.append(gDeny);
+
+    const gFlex=el('div',undefined,'rec-setting-group');
+    gFlex.append(el('h4','4. ความยืดหยุ่นในการทำงานร่วมกับ AI & Editor'));
+    const relaxEpoch=check(
+      gFlex,
+      'ไม่บล็อก STALE_WORKSPACE เมื่อเซิร์ฟเวอร์รีสตาร์ต (รับค่า workspaceEpoch เดิมของโปรเจกต์อัตโนมัติ)',
+      'relaxEpochCheck',
+      Boolean(config.relaxEpochCheck)
+    );
+    const relaxHash=check(
+      gFlex,
+      'ยืดหยุ่น expectedHash สำหรับ edit_file เมื่อแก้ไฟล์ร่วมกับ VS Code / Editor อื่น (ลดปัญหา FILE_CHANGED)',
+      'relaxExpectedHash',
+      Boolean(config.relaxExpectedHash)
+    );
+    gFlex.append(el('p','ช่วยให้ AI ทำงานต่อเนื่องได้แม้คุณเซฟไฟล์ใน VS Code หรือเพิ่งรีสตาร์ต DODO ใหม่','muted'));
+    grid.append(gFlex);
+
+    const actionBar=el('div',undefined,'rec-action-bar');
+    actionBar.append(button('บันทึกการอนุญาตไฟล์และความยืดหยุ่น (มีผลทันที)',async()=>{
+      if(modeSelect.value==='off'&&!confirmAllowAll.checked){
+        if(!await confirmDanger('ยืนยันอนุญาตทุกไฟล์?','การเปิดโหมดอนุญาตทุกไฟล์ (Allow All) จะปิดการบล็อก SECRET_PATH_DENIED ทำให้เข้าถึงและแก้ไขได้ทุกไฟล์ในโปรเจกต์ (รวมถึง .env และคีย์ต่าง ๆ)','ยืนยันอนุญาตทุกไฟล์'))return;
+        confirmAllowAll.checked=true;
+      }
+      const payload={
+        secretPolicyMode:modeSelect.value,
+        secretAllow:[...new Set(allowField.value.split('\n').map(v=>v.trim()).filter(Boolean))],
+        secretDeny:[...new Set(denyField.value.split('\n').map(v=>v.trim()).filter(Boolean))],
+        relaxEpochCheck:relaxEpoch.checked,
+        relaxExpectedHash:relaxHash.checked,
+      };
+      await api('admin/config',payload);
+      notice('บันทึกการอนุญาตไฟล์และความยืดหยุ่นแล้ว — มีผลทันทีทุกโปรเจกต์');
+      if(onSaved)await onSaved(payload);
+    },'btn primary'));
+    card.append(actionBar);
+    return card;
+  }
+
   async function projects(body) {
     const personal=state.accessMode==='personal';
     const s=section('โปรเจกต์พร้อมกัน',personal?'เพิ่ม path แล้วใช้ได้ทันที ไม่ต้องอนุญาต client หรือ profile ซ้ำ งานต่างโปรเจกต์ทำพร้อมกันได้':'เปิด runtime แยกโปรเจกต์และกำหนด ACL/trust ของแต่ละโปรเจกต์เอง');body.append(s);
     const name=field(s,'ชื่อโปรเจกต์','projectName'),root=field(s,'Absolute path ในเครื่อง','projectRoot');
     s.append(button(personal?'เพิ่มและพร้อมใช้':'เพิ่ม path',async()=>{await api('projects/add',{path:root.value,...(name.value?{displayName:name.value}:{})});notice(personal?'เพิ่มโปรเจกต์แล้ว พร้อมใช้งานทันที':'เพิ่มในทะเบียนแล้ว ตั้งค่าสิทธิ์ก่อนใช้งาน');await show('projects');}));
     if(!selected){s.append(el('p',personal?'เพิ่มหรือเลือกโปรเจกต์จากรายการด้านบน':'เลือกโปรเจกต์จากรายการด้านบนเพื่อจัดการสิทธิ์','wb-empty'));return;}
+
+    const [config,stuckChangesets]=await Promise.all([
+      api('admin/config'),
+      api('admin/action',{projectId:selected.projectId,operation:'recover.list',args:{}},true).catch(()=>[]),
+    ]);
+
+    if(Array.isArray(stuckChangesets)&&stuckChangesets.length>0){
+      const stuckBanner=el('div',undefined,'rec-alert');
+      stuckBanner.dataset.tone='danger';
+      stuckBanner.append(
+        el('p',`พบรายการแก้ไฟล์ที่ค้างจากการทำงานรอบก่อน (${stuckChangesets.length} รายการ)`,'rec-alert-title'),
+        el('p','โปรเจกต์นี้อาจติดบล็อกการแก้ไฟล์จนกว่าจะปลดล็อกรายการที่ค้าง คุณสามารถกดปุ่มด้านล่างเพื่อปลดล็อกทั้งหมดได้ในคลิกเดียว','muted')
+      );
+      const stuckActions=el('div',undefined,'rec-action-bar');
+      stuckActions.append(button('ปลดล็อกรายการแก้ไฟล์ที่ค้างทั้งหมด (Resolve All)',async()=>{
+        await api('admin/action',{projectId:selected.projectId,operation:'recover.resolve',args:{changesetId:'*',action:'resolve-all'}},true);
+        notice('ปลดล็อกรายการแก้ไฟล์ที่ค้างทั้งหมดเรียบร้อยแล้ว');
+        await show('projects');
+      },'btn primary'));
+      stuckBanner.append(stuckActions);
+      s.append(stuckBanner);
+    }
+
+    const tabBar=el('div',undefined,'wb-subtabs');
+    tabBar.setAttribute('role','tablist');
+    const tabDefs=[
+      ['all','แสดงทั้งหมด'],
+      ['general','ทั่วไป & การอนุญาตไฟล์'],
+      ['recovery','สำรอง & กู้คืน (Recovery & Git)'],
+      ['deploy','Deployment'],
+      ['data','Database & Config Vault'],
+      ['jobs','Jobs'],
+    ];
+    const applySubtabFilter=()=>{
+      for(const btn of tabBar.querySelectorAll('button')){
+        const isCurrent=btn.dataset.subtab===activeProjectTab;
+        btn.setAttribute('aria-selected',String(isCurrent));
+        btn.classList.toggle('active',isCurrent);
+      }
+      for(const child of s.children){
+        if(!child.dataset.projectTab)continue;
+        child.hidden=activeProjectTab!=='all'&&child.dataset.projectTab!==activeProjectTab;
+      }
+    };
+    for(const [tabId,tabLabel] of tabDefs){
+      const btn=button(tabLabel,()=>{activeProjectTab=tabId;applySubtabFilter();},'wb-subtab-btn');
+      btn.dataset.subtab=tabId;
+      btn.setAttribute('role','tab');
+      tabBar.append(btn);
+    }
+    s.append(tabBar);
+    const markChildrenFrom=(startIdx,tabId)=>{
+      for(let i=startIdx;i<s.children.length;i+=1){
+        s.children[i].dataset.projectTab=tabId;
+      }
+    };
+
+    const genStart=s.children.length;
     if(!personal){
     const trust=choice(s,'Trust ที่บันทึก','trust',[['inspect','inspect — อ่าน; งานที่มีผลขออนุมัติ'],['edit','edit — อ่านและแก้ไฟล์; คำสั่งขออนุมัติ'],['trusted','trusted — รันคำสั่งด้วยสิทธิ์ OS ของผู้ใช้']],selected.savedTrust);
     trust.parentElement.append(help('trust ที่บันทึกคือค่าถาวรของโปรเจกต์ ส่วนสิทธิ์ที่มีผลรอบนี้อาจต่างกันเมื่อ DODO ถูกเปิดด้วย override flag คำสั่งใน trusted ไม่ใช่ OS sandbox', 'trust'));
@@ -209,12 +385,28 @@
       s.append(button('ตั้งเป็น default project',async()=>{await api('ai/project',{projectId:selected.projectId,action:'close'});await api('workspace/switch',{path:selected.root});await reload();await selectProject();notice('เปลี่ยน default workspace แล้ว');await show('projects');}));
       s.append(button('ปิด runtime ที่ว่าง',async()=>{const result=await api('ai/project',{projectId:selected.projectId,action:'close'});notice(result.closed?'ปิด runtime รองแล้ว โปรเจกต์ยังพร้อมเปิดใหม่':'ไม่มี runtime รองที่ปิดได้');}));
     }
+    renderFileAccessPolicyCard(s,config,()=>show('projects'));
+    markChildrenFrom(genStart,'general');
+
+    const recStart=s.children.length;
     await recoveryPanel(s);
+    markChildrenFrom(recStart,'recovery');
+
     const projectContext={...selected};
+    const depStart=s.children.length;
     await deploymentPanel(s,(operation,args={})=>api('admin/action',{projectId:projectContext.projectId,operation,args},true),projectContext);
+    markChildrenFrom(depStart,'deploy');
+
+    const dataStart=s.children.length;
     await dataRecoveryPanel(s,(operation,args={})=>api('admin/action',{projectId:projectContext.projectId,operation,args},true),projectContext);
+    markChildrenFrom(dataStart,'data');
+
+    const jobsStart=s.children.length;
     const jobs=section('Jobs ของโปรเจกต์','สถานะจาก runtime ปัจจุบัน');s.append(jobs);
     const jobsDetails=el('details');jobsDetails.append(el('summary','รายละเอียดทางเทคนิค (JSON)'));output(jobsDetails,selected.jobs);jobs.append(jobsDetails);
+    markChildrenFrom(jobsStart,'jobs');
+
+    applySubtabFilter();
   }
 
   const recoveryPanel=window.DodoRecovery({el,section,button,check,field,choice,notice,confirmDanger,help,api,refresh:()=>show('projects'),getSelected:()=>selected});
@@ -438,6 +630,7 @@
     access.querySelector('h2').append(help('Personal = คนเดียวใช้ ทุก client ที่อนุมัติแล้วใช้ทุกโปรเจกต์ตาม token scopes · Managed = แยกสิทธิ์ราย client รายโปรเจกต์ การสลับโหมดไม่แตะ OAuth scopes, sandbox หรือ guards ใด ๆ', 'Personal / Managed mode'));
     if(state.accessMode==='personal')access.append(button('เปลี่ยนเป็นโหมดแยกสิทธิ์',async()=>{if(!await confirmDanger('เปลี่ยนเป็นโหมดแยกสิทธิ์?','หลังเปลี่ยน AI จะหยุดจนกว่าจะตั้ง ACL/trust/profile permission ของแต่ละโปรเจกต์','เปลี่ยนโหมด'))return;await api('ai/access-mode',{mode:'managed'});notice('เปิดโหมดแยกสิทธิ์แล้ว');await show('settings');}));
     else access.append(button('ใช้โหมดส่วนตัวแบบเพิ่มแล้วใช้ได้เลย',async()=>{if(!await confirmDanger('เปลี่ยนเป็นโหมดส่วนตัว?','OAuth client ที่คุณอนุมัติจะใช้ทุกโปรเจกต์ตาม token scopes และ remote profiles จะส่ง context ไป provider ได้','เปลี่ยนโหมด'))return;await api('ai/access-mode',{mode:'personal'});notice('เปิดโหมดส่วนตัวแล้ว มีผลทันที');await show('settings');},'btn primary'));
+    renderFileAccessPolicyCard(body,config,()=>show('settings'));
     const exposure=section('Sub-agent tools ใน MCP',config.exposeSubagentsToMcp?'เปิดอยู่: AI ภายนอกมองเห็น operations สำหรับสร้างและจัดการ sub-agent':'ปิดอยู่: หน้าเว็บยังสร้าง agent ได้ แต่ MCP clients จะไม่เห็น operations กลุ่ม sub-agent');body.append(exposure);
     const exposureSummary=exposure.querySelector(':scope > p.muted');
     exposure.querySelector('h2').append(help('ควบคุมเฉพาะ MCP catalog: subagent_spawn, subagent_status, subagent_result และ subagent_control รวมถึงรายการใน dodo_discover/gateway schema ไม่เพิ่มหรือลด OAuth scopes, trust, approvals หรือสิทธิ์ของ profile', 'Sub-agent tool exposure'));

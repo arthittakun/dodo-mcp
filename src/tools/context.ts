@@ -312,9 +312,18 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
         });
       }
       if (epochArg !== services.epoch) {
-        throw new DodoError('STALE_WORKSPACE', 'the server restarted or switched workspace since this workspaceEpoch; call project_overview again', {
-          recovery: 'call project_overview and use the fresh workspaceEpoch',
-        });
+        const canRelaxEpoch =
+          services.config.relaxEpochCheck === true &&
+          typeof epochArg === 'string' &&
+          /^boot_[a-z0-9]{8,24}$/.test(epochArg) &&
+          def.name !== 'restore_apply' &&
+          def.name !== 'recovery_maintenance_apply';
+        if (!canRelaxEpoch) {
+          throw new DodoError('STALE_WORKSPACE', 'the server restarted or switched workspace since this workspaceEpoch; call project_overview again', {
+            detail: { currentWorkspaceId: services.workspaceId, currentWorkspaceEpoch: services.epoch },
+            recovery: 'call project_overview and use the fresh workspaceEpoch',
+          });
+        }
       }
     }
     // Shared application budget, including STDIO. HTTP and STDIO also

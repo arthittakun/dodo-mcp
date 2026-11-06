@@ -19,6 +19,7 @@ export class Planner {
     private readonly wfs: WorkspaceFS,
     private readonly limits: Limits,
     private readonly store: Store,
+    private readonly allowRelaxedHash?: () => boolean,
   ) {}
 
   preview(opts: {
@@ -142,7 +143,8 @@ export class Planner {
         };
       }
       case 'replace_exact': {
-        const current = this.readCurrent(op.path, op.expectedHash);
+        const relaxed = this.allowRelaxedHash?.() === true;
+        const current = this.readCurrent(op.path, relaxed ? undefined : op.expectedHash);
         if (current.text === undefined) {
           throw new DodoError('UNSUPPORTED_ENCODING', 'replace_exact requires a UTF-8 text file', { detail: { path: current.rel } });
         }
@@ -150,6 +152,12 @@ export class Planner {
         const expected = op.expectedCount ?? 1;
         const count = countOccurrences(current.text, op.find);
         if (count !== expected) {
+          if (relaxed && op.expectedHash !== undefined && op.expectedHash !== current.hash) {
+            throw new DodoError('FILE_CHANGED', 'file content does not match expectedHash', {
+              detail: { path: current.rel, expectedHash: op.expectedHash, actualHash: current.hash },
+              recovery: 'read the file again to get its current content and hash',
+            });
+          }
           throw new DodoError('AMBIGUOUS_EDIT', `expected ${expected} occurrence(s) of the target text, found ${count}`, {
             detail: { path: current.rel, expected, found: count },
             recovery: 'read the file again and provide a more specific target or the correct expectedCount',

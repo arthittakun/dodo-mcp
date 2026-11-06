@@ -77,4 +77,25 @@ describe('R03 independent Git recovery copies',()=>{
   const count=copies().length;fail=true;await r.checkpoint('owner-checkpoint','owner');expect(r.git.status().state).toBe('unavailable');expect(copies()).toHaveLength(count);
  });
 
+ it('supports direct Git recovery checkpoints, diff preview, and restore without touching .git/index',async()=>{
+  const r=setup();
+  await r.configure({...r.policy(),mode:'git',strictEnforcement:false},true);
+  expect(r.status().effectiveMode).toBe('git');
+  fs.writeFileSync(path.join(f.root,'env.example'),'OPENAI_KEY=sk-'+'B'.repeat(40));
+  const indexBefore=fs.readFileSync(path.join(f.root,'.git/index'));
+  const cp=await r.createGitCheckpoint('owner-checkpoint','local-config-owner');
+  expect(cp.ref).toMatch(/^refs\/dodo\/checkpoints\/gitcp_/);
+  fs.writeFileSync(path.join(f.root,'a'),'modified-after-cp');
+  const gitSt=await r.gitRecoveryStatus();
+  expect(gitSt.isRepo).toBe(true);
+  expect(gitSt.checkpoints.some(c=>c.id===cp.id)).toBe(true);
+  const preview=await r.previewGitRestore({ref:cp.ref,paths:['a']});
+  expect(preview.changedFiles).toEqual([expect.objectContaining({path:'a',status:'M'})]);
+  expect(preview.diff).toContain('modified-after-cp');
+  const restored=await r.applyGitRestore({ref:cp.ref,paths:['a']});
+  expect(restored.restoredFiles).toContain('a');
+  expect(fs.readFileSync(path.join(f.root,'a'),'utf8')).toBe('committed');
+  expect(fs.readFileSync(path.join(f.root,'.git/index'))).toEqual(indexBefore);
+ });
+
 });
