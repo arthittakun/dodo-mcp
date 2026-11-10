@@ -22,15 +22,26 @@ export function rootIdentity(root: string): string {
 }
 /** Separate CAS and references: media/resource TTL and GC never own these bytes. */
 export class RecoveryStorage {
-  readonly directory: string;
-  private readonly identity: string;
-  constructor(readonly store: Store, configDir: string, readonly installationPolicy: () => RecoveryInstallationPolicy) {
+  private readonly recoveryDir: string;
+  private initializedDirectory: string|undefined;
+  private identity: string|undefined;
+  constructor(readonly store: Store, private readonly configDir: string, readonly installationPolicy: () => RecoveryInstallationPolicy) {
     assertPrivatePath(configDir,true);
-    const recoveryDir = path.join(configDir,'recovery');
-    ensurePrivateDirectory(recoveryDir);
-    this.directory = fs.realpathSync.native(recoveryDir);
-    this.identity = rootIdentity(this.directory);
-    for (const dir of ['objects','manifests','staging']) ensurePrivateDirectory(path.join(this.directory,dir));
+    this.recoveryDir=path.join(configDir,'recovery');
+  }
+  get directory():string {
+    if(this.initializedDirectory===undefined){
+      // Recovery storage is optional during bootstrap. Initialize only on real
+      // disk access, then pin the same canonical identity used by safeDir().
+      assertPrivatePath(this.configDir,true);
+      ensurePrivateDirectory(this.recoveryDir);
+      const directory=fs.realpathSync.native(this.recoveryDir),identity=rootIdentity(directory);
+      for(const dir of ['objects','manifests','staging'])ensurePrivateDirectory(path.join(directory,dir));
+      if(rootIdentity(directory)!==identity)throw new DodoError('PATH_DENIED','recovery storage directory changed during initialization');
+      this.initializedDirectory=directory;
+      this.identity=identity;
+    }
+    return this.initializedDirectory;
   }
   private safeDir(name: 'objects'|'manifests'|'staging'): string {
     if (rootIdentity(this.directory) !== this.identity) throw new DodoError('PATH_DENIED','recovery storage directory changed');

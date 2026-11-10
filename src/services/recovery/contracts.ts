@@ -8,6 +8,8 @@ export const RecoveryPolicySchema = z.object({
   version: z.literal(1).default(1),
   enabled: z.boolean().default(true),
   mode: RecoveryModeSchema.default('auto'),
+  // Kept for stored-policy compatibility and strict checkpoint diagnostics.
+  // Automatic source backup never prevents ordinary writes or commands.
   strictEnforcement: z.boolean().default(false),
   scanContentSecrets: z.boolean().default(true),
   skipSecretContentFiles: z.boolean().default(true),

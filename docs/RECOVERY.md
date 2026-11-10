@@ -11,9 +11,10 @@ Existing projects without a Recovery policy also default to enabled; an explicit
 owner opt-out persists. Merely starting DODO from an arbitrary directory does
 not scan that directory, the launcher workspace, or your home directory.
 
-In Local Config, select a project and open **Recovery · สำรอง source**. The card
-shows initializing, ready, blocked, or disabled by owner, the last saved
-checkpoint (integrity checked at capture), included/excluded counts and logical project storage. Advanced
+In Local Config, select a project and open **Recovery · ระบบสำรองและกู้คืนโปรเจกต์**. The card
+shows initializing, ready, backup unavailable (`BLOCKED`), or disabled by owner,
+the last saved checkpoint (integrity checked at capture), included/excluded counts and logical project storage. `BLOCKED` describes the backup, while
+`operationsBlocked:false` means a backup problem does not stop normal editing or commands. Advanced
 settings cover the project's quota, retention, and relative runtime/data roots.
 Installation storage/free-space limits are under Settings → system JSON →
 `recovery`. Changing that configuration never grants access to source or commands.
@@ -32,11 +33,20 @@ Recovery policy. Disabling requires owner confirmation, is audited, preserves
 old points and does not turn off the existing file journal. Re-enabling schedules
 a new baseline; saving a preference alone does not mean a backup has completed.
 
-Writes and directory creation capture their targets before mutation. Commands,
-verification recipes, runtime/media jobs, schedules, and Git commits capture the
-source scope before executing. These paths keep the shared project mutation queue,
-authorization, hash/conflict and sandbox checks. A caller cannot bypass backups
-by hiding an operation from discover or selecting a more permissive trust mode.
+Writes and directory creation attempt to capture their targets before mutation.
+Commands, verification recipes, runtime/media jobs, schedules, and Git commits
+attempt to capture the source scope before executing. Automatic backups are
+**best effort**: an unavailable backup, scan failure, excluded target or failed
+Git copy produces a warning and normal work can continue. Existing saved
+`strictEnforcement`, `gitRequired` or `gitDirectory` settings do not make backup
+availability a gate for these operations. These paths keep the shared project
+mutation queue, authorization, expected-hash/conflict and sandbox checks.
+
+Explicit owner/verified checkpoints and reviewed restores still require valid
+backup evidence. They report failure when their required capture or integrity
+checks fail, and never report an unsuccessful backup as saved. Local Config
+shows this behavior as an explanation instead of a Strict Blocking switch;
+saving Recovery settings writes `strictEnforcement:false` for legacy compatibility.
 
 Backups hold actual independent bytes, modes and existence tombstones in private
 `recovery/objects`, with versioned manifests and SQLite references separate from
@@ -44,7 +54,9 @@ resource/media cache. No working Git repository, branch or commit is modified, a
 Independent private Git copies are described below.
 Deleting a working file does not delete its backup. Hash verification and a source
 rescan precede readiness. Corruption, changing files, scan limits, insufficient
-disk space or a failed backup stop the pending source mutation.
+disk space or a failed backup leave the backup unavailable and expose the
+failure without stopping normal source work. The pending operation may therefore
+have no Recovery checkpoint; a successful file journal is separate evidence.
 
 Defaults: 5 GiB of referenced objects per project, 20 GiB physical objects per
 installation, 500 MiB free-space floor, 30 days/200 unpinned points, 64 MiB per
@@ -58,19 +70,31 @@ just to allow another write.
 This is **source-only coverage**. Default exclusions include secret/protected
 paths, `.git`, dependencies/build/cache directories, database/dump/log files and
 owner-declared data roots. Ordinary ignore rules reduce baseline scanning; an
-explicit allowed source target is captured even if ordinarily ignored. Explicit
-targets excluded by the source/data policy are refused while protection is on.
+explicit allowed source target is captured even if ordinarily ignored. Targets
+excluded by source/data policy are omitted from Recovery coverage. An automatic
+capture failure does not grant access to secret/protected paths or suppress the
+file tool's existing path checks.
 Do not interpret this as a backup of databases, volumes, secrets, OS settings,
 Desktop/ADB effects or remote systems.
 
 Credential screening is bounded and heuristic, not a guarantee that every
-secret is recognizable. Backup storage has the same private filesystem/ACL
+secret is recognizable. The persistent `skipSecretContentFiles` preference
+controls whether matching files are skipped during capture. The Recovery quick
+action **ข้ามไฟล์ที่มีเนื้อหาคล้าย Secret ในการสำรอง** saves that project preference
+and retries the backup; it preserves the content-screening setting and does not change
+global file-access permissions. Diagnostics expose
+`blockedPath` as a workspace-relative path when available, the bounded
+`skippedSecretFiles` list, `errorCode`, and `lastWarning`. Skipped files have no
+new backup coverage; their paths do not certify that the rest of the capture
+succeeded. **ลองสำรองใหม่** retries capture and leaves the failure visible if it
+is still unavailable. Backup storage has the same private filesystem/ACL
 requirements as DODO state. It is not protected against an administrator or the
 same OS owner intentionally tampering with both data and metadata.
 
 A checkpoint is not an atomic filesystem-wide snapshot. DODO queues its own
 writers but cannot stop an IDE or unrelated process. It verifies paths, identity,
-hashes and inventory; detected drift fails closed. Modes are preserved, not all
+hashes and inventory; detected changes prevent that capture from being declared
+complete. Modes are preserved, not all
 ACLs/xattrs/alternate streams. On Windows directory fsync is unavailable. Private
 Git copy files use write-capable handles for mandatory file flushes, with fresh
 ACL and file identity checks. See [platform evidence](TEST_REPORT.md) for the
@@ -143,7 +167,14 @@ active jobs, pinned points and unexpired plans retain their backup references.
 
 ## External changes and Git copies
 
-DODO now keeps the **expected source state** separately from its snapshots. When a mutation target was changed outside the journal, the write fails with `FILE_CHANGED` even when the caller rereads its new hash. Other non-conflicting file edits remain possible. Significant source drift blocks new commands until the owner reviews it. Defaults: at least 20 changed files and more than 20% of the baseline, or 10 deletions. Commands still run under the existing exec/sandbox policy; backups cannot undo database or volume effects.
+DODO keeps the **expected source state** separately from its snapshots. External
+changes are reported with before/observed hashes and an unknown author. Recovery
+drift is advisory for normal work: the caller can edit using the current expected
+hash and run permitted commands while the warning remains visible. File-tool
+hash conflicts and reviewed-restore conflicts still reject changed inputs.
+Significant drift defaults to at least 20 changed files and more than 20% of the
+baseline, or 10 deletions. Commands still run under the existing exec/sandbox
+policy; backups cannot undo database or volume effects.
 
 In the project's Recovery card choose **ตรวจไฟล์และเปรียบเทียบ**. The comparison shows paths and before/observed hashes, with pagination, not raw credential/file contents. **ยอมรับสถานะที่ตรวจนี้** accepts exactly the reviewed state; it neither restores files nor marks tests as passed. To restore previous source instead, use the existing checkpoint/session preview and confirm that exact plan.
 
@@ -163,7 +194,14 @@ External changes are labeled **unknown author**, including changes observed afte
 
 For Git projects, DODO creates independent private bare copies at source checkpoint boundaries. No working branch, HEAD, staged/unstaged split or user index changes. Each copy contains only approved source bytes and a create-only `refs/dodo/snapshots/<snapshot-id>`; not old Git history, secrets or remotes. Hooks, filters, helpers and network protocols are disabled for this builder. The source manifest also records modes/empty directories that Git alone cannot represent.
 
-The advanced Recovery settings can require Git copies and select a separate backup directory. Prepare an **empty, dedicated private directory** outside projects and DODO state; its existing filesystem identity is verified. Removing or replacing that directory stops configured copies rather than redirecting them elsewhere. Copies count toward Recovery quotas. With no Git repository, ordinary source recovery still works; Git-required mode blocks full checkpoints until Git is available.
+The advanced Recovery settings can require Git copies for requested checkpoints
+and select a separate backup directory. Prepare an **empty, dedicated private
+directory** outside projects and DODO state; its existing filesystem identity is
+verified. Removing or replacing that directory makes configured copies unavailable
+rather than redirecting them elsewhere. Copies count toward Recovery quotas.
+With no Git repository, ordinary source recovery still works. A required Git
+copy that cannot be created fails an explicit checkpoint; automatic backup
+warnings do not stop normal edits or commands.
 
 If `.git` and source files are deleted but the registered root directory remains, preview/restore still uses the independent source checkpoint. If the entire root or installation state was lost, automatic restore cannot validate its old identity. Inspect the separately stored bare copy and `dodo-source-manifest.json` locally, extract approved files to a new directory, review it, then register that directory. For a single reviewed file, an owner may use `git --git-dir=/absolute/backup/snap_ID.git show refs/dodo/snapshots/snap_ID:path/to/file` to inspect the independent bytes. Do not pipe an unreviewed archive over an existing project. Git copies do not back up Git history, external LFS objects, databases or volumes.
 
@@ -223,9 +261,10 @@ To manage a project such as `my-project`:
    previously included files until separately deleted. Changing settings alone
    does not certify readiness, acknowledge drift or repair a corrupt backup.
 
-Excluded files are not restorable from future checkpoints. When an operation
-requires a before-image of an excluded file, DODO refuses it rather than silently
-editing without protection. Shell commands can still change excluded data; a
+Excluded files are not restorable from future checkpoints. Normal editing can
+continue with a warning when its automatic before-image cannot be captured;
+an explicit checkpoint or reviewed restore still requires its backup evidence.
+Shell commands can change excluded data; a
 source checkpoint is not a full machine/data backup or an OS sandbox.
 
 Current/latest source checkpoints, drift baselines, pins, names, active captures,

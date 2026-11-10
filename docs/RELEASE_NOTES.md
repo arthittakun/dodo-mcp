@@ -1,5 +1,21 @@
 # DODO MCP — Release Notes
 
+## 1.4.2 — Recovery best effort across restart
+
+- Automatic source backup failures no longer block normal commands or edits,
+  including after restart with legacy strict or Git-required settings.
+- Persist the per-project secret-skip preference; show relative `blockedPath`,
+  `skippedSecretFiles`, warnings and `operationsBlocked:false` in the overview.
+- Initialize Recovery disk storage lazily, and keep optional history/drift/agent
+  bookkeeping failures from masking successful work. Explicit checkpoints,
+  reviewed restores, authorization, path/hash and actual journal guards remain.
+- Replace Recovery's Strict Blocking and global permission quick actions with
+  project-scoped backup controls and truthful unavailable-backup diagnostics.
+- Focused Windows patch validation: 89 passed / 2 skipped across Recovery,
+  storage, Chrome UI and fresh-install packaging checks. Full native platform
+  gates and live production acceptance remain separate; see [validation](TEST_REPORT.md).
+- See [upgrade details](RELEASE_1.4.2.md) and [Recovery usage](RECOVERY.md).
+
 ## 1.4.1 — Immediate Upgrade Unblock, Full Edit Defaults & Concurrent Multi-Project UI
 
 - Automatically clears pre-existing write blocks (`recovery_required` changesets, `PREPARING` snapshots, `recovery_drift`, strict `recovery_policies`, `read`/`inspect` defaults, and read-only OAuth grants/tokens) immediately upon upgrading and opening `state.db`.

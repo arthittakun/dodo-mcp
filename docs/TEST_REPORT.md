@@ -1,5 +1,50 @@
 # DODO MCP — Test Report
 
+## 1.4.2 Recovery best-effort patch — Windows, 2026-11-11
+
+Focused checks on Windows / Node 24.22.1: **build, typecheck and lint passed**.
+These results cover the Recovery patch and are not a full native release gate.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Main Recovery regressions (7 files) | 69 | 0 | 2 |
+| Recovery-only storage failure at boot and pinned directory identity | 2 | 0 | 0 |
+| Owner UI in installed system Chrome | 1 | 0 | 0 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total focused checks | 89 | 0 | 2 |
+
+The main group's skips were the Windows directory-fsync case and the existing
+owner UI case whose bundled Chromium was unavailable. A separate UI regression
+used installed system Chrome and exercised the actual Recovery dashboard code.
+
+Real isolated SQLite/workspace/process fixtures verify persisted secret skipping
+with an AWS-like test key after restart; actual `echo ok` and edits despite
+legacy strict/Git settings or unavailable storage; corrupt prior snapshots and
+policy/drift metadata; relative failure paths and stale-path clearing; live
+authority revocation; and failed required backups before a reviewed restore.
+Bookkeeping trigger failures preserve the operation's result and do not repeat
+effects. Existing regressions retain stale-hash, secret/path, backup integrity
+and actual partial-journal recovery checks.
+
+The storage restart test replaces only a disposable Recovery directory with a
+plain file, confirms the server boots and performs normal work, and verifies that
+the occupied file and old backup bytes stay intact. A separate identity test
+rejects a replacement directory after successful lazy initialization.
+
+The Chrome case checks legacy `BLOCKED` diagnostics, secret-skip settings in both
+states, project-only skip actions and an unsuccessful retry notice. Packaging
+checks install a fresh tarball and verify its Compact MCP backup/restore flow and
+the new overview fields.
+
+**Not completed:** the full Windows suite/native gate (the host lacks enabled
+Administrator and symlink prerequisites), native Linux/macOS validation, and live
+gufile/production acceptance. The earlier production-only npm audit reported
+10 affected packages (1 critical, 5 high, 4 moderate); this Recovery patch does not
+remediate those advisories or claim a clean dependency audit. Publication is
+verified separately from these tests.
+
+See [release scope and upgrade steps](RELEASE_1.4.2.md).
+
 ## 1.3.2 Recovery maintenance — macOS release gate, 2026-09-25
 
 `AUTOMATED_PASS` on macOS: build, typecheck and lint; full core suite **926 passed,

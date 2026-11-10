@@ -619,6 +619,11 @@ npm pack
 ### Recovery — สำรองและกู้คืนงาน
 
 โปรเจกต์ที่ลงทะเบียนเปิด source backup เป็นค่าเริ่มต้น ก่อนแก้ไฟล์หรือรันคำสั่ง
+ตั้งแต่ **1.4.2** การสำรองอัตโนมัติเป็น best effort: หากสำรองไม่ได้ งานปกติยังทำต่อได้
+แม้รีสตาร์ตหรือมีค่า strict/Git requirement เดิม ระบบแสดงคำเตือนและ `blockedPath`
+พร้อม `skippedSecretFiles` และ `operationsBlocked:false` ใน `project_overview`
+ค่าเลือกข้ามไฟล์ที่มีเนื้อหาคล้าย Secret เก็บถาวรต่อโปรเจกต์ ส่วน checkpoint ที่สั่งเอง
+และการกู้คืนตามแผนยังต้องผ่านการตรวจสำเนาและ integrity จริง
 หน้า **Projects → Recovery** ใช้ตรวจประวัติ เปรียบเทียบ และยืนยันแผนกู้คืนได้จริง
 หรือใช้ `dodo recovery --help` ผ่าน terminal สำเนาอยู่ใน private state แยกจาก Git
 ของโปรเจกต์ และไม่ push ขึ้น GitHub อัตโนมัติ
@@ -632,7 +637,11 @@ npm pack
 **Source restore ไม่ย้อนฐานข้อมูล, secrets, volumes หรือระบบภายนอก** การสำรอง config
 ใช้กุญแจจาก OS credential store และไม่ส่งเนื้อหาให้ AI; ไม่มี generic database rollback
 หรือการ restart service อัตโนมัติ ดู [คู่มือ Recovery](docs/RECOVERY.md),
-[การเปลี่ยนแปลง 1.3.0](docs/RELEASE_1.3.0.md) และ [ผลตรวจรับจริง](docs/TEST_REPORT.md)
+[การเปลี่ยนแปลง 1.4.2](docs/RELEASE_1.4.2.md) และ [ผลตรวจรับจริง](docs/TEST_REPORT.md)
+
+อัปเดตด้วย `npm install -g dodo-mcp@1.4.2` แล้ว restart process ของ DODO ที่ใช้งานจริง
+และเรียก `project_overview` ใหม่เพื่อรับ workspace epoch ปัจจุบัน การติดตั้งแพ็กเกจ
+อย่างเดียวไม่เปลี่ยนโค้ดที่ process เดิมโหลดค้างอยู่
 
 ### จัดการพื้นที่สำรอง Recovery
 

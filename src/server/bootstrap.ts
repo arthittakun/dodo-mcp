@@ -179,10 +179,13 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
   applier.beforeMutation = async (opts, files) => {
     await services.recovery!.checkpoint('before-write', opts.principal, files.flatMap(f => [f.path, ...(f.destPath ? [f.destPath] : [])]));
   };
-  applier.onCommitted = files => services.recovery!.drift.committed(files);
-  applier.onChangeset = id => services.recovery!.history.record('changeset',id);
+  const recordRecovery = (record:()=>void):void => {
+    try{record();}catch(error){services.recovery!.reportBookkeepingFailure(error);}
+  };
+  applier.onCommitted = files => recordRecovery(()=>services.recovery!.drift.committed(files));
+  applier.onChangeset = id => recordRecovery(()=>services.recovery!.history.record('changeset',id));
   jobs.withRecovery = (actor,fn) => services.recovery!.history.around(actor,undefined,fn);
-  jobs.onRecorded = id => services.recovery!.history.record('job',id);
+  jobs.onRecorded = id => recordRecovery(()=>services.recovery!.history.record('job',id));
   jobs.afterFinished = () => services.recovery!.observeJob();
   jobs.beforeStart = async req => { await services.recovery!.checkpoint('before-exec', req.principal); };
   jobs.requiresPreparation = () => Boolean(store.db.prepare('SELECT 1 FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(workspaceId));

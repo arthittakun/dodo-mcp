@@ -30,12 +30,15 @@ describe('R01 durable default-on source backups',()=>{
     await f.call('edit_file',{path:'a.txt',edits:[{find:'first',replace:'second'}]});
     const m=await f.ws.services.recovery!.storage.readVerified(latest().id,f.ws.workspaceId);expect(m.entries.some(e=>e.path==='a.txt')).toBe(true);
   });
-  it('omits secrets/data/generated files from baseline but refuses excluded mutation targets',async()=>{
+  it('omits secrets/data/generated files from baseline and warns without gating excluded mutation targets',async()=>{
     const r=setup({'.env':'private','db.sqlite':'database','node_modules/lib.js':'dependency','a.txt':'source'});
     await r.checkpoint('owner-checkpoint','owner');const m=await r.storage.readVerified(latest().id,f.ws.workspaceId);
     expect(m.entries.map(e=>e.path)).toEqual(['a.txt']);expect(m.excludedByPolicy).toBe(3);
-    await expect(f.call('edit_file',{path:'db.sqlite',edits:[{find:'database',replace:'changed'}]})).rejects.toThrow('RECOVERY_REQUIRED');
-    expect(fs.readFileSync(path.join(f.root,'db.sqlite'),'utf8')).toBe('database');
+    await f.call('edit_file',{path:'db.sqlite',edits:[{find:'database',replace:'changed'}]});
+    expect(fs.readFileSync(path.join(f.root,'db.sqlite'),'utf8')).toBe('changed');
+    expect(r.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false,errorCode:'PATH_DENIED',blockedPath:'db.sqlite'});
+    expect(r.status().lastWarning).toBeTruthy();
+    await expect(r.checkpoint('owner-checkpoint','owner',['db.sqlite'])).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});
   });
   it('tombstones a new file and captures both move ends',async()=>{
     const r=setup({'a.txt':'bytes'});await f.call('write_file',{path:'new.txt',content:'new'});
@@ -47,14 +50,16 @@ describe('R01 durable default-on source backups',()=>{
   it('detects drift during capture and never permits the requested mutation',async()=>{
     const r=setup({'a.txt':'before'});const original=r.storage.publishObject.bind(r.storage);const publish=vi.spyOn(r.storage,'publishObject');
     publish.mockImplementationOnce(async(...args)=>{await original(...args);fs.writeFileSync(path.join(f.root,'a.txt'),'external');});
-    await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]})).rejects.toThrow('RECOVERY_REQUIRED');
+    await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]})).rejects.toThrow('FILE_CHANGED');
     expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('external');expect(r.status().state).toBe('BLOCKED');
     expect(f.ws.store.db.prepare("SELECT COUNT(*) n FROM recovery_snapshots WHERE state='READY'").get()).toEqual({n:0});
   });
-  it('corrupt backup bytes block a subsequent write without overwriting source',async()=>{
+  it('corrupt backup bytes warn while a normal write proceeds but explicit checkpoints still fail',async()=>{
     const r=setup({'a.txt':'before'});await r.checkpoint('owner-checkpoint','owner');const m=await r.storage.readVerified(latest().id,f.ws.workspaceId);
     fs.writeFileSync(r.storage.objectPath(m.entries[0]!.hash!),'broken');
-    await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]})).rejects.toThrow('RECOVERY_REQUIRED');expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('before');
+    await f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]});expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('AI');
+    expect(r.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false,errorCode:'RECOVERY_REQUIRED'});expect(r.status().lastWarning).toBeTruthy();
+    await expect(r.checkpoint('owner-checkpoint','owner')).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});
   });
   it('content credential screening stops backup and never stores credential bytes as a ready point',async()=>{
     const r=setup({'a.txt':'sk-'+ 'A'.repeat(40)});
@@ -67,14 +72,16 @@ describe('R01 durable default-on source backups',()=>{
     fs.unlinkSync(path.join(f.root,'linked.txt'));fs.renameSync(f.root,f.root+'-old');fs.mkdirSync(f.root);
     await expect(r.checkpoint('owner-checkpoint','owner')).rejects.toThrow('original registered project');
   });
-  it('backup storage failure preserves source; owner opt-out is explicit and retains old points',async()=>{
+  it('backup storage failure warns while edits proceed; owner opt-out is explicit and retains old points',async()=>{
     const r=setup({'a.txt':'before'});await r.checkpoint('owner-checkpoint','owner');const id=latest().id;
     await expect(r.configure({enabled:false},false)).rejects.toThrow('confirm');
     vi.spyOn(r.storage,'reserve').mockImplementation(()=>{throw Object.assign(new Error('disk full'),{code:'ENOSPC'});});
-    await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]})).rejects.toThrow('RECOVERY_REQUIRED');
-    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('before');
+    await f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'AI'}]});
+    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('AI');
+    expect(r.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false,errorCode:'BACKUP_IO_ERROR'});expect(r.status().lastWarning).toContain('disk full');
+    await expect(r.checkpoint('owner-checkpoint','owner')).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});
     await r.configure({enabled:false},true);expect(r.status().state).toBe('DISABLED_BY_OWNER');
-    await f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'owner-optout'}]});
+    await f.call('edit_file',{path:'a.txt',edits:[{find:'AI',replace:'owner-optout'}]});
     expect((await r.storage.readVerified(id,f.ws.workspaceId)).id).toBe(id);
     expect(f.ws.store.db.prepare('SELECT payload FROM recovery_policies WHERE workspace_id=?').get(f.ws.workspaceId)).toBeTruthy();
   });
@@ -116,8 +123,10 @@ describe('R01 durable default-on source backups',()=>{
     expect(f.ws.services.mutations!.busy).toBe(false);expect(count()).toEqual(saved);
     expect(r.status().baselineId).toBe(before.baselineId);
     expect((await r.scanDrift()).changes).toEqual([expect.objectContaining({path:'a.txt',change:'modified'})]);
-    await expect(f.call('write_file',{path:'a.txt',content:'must not overwrite'})).rejects.toThrow('FILE_CHANGED');
-    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('outside');
+    const freshHash=f.ws.services.wfs.readTextFile('a.txt',1024).hash;
+    await f.call('write_file',{path:'a.txt',content:'journaled after review',expectedHash:freshHash});
+    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('journaled after review');
+    expect((await r.scanDrift()).changedCount).toBe(0);
   });
   it('default non-blocking policy skips credential-like example files, ignores .next, and never blocks edits',async()=>{
     const r=setup({'a.txt':'original','env.example':'OPENAI_KEY=sk-'+'A'.repeat(40),'.next/build.js':'compiled'},false);

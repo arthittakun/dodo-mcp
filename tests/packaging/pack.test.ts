@@ -51,6 +51,13 @@ describe('PACK: npm tarball', () => {
     const meta = JSON.parse(out) as Array<{ filename: string; files: Array<{ path: string }> }>;
     tarball = path.join(workDir, meta[0]!.filename);
     fileList = meta[0]!.files.map((f) => f.path);
+    // Retain the exact candidate installed below when preparing a release.
+    // Exclusive creation prevents a rerun from silently reusing an old artifact.
+    const artifactDir = process.env['DODO_PACK_TEST_ARTIFACT_DIR'];
+    if (artifactDir) {
+      fs.mkdirSync(artifactDir, { recursive: true });
+      fs.copyFileSync(tarball, path.join(artifactDir, path.basename(tarball)), fs.constants.COPYFILE_EXCL);
+    }
   }, 180_000);
 
   it('PACK-01: contains dist, schemas, examples and docs — no source maps of state', () => {
@@ -58,6 +65,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('schemas/tools.json');
     expect(fileList).toContain('package.json');
     expect(fileList).toContain('README.md');
+    expect(fileList).toContain('docs/RELEASE_1.4.2.md');
     for (const file of ['dist/cli/menu.js', 'dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/services/android/androidService.js', 'dist/services/android/adbBackend.js', 'dist/tools/androidTools.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/ANDROID.md', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/RELEASE_1.0.4.md', 'docs/RELEASE_1.0.5.md', 'docs/RELEASE_1.1.0.md', 'docs/RELEASE_1.2.0.md', 'docs/WINDOWS.md', 'docs/WINDOWS_SETUP.md', 'docs/WEB_CLIENTS.md', 'docs/adr/044-global-launcher-and-cli-menu.md', 'docs/adr/049-android-adb-control.md', 'docs/adr/050-cloudflare-local-and-project-access.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
@@ -337,7 +345,7 @@ describe('PACK: npm tarball', () => {
       const objects=path.join(cfg,'recovery','objects');
       expect(fs.readdirSync(objects).some(name=>fs.readFileSync(path.join(objects,name),'utf8')==='before')).toBe(true);
       const status=(await client.callTool({name:'project_overview',arguments:{}})).structuredContent;
-      expect(status).toMatchObject({ok:true,data:{recovery:{enabled:true,state:'READY',sourceOnly:true}}});
+      expect(status).toMatchObject({ok:true,data:{recovery:{enabled:true,state:'READY',sourceOnly:true,operationsBlocked:false,blockedPath:null,skippedSecretFiles:[]}}});
       const gateway=async(name:string,operation:string,args:Record<string,unknown>)=>{
         const r=await client.callTool({name,arguments:{workspaceId:context.workspaceId,workspaceEpoch:context.workspaceEpoch,operation,args}});
         expect(r.isError,JSON.stringify(r.structuredContent)).not.toBe(true);return (r.structuredContent as {data:Record<string,unknown>}).data;

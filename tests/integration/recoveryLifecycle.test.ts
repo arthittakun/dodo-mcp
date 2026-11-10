@@ -43,12 +43,14 @@ describe('R01 runtime recovery, quotas and real owner UI',()=>{
     const result=await invokeToolDefinition({services:f.ws.services,def:TOOL_CATALOG.find(t=>t.name==='edit_file')!,principal:()=>({...f!.ws.services.localPrincipal!,scopes:revoked?['dodo:read']:['dodo:read','dodo:write']}),args:{workspaceId:f.ws.workspaceId,workspaceEpoch:f.ws.epoch,path:'a.txt',edits:[{find:'before',replace:'after'}]}});
     expect(result.envelope.error).toMatchObject({code:'FORBIDDEN'});expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('before');
   });
-  it('scan limits and data-root policy fail closed without exposing secret content',async()=>{
+  it('scan limits warn without gating normal edits while explicit checkpoints and data-root validation stay strict',async()=>{
     f=platformFixture();new ProjectRegistry(f.ws.store).add(f.root,'A');fs.writeFileSync(path.join(f.root,'a.txt'),'before');
     f.ws.store.db.prepare('INSERT INTO recovery_policies VALUES (?,?)').run(f.ws.workspaceId,JSON.stringify(RecoveryPolicySchema.parse({maxEntries:1,strictEnforcement:true})));
-    await expect(f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'after'}]})).rejects.toThrow('RECOVERY_REQUIRED');
-    expect(f.ws.services.recovery!.status()).toMatchObject({state:'BLOCKED',errorCode:'RESOURCE_LIMIT'});
-    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('before');
+    await f.call('edit_file',{path:'a.txt',edits:[{find:'before',replace:'after'}]});
+    expect(f.ws.services.recovery!.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false,errorCode:'RESOURCE_LIMIT'});
+    expect(f.ws.services.recovery!.status().lastWarning).toBeTruthy();
+    expect(fs.readFileSync(path.join(f.root,'a.txt'),'utf8')).toBe('after');
+    await expect(f.ws.services.recovery!.checkpoint('owner-checkpoint','owner')).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});
     await expect(f.ws.services.recovery!.configure({dataRoots:['../elsewhere']},true)).rejects.toThrow('traversal');
   });
   it.skipIf(!fs.existsSync(chromium.executablePath()))('owner UI saves defaults/opt-out, confirms once and fits desktop and narrow screens',async()=>{
@@ -57,15 +59,15 @@ describe('R01 runtime recovery, quotas and real owner UI',()=>{
     const evidence=path.resolve('release-evidence/recovery/R04/20260920/browser');fs.mkdirSync(evidence,{recursive:true});
     try{
       await page.goto(ctx.configUrl!);await page.getByRole('button',{name:'โปรเจกต์',exact:true}).click();await page.locator('#wb-project').selectOption(project.projectId);
-      await page.getByRole('heading',{name:'Recovery · สำรอง source',exact:true}).waitFor();
+      await page.getByRole('heading',{name:'Recovery · ระบบสำรองและกู้คืนโปรเจกต์',exact:true}).waitFor();
       await page.getByRole('button',{name:'สร้างจุดกู้คืนตอนนี้',exact:true}).click();
       await expect.poll(()=>page.getByRole('switch',{name:'เปิดการสำรองอัตโนมัติ'}).isChecked()).toBe(true);
-      await page.getByText('SAVED · มีสำเนาที่ตรวจ integrity แล้ว',{exact:true}).waitFor();
-      await page.locator('section').filter({has:page.getByRole('heading',{name:'Recovery · สำรอง source',exact:true})}).last().screenshot({path:path.join(evidence,'recovery-desktop.png')});
+      await page.getByText(/^SAVED · มีสำเนาที่ตรวจ integrity แล้ว/).waitFor();
+      await page.locator('section').filter({has:page.getByRole('heading',{name:'Recovery · ระบบสำรองและกู้คืนโปรเจกต์',exact:true})}).last().screenshot({path:path.join(evidence,'recovery-desktop.png')});
       await page.getByRole('switch',{name:'เปิดการสำรองอัตโนมัติ'}).uncheck();await page.getByRole('button',{name:'บันทึกการสำรอง',exact:true}).click();
       await page.getByRole('button',{name:'ปิดการสำรอง',exact:true}).click();await page.getByText('เจ้าของปิดการสำรองอัตโนมัติ',{exact:true}).waitFor();
       expect(ctx.server.services.recovery!.status().enabled).toBe(false);
-      await page.setViewportSize({width:390,height:844});await page.locator('section').filter({has:page.getByRole('heading',{name:'Recovery · สำรอง source',exact:true})}).last().screenshot({path:path.join(evidence,'recovery-narrow.png')});
+      await page.setViewportSize({width:390,height:844});await page.locator('section').filter({has:page.getByRole('heading',{name:'Recovery · ระบบสำรองและกู้คืนโปรเจกต์',exact:true})}).last().screenshot({path:path.join(evidence,'recovery-narrow.png')});
       expect(await page.evaluate('document.documentElement.scrollWidth<=innerWidth')).toBe(true);
       expect(errors).toEqual([]);
     }finally{await browser.close();}

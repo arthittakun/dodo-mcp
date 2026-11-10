@@ -48,7 +48,15 @@ export class RecoveryHistory {
     const inherited=this.context.getStore();if(inherited){if(sessionId&&inherited.sessionId!==sessionId)throw new DodoError('INVALID_INPUT','nested recovery session override');return fn();}
     if(sessionId){const row=this.session(sessionId,{id:actor});if(row.state!=='open'||row.epoch!==this.s.epoch)throw new DodoError('CONFLICT','session is not open in this epoch; begin a new session');}
     const op:Operation={actor,implicit:!sessionId,...(sessionId?{sessionId}:{})};
-    return this.context.run(op,async()=>{try{return await fn();}finally{if(op.implicit&&op.sessionId)this.end(op.sessionId,{id:actor});}});
+    return this.context.run(op,async()=>{
+      try{return await fn();}
+      finally{
+        if(op.implicit&&op.sessionId){
+          try{this.end(op.sessionId,{id:actor});}
+          catch(error){this.recovery.reportBookkeepingFailure(error);}
+        }
+      }
+    });
   }
   sessionForCapture(actor:string):string {
     const op=this.context.getStore();
@@ -67,8 +75,10 @@ export class RecoveryHistory {
   }
   record(kind:'changeset'|'job'|'verification',ref:string):void {
     const op=this.context.getStore();if(!op?.sessionId)return;
-    this.db.prepare('INSERT INTO recovery_events (session_id,snapshot_id,kind,ref,created_at) VALUES (?,?,?,?,?)')
-      .run(op.sessionId,op.snapshotId??null,kind,ref,Date.now());
+    try{
+      this.db.prepare('INSERT INTO recovery_events (session_id,snapshot_id,kind,ref,created_at) VALUES (?,?,?,?,?)')
+        .run(op.sessionId,op.snapshotId??null,kind,ref,Date.now());
+    }catch(error){this.recovery.reportBookkeepingFailure(error);}
   }
   async begin(actor:RecoveryActor,title:string):Promise<{sessionId:string;checkpointId:string}> {
     return this.s.mutations!.run(async()=>{
@@ -220,16 +230,21 @@ export class RecoveryHistory {
     })};
   }
   finishAgent(runId:string,actor:string):void {
-    const key='recovery-agent:'+digestOf({runId,actor,workspace:this.s.workspaceId,epoch:this.s.epoch});const id=this.s.store.getMeta(key);
-    if(id)this.end(id,{id:actor});
+    try{
+      const key='recovery-agent:'+digestOf({runId,actor,workspace:this.s.workspaceId,epoch:this.s.epoch});const id=this.s.store.getMeta(key);
+      if(id)this.end(id,{id:actor});
+    }catch(error){this.recovery.reportBookkeepingFailure(error);}
   }
   async forAgent(runId:string,actor:string):Promise<string|undefined>{
-    if(!this.recovery.status().registered||!this.recovery.policy().enabled)return undefined;
-    return this.s.mutations!.run(async()=>{
-      const key='recovery-agent:'+digestOf({runId,actor,workspace:this.s.workspaceId,epoch:this.s.epoch});const saved=this.s.store.getMeta(key);
-      if(saved&&this.session(saved,{id:actor}).state==='open')return saved;
-      const result=await this.begin({id:actor},`Agent run ${runId}`);this.s.store.setMeta(key,result.sessionId);return result.sessionId;
-    });
+    // Agent attribution is optional; explicit begin() still requires its checkpoint.
+    try{
+      if(!this.recovery.status().registered||!this.recovery.policy().enabled)return undefined;
+      return await this.s.mutations!.run(async()=>{
+        const key='recovery-agent:'+digestOf({runId,actor,workspace:this.s.workspaceId,epoch:this.s.epoch});const saved=this.s.store.getMeta(key);
+        if(saved&&this.session(saved,{id:actor}).state==='open')return saved;
+        const result=await this.begin({id:actor},`Agent run ${runId}`);this.s.store.setMeta(key,result.sessionId);return result.sessionId;
+      });
+    }catch(error){this.recovery.reportAutomaticFailure(error);return undefined;}
   }
   async apply(a:RecoveryActor,planId:string,planHash:string){
     return this.s.mutations!.run(async()=>{

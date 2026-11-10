@@ -171,13 +171,13 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
     const box=section('การเปลี่ยนไฟล์นอก journal','เปรียบเทียบ hash จริง ไม่ระบุว่าใครแก้จากเวลาไฟล์ การยอมรับสถานะไม่ใช่ผลทดสอบและไม่เพิ่มสิทธิ์');parent.append(box);
     const view=el('div');box.append(view);
     function render(d){
-      view.replaceChildren(el('p',d.state==='external_changes'?`พบ ${d.changedCount} รายการ · ไม่ทราบผู้แก้${d.critical?' · ต้องตรวจทานก่อนรันคำสั่ง':''}`:d.state==='unchanged'?'ไม่พบการเปลี่ยนจากสถานะที่บันทึก':d.state==='unavailable'?`ตรวจไม่สำเร็จ: ${d.errorCode}`:'ยังไม่ได้สแกน'));
+      view.replaceChildren(el('p',d.state==='external_changes'?`พบ ${d.changedCount} รายการ · ไม่ทราบผู้แก้${d.critical?' · แนะนำให้ตรวจทานก่อนรันคำสั่ง':''}`:d.state==='unchanged'?'ไม่พบการเปลี่ยนจากสถานะที่บันทึก':d.state==='unavailable'?`ตรวจไม่สำเร็จ: ${d.errorCode} · ไม่บล็อกงานปกติ`:'ยังไม่ได้สแกน'));
       if(d.changedCount){
         const list=el('ul');for(const c of d.changes)list.append(el('li',`${c.change} · ${c.path} · ${c.beforeHash?.slice(0,12)||'ไม่มี'} → ${c.observedHash?.slice(0,12)||'ไม่มี'}`));view.append(list);
         if(d.truncated){view.append(el('p','ยังมีรายการถัดไป การยืนยันใช้กับการเปลี่ยนแปลงทั้งหมดที่ระบุ'));view.append(button('ดูรายการเปลี่ยนแปลงถัดไป',async()=>render(await act('recovery.drift.scan',{cursor:d.nextCursor}))));}
         view.append(el('p','สำเนาที่ตรวจพบแยกจาก baseline เดิม ไม่รับรองว่ามี bytes ก่อนถูกเขียนทับ หากยังไม่เคยสำรอง'));
         view.append(button('ยอมรับสถานะที่ตรวจนี้',async()=>{
-          if(!await confirmDanger('ยอมรับไฟล์ที่เปลี่ยน?',`มี ${d.changedCount} รายการ การยืนยันอนุญาตให้ทำงานต่อจากสถานะนี้ ไม่ได้กู้ไฟล์กลับ`,'ยอมรับสถานะ'))return;
+          if(!await confirmDanger('ยอมรับไฟล์ที่เปลี่ยน?',`มี ${d.changedCount} รายการ การยืนยันบันทึกสถานะที่ตรวจแล้วเป็น baseline ใหม่ ไม่ได้กู้ไฟล์กลับ`,'ยอมรับสถานะ'))return;
           const result=await act('recovery.drift.acknowledge',{digest:d.digest,workspaceId:selected.workspaceId,workspaceEpoch:selected.workspaceEpoch,confirm:true});render(result);notice('บันทึกสถานะที่เจ้าของตรวจแล้ว');
         }));
       }
@@ -191,26 +191,31 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
     const status=el('p','กำลังตรวจสอบจุดกู้คืน…','wb-status');status.setAttribute('role','status');card.append(status);
     const selected={...getSelected()};
     const act=(operation,args={})=>api('admin/action',{projectId:selected.projectId,operation,args},true);
+    const retryBackup=async()=>{
+      const result=await act('recovery.reset');
+      notice(result.state==='BLOCKED'?`ตรวจสำเนาใหม่แล้ว ยังสำรองไม่ได้ (${result.errorCode||'UNKNOWN'}) · งานปกติยังทำต่อได้`:'ตรวจสถานะสำเนาใหม่แล้ว');
+      await refresh();
+    };
     try {
       const data=await act('recovery.status');
       const effectiveMode=data.effectiveMode||(data.hasGitRepo?'git':'snapshot');
       const labels={
         INITIALIZING:'กำลังเตรียมสำเนา — พร้อมใช้งานโดยไม่บล็อกการทำงาน',
         READY:effectiveMode==='git'?'SAVED · พร้อมใช้งาน (โหมด Git Recovery)':'SAVED · มีสำเนาที่ตรวจ integrity แล้ว (โหมด Snapshot)',
-        BLOCKED:'สำรองไม่ได้ — หยุดการเปลี่ยน source (สามารถกดล้างสถานะบล็อกหรือปิด Strict Mode ด้านล่าง)',
+        BLOCKED:'สำรองไม่พร้อม — ยังแก้ไฟล์และรันคำสั่งได้ตามสิทธิ์เดิม',
         DISABLED_BY_OWNER:'เจ้าของปิดการสำรองอัตโนมัติ',
       };
       status.textContent=labels[data.state]||data.state;
-      if(data.awaitingActivation&&data.enabled)status.textContent='เปิดการป้องกันไว้ — รอสร้างจุดกู้คืนแรก';
+      if(data.awaitingActivation&&data.enabled&&data.state==='INITIALIZING')status.textContent='เปิดการสำรองไว้ — รอสร้างจุดกู้คืนแรก';
 
       const headerBar=el('div',undefined,'rec-header');
       const headerCopy=el('div',undefined,'rec-header-copy');
       headerCopy.append(
         el('strong',data.hasGitRepo?'ตรวจพบ Git Repository ในโปรเจกต์นี้ (.git)':'โปรเจกต์ทั่วไป (ยังไม่ได้เชื่อม Git)'),
-        el('span',data.policy.strictEnforcement?'โหมดเข้มงวด (Strict Blocking เปิดอยู่)':'โหมดไม่บังคับบล็อก (แก้ไฟล์และรันคำสั่งได้ตลอดเวลา ไม่ติด RECOVERY_REQUIRED)','muted')
+        el('span','สำรองอัตโนมัติแบบ best effort: ปัญหาการสำรองไม่บล็อกการแก้ไฟล์หรือรันคำสั่ง','muted')
       );
       const badge=el('span',
-        data.state==='BLOCKED'?`ติดบล็อก · ${data.errorCode||'BLOCKED'}`:
+        data.state==='BLOCKED'?`สำรองไม่พร้อม · ${data.errorCode||'BLOCKED'}`:
         data.state==='DISABLED_BY_OWNER'?'ปิดการใช้งาน':
         effectiveMode==='git'?'พร้อมใช้งาน · Git Recovery':'พร้อมใช้งาน · DODO Snapshot',
         'rec-badge'
@@ -224,7 +229,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
         statCard(
           'โหมดที่ใช้งานจริง',
           effectiveMode==='git'?'Git Recovery':effectiveMode==='off'?'ปิดการใช้งาน':'DODO Snapshot',
-          `ตั้งค่า: ${(data.policy.mode||'auto').toUpperCase()} · ${data.policy.strictEnforcement?'บล็อกเมื่อพบปัญหา':'ไม่บล็อกงาน'}`
+          `ตั้งค่า: ${(data.policy.mode||'auto').toUpperCase()} · ปัญหาการสำรองไม่บล็อกงานปกติ`
         ),
         statCard(
           'การตรวจสอบล่าสุด',
@@ -256,49 +261,35 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
         alertBox.append(
           el('p',
             data.state==='BLOCKED'
-              ?`พบปัญหาที่ทำให้ Recovery ติดสถานะ BLOCKED (${data.errorCode||'UNKNOWN'})`
+              ?`Recovery ยังสำรองไม่สำเร็จ (${data.errorCode||'UNKNOWN'}) · ไม่บล็อกการแก้ไฟล์หรือรันคำสั่ง`
               :`คำเตือนจากระบบ Recovery (ไม่บล็อกการแก้ไฟล์หรือรันคำสั่ง)`,
             'rec-alert-title'
           )
         );
-        if(data.errorDetail||data.lastWarning){
-          alertBox.append(el('p',data.errorDetail||data.lastWarning,'muted'));
-        }
+        if(data.errorDetail)alertBox.append(el('p',data.errorDetail,'muted'));
+        if(data.lastWarning&&data.lastWarning!==data.errorDetail)alertBox.append(el('p',data.lastWarning,'muted'));
         if(problemPaths.length){
-          alertBox.append(el('p','ไฟล์ที่เป็นต้นเหตุ (เช่น มีข้อความคล้าย API key / Private key หรือขนาดเกินขีดจำกัด):'));
+          alertBox.append(el('p','พาธภายในโปรเจกต์ที่สำรองไม่ได้หรือถูกข้าม (relative path; เช่น เนื้อหาคล้ายคีย์หรือไฟล์เกินขีดจำกัด):'));
           const ul=el('ul',undefined,'rec-path-list');
           for(const p of problemPaths)ul.append(el('li',p,'rec-path-pill'));
           alertBox.append(ul);
         }else if(data.errorCode==='SECRET_PATH_DENIED'){
-          alertBox.append(el('p','คำแนะนำ: มักเกิดจากไฟล์ตัวอย่างที่มีรูปแบบคีย์ เช่น env.example, scripts/setup-env.sh หรือ src/lib/env.ts คุณสามารถกดปุ่มด้านล่างเพื่อล้างสถานะบล็อก หรือเพิ่มไฟล์เข้า Exclude ได้ทันที','muted'));
+          alertBox.append(el('p','ตรวจไฟล์ตัวอย่างที่อาจมีข้อความคล้ายคีย์ เช่น env.example, scripts/setup-env.sh หรือ src/lib/env.ts แล้วลองสำรองใหม่หรือเลือกข้ามไฟล์นั้น การแก้ไฟล์และรันคำสั่งยังใช้สิทธิ์เดิม','muted'));
         }
         const quickActions=el('div',undefined,'rec-action-bar');
         if(problemPaths.length){
           quickActions.append(button('เพิ่มไฟล์ต้นเหตุเข้า Exclude ทันที',async()=>{
             const merged=[...new Set([...(data.policy.excludePaths||[]),...problemPaths])];
-            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,skipSecretContentFiles:true,excludePaths:merged}});
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,excludePaths:merged}});
             await act('recovery.reset');
-            notice(`เพิ่ม ${problemPaths.join(', ')} เข้า Exclude และปลดบล็อกเรียบร้อยแล้ว`);
+            notice(`เพิ่ม ${problemPaths.join(', ')} เข้า Exclude แล้ว · ตรวจสถานะสำเนาใหม่ด้านบน`);
             await refresh();
           },'btn primary'));
-          quickActions.append(button('อนุญาตไฟล์ต้นเหตุในสิทธิ์ไฟล์ (Secret Allow)',async()=>{
-            const cfg=await api('admin/config');
-            const nextAllow=[...new Set([...(cfg.secretAllow||[]),...problemPaths])];
-            await api('admin/config',{secretAllow:nextAllow});
-            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,skipSecretContentFiles:true}});
-            await act('recovery.reset');
-            notice(`อนุญาต ${problemPaths.join(', ')} ในสิทธิ์ไฟล์และปลดบล็อกเรียบร้อยแล้ว`);
-            await refresh();
-          },'btn'));
         }
-        if(data.errorCode==='SECRET_PATH_DENIED'||problemPaths.length){
-          quickActions.append(button('อนุญาตทุกไฟล์ (ปิดการบล็อก SECRET_PATH_DENIED)',async()=>{
-            if(!await confirmDanger('ยืนยันอนุญาตให้เข้าถึงทุกไฟล์?','ระบบจะเปิดโหมดอนุญาตทุกไฟล์ (Allow All) และปิดการบล็อก SECRET_PATH_DENIED ทั้งชื่อไฟล์และเนื้อหา เพื่อให้คุณและ AI แก้ไขได้ทุกไฟล์','ยืนยันอนุญาตทุกไฟล์'))return;
-            await api('admin/config',{secretPolicyMode:'off'});
-            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,scanContentSecrets:false,skipSecretContentFiles:true}});
-            await act('recovery.reset');
-            notice('เปิดโหมดอนุญาตทุกไฟล์และปลดบล็อกเรียบร้อยแล้ว');
-            await refresh();
+        if(data.errorCode==='SECRET_PATH_DENIED'||(Array.isArray(data.skippedSecretFiles)&&data.skippedSecretFiles.length)){
+          quickActions.append(button('ข้ามไฟล์ที่มีเนื้อหาคล้าย Secret ในการสำรอง',async()=>{
+            await act('recovery.configure',{confirm:true,policy:{...data.policy,strictEnforcement:false,skipSecretContentFiles:true}});
+            await retryBackup();
           },'btn'));
         }
         if(data.hasGitRepo&&data.policy.mode!=='git'){
@@ -309,11 +300,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
             await refresh();
           },'btn'));
         }
-        quickActions.append(button('ล้างสถานะบล็อก / สแกนใหม่ทันที',async()=>{
-          await act('recovery.reset');
-          notice('ล้างสถานะบล็อกและสแกนใหม่เรียบร้อยแล้ว');
-          await refresh();
-        },'btn'));
+        quickActions.append(button('ลองสำรองใหม่ทันที',retryBackup,'btn'));
         alertBox.append(quickActions);
         card.append(alertBox);
       }
@@ -327,8 +314,8 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
       const settingsGrid=el('div',undefined,'rec-settings-grid');
       card.append(settingsGrid);
 
-      // Group 1: Mode & Blocking Behavior
-      const g1=groupCard(1,'โหมดการทำงานและการบล็อกงาน','กำหนดว่าจะใช้ Git หรือ Snapshot และป้องกันไม่ให้ระบบบล็อกการแก้ไฟล์/รันคำสั่ง');
+      // Group 1: Backup mode and automatic best-effort behavior.
+      const g1=groupCard(1,'โหมดการสำรอง','เลือก Git หรือ Snapshot โดยปัญหาการสำรองอัตโนมัติไม่บล็อกงานปกติ');
       const modeSelect=choice(g1,'โหมดการสำรองและกู้คืน (Recovery Mode)','recoveryMode',[
         ['auto','Auto (แนะนำ — ใช้ Git อัตโนมัติถ้าโปรเจกต์มี .git)'],
         ['git','Git เท่านั้น (ใช้ Git ล้วน ไม่สแกนไฟล์ CAS ของ DODO)'],
@@ -336,16 +323,14 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
         ['off','ปิดการใช้งาน Recovery'],
       ],data.policy.mode||'auto');
       const enabled=check(g1,'เปิดการสำรองอัตโนมัติ','recoveryEnabled',data.enabled);enabled.setAttribute('role','switch');
-      const strictEnforcement=check(g1,'บังคับบล็อกการแก้ไฟล์/รันคำสั่งเมื่อสำรองไม่สำเร็จ (Strict Mode — แนะนำให้ปิด)','recoveryStrict',Boolean(data.policy.strictEnforcement));
-      strictEnforcement.setAttribute('role','switch');
-      g1.append(el('p','เมื่อปิด Strict Mode: ต่อให้ไฟล์ติด SECRET_PATH_DENIED หรือเกิดข้อผิดพลาดระหว่างสำรอง คุณยังสามารถแก้ไฟล์และรันคำสั่งได้ตามปกติ','muted'));
+      g1.append(el('p','สำรองอัตโนมัติแบบ best effort: หากไฟล์ถูกข้าม คลังสำรองไม่พร้อม หรือสแกนไม่สำเร็จ จะแสดงคำเตือนและให้งานปกติทำต่อได้ การสร้างจุดกู้คืนที่ร้องขอและการกู้คืนตามแผนยังต้องตรวจสำเนาสำเร็จ','muted'));
       settingsGrid.append(g1);
 
       // Group 2: Secret Content Screening & Drift Policy
       const g2=groupCard(2,'การตรวจไฟล์ความลับและไฟล์เปลี่ยนภายนอก','จัดการการตรวจจับคีย์ตัวอย่างในโค้ด (เช่น env.example) และการแก้ไฟล์จากภายนอก');
       const scanContentSecrets=check(g2,'สแกนหาคีย์ความลับในเนื้อหาไฟล์ระหว่างสำรอง Snapshot','recoveryScanSecrets',data.policy.scanContentSecrets!==false);
       scanContentSecrets.setAttribute('role','switch');
-      const skipSecretContentFiles=check(g2,'ข้ามไฟล์ที่พบเนื้อหาคล้าย Secret อัตโนมัติ (ไม่ให้ติดบล็อก SECRET_PATH_DENIED)','recoverySkipSecrets',data.policy.skipSecretContentFiles!==false);
+      const skipSecretContentFiles=check(g2,'ข้ามไฟล์ที่พบเนื้อหาคล้าย Secret อัตโนมัติ และแสดงพาธที่ข้าม','recoverySkipSecrets',data.policy.skipSecretContentFiles!==false);
       skipSecretContentFiles.setAttribute('role','switch');
       const checkDrift=check(g2,'ตรวจจับการแก้ไฟล์จากภายนอก DODO (Drift Detection)','recoveryCheckDrift',data.policy.checkDrift!==false);
       checkDrift.setAttribute('role','switch');
@@ -391,9 +376,10 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
       g4.append(quotaCols);
 
       const advanced=el('details',undefined,'details');advanced.append(el('summary','ขอบเขตและพื้นที่สำรอง (Git Copy แยกโฟลเดอร์ขั้นสูง)'));
-      const gitRequired=check(advanced,'ต้องมี Git recovery copy ก่อนทำงาน','recoveryGitRequired',data.policy.gitRequired);
+      const gitRequired=check(advanced,'กำหนดให้จุดกู้คืนที่ร้องขอมี Git recovery copy','recoveryGitRequired',data.policy.gitRequired);
       const gitDirectory=field(advanced,'ที่เก็บ Git สำรอง (absolute path; เว้นว่างใช้ private state)','recoveryGitDirectory',data.policy.gitDirectory||'');
       advanced.append(el('p','โฟลเดอร์สำรองต้องมีอยู่แล้ว เป็น private ของเจ้าของ และอยู่นอกโปรเจกต์','muted'));
+      advanced.append(el('p','เมื่อ Git copy หรือโฟลเดอร์สำรองไม่พร้อม งานแก้ไฟล์และคำสั่งปกติยังทำต่อได้ พร้อมคำเตือนเรื่องสำเนาที่ขาดไป','muted'));
       g4.append(advanced);
       settingsGrid.append(g4);
 
@@ -415,7 +401,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
             ...data.policy,
             enabled:isEnabled,
             mode:isEnabled?(modeSelect.value==='off'?'auto':modeSelect.value):'off',
-            strictEnforcement:strictEnforcement.checked,
+            strictEnforcement:false,
             scanContentSecrets:scanContentSecrets.checked,
             skipSecretContentFiles:skipSecretContentFiles.checked,
             checkDrift:checkDrift.checked,
@@ -438,7 +424,7 @@ window.DodoRecovery=({el,section,button,check,field,choice,notice,confirmDanger,
           await refresh();
         },'btn primary'),
         button('สร้างจุดกู้คืนตอนนี้',async()=>{await act('recovery.checkpoint');notice('สร้างจุดกู้คืนเรียบร้อยแล้ว');await refresh();}),
-        button('ล้างสถานะบล็อก / สแกนใหม่',async()=>{await act('recovery.reset');notice('ล้างสถานะบล็อกและสแกนใหม่แล้ว');await refresh();}),
+        button('ลองสำรองใหม่',retryBackup),
         button('ตรวจสถานะใหม่',async()=>refresh())
       );
       card.append(mainActions);

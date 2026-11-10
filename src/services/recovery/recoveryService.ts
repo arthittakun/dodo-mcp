@@ -54,8 +54,11 @@ export class RecoveryService {
   private background:Promise<unknown>|undefined;
   private observations=new Set<Promise<unknown>>();
   observeJob():Promise<unknown>{
-    if(this.closed||!this.policy().enabled||!this.project())return Promise.resolve();
-    const work=this.deadline.run(Date.now()+this.policy().scanMs,()=>this.drift.scan()).catch(()=>undefined);
+    if(this.closed)return Promise.resolve();
+    let policy:RecoveryPolicy;
+    try{policy=this.policy();if(!policy.enabled||!this.project())return Promise.resolve();}
+    catch(e){this.reportAutomaticFailure(e);return Promise.resolve();}
+    const work=this.deadline.run(Date.now()+policy.scanMs,()=>this.drift.scan()).catch(e=>{this.reportAutomaticFailure(e);});
     this.observations.add(work);void work.finally(()=>this.observations.delete(work));return work;
   }
   withReviewedRestore<T>(fn:()=>Promise<T>,recheck:()=>Promise<void>=async()=>{}):Promise<T>{return this.reviewedRestore.run(recheck,fn);}
@@ -72,7 +75,12 @@ export class RecoveryService {
   captureObserved(){return this.capture('emergency-observed','system:observation');}
   private startScanner(){
     if(this.scanTimer)return;
-    this.scanTimer=setInterval(()=>{if(this.closed||this.background||this.s.mutations?.busy||this.s.jobs.runningCount()||!this.policy().enabled)return;this.background=this.scanDrift().catch(()=>undefined).finally(()=>{this.background=undefined;});},60000);
+    this.scanTimer=setInterval(()=>{
+      try{
+        if(this.closed||this.background||this.s.mutations?.busy||this.s.jobs.runningCount()||!this.policy().enabled)return;
+        this.background=this.scanDrift().catch(e=>{this.reportAutomaticFailure(e);}).finally(()=>{this.background=undefined;});
+      }catch(e){this.reportAutomaticFailure(e);}
+    },60000);
     this.scanTimer.unref();
   }
   private readonly authority = new AsyncLocalStorage<() => void>();
@@ -283,27 +291,29 @@ export class RecoveryService {
   }
   protectedCheckpointIds():Array<string|undefined>{return [this.baseline,this.latest];}
   summary(){
-    const {enabled,state,effectiveMode,hasGitRepo,registered,awaitingActivation,sourceOnly,lastCheckedAt,errorCode,errorDetail,blockedPath,skippedSecretFiles,lastWarning,lastGitCheckpoint,progress,projectBytes}=this.status();
-    const drift=this.drift.status();return {enabled,state,effectiveMode,hasGitRepo,registered,awaitingActivation,sourceOnly,lastCheckedAt,errorCode,errorDetail,blockedPath,skippedSecretFiles,lastWarning,lastGitCheckpoint,progress,projectBytes,drift:{state:drift.state,changedCount:drift.changedCount,critical:drift.critical,errorCode:drift.errorCode},git:this.git.status(),verification:this.evidence.summary()};
+    const {enabled,state,effectiveMode,hasGitRepo,registered,awaitingActivation,sourceOnly,lastCheckedAt,errorCode,errorDetail,blockedPath,skippedSecretFiles,lastWarning,lastGitCheckpoint,progress,projectBytes,drift,git,verification}=this.status();
+    return {enabled,state,effectiveMode,hasGitRepo,registered,awaitingActivation,sourceOnly,operationsBlocked:false,lastCheckedAt,errorCode,errorDetail,blockedPath,skippedSecretFiles,lastWarning,lastGitCheckpoint,progress,projectBytes,drift:{state:drift.state,changedCount:drift.changedCount,critical:drift.critical,errorCode:drift.errorCode},git,verification};
   }
   status(){
     const registered=Boolean(this.s.store.db.prepare('SELECT 1 FROM project_registry WHERE workspace_id=? AND removed_at IS NULL').get(this.s.workspaceId));
-    const policy=this.policy();
+    let policy:RecoveryPolicy;
+    try{policy=this.policy();}catch(e){this.reportAutomaticFailure(e);policy=RecoveryPolicySchema.parse({});}
     const effectiveMode=this.effectiveMode(policy);
-    return {enabled:policy.enabled,state:policy.enabled&&policy.mode!=='off'?this.state:'DISABLED_BY_OWNER',effectiveMode,hasGitRepo:this.s.git.hasGitMarker(),registered,awaitingActivation:registered&&!this.activated,
+    const drift=this.drift.status();
+    return {enabled:policy.enabled,state:policy.enabled&&policy.mode!=='off'?this.state:'DISABLED_BY_OWNER',effectiveMode,hasGitRepo:this.s.git.hasGitMarker(),registered,awaitingActivation:registered&&!this.activated,operationsBlocked:false,
       sourceOnly:true,lastTrigger:this.lastTrigger,counts:{...this.counts},lastCheckpointId:this.latest??this.lastGitCheckpoint?.id??null,baselineId:this.baseline??this.lastGitCheckpoint?.id??null,integrity:this.lastCheckedAt?'verified_at_capture':'not_verified',lastCheckedAt:this.lastCheckedAt,
-      errorCode:this.errorCode,errorDetail:this.errorDetail,blockedPath:this.blockedPath,skippedSecretFiles:[...this.skippedSecretFiles],lastWarning:this.lastWarning,lastGitCheckpoint:this.lastGitCheckpoint,progress:{...this.progress},drift:this.drift.status(),git:this.git.status(),verification:this.evidence.summary(),...this.storage.usageFor(this.s.workspaceId),policy};
+      errorCode:this.errorCode,errorDetail:this.errorDetail,blockedPath:this.blockedPath,skippedSecretFiles:[...this.skippedSecretFiles],lastWarning:this.lastWarning,lastGitCheckpoint:this.lastGitCheckpoint,progress:{...this.progress},drift,git:this.git.status(),verification:this.evidence.summary(),...this.storage.usageFor(this.s.workspaceId),policy};
   }
   activate():void {
     if(this.closed||this.activated)return;
-    try {if(!this.project())return;}catch(e){this.fail(e,true);return;}
-    this.activated=true;
-    if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
-    const policy=this.policy();
-    if(!policy.enabled||policy.mode==='off'){this.state='DISABLED_BY_OWNER';return;}
-    this.initialization=(async()=>{
+    try {
+      if(!this.project())return;
+      this.activated=true;
+      if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
+      const policy=this.policy();
+      if(!policy.enabled||policy.mode==='off'){this.state='DISABLED_BY_OWNER';return;}
       // The same queue protects activation from direct, agent and scheduled writers.
-      await this.s.mutations!.run(async()=>{
+      this.initialization=this.s.mutations!.run(async()=>{
         if(policy.mode==='git'){
           await this.createGitCheckpoint('activation','system:activation');
           return;
@@ -314,38 +324,46 @@ export class RecoveryService {
         // Attaching/selecting the project must not start a second activation.
         if(!this.baseline)await this.capture('activation','system:activation');
         this.startScanner();
-      });
-    })().catch(e=>{this.fail(e);});
+      }).catch(e=>{this.reportAutomaticFailure(e);});
+    }catch(e){this.reportAutomaticFailure(e);}
   }
-  private fail(error:unknown,forceBlock=false):void {
-    const policy=this.policy();
+  /** Backup availability never grants authority or gates ordinary source work. */
+  reportAutomaticFailure(error:unknown):void {
+    if(error instanceof DodoError&&['FORBIDDEN','AUTH_REQUIRED'].includes(error.code))throw error;
+    this.fail(error);
+  }
+  /** Post-effect bookkeeping cannot change a committed operation's outcome. */
+  reportBookkeepingFailure(error:unknown):void { this.fail(error); }
+  private fail(error:unknown):void {
+    // Keep the original diagnostic when checkpointRequired wraps a failure.
+    if(error instanceof DodoError&&error.code==='RECOVERY_REQUIRED'&&error.detail?.['reason']===this.errorCode){
+      this.state='BLOCKED';return;
+    }
     this.errorCode=error instanceof DodoError?error.code:'BACKUP_IO_ERROR';
     this.errorDetail=error instanceof Error?error.message:String(error);
+    this.blockedPath=null;
     if(error instanceof DodoError&&error.detail&&typeof error.detail==='object'&&'path' in error.detail&&typeof (error.detail as {path?:unknown}).path==='string'){
       this.blockedPath=(error.detail as {path:string}).path;
     }
-    const criticalIdentity=error instanceof DodoError&&((error.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(error.message))||error.code==='RECOVERY_REQUIRED');
-    if(forceBlock||criticalIdentity||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)){
-      this.state='BLOCKED';
-    }else{
-      this.lastWarning=`${this.errorCode}: ${this.errorDetail}${this.blockedPath?` (${this.blockedPath})`:''}`;
-      this.state='READY';
-    }
+    this.lastWarning=`${this.errorCode}: ${this.errorDetail}${this.blockedPath?` (${this.blockedPath})`:''}`;
+    this.state='BLOCKED'; // The backup is unavailable; operationsBlocked remains false.
   }
   async checkpoint(trigger:RecoveryTrigger,actor:string,targets?:string[]):Promise<string|undefined>{
     if(this.closed)throw new DodoError('CONFLICT','Recovery runtime is closing');
+    const automatic=(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')&&!this.reviewedRestore.getStore();
+    if(!automatic)return this.checkpointRequired(trigger,actor,targets);
+    let id:string|undefined;
+    try{id=await this.checkpointRequired(trigger,actor,targets);}
+    catch(e){this.reportAutomaticFailure(e);}
+    // Recheck the caller even when backup preparation failed. Optional backup
+    // failure must never swallow permission revocation or repeat an effect.
+    this.authority.getStore()?.();
+    return id;
+  }
+  private async checkpointRequired(trigger:RecoveryTrigger,actor:string,targets?:string[]):Promise<string|undefined>{
+    if(this.closed)throw new DodoError('CONFLICT','Recovery runtime is closing');
     const policy=this.policy();
-    try{
-      if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
-    }catch(e){
-      if(!policy.strictEnforcement&&(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')){
-        this.fail(e,false);
-        this.authority.getStore()?.();
-        await this.reviewedRestore.getStore()?.();
-        return undefined;
-      }
-      throw e;
-    }
+    if(!this.project())return undefined; // launcher/unregistered CWD is never scanned
     if(!this.reconciled){this.storage.reconcile(this.s.workspaceId);this.history.reconcile();this.deployments.reconcile();this.configVault.reconcile();this.reconciled=true;}
     if(!policy.enabled||policy.mode==='off'){this.state='DISABLED_BY_OWNER';return undefined;}
     if(policy.mode==='git'){
@@ -359,11 +377,6 @@ export class RecoveryService {
         }catch(e){
           if(e instanceof DodoError&&['FORBIDDEN','AUTH_REQUIRED'].includes(e.code))throw e;
           this.fail(e);
-          if(!policy.strictEnforcement&&(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')){
-            this.authority.getStore()?.();
-            await this.reviewedRestore.getStore()?.();
-            return this.lastGitCheckpoint?.id;
-          }
           throw new DodoError('RECOVERY_REQUIRED','Git recovery checkpoint is blocked; no source mutation was started',{detail:{reason:this.errorCode,path:this.blockedPath},recovery:'inspect Recovery in project settings or switch mode'});
         }
       });
@@ -411,14 +424,7 @@ export class RecoveryService {
         return id;
       }catch(e){
         if(guardRejected||e instanceof DodoError && (['FORBIDDEN','AUTH_REQUIRED'].includes(e.code)))throw e;
-        const criticalIdentity=e instanceof DodoError&&e.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(e.message);
-        const mustBlock=(criticalIdentity&&policy.strictEnforcement)||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint'||trigger==='owner-checkpoint';
-        this.fail(e,mustBlock);
-        if(!mustBlock&&(trigger==='before-write'||trigger==='before-exec'||trigger==='activation')){
-          this.authority.getStore()?.();
-          await this.reviewedRestore.getStore()?.();
-          return this.latest??this.lastGitCheckpoint?.id;
-        }
+        this.fail(e);
         throw new DodoError('RECOVERY_REQUIRED','source backup is blocked; no source mutation was started',{detail:{reason:this.errorCode,path:this.blockedPath},recovery:'inspect Recovery in project settings, fix storage/path/integrity problems and retry'});
       }
     });
@@ -431,6 +437,9 @@ export class RecoveryService {
   private async inventory(policy:RecoveryPolicy,targets?:string[]):Promise<{files:CaptureFile[];excluded:number}> {
     this.project();const files:CaptureFile[]=[];let excluded=0,visited=0;
     const visit=async(rel:string,target:boolean):Promise<void>=>{
+      try{await visitEntry(rel,target);}catch(e){throw this.withSourcePath(e,rel);}
+    };
+    const visitEntry=async(rel:string,target:boolean):Promise<void>=>{
       this.checkBudget();if(this.closed)throw new DodoError('CONFLICT','Recovery runtime closing');
       if(++visited>policy.maxEntries)throw new DodoError('RESOURCE_LIMIT','source inventory exceeds entry budget');
       this.progress.scanned=visited;
@@ -480,6 +489,17 @@ export class RecoveryService {
     return {files:[...distinct.values()].sort((a,b)=>a.entry.path.localeCompare(b.entry.path)),excluded};
   }
   private async readFile(file:CaptureFile,stage?:string,policy=this.policy()):Promise<string>{
+    try{return await this.readSourceFile(file,stage,policy);}
+    catch(e){throw this.withSourcePath(e,file.entry.path);}
+  }
+  private withSourcePath(error:unknown,rel:string):DodoError {
+    if(error instanceof DodoError)return new DodoError(error.code,error.message,{
+      retryable:error.retryable,...(error.recovery?{recovery:error.recovery}:{}),
+      detail:{...error.detail,path:typeof error.detail?.['path']==='string'?error.detail['path']:rel},cause:error,
+    });
+    return new DodoError('INTERNAL_ERROR','source backup could not read a source path',{detail:{path:rel},cause:error});
+  }
+  private async readSourceFile(file:CaptureFile,stage:string|undefined,policy:RecoveryPolicy):Promise<string>{
     const r=this.s.wfs.resolve(file.entry.path);this.s.wfs.assertRegularFileForDirectAccess(r);
     if(!r.stat||this.signature(r.stat)!==file.signature)throw new DodoError('FILE_CHANGED','source changed during backup');
     const input=await fs.promises.open(r.abs,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW??0));
@@ -577,7 +597,7 @@ export class RecoveryService {
       this.lastCheckedAt=Date.now();this.state='READY';this.errorCode=null;this.errorDetail=null;this.blockedPath=null;
       this.s.store.audit({principal:actor,workspaceId:this.s.workspaceId,tool:'recovery.checkpoint',result:'ready',inputDigest:digestOf({id,trigger})});
       this.storage.prune(this.s.workspaceId,policy);this.git.prune();return id;
-    }catch(e){this.s.store.db.prepare("UPDATE recovery_snapshots SET state='INCOMPLETE' WHERE id=? AND state='PREPARING'").run(id);const mustBlock=((e instanceof DodoError&&e.code==='PATH_DENIED'&&/original registered project|private-state overlap|previous root identity/.test(e.message))&&policy.strictEnforcement)||policy.strictEnforcement||policy.gitRequired||Boolean(policy.gitDirectory)||trigger==='verified-checkpoint'||trigger==='owner-checkpoint';this.fail(e,mustBlock);throw e;}
+    }catch(e){this.s.store.db.prepare("UPDATE recovery_snapshots SET state='INCOMPLETE' WHERE id=? AND state='PREPARING'").run(id);this.fail(e);throw e;}
     finally{this.storage.release(id);if(staging)fs.rmSync(staging,{force:true});}
   }
   async close():Promise<void>{this.closed=true;if(this.scanTimer)clearInterval(this.scanTimer);await this.background;await Promise.allSettled(this.observations);await this.initialization;}

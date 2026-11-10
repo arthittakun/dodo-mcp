@@ -39,7 +39,14 @@ export class RecoveryDrift {
     else this.s.store.db.prepare('UPDATE recovery_drift SET payload=? WHERE workspace_id=?').run(JSON.stringify(state),this.s.workspaceId);
   }
   trackedPaths():string[]{return this.load()?.entries.filter(e=>e.kind!=='absent').map(e=>e.path)??[];}
-  status(limit=50,cursor=0){return {state:this.lastError?'unavailable':!this.load()?'pending':!this.observation?'not_scanned':this.observation.changes.length?'external_changes':'unchanged',
+  status(limit=50,cursor=0){
+    let initialized=false;
+    try{initialized=Boolean(this.load());}
+    catch(error){
+      this.lastError=error instanceof DodoError?error.code:'BACKUP_IO_ERROR';
+      this.recovery.reportBookkeepingFailure(error);
+    }
+    return {state:this.lastError?'unavailable':!initialized?'pending':!this.observation?'not_scanned':this.observation.changes.length?'external_changes':'unchanged',
     attribution:'unknown' as const,checkedAt:this.observation?.checkedAt??null,digest:this.observation?.digest??null,
     changedCount:this.observation?.changes.length??0,critical:this.observation?.critical??false,emergencyCheckpointId:this.observation?.snapshotId??null,
     changes:(this.observation?.changes??[]).filter(c=>{try{this.recovery.assertSourcePath(c.path);return true;}catch{return false;}}).slice(cursor,cursor+limit),
@@ -117,9 +124,11 @@ export class RecoveryDrift {
         else if(f.action==='mkdir')set(f.path,'directory',null,0);
         else set(f.path,'file',f.afterHash,f.bytesAfter);
       }
-      state.entries=[...entries.values()].sort((a,b)=>a.path.localeCompare(b.path));state.revision++;this.save(state);this.observation=undefined;
+      state.entries=[...entries.values()].sort((a,b)=>a.path.localeCompare(b.path));state.revision++;this.save(state);this.observation=undefined;this.lastError=null;
     } catch (e) {
-      if (this.recovery.policy().strictEnforcement) throw e;
+      this.lastError=e instanceof DodoError?e.code:'BACKUP_IO_ERROR';
+      this.observation=undefined;
+      this.recovery.reportBookkeepingFailure(e);
     }
   }
 }

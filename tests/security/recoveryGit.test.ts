@@ -30,10 +30,15 @@ describe('R03 independent Git recovery copies',()=>{
   for(const name of fs.readdirSync(f.root))fs.rmSync(path.join(f.root,name),{recursive:true,force:true});const meta=JSON.parse(copy.payload);expect(git(['--git-dir='+copy.directory,'show',meta.commit+':a']).toString()).toBe('committed');
   const plan=await f.call('restore_preview',{checkpointId:cp});await f.call('restore_apply',{planId:plan.planId,planHash:plan.planHash,idempotencyKey:f.key()});expect(fs.readFileSync(path.join(f.root,'a'),'utf8')).toBe('committed');expect(fs.existsSync(path.join(f.root,'.git'))).toBe(false);
  });
- it('rejects repository/private-state destinations and unavailable volumes without fallback',async()=>{
+ it('rejects unsafe destinations and keeps unavailable volumes visible without gating normal commands or falling back',async()=>{
   const r=setup();await expect(r.configure({...r.policy(),gitDirectory:f.root},true)).rejects.toThrow();await expect(r.configure({...r.policy(),gitDirectory:f.configDir},true)).rejects.toThrow();
   const destination=path.join(f.base,'private-backups');ensurePrivateDirectory(destination);await r.configure({...r.policy(),gitDirectory:destination},true);await expect.poll(()=>r.status().state,{timeout:30000}).toBe('READY');
-  fs.renameSync(destination,destination+'-removed');await expect(r.checkpoint('before-exec','owner')).rejects.toThrow('backup is blocked');expect(fs.existsSync(destination)).toBe(false);
+  fs.renameSync(destination,destination+'-removed');await expect(r.checkpoint('before-exec','owner')).resolves.toBeUndefined();
+  const run=await f.call('exec_command',{program:'node',args:['-e',"process.stdout.write('executed')"],idempotencyKey:f.key()});await f.ws.services.jobs.waitForExit(run.jobId as string,10000);
+  await expect.poll(()=>f.ws.services.mutations!.busy,{timeout:r.policy().scanMs+5000}).toBe(false);
+  expect(f.ws.store.getJob(run.jobId as string)?.exitCode).toBe(0);expect(f.ws.services.jobs.inlineOutput(run.jobId as string,f.ws.workspaceId,'stdout',1024).content).toBe('executed');
+  expect(r.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false});expect(r.status().lastWarning).toBeTruthy();
+  await expect(r.checkpoint('owner-checkpoint','owner')).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});expect(fs.existsSync(destination)).toBe(false);
  });
  it('handles unborn and detached HEAD; a parent repo copy never includes a sibling',async()=>{
   f=platformFixture();git(['init'],f.base);fs.writeFileSync(path.join(f.base,'sibling'),'do not capture');fs.writeFileSync(path.join(f.root,'a'),'source');new ProjectRegistry(f.ws.store).add(f.root,'Subdirectory');const r=f.ws.services.recovery!;
@@ -46,12 +51,16 @@ describe('R03 independent Git recovery copies',()=>{
   const gitfile=fs.readFileSync(path.join(f.root,'.git'));await r.checkpoint('owner-checkpoint','owner');expect(r.git.status().state).toBe('ready');expect(fs.readFileSync(path.join(f.root,'.git'))).toEqual(gitfile);
   const copy=copies().at(-1)!,meta=JSON.parse(copy.payload);expect(git(['--git-dir='+copy.directory,'cat-file','-s',meta.commit+':large']).toString().trim()).toBe(String(3*1024*1024));
  });
- it('required copy respects shared quotas; existing data/credential destinations are refused',async()=>{
+ it('required copy respects shared quotas without gating normal commands; unsafe destinations and explicit checkpoints are refused',async()=>{
   const r=setup(),mixed=path.join(f.base,'mixed');ensurePrivateDirectory(mixed);fs.writeFileSync(path.join(mixed,'user-data'),'never overwrite');
   await expect(r.configure({...r.policy(),gitDirectory:mixed},true)).rejects.toThrow('dedicated');
   const secret=path.join(f.base,'.ssh');ensurePrivateDirectory(secret);await expect(r.configure({...r.policy(),gitDirectory:secret},true)).rejects.toThrow('credential');
   await r.configure({...r.policy(),projectBytes:1024*1024,gitRequired:true},true);await expect.poll(()=>r.status().state,{timeout:30000}).toBe('BLOCKED');
-  await expect(f.call('exec_command',{program:'node',args:['-e','process.exit(0)'],idempotencyKey:f.key()})).rejects.toThrow('RECOVERY_REQUIRED');expect(f.ws.services.jobs.runningCount()).toBe(0);expect(fs.readFileSync(path.join(mixed,'user-data'),'utf8')).toBe('never overwrite');
+  const run=await f.call('exec_command',{program:'node',args:['-e',"process.stdout.write('executed')"],idempotencyKey:f.key()});await f.ws.services.jobs.waitForExit(run.jobId as string,10000);
+  await expect.poll(()=>f.ws.services.mutations!.busy,{timeout:r.policy().scanMs+5000}).toBe(false);
+  expect(f.ws.store.getJob(run.jobId as string)?.exitCode).toBe(0);expect(f.ws.services.jobs.inlineOutput(run.jobId as string,f.ws.workspaceId,'stdout',1024).content).toBe('executed');
+  expect(r.status()).toMatchObject({state:'BLOCKED',operationsBlocked:false});expect(r.status().lastWarning).toBeTruthy();
+  await expect(r.checkpoint('owner-checkpoint','owner')).rejects.toMatchObject({code:'RECOVERY_REQUIRED'});expect(fs.readFileSync(path.join(mixed,'user-data'),'utf8')).toBe('never overwrite');
  });
 
  it('free-space floor accounts for other projects pending reservations before Git starts',async()=>{
