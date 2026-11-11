@@ -1,6 +1,10 @@
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
-import { imageView, imageDifference } from '../../src/services/multimodal/images.js';
+import { imageView, imageDifference, hasSupportedRasterHeader } from '../../src/services/multimodal/images.js';
+import { inspectResourceFile, imagePreview } from '../../src/services/resources/providers.js';
 import { parseSubtitles } from '../../src/services/multimodal/mediaService.js';
 import { isPublicAddress, validatePublicUrl } from '../../src/services/multimodal/network.js';
 import { BrowserAction, GameAction, Workflow, WorkerSpec } from '../../src/services/multimodal/contracts.js';
@@ -22,7 +26,17 @@ describe('multimodal image math and input validation', () => {
     await expect(imageView(await picture('#000000'), 640, { left: 600, top: 1, width: 100, height: 100 })).rejects.toThrow(/outside/);
   });
   it('rejects executable/HTML text disguised as an image', async () => {
-    await expect(imageView(Buffer.from('<svg><script>alert(1)</script></svg>'), 640)).rejects.toThrow();
+    await expect(imageView(Buffer.from('<svg><script>alert(1)</script></svg>'), 640)).rejects.toThrow(/PNG\/JPEG\/WebP\/GIF/);
+    expect(hasSupportedRasterHeader(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>'))).toBe(false);
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-svg-guard-'));
+    const disguised = path.join(tmp, 'disguised.png');
+    fs.writeFileSync(disguised, '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>');
+    try {
+      await expect(inspectResourceFile(disguised, 'image/png')).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+      await expect(imagePreview(disguised, 320)).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
   it('reports zero pixel difference for identical images and change for different frames', async () => {
     const a = await picture('#000000'), b = await picture('#ffffff');

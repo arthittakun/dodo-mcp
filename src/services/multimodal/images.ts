@@ -6,9 +6,19 @@ import { loadSharpBackend } from './sharpBackend.js';
 import type { z } from 'zod';
 
 const OPTIONS = { limitInputPixels: 40_000_000, failOn: 'warning' as const };
+
+export function hasSupportedRasterHeader(buf: Buffer): boolean {
+  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 && buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a) return true;
+  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  if (buf.length >= 6 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38 && (buf[4] === 0x37 || buf[4] === 0x39) && buf[5] === 0x61) return true;
+  if (buf.length >= 12 && buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return true;
+  return false;
+}
+
 export async function imageView(bytes: Buffer, maxEdge: number, crop?: CropRect) {
   if (bytes.length > 16 * 1024 * 1024) throw new DodoError('FILE_TOO_LARGE', 'image input exceeds 16 MiB');
   const sharp = await loadSharpBackend();
+  if (!hasSupportedRasterHeader(bytes)) throw new DodoError('UNSUPPORTED_ENCODING', 'use PNG/JPEG/WebP/GIF; animated files use the first frame');
   const image = sharp(bytes, OPTIONS); const metadata = await image.metadata();
   if (!['jpeg', 'png', 'webp', 'gif'].includes(metadata.format ?? '') || !metadata.width || !metadata.height) throw new DodoError('UNSUPPORTED_ENCODING', 'use PNG/JPEG/WebP/GIF; animated files use the first frame');
   const width = metadata.width, height = metadata.height;

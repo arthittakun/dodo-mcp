@@ -1,15 +1,27 @@
 import fs from 'node:fs';
 import { DodoError } from '../../errors.js';
 import { decodeUtf8Strict } from '../../util/bytes.js';
+import { hasSupportedRasterHeader } from '../multimodal/images.js';
 import { loadSharpBackend } from '../multimodal/sharpBackend.js';
 import type { ResourceMetadataData } from './contracts.js';
 
 const MAX_IMAGE_PIXELS = 64 * 1024 * 1024;
 
+function assertRasterFileHeader(file: string): void {
+  const header = Buffer.alloc(12);
+  const fd = fs.openSync(file, 'r');
+  let read = 0;
+  try { read = fs.readSync(fd, header, 0, header.length, 0); } finally { fs.closeSync(fd); }
+  if (!hasSupportedRasterHeader(header.subarray(0, read))) {
+    throw new Error('unsupported raster signature');
+  }
+}
+
 export async function inspectResourceFile(file: string, mimeType: string): Promise<ResourceMetadataData> {
   if (['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(mimeType)) {
     try {
       const sharp = await loadSharpBackend();
+      assertRasterFileHeader(file);
       const meta = await sharp(file, { limitInputPixels: MAX_IMAGE_PIXELS, sequentialRead: true, failOn: 'error' }).metadata();
       if (!meta.width || !meta.height) throw new Error('missing dimensions');
       return { width: meta.width, height: meta.height, ...(meta.format ? { format: meta.format } : {}) };
@@ -35,6 +47,7 @@ export async function inspectResourceFile(file: string, mimeType: string): Promi
 export async function imagePreview(file: string, maxEdge: number): Promise<{ bytes: Buffer; mimeType: 'image/jpeg'; width: number; height: number }> {
   try {
     const sharp = await loadSharpBackend();
+    assertRasterFileHeader(file);
     const converted = await sharp(file, { limitInputPixels: MAX_IMAGE_PIXELS, sequentialRead: true, failOn: 'error' })
       .rotate()
       .resize({ width: maxEdge, height: maxEdge, fit: 'inside', withoutEnlargement: true })

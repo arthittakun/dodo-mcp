@@ -1,6 +1,6 @@
 {
   "name": "dodo-mcp",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "author": "Arthittakun",
   "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
@@ -57,6 +57,7 @@
     "docs/RELEASE_1.4.0.md",
     "docs/RELEASE_1.4.1.md",
     "docs/RELEASE_1.4.2.md",
+    "docs/RELEASE_1.4.3.md",
     "docs/RELEASE_NOTES.md",
     "docs/SCHEDULES.md",
     "docs/SECURITY.md",
@@ -97,26 +98,26 @@
     "test:desktop:native": "npm run build && node scripts/test-desktop-native.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/express": "2.0.0",
-    "@modelcontextprotocol/node": "2.0.0",
-    "@modelcontextprotocol/server": "2.0.0",
+    "@modelcontextprotocol/express": "2.0.2",
+    "@modelcontextprotocol/node": "2.1.2",
+    "@modelcontextprotocol/server": "2.4.0",
     "better-sqlite3": "13.0.3",
     "commander": "15.0.0",
     "cron-parser": "5.10.0",
     "diff": "^9.0.0",
-    "express": "5.2.1",
+    "express": "5.3.0",
     "ignore": "^7.0.9",
     "jose": "6.2.12",
     "oidc-provider": "9.12.2",
     "picomatch": "^4.0.7",
     "playwright": "1.63.0",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "tar-stream": "3.2.1",
     "typescript": "5.9.3",
-    "zod": "^4.2.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@modelcontextprotocol/client": "2.0.0",
+    "@modelcontextprotocol/client": "2.4.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/diff": "^7.0.2",
     "@types/express": "^5.0.0",
@@ -126,8 +127,8 @@
     "eslint": "^9.39.0",
     "pyright": "^1.1.413",
     "sweetalert2": "11.26.25",
-    "typescript-eslint": "^8.70.0",
-    "vitest": "5.0.0"
+    "typescript-eslint": "^8.72.2",
+    "vitest": "5.1.0"
   },
   "keywords": [
     "dodo",
@@ -167,6 +168,16 @@
     "url": "https://github.com/arthittakun/dodo-mcp/issues"
   },
   "optionalDependencies": {
-    "@img/sharp-wasm32": "0.35.4"
+    "@img/sharp-wasm32": "0.35.5"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.7"
+    },
+    "eslint": {
+      "minimatch": {
+        "brace-expansion": "^1.1.21"
+      }
+    }
   }
 }

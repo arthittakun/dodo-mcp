@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.4.3 — Dependency security updates & raster image signature hardening
+
+- Upgraded runtime dependencies `@modelcontextprotocol/server` (`2.4.0`), `@modelcontextprotocol/node` (`2.1.2`), `@modelcontextprotocol/express` (`2.0.2`), `express` (`5.3.0`), `sharp` / `@img/sharp-wasm32` (`0.35.5`), and `zod` (`^4.6.7`), clearing all advisories reported on `npm.io` and `npm audit --omit=dev`.
+- Added strict PNG/JPEG/GIF/WebP magic-byte header validation before passing image buffers or files to `sharp`, ensuring disguised SVG/XML payloads are rejected before native decoding.
+- Updated development test/lint dependencies (`@modelcontextprotocol/client@2.4.0`, `vitest@5.1.0`, `typescript-eslint@^8.72.2`, and transitive glob dependencies) to `0 vulnerabilities` across the full `npm audit` tree.
+- See [upgrade details](RELEASE_1.4.3.md).
+
 ## 1.4.2 — Recovery best effort across restart
 
 - Automatic source backup failures no longer block normal commands or edits,
