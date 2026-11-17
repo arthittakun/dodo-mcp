@@ -13,7 +13,7 @@ export const ResourceCapabilities = z.object({
 }).strict();
 
 export const ResourceSource = z.object({
-  kind: z.enum(['workspace', 'media_asset', 'transform']),
+  kind: z.enum(['workspace', 'media_asset', 'transform', 'generated']),
   /** Workspace-relative path, asset id, or parent resource id. Never absolute. */
   label: z.string().max(1024),
 }).strict();

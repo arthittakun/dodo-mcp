@@ -1,4 +1,5 @@
 import { MULTIMODAL_TOOLS } from './multimodalTools.js';
+import { CREATIVE_TOOLS } from './creativeTools.js';
 import { contextForTaskTool, analyzeImpactTool, readSymbolTool, previewRefactorTool, verifyChangesTool } from './assistanceTools.js';
 import { scheduleProposeTool } from './scheduleTools.js';
 import { desktopStatusTool, desktopWindowsTool, desktopCaptureTool, desktopAccessibilityTool, desktopActionTool } from './desktopTools.js';
@@ -79,5 +80,6 @@ export const CORE_TOOL_CATALOG: AnyToolDef[] = [
   ...RUNTIME_TOOLS,
   ...BRAIN_TOOLS,
   ...MULTIMODAL_TOOLS,
+  ...CREATIVE_TOOLS,
   ...RESOURCE_TOOLS,
 ];

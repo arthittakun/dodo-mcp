@@ -5,6 +5,7 @@ import { MediaService } from './mediaService.js';
 import { BrowserService } from './browserService.js';
 import { GameService } from './gameService.js';
 import { WorkflowService } from './workflowService.js';
+import { CreativeService } from './creativeService.js';
 
 /** One instance per workspace/epoch. Services are lazy: constructing this opens no browser, camera, microphone or decoder. */
 export class MultimodalService {
@@ -14,6 +15,7 @@ export class MultimodalService {
   readonly browser: BrowserService;
   readonly games: GameService;
   readonly workflows: WorkflowService;
+  readonly creative: CreativeService;
   private closePromise: Promise<void> | undefined;
   private readonly cleanupTimer: NodeJS.Timeout;
   private sweeping: Promise<void> | undefined;
@@ -24,9 +26,10 @@ export class MultimodalService {
     this.browser = new BrowserService(this.storage);
     this.games = new GameService(this.storage, this.screen, this.browser);
     this.workflows = new WorkflowService(this.storage, this.screen, this.browser);
+    this.creative = new CreativeService(this.storage);
     this.cleanupTimer = setInterval(() => {
       if (this.storage.closed || this.sweeping) return;
-      this.storage.sweep(); this.games.sweep(); this.workflows.sweep();
+      this.storage.sweep(); this.games.sweep(); this.workflows.sweep(); this.creative.sweep();
       this.sweeping = Promise.all([this.media.sweep(), this.browser.sweep()]).then(() => undefined).catch(() => undefined).finally(() => { this.sweeping = undefined; });
     }, 15000);
     this.cleanupTimer.unref();
@@ -37,7 +40,7 @@ export class MultimodalService {
       clearInterval(this.cleanupTimer);
       this.closePromise = (async () => {
         await this.sweeping;
-        await Promise.all([this.media.close(), this.browser.close()]);
+        await Promise.all([this.media.close(), this.browser.close(), this.creative.close()]);
         this.screen.close(); this.games.close(); this.workflows.close(); this.storage.close();
       })();
     }

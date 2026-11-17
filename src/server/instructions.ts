@@ -2,15 +2,16 @@ const COMMON_INSTRUCTIONS = `DODO uses the connected client's OAuth scopes (HTTP
 
 const SUBAGENT_INSTRUCTIONS = ` The overview ai.profiles list contains authorized profile IDs: discover subagent_spawn/status/result/control to delegate work with an idempotency key and retrieve actual receipts. Agents cannot spawn child agents or approve themselves.`;
 const SUBAGENT_HIDDEN_INSTRUCTIONS = ` Sub-agent operations are not exposed to this MCP connection; the owner can still create and manage agents in the private Local Config web workbench.`;
+const CREATIVE_INSTRUCTIONS = ` Media operations include image_generate, image_crop, image_remove_background and video_generate; video_edit and video_extend use completed owned video jobs. Official OpenAI Videos API is retired, so video compatibility needs explicit configuration. Cloud media requires owner-configured project access. Generation returns a jobId: use creative_job to collect the existing job, then resource_preview/read_range or media_save for its output. Never start a second paid request to check progress; retry a lost submission only with its original idempotencyKey and arguments.`;
 const COMPACT_SUFFIX = ` This connection uses the COMPACT tool surface: a few dodo_* gateway tools cover every exposed capability. Choose the gateway for the domain (dodo_read/dodo_write/dodo_exec for code, dodo_git_*, dodo_desktop_*, dodo_assist_*, dodo_media, dodo_browser, dodo_game, dodo_workflow_*, dodo_schedule, dodo_web), set operation to the target operation and put its own arguments in args. Use dodo_discover when you need a capability not obvious from a gateway's operation list, or to fetch an operation's exact input schema before calling it. Gateways change nothing about permissions: the target operation's scope, trust policy, approvals and guards apply exactly as if called directly.`;
 const HYBRID_SUFFIX = ` This connection uses the HYBRID tool surface: the most common coding tools (read/write/edit/search/git/run/jobs) are available directly under their own names, and every other exposed capability (assistance, desktop, media, browser, game, workflow, schedule, web fetch, todos/handoff/diagnostics) is reached through the dodo_* gateway tools — set operation to the target operation and put its own arguments in args. Use dodo_discover to find an operation or fetch its exact args schema. Gateways change nothing about permissions: the target operation's scope, trust policy, approvals and guards apply exactly as if called directly.`;
 
-export const WORKSPACE_INSTRUCTIONS = COMMON_INSTRUCTIONS + SUBAGENT_INSTRUCTIONS;
+export const WORKSPACE_INSTRUCTIONS = COMMON_INSTRUCTIONS + SUBAGENT_INSTRUCTIONS + CREATIVE_INSTRUCTIONS;
 export const COMPACT_INSTRUCTIONS = WORKSPACE_INSTRUCTIONS + COMPACT_SUFFIX;
 export const HYBRID_INSTRUCTIONS = WORKSPACE_INSTRUCTIONS + HYBRID_SUFFIX;
 
 export function instructionsFor(surface: 'compact' | 'full' | 'hybrid', features: { subagents: boolean; disabledDiscoverOperations?: readonly string[] } = { subagents: true }): string {
-  const base = COMMON_INSTRUCTIONS + (features.subagents ? SUBAGENT_INSTRUCTIONS : SUBAGENT_HIDDEN_INSTRUCTIONS);
+  const base = COMMON_INSTRUCTIONS + (features.subagents ? SUBAGENT_INSTRUCTIONS : SUBAGENT_HIDDEN_INSTRUCTIONS) + CREATIVE_INSTRUCTIONS;
     const hidden = features.disabledDiscoverOperations?.length ?? 0;
     const visibility = hidden > 0
         ? ` The owner has hidden ${hidden} operation${hidden === 1 ? '' : 's'} from this Compact/Hybrid catalog. dodo_discover and each gateway operation enum are authoritative; do not assume a hidden operation is available.`

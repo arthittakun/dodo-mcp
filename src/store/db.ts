@@ -757,6 +757,9 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
       }
     }
   },
+  `CREATE TABLE creative_jobs (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, owner TEXT NOT NULL,
+    payload TEXT NOT NULL, updated_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+   CREATE INDEX creative_jobs_owner ON creative_jobs(workspace_id,owner,expires_at);`,
 ];
 
 /**

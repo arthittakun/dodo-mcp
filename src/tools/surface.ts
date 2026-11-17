@@ -174,11 +174,12 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     name: 'dodo_media',
     title: 'Screen, image, media and speech',
     domain: 'media',
-    summary: 'bounded screen/image views, local video/audio evidence, transcription, subtitles and local speech synthesis',
+    summary: 'image generation/crop/background removal, video generation, media saving, bounded screen/image views and local video/audio/speech',
     operations: [
       'multimodal_status',
       'screen_observe',
       'image_view',
+      'image_generate', 'image_crop', 'image_remove_background', 'video_generate', 'video_edit', 'video_extend', 'creative_job', 'media_save',
       'media_open',
       'media_extract',
       'media_transcribe',

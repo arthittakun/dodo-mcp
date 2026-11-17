@@ -1,8 +1,8 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.",
   "version": 1,
-  "toolCount": 162,
-  "defaultLiveToolCount": 158,
+  "toolCount": 170,
+  "defaultLiveToolCount": 166,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -19991,6 +19991,55 @@
                     ],
                     "additionalProperties": false
                   },
+                  "creative": {
+                    "type": "object",
+                    "properties": {
+                      "enabled": {
+                        "type": "boolean"
+                      },
+                      "available": {
+                        "type": "boolean"
+                      },
+                      "imageModel": {
+                        "type": "string"
+                      },
+                      "videoModel": {
+                        "type": "string"
+                      },
+                      "videoAvailable": {
+                        "type": "boolean"
+                      },
+                      "videoNote": {
+                        "type": "string"
+                      },
+                      "localCrop": {
+                        "type": "boolean"
+                      },
+                      "imageUploadEnabled": {
+                        "type": "boolean"
+                      },
+                      "modelCalls": {
+                        "type": "boolean",
+                        "const": false
+                      },
+                      "note": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "enabled",
+                      "available",
+                      "imageModel",
+                      "videoModel",
+                      "videoAvailable",
+                      "videoNote",
+                      "localCrop",
+                      "imageUploadEnabled",
+                      "modelCalls",
+                      "note"
+                    ],
+                    "additionalProperties": false
+                  },
                   "modelCalls": {
                     "type": "boolean",
                     "const": false
@@ -20006,6 +20055,7 @@
                   "media",
                   "browser",
                   "desktop",
+                  "creative",
                   "modelCalls",
                   "notes"
                 ],
@@ -29472,6 +29522,2963 @@
       }
     },
     {
+      "name": "image_generate",
+      "title": "Generate an image",
+      "description": "Start ONE paid image generation with the owner-configured OpenAI-compatible media connection (OpenAI default). No API URL/key/model override in tool arguments. Requires owner enablement for this project and existing exec policy. Returns jobId immediately; call creative_job to collect a real image resource and preview. No automatic retries; reuse the SAME idempotencyKey to recover a lost response.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "size": {
+            "default": "1024x1024",
+            "type": "string",
+            "enum": [
+              "auto",
+              "1024x1024",
+              "1536x1024",
+              "1024x1536"
+            ]
+          },
+          "quality": {
+            "default": "auto",
+            "type": "string",
+            "enum": [
+              "auto",
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "background": {
+            "default": "auto",
+            "type": "string",
+            "enum": [
+              "auto",
+              "opaque",
+              "transparent"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "prompt",
+          "size",
+          "quality",
+          "background",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "image_crop",
+      "title": "Crop images locally without losing transparency",
+      "description": "Crop 1-16 exact pixel rectangles from ONE guarded workspace path, owned image assetId or resourceId. Runs locally with no API call. Returns lossless PNG resources preserving transparency, first-frame pixels and encoded source orientation. Coordinates are left/top/width/height before EXIF rotation. Use resource_preview/read_range or media_save for the results.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "assetId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "regions": {
+            "minItems": 1,
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "left": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20000
+                },
+                "top": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 20000
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20000
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 20000
+                }
+              },
+              "required": [
+                "left",
+                "top",
+                "width",
+                "height"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "grid": {
+            "type": "object",
+            "properties": {
+              "rows": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              },
+              "columns": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 16
+              },
+              "gap": {
+                "default": 0,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20000
+              },
+              "margin": {
+                "default": 0,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20000
+              }
+            },
+            "required": [
+              "rows",
+              "columns",
+              "gap",
+              "margin"
+            ],
+            "additionalProperties": false
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "resources": {
+                    "minItems": 1,
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "resourceId": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                        },
+                        "uri": {
+                          "type": "string",
+                          "pattern": "^dodo-resource:\\/\\/"
+                        },
+                        "mimeType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 150
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^sha256:[a-f0-9]{64}$"
+                        },
+                        "source": {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "workspace",
+                                "media_asset",
+                                "transform",
+                                "generated"
+                              ]
+                            },
+                            "label": {
+                              "type": "string",
+                              "maxLength": 1024
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "label"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "capabilities": {
+                          "type": "object",
+                          "properties": {
+                            "read": {
+                              "type": "boolean",
+                              "const": true
+                            },
+                            "stream": {
+                              "type": "boolean",
+                              "const": true
+                            },
+                            "seek": {
+                              "type": "boolean",
+                              "const": true
+                            },
+                            "preview": {
+                              "type": "boolean"
+                            },
+                            "transform": {
+                              "type": "boolean"
+                            },
+                            "extractText": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "read",
+                            "stream",
+                            "seek",
+                            "preview",
+                            "transform",
+                            "extractText"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "metadata": {
+                          "type": "object",
+                          "properties": {
+                            "provider": {
+                              "type": "string",
+                              "maxLength": 80
+                            },
+                            "width": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "height": {
+                              "type": "integer",
+                              "exclusiveMinimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "format": {
+                              "type": "string",
+                              "maxLength": 40
+                            },
+                            "entries": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "createdAt": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "expiresAt": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "deduplicated": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "resourceId",
+                        "uri",
+                        "mimeType",
+                        "bytes",
+                        "sha256",
+                        "source",
+                        "capabilities",
+                        "metadata",
+                        "createdAt",
+                        "expiresAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "resources",
+                  "note",
+                  "replayed"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "image_remove_background",
+      "title": "Remove an image background",
+      "description": "Start ONE paid generative image edit to isolate the subject on a transparent PNG. Requires owner image-upload permission and project media enablement. Select exactly ONE guarded path, owned assetId or resourceId. The provider can alter image details; success requires actual transparent pixels. Poll creative_job for output; no repeated paid edit or automatic retry.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "assetId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "video_generate",
+      "title": "Generate a video",
+      "description": "Submit ONE text-to-video or image-guided render to an explicitly owner-enabled compatible video connection. Official OpenAI Videos API is retired; video has no enabled default. Optional reference selects one owned/guarded image matching size and requires image-upload permission. Returns jobId; creative_job collects that same render as MP4. No automatic retries, background polling, or 3D.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "size": {
+            "default": "1280x720",
+            "type": "string",
+            "enum": [
+              "1280x720",
+              "720x1280"
+            ]
+          },
+          "seconds": {
+            "default": 4,
+            "anyOf": [
+              {
+                "type": "number",
+                "const": 4
+              },
+              {
+                "type": "number",
+                "const": 8
+              },
+              {
+                "type": "number",
+                "const": 12
+              },
+              {
+                "type": "number",
+                "const": 16
+              },
+              {
+                "type": "number",
+                "const": 20
+              }
+            ]
+          },
+          "reference": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1024
+              },
+              "assetId": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+              },
+              "resourceId": {
+                "type": "string",
+                "maxLength": 100,
+                "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "prompt",
+          "size",
+          "seconds",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "video_edit",
+      "title": "Edit a completed generated video",
+      "description": "Submit one paid video edit using a completed video jobId owned by this caller/workspace. The backend selects its stored remote ID; raw IDs/URLs are never accepted. Requires the same explicitly enabled compatible connection and configuration. Returns a NEW jobId for creative_job; the original remains immutable. Official OpenAI Videos API is retired; compatible-provider support must be configured.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "jobId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "jobId",
+          "prompt",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "video_extend",
+      "title": "Continue a completed generated video",
+      "description": "Submit one paid continuation of a completed owned video job, preserving its provider-side source reference. No source URL or remote ID argument. Requires the original compatible connection/configuration and owner video enablement; returns a new jobId without replacing the source. Provider support/duration limits vary. No automatic resubmission. Official OpenAI Videos API is retired.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "jobId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          },
+          "seconds": {
+            "default": 4,
+            "anyOf": [
+              {
+                "type": "number",
+                "const": 4
+              },
+              {
+                "type": "number",
+                "const": 8
+              },
+              {
+                "type": "number",
+                "const": 12
+              },
+              {
+                "type": "number",
+                "const": 16
+              },
+              {
+                "type": "number",
+                "const": 20
+              }
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "jobId",
+          "prompt",
+          "seconds",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "creative_job",
+      "title": "Collect generated image or video output",
+      "description": "Read one owned creative job. For a remote video, retrieves status/content only; NEVER starts another render. Completed images return a real bounded MCP preview and full PNG resource, videos return an MP4 resource. Reports interrupted/uncertain work truthfully after failures/restarts. Rechecks project/client authority and connection configuration before any provider request.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "jobId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "jobId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "media_save",
+      "title": "Save generated media into the project",
+      "description": "Save an owned generated PNG/MP4 resource to a guarded workspace-relative path. Requires write AND exec scopes, expectedSha256, and an explicit expectedHash before replacing an existing file. Uses the existing hash-verified journal/backup/rollback path. Owner-configured plan byte budgets apply; no arbitrary download or API call. Retry the same idempotencyKey after a lost response.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "expectedHash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "createParents": {
+            "default": true,
+            "type": "boolean"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "expectedSha256",
+          "path",
+          "createParents",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "hash": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "bytes": {
+                    "type": "number"
+                  },
+                  "changesetId": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "path",
+                  "hash",
+                  "bytes",
+                  "changesetId",
+                  "replayed"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "resource_inspect",
       "title": "Ingest or inspect one immutable resource",
       "description": "Create a workspace/principal-scoped reference to one guarded workspace path or owned media asset, or inspect an existing resourceId. Bytes enter the private content-addressed store only after path/link/file-identity checks and SHA-256 verification. A resourceId/URI is never authority and cannot cross clients or workspaces.",
@@ -29601,7 +32608,8 @@
                         "enum": [
                           "workspace",
                           "media_asset",
-                          "transform"
+                          "transform",
+                          "generated"
                         ]
                       },
                       "label": {
@@ -29904,7 +32912,8 @@
                             "enum": [
                               "workspace",
                               "media_asset",
-                              "transform"
+                              "transform",
+                              "generated"
                             ]
                           },
                           "label": {
@@ -30294,7 +33303,8 @@
                             "enum": [
                               "workspace",
                               "media_asset",
-                              "transform"
+                              "transform",
+                              "generated"
                             ]
                           },
                           "label": {
@@ -30676,7 +33686,8 @@
                             "enum": [
                               "workspace",
                               "media_asset",
-                              "transform"
+                              "transform",
+                              "generated"
                             ]
                           },
                           "label": {
@@ -31024,7 +34035,8 @@
                             "enum": [
                               "workspace",
                               "media_asset",
-                              "transform"
+                              "transform",
+                              "generated"
                             ]
                           },
                           "label": {
@@ -31397,7 +34409,8 @@
                         "enum": [
                           "workspace",
                           "media_asset",
-                          "transform"
+                          "transform",
+                          "generated"
                         ]
                       },
                       "label": {
@@ -33421,7 +36434,7 @@
     {
       "name": "agent_write",
       "title": "Write through an agent capability boundary",
-      "description": "Dispatch one dodo:write target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_rename, preview_changes, apply_changes, todo_write, handoff_write, preview_refactor, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, workflow_save.",
+      "description": "Dispatch one dodo:write target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_rename, preview_changes, apply_changes, todo_write, handoff_write, preview_refactor, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, workflow_save, media_save.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -33490,7 +36503,8 @@
               "memory_learning_propose",
               "runtime_session_open",
               "runtime_session_close",
-              "workflow_save"
+              "workflow_save",
+              "media_save"
             ]
           },
           "args": {
@@ -33613,7 +36627,7 @@
     {
       "name": "agent_exec",
       "title": "Execute through an agent capability boundary",
-      "description": "Dispatch one dodo:exec target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: git_commit, run_task, exec_command, desktop_windows, desktop_capture, desktop_accessibility, desktop_action, verify_changes, runtime_task_start, runtime_task_cancel, brain_rebuild, brain_pause, brain_cancel, screen_observe, image_view, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, browser_session, browser_observe, browser_action, game_session, game_step, workflow_run, resource_transform.",
+      "description": "Dispatch one dodo:exec target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: git_commit, run_task, exec_command, desktop_windows, desktop_capture, desktop_accessibility, desktop_action, verify_changes, runtime_task_start, runtime_task_cancel, brain_rebuild, brain_pause, brain_cancel, screen_observe, image_view, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, browser_session, browser_observe, browser_action, game_session, game_step, workflow_run, image_generate, image_crop, image_remove_background, video_generate, video_edit, video_extend, creative_job, resource_transform.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -33695,6 +36709,13 @@
               "game_session",
               "game_step",
               "workflow_run",
+              "image_generate",
+              "image_crop",
+              "image_remove_background",
+              "video_generate",
+              "video_edit",
+              "video_extend",
+              "creative_job",
               "resource_transform"
             ]
           },

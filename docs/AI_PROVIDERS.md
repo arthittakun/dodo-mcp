@@ -17,6 +17,16 @@ DODO MCP 1.2.1 สามารถเปิด runtime ของหลายโ�
 
 ประวัติแสดงผลที่มองเห็นได้และหลักฐาน ไม่แสดง raw reasoning/continuation ของ provider หากติด approval ให้อ่านคำขอของ operation เป้าหมายและอนุมัติผ่าน owner controls จากนั้น Resume ด้วยผู้เรียกเดิม การกด Resume ไม่ขยาย scopes หรือ trust
 
+## สร้างภาพและวิดีโอผ่าน Creative Media
+
+ส่วน **Providers & Profiles → Creative Media** ใช้ connection/credential store เดียวกัน แต่เลือกโมเดลงานภาพและวิดีโอแยกจาก Agent Profile ไม่ต้องสร้าง profile เพื่อเรียกเครื่องมือสื่อ ค่าเริ่มต้นงานภาพเป็น OpenAI (`https://api.openai.com/v1`) และ `gpt-image-2.5-flare` ปุ่มเพิ่ม OpenAI สำหรับงานสื่อให้กรอกคีย์โดยไม่ต้องกรอก URL วิดีโอมี `videoEnabled:false` และ `videoModel` ว่างจนเจ้าของตั้งค่าเอง
+
+งานสร้างสื่อผ่าน AI เริ่มปิดไว้ ต้องเปิดและเลือกโปรเจกต์ที่อนุญาตก่อน วิดีโอต้องเปิดเพิ่มสำหรับ connection ที่รองรับ การส่งภาพไปลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอต้องเปิด image-upload permission เพิ่ม ส่วนครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ ใน managed mode ใช้ client allowlist ของสิทธิ์ AI รายโปรเจกต์ด้วย การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference และคีย์แบบ session ต้องใส่ใหม่หลังรีสตาร์ต
+
+Creative Media เลือก connection OpenAI/Custom ที่เปิดใช้และรองรับ Responses หรือ Chat Completions เป็นการเชื่อมต่อแบบ OpenAI-compatible; endpoint นั้นต้องรองรับ operation ภาพ/วิดีโอที่เรียกจริงด้วย ไม่อนุมานจากการที่ text chat ใช้งานได้ เครื่องมือไม่รับ URL/key/model/remote task ID จาก MCP arguments และไม่มี fallback เปลี่ยนผู้ให้บริการอัตโนมัติ ดู [Creative Media](CREATIVE_MEDIA.md) สำหรับ create/edit/extend, async jobs, การครอป/บันทึก และข้อจำกัดของ generative background removal
+
+OpenAI ระบุว่า Sora 2 และ Videos API ยุติบริการเมื่อ 24 กันยายน 2026 และไม่มี API ทดแทนตรงตัว ระบบจึงปฏิเสธการเปิดวิดีโอกับ `api.openai.com` และไม่ตั้ง `sora-2` ให้อัตโนมัติ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
+
 ## Protocols
 
 | Preset | Protocol | Base URL เริ่มต้น |
@@ -48,7 +58,7 @@ Ollama loopback อาจเรียก cloud model ได้ ต้องเ�
 
 ## MCP หลายโปรเจกต์
 
-Complete Full มี 138 tools; Compact 20; Hybrid 49 โดย operations ใหม่ใช้ gateways เดิม
+Full มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ gateways เดิม ตรวจ catalog/schema ของ build ที่รันด้วย `dodo_discover` ก่อนเรียก
 
 ```text
 project_overview()
@@ -70,9 +80,9 @@ dodo_write(
 
 Sub-agent ยังพร้อมใช้จากหน้า Local Config → Chat & Tasks เสมอ ส่วน MCP clients จะไม่
 เห็น operations กลุ่มนี้โดยค่าเริ่มต้น เจ้าของเปิดได้ที่ **Settings → Sub-agent tools
-ใน MCP** แล้ว restart DODO และ rescan/recreate MCP app เมื่อปิด Full live catalog มี
-121 tools; เมื่อเปิดมีครบ 125 ส่วน Compact/Hybrid ยังมี 19/49 ชื่อเท่าเดิมแต่ operation
-enum และ `dodo_discover` จะมีสี่ operations ด้านล่างเฉพาะเมื่อเปิดเท่านั้น
+ใน MCP** แล้ว restart DODO และ rescan/recreate MCP app เมื่อเปิด Full live catalog
+จะเพิ่มสี่ tools ด้านล่าง ส่วน Compact/Hybrid ใช้ชื่อ gateways เดิม แต่ operation enum
+และ `dodo_discover` จะมีสี่ operations นี้เฉพาะเมื่อเปิดเท่านั้น
 
 ```text
 dodo_discover(operation="subagent_spawn")

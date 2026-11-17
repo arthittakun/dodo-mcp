@@ -5,6 +5,7 @@ import { AICredentials } from './credentials.js';
 import { AILimits, PRESETS, ProviderInput, ProfileInput, ProjectAIInput, type Provider, type Profile, type ProjectAI } from './contracts.js';
 import { validateEndpoint, providerRequest } from './network.js';
 import { generate } from './adapters.js';
+import { CREATIVE_MEDIA_DEFAULTS, CreativeSettingsInput, isCreativeConnection, supportsCreativeVideoConnection, type CreativeSettings } from '../multimodal/creativeSettings.js';
 export class AISettings {
   readonly credentials = new AICredentials();
   private readonly users = new Map<string, number>();
@@ -25,12 +26,26 @@ export class AISettings {
   put(kind: string, id: string, payload: unknown): void { this.store.db.prepare('INSERT INTO ai_settings VALUES (?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET payload=excluded.payload,updated_at=excluded.updated_at').run(kind, id, JSON.stringify(payload), Date.now()); }
   limits() { return AILimits.parse(this.get('settings','limits') ?? {}); }
   saveLimits(raw: unknown) { const value = AILimits.parse(raw); this.put('settings','limits',value); return value; }
-  state() { return { presets: PRESETS, connections: this.list<Provider>('connection').map(c => ({ ...c, credentialPresent: c.credentialStorage === 'session' ? this.credentials.hasSession(c.id) : this.get('credential', c.id) === true })), metadata: this.list('metadata'), probes: this.list('probe'), profiles: this.list<Profile>('profile'), permissions: this.list<ProjectAI>('project'), limits: this.limits() }; }
+  media(): CreativeSettings { return CreativeSettingsInput.parse(this.get('settings', 'creative-media') ?? {}); }
+  saveMedia(raw: unknown): CreativeSettings {
+    const value = CreativeSettingsInput.parse(raw);
+    if (value.enabled || value.videoEnabled) {
+      const connection = value.connectionId ? this.get<Provider>('connection', value.connectionId) : undefined;
+      if (!connection || !isCreativeConnection(connection)) throw new DodoError('INVALID_INPUT', 'select an enabled OpenAI-compatible connection for creative media');
+      if (value.videoEnabled && !supportsCreativeVideoConnection(connection)) throw new DodoError('NOT_SUPPORTED', 'the official OpenAI Videos API is retired; compatibility video requires a separately supported connection and model');
+    }
+    const normalized = { ...value, projectIds: [...new Set(value.projectIds)] };
+    this.put('settings', 'creative-media', normalized); return normalized;
+  }
+  state() { return { presets: PRESETS, connections: this.list<Provider>('connection').map(c => ({ ...c, credentialPresent: c.credentialStorage === 'session' ? this.credentials.hasSession(c.id) : this.get('credential', c.id) === true })), metadata: this.list('metadata'), probes: this.list('probe'), profiles: this.list<Profile>('profile'), permissions: this.list<ProjectAI>('project'), limits: this.limits(), media: this.media(), mediaDefaults: CREATIVE_MEDIA_DEFAULTS }; }
   async saveConnection(raw: unknown, key?: string): Promise<Provider> {
     const input = ProviderInput.parse(raw); const c = { ...input, id: input.id ?? newId('ai') };
     const done = this.edit(c.id);
     try {
     validateEndpoint(c, this.ports);
+    const media = this.media();
+    if (media.enabled && media.connectionId === c.id && !isCreativeConnection(c)) throw new DodoError('CONFLICT', 'disable creative media or select another connection before disabling/changing this provider protocol');
+    if (media.videoEnabled && media.connectionId === c.id && !supportsCreativeVideoConnection(c)) throw new DodoError('CONFLICT', 'disable compatibility video before changing to a connection without video support');
     const previous = this.get<Provider>('connection', c.id);
     if (previous && (previous.baseUrl !== c.baseUrl || previous.protocol !== c.protocol || previous.credentialStorage !== c.credentialStorage) && !key) throw new DodoError('INVALID_INPUT', 'endpoint/protocol/storage change requires entering credentials again; old keys are never forwarded');
     if (key) { await this.credentials.set(c.id, c.credentialStorage, key); this.put('credential', c.id, true); }
@@ -44,6 +59,7 @@ export class AISettings {
     const done = kind === 'connection' ? this.edit(id) : () => undefined;
     try {
     if (kind === 'connection') {
+      if (this.media().connectionId === id) throw new DodoError('CONFLICT', 'clear or change the creative media connection before removing it');
       if (this.list<Profile>('profile').some(p => p.connectionId === id)) throw new DodoError('CONFLICT', 'remove profiles using this connection first');
       const c = this.get<Provider>('connection', id);
       if (c && this.get('credential', id)) await this.credentials.delete(id, c.credentialStorage);

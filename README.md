@@ -15,11 +15,12 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface; มี capability definitions ทั้งหมด 162 รายการ แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP จึงเห็น 158 tools
+- STDIO ใช้ Full Tool Surface สำหรับเครื่องมือรายตัว แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
+- สร้างภาพด้วยค่าเริ่มต้น OpenAI ครอป/แบ่ง grid เป็น PNG ที่รักษาความโปร่งใส ลบพื้นหลัง พร้อม video compatibility สำหรับสร้างจากข้อความ/ภาพ แก้ไข และต่อคลิปผ่านปลายทางที่รองรับ ([Creative Media](docs/CREATIVE_MEDIA.md))
 - ตรวจและควบคุมมือถือ Android ผ่าน ADB ได้ตั้งแต่ภาพหน้าจอ/UI/logcat ไปจนถึง input, apps, APK, file transfer และ device-side shell โดยจำกัดเฉพาะ serial ที่เจ้าของอนุญาต ([คู่มือ](docs/ANDROID.md))
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
@@ -43,6 +44,14 @@ npm install -g dodo-mcp
 dodo setup --check
 dodo --cli
 ```
+
+### สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ
+
+เปิด **Local Config → Providers & Profiles → Creative Media** เพื่อใส่ OpenAI API key เลือกโมเดล/โปรเจกต์ แล้วเปิดงานภาพผ่าน AI ค่าเริ่มต้นใช้ `gpt-image-2.5-flare` การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องเปิดอนุญาตอัปโหลดภาพที่เลือกเพิ่ม ส่วนครอปแบบ `regions` หรือ `grid` ทำในเครื่องโดยไม่ใช้คีย์
+
+เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) ติดตามงานด้วย `creative_job` และบันทึก PNG/MP4 ด้วย `media_save` งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
+
+วิดีโอเริ่มปิดไว้และไม่มีโมเดลเริ่มต้น ต้องเลือก connection ที่รองรับจริงและเปิดเอง OpenAI ยุติ Sora 2/Videos API เมื่อ 24 กันยายน 2026 จึงไม่ส่งงานวิดีโอไปที่ OpenAI ทางการ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
 
 ### Android / ADB และ Termux
 
@@ -566,6 +575,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Windows setup และ ACL troubleshooting](docs/WINDOWS_SETUP.md)
 - [Task assistance](docs/ASSISTANCE.md)
 - [Multimodal](docs/MULTIMODAL.md)
+- [Creative Media: สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ](docs/CREATIVE_MEDIA.md)
 - [Project Registry](docs/PROJECTS.md)
 - [Universal resources and CAS](docs/RESOURCES.md)
 - [Project Brain and incremental index](docs/BRAIN.md)

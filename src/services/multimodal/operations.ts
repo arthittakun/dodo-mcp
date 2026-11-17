@@ -3,8 +3,10 @@ import { digestOf } from '../../util/hash.js';
 import { policyGate, type ToolCtx } from '../../tools/context.js';
 import { liveAccess } from './storage.js';
 
-/** Preserve reservations on uncertain execution OR receipt-persistence failure. Never replay an action just because its response was lost. */
-export async function multimediaEffect<T>(ctx: ToolCtx, tool: string, key: string, payload: Record<string, unknown>, fn: () => Promise<T>, standardGate = true): Promise<T & { replayed: boolean }> {
+/** Preserve reservations on uncertain execution OR receipt-persistence failure. Never replay an action just because its response was lost.
+ * preflightCodes is backend-only and may be supplied only when fn guarantees that those errors precede every effect.
+ */
+export async function multimediaEffect<T>(ctx: ToolCtx, tool: string, key: string, payload: Record<string, unknown>, fn: () => Promise<T>, standardGate = true, preflightCodes: readonly string[] = []): Promise<T & { replayed: boolean }> {
   liveAccess(ctx, 'dodo:exec');
   const store = ctx.services.store, ids = { key, principal: ctx.principal.grantId, workspaceId: ctx.services.workspaceId, tool };
   const reservation = store.reserveIdempotency({ ...ids, payloadHash: digestOf({ ...payload, epoch: ctx.services.epoch }) });
@@ -19,7 +21,7 @@ export async function multimediaEffect<T>(ctx: ToolCtx, tool: string, key: strin
     result = await fn();
   } catch (err) {
     const safeCodes = ['APPROVAL_REQUIRED', 'FORBIDDEN', 'INVALID_INPUT', 'NOT_SUPPORTED', 'NOT_FOUND', 'PATH_DENIED', 'SECRET_PATH_DENIED', 'FILE_CHANGED', 'FILE_TOO_LARGE', 'RESOURCE_LIMIT', 'STALE_WORKSPACE', 'AMBIGUOUS_EDIT'];
-    if (err instanceof DodoError && safeCodes.includes(err.code)) { store.releaseIdempotency(ids); throw err; }
+    if (err instanceof DodoError && (safeCodes.includes(err.code) || preflightCodes.includes(err.code))) { store.releaseIdempotency(ids); throw err; }
     throw new DodoError('RECOVERY_REQUIRED', `operation outcome requires inspection; it was not automatically repeated (${err instanceof DodoError ? err.code : 'PROCESS_ERROR'})`);
   }
   try { store.completeIdempotency(ids, JSON.stringify(result)); }

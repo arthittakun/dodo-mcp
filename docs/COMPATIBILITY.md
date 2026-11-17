@@ -29,10 +29,10 @@ Effectful tools และ jobs ยังทำงานใน active workspace �
 ## Tool surfaces
 
 - HTTP default: Compact 20 tools
-- STDIO default: Full 154 tools; เปิด Sub-agent MCP exposure แล้วเป็น 158
+- STDIO default: Full 166 tools; เปิด Sub-agent MCP exposure แล้วเป็น 170
 - explicit Hybrid: 49 tools
 
-Complete capability schema มี 158 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
+Complete capability schema มี 170 operations ค่าเริ่มต้น `exposeSubagentsToMcp=false`
 ซ่อน `subagent_spawn/status/result/control` จาก MCP เท่านั้น หน้าเว็บ Chat & Tasks ยัง
 ใช้ได้ Compact/Hybrid คงจำนวน 20/49 tool names แต่กรอง operation enum, instructions
 และ discover index ให้ตรงกับ live runtime หลังเปลี่ยนค่าต้อง restart และให้ client
@@ -121,4 +121,4 @@ Chromium desktop/narrow fixtures and freshly installed npm tarballs. Native
 Linux/Windows CI for this patch is deferred to the next release by owner decision;
 prior platform results are not evidence for these new maintenance paths.
 No platform/security checks were disabled in code. Compact remains 20 tools;
-Full exposes 158 by default or 162 when sub-agent tools are enabled.
+Full exposes 166 by default or 170 when sub-agent tools are enabled.

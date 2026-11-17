@@ -1,5 +1,13 @@
 # DODO MCP — Release Notes
 
+## 1.5.0 — Creative Media
+
+- Add image generation, lossless local PNG regions/grid crops and transparent-background edits, with OpenAI as the image default.
+- Prepare explicitly enabled video compatibility: text/image-guided creation, edits and extensions of completed owned videos. Official OpenAI video requests are refused because Videos API/Sora 2 are retired; no default video model is selected.
+- Add owner-only media settings, project/upload permissions, asynchronous job receipts, explicit status collection and journaled media saves. Paid operations are never automatically resubmitted.
+- Keep API endpoints and credentials out of tool arguments; private test configuration is not shipped.
+- See [release details](RELEASE_1.5.0.md), [Creative Media setup and contracts](CREATIVE_MEDIA.md) and [validation](TEST_REPORT.md). Live video acceptance remains dependent on the selected service/model.
+
 ## 1.4.3 — Dependency security updates & raster image signature hardening
 
 - Upgraded runtime dependencies `@modelcontextprotocol/server` (`2.4.0`), `@modelcontextprotocol/node` (`2.1.2`), `@modelcontextprotocol/express` (`2.0.2`), `express` (`5.3.0`), `sharp` / `@img/sharp-wasm32` (`0.35.5`), and `zod` (`^4.6.7`), clearing all advisories reported on `npm.io` and `npm audit --omit=dev`.

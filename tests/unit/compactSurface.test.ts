@@ -37,6 +37,7 @@ const FULL_NAMES = [
   'media_subtitles', 'media_search', 'media_read', 'media_job', 'media_close', 'speech_synthesize',
   'browser_session', 'browser_observe', 'browser_action', 'game_session', 'game_step',
   'workflow_save', 'workflow_search', 'workflow_run',
+  'image_generate', 'image_crop', 'image_remove_background', 'video_generate', 'video_edit', 'video_extend', 'creative_job', 'media_save',
   'resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform',
   'agent_run_open', 'agent_run_status', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire',
   'agent_intent_release', 'agent_read', 'agent_write', 'agent_exec', 'agent_snapshot_create',
@@ -165,8 +166,8 @@ describe('compact surface catalog', () => {
     const compact = surfaceCatalog('compact', hidden);
     const hybrid = surfaceCatalog('hybrid', hidden);
 
-    expect(TOOL_CATALOG).toHaveLength(162); // the installed capability contract stays complete
-    expect(full).toHaveLength(158);
+    expect(TOOL_CATALOG).toHaveLength(170); // the installed capability contract stays complete
+    expect(full).toHaveLength(166);
     expect(compact).toHaveLength(20);
     expect(hybrid).toHaveLength(49);
     for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
@@ -182,10 +183,10 @@ describe('compact surface catalog', () => {
     const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
     expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
 
-    expect(surfaceStats('full', hidden).toolCount).toBe(158);
+    expect(surfaceStats('full', hidden).toolCount).toBe(166);
     expect(surfaceStats('compact', hidden).toolCount).toBe(20);
     expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
-    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(162);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(170);
     expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
     expect(instructionsFor('compact', hidden)).toContain('not exposed');
     expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
@@ -207,8 +208,12 @@ describe('dodo_discover', () => {
 
   it('domain filter restricts matches and empty query lists everything paged', async () => {
     const media = await call(discover, { ...WS, domain: 'media', limit: 25 });
-    const ops = (media.data as { matches: Array<{ operation: string; gateway: string }> }).matches;
-    expect(ops.length).toBe(18);
+    expect(media.nextCursor).toBe('c25');
+    const mediaNext = await call(discover, { ...WS, domain: 'media', limit: 25, cursor: media.nextCursor! });
+    const matches = (value: typeof media) => (value.data as { matches: Array<{ operation: string; gateway: string }> }).matches;
+    expect(matches(media)).toHaveLength(25); expect(matches(mediaNext)).toHaveLength(1);
+    const ops = [...matches(media), ...matches(mediaNext)];
+    expect(ops.length).toBe(26);
     expect(ops.every((m) => m.gateway === 'dodo_media')).toBe(true);
 
     const page1 = await call(discover, { ...WS, limit: 10 });
@@ -251,7 +256,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(162);
+    expect(TOOL_CATALOG).toHaveLength(170);
     expect(COMPACT_CATALOG).toHaveLength(20);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

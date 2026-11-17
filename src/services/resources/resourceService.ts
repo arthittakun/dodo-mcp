@@ -25,7 +25,7 @@ interface ResourceRow {
   principal: string;
   object_hash: string;
   mime_type: string;
-  source_kind: 'workspace' | 'media_asset' | 'transform';
+  source_kind: 'workspace' | 'media_asset' | 'transform' | 'generated';
   source_label: string;
   capabilities: string;
   metadata: string;
@@ -102,6 +102,26 @@ export class ResourceService {
     this.assertExpectedMime(expectedMimeType, row.mime_type);
     await this.cas.verify(row.object_hash, row.bytes);
     return this.toInfo(row);
+  }
+
+  /** Internal creative output only: never accepts a caller URL, path or claimed MIME. */
+  async ingestGenerated(ctx: ToolCtx, bytes: Buffer, mimeType: 'image/png' | 'video/mp4', label: string, metadata: ResourceMetadataData = {}): Promise<ResourceInfoData> {
+    this.check(); liveAccess(ctx, 'dodo:exec');
+    if (bytes.length > 64 * 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'generated media exceeds 64 MiB');
+    if (!/^(?:creative|crop)_[a-z0-9]{8,64}$/.test(label) || sniffType(bytes.subarray(0, 64 * 1024)).mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
+    const object = await this.cas.ingestBuffer(bytes);
+    this.check(); liveAccess(ctx, 'dodo:exec'); ctx.revalidate?.();
+    return this.createReference(ctx, object, mimeType, 'generated', label, metadata);
+  }
+
+  /** Owned, verified binary input for journaled media_save. Budgets apply before allocation. */
+  async exportBytes(ctx: ToolCtx, resourceId: string, expectedHash: string, maxBytes: number): Promise<{ info: ResourceInfoData; bytes: Buffer }> {
+    const row = await this.lookup(ctx, resourceId, expectedHash, 'dodo:exec');
+    if (row.source_kind !== 'generated' || !['image/png', 'video/mp4'].includes(row.mime_type)) throw new DodoError('FORBIDDEN', 'media_save accepts generated image/video resources only');
+    if (row.bytes > Math.min(maxBytes, 64 * 1024 * 1024)) throw new DodoError('RESOURCE_LIMIT', 'media exceeds the configured file/plan budget; use resource_read_range or raise the owner budget');
+    const bytes = await this.cas.readRange(row.object_hash, row.bytes, 0, row.bytes);
+    if (sha256Bytes(bytes) !== row.object_hash) throw new DodoError('FILE_CHANGED', 'media changed during export');
+    return { info: this.toInfo(row), bytes };
   }
 
   async read(ctx: ToolCtx, resourceId: string, maxBytes: number, expectedHash?: string): Promise<{

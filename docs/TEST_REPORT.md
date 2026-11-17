@@ -1,5 +1,60 @@
 # DODO MCP — Test Report
 
+## 1.5.0 Creative Media — Windows, 2026-11-17
+
+Build, typecheck, lint, UI JavaScript syntax and diff checks passed. Focused
+validation covers the four creative operations and their job/resource/save flow;
+this is not a full native release gate.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| New creative image/settings/transport/MCP/owner UI cases | 61 | 0 | 0 |
+| Existing media math, resource and Full/Compact/Hybrid regressions | 56 | 0 | 9 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total passing focused coverage | 134 | 0 | 9 |
+
+New cases cover exact PNG region/grid crop pixels and alpha, actual transparency checks,
+metadata stripping and image budgets; pinned DNS, denied redirects, multipart
+requests and sanitized provider errors; owner/project/client/upload guards;
+single-submit idempotency, interrupted/uncertain jobs and restart persistence;
+remote render capacity; image-guided video upload dimensions/expiry; owned video
+edits/extensions; failed image/MP4 final receipt persistence without paid replay;
+stale jobs in unopened projects; hash-verified saves and actual rollback. The
+owner HTTP test uses the real server, and the actual Chrome settings UI test
+uses a mocked API. Provider calls in automated MCP tests use adapter fixtures.
+The installed tarball also performs an actual local crop and journaled save
+through Compact MCP. Eight additions bring the complete catalog to 170 Full
+capabilities, 166 with sub-agents hidden; Compact remains 20 and Hybrid 49.
+Media discovery spans two bounded pages. The reported totals use the latest
+passing result for each file, including the corrected discovery pagination case.
+
+The nine skips are pre-existing browser/local speech cases whose native
+prerequisites were unavailable. Two additional existing security suites
+(`security/multimodal` and `security/resources`) could not complete setup:
+Windows refused file symlink creation with `EPERM`. Their 26 cases are not
+counted as passed or included in the table; full symlink/native acceptance
+remains outstanding.
+
+Live smoke testing used ephemeral private test configuration, never the owner
+settings or shipped files. One image generation and one background edit returned
+real PNGs; local decoding confirmed transparent pixels in the edit and a
+256 × 256 crop. The video creation attempt was rejected with HTTP 403 and was
+not retried. Video create/status/content contracts passed against fixtures;
+live video generation has not been accepted with the supplied test credential.
+A fresh model-list check returned HTTP 200 and twelve image models, with no
+advertised video model. No extra creation request was sent by that check.
+
+Current official documentation confirms the OpenAI Videos API/Sora 2 shutdown on
+2026-09-24. The release selects no default video model, requires explicit video
+compatibility enablement, and tests refusal of official OpenAI video requests
+before network access while preserving independent image access. The historical
+video wire contracts are prepared for compatible services, not represented as a
+currently available OpenAI product; see [release notes](RELEASE_1.5.0.md).
+
+The inspected tarball contains the creative modules and documentation, retains
+the official OpenAI default, and contains no private test endpoint or credential.
+See [Creative Media](CREATIVE_MEDIA.md) for setup and operational limits.
+
 ## 1.4.2 Recovery best-effort patch — Windows, 2026-11-11
 
 Focused checks on Windows / Node 24.22.1: **build, typecheck and lint passed**.

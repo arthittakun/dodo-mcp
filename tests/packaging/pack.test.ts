@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
 import { TOOL_CATALOG } from '../../src/tools/catalog.js';
 import { COMPACT_CATALOG, HYBRID_CATALOG, surfaceCatalog } from '../../src/tools/surface.js';
@@ -67,6 +68,7 @@ describe('PACK: npm tarball', () => {
     expect(fileList).toContain('README.md');
     expect(fileList).toContain('docs/RELEASE_1.4.2.md');
     expect(fileList).toContain('docs/RELEASE_1.4.3.md');
+    expect(fileList).toContain('docs/RELEASE_1.5.0.md');
     for (const file of ['dist/cli/menu.js', 'dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/services/android/androidService.js', 'dist/services/android/adbBackend.js', 'dist/tools/androidTools.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/ANDROID.md', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/RELEASE_1.0.4.md', 'docs/RELEASE_1.0.5.md', 'docs/RELEASE_1.1.0.md', 'docs/RELEASE_1.2.0.md', 'docs/WINDOWS.md', 'docs/WINDOWS_SETUP.md', 'docs/WEB_CLIENTS.md', 'docs/adr/044-global-launcher-and-cli-menu.md', 'docs/adr/049-android-adb-control.md', 'docs/adr/050-cloudflare-local-and-project-access.md']) expect(fileList).toContain(file);
     const privateDocs = [
       /^docs\/development\//,
@@ -108,7 +110,7 @@ describe('PACK: npm tarball', () => {
   });
 
   it('PACK-10: ships assistance/media documentation and explicit setup, never models or recordings', () => {
-    for (const file of ['docs/ASSISTANCE.md', 'docs/MULTIMODAL.md', 'docs/RELEASE_NOTES.md', 'scripts/setup-multimodal.mjs', 'scripts/guard-publish.mjs', 'dist/services/multimodal/mediaWorker.js']) expect(fileList).toContain(file);
+    for (const file of ['docs/ASSISTANCE.md', 'docs/MULTIMODAL.md', 'docs/CREATIVE_MEDIA.md', 'docs/RELEASE_NOTES.md', 'scripts/setup-multimodal.mjs', 'scripts/guard-publish.mjs', 'dist/services/multimodal/mediaWorker.js', 'dist/services/multimodal/creativeService.js', 'dist/services/multimodal/creativeProvider.js', 'dist/services/multimodal/creativeImages.js', 'dist/services/multimodal/creativeSettings.js', 'dist/tools/creativeTools.js']) expect(fileList).toContain(file);
     expect(fileList.some(f => /^(?:models|tmp|release-evidence)\//.test(f) || /\.(?:bin|mp4|aiff|wav|db)$/.test(f))).toBe(false);
   });
 
@@ -257,7 +259,7 @@ describe('PACK: npm tarball', () => {
     expect(compact.toolCount).toBeLessThanOrEqual(20);
     expect(compact.fullToolCount).toBe(TOOL_CATALOG.length);
     expect(compact.defaultLiveToolCount).toBe(20);
-    expect(compact.defaultLiveFullToolCount).toBe(158);
+    expect(compact.defaultLiveFullToolCount).toBe(166);
     expect(compact.optionalMcpFeatures.subagents).toMatchObject({
       default: false,
       operations: ['subagent_spawn', 'subagent_status', 'subagent_result', 'subagent_control'],
@@ -273,13 +275,29 @@ describe('PACK: npm tarball', () => {
     // the installed tarball can actually serve the compact surface over STDIO
     const root = fs.mkdtempSync(path.join(workDir, 'compact-root-'));
     const cfg = fs.mkdtempSync(path.join(workDir, 'compact-cfg-'));
+    const env = { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>;
+    fs.writeFileSync(path.join(root, 'crop-source.png'), await sharp({ create: { width: 4, height: 4, channels: 4, background: { r: 40, g: 80, b: 120, alpha: 0.5 } } }).png().toBuffer());
+    execFileSync(process.execPath, [installedBin, 'trust', '--mode', 'trusted', '--yes'], { cwd: root, env, stdio: 'pipe' });
     const client = new Client({ name: 'packed-compact-client', version: '1' });
-    await client.connect(new StdioClientTransport({ command: process.execPath, args: [installedBin, 'stdio', '--tools', 'compact'], cwd: root, env: { ...process.env, DODO_CONFIG_DIR: cfg } as Record<string, string>, stderr: 'pipe' }));
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [installedBin, 'stdio', '--tools', 'compact'], cwd: root, env, stderr: 'pipe' }));
     try {
       const tools = (await client.listTools()).tools.map((t) => t.name);
       expect(tools).toEqual(COMPACT_CATALOG.map((t) => t.name));
       const overview = await client.callTool({ name: 'project_overview', arguments: {} });
       const envelope = overview.structuredContent as { workspaceId: string; workspaceEpoch: string };
+      const crop = await client.callTool({ name: 'dodo_media', arguments: {
+        workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
+        operation: 'image_crop', args: { path: 'crop-source.png', regions: [{ left: 1, top: 1, width: 2, height: 2 }], idempotencyKey: 'packed-creative-crop' },
+      } });
+      expect(crop.isError, JSON.stringify(crop.structuredContent)).not.toBe(true);
+      const generated = (crop.structuredContent as { data: { resources: Array<{ resourceId: string; sha256: string; mimeType: string }> } }).data.resources[0]!;
+      expect(generated.mimeType).toBe('image/png');
+      const saved = await client.callTool({ name: 'dodo_media', arguments: {
+        workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
+        operation: 'media_save', args: { resourceId: generated.resourceId, expectedSha256: generated.sha256, path: 'crop-result.png', idempotencyKey: 'packed-creative-save' },
+      } });
+      expect(saved.isError, JSON.stringify(saved.structuredContent)).not.toBe(true);
+      expect(await sharp(fs.readFileSync(path.join(root, 'crop-result.png'))).metadata()).toMatchObject({ format: 'png', width: 2, height: 2, hasAlpha: true });
       const memory = await client.callTool({ name: 'dodo_assist_read', arguments: {
         workspaceId: envelope.workspaceId, workspaceEpoch: envelope.workspaceEpoch,
         operation: 'memory_status', args: {},

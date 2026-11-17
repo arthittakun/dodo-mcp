@@ -3,8 +3,8 @@
   "version": 1,
   "toolCount": 20,
   "defaultLiveToolCount": 20,
-  "fullToolCount": 162,
-  "defaultLiveFullToolCount": 158,
+  "fullToolCount": 170,
+  "defaultLiveFullToolCount": 166,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -21,15 +21,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 63565
+      "schemaBytes": 63837
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 144447
+      "schemaBytes": 144719
     },
     "full": {
-      "toolCount": 162,
-      "schemaBytes": 582689
+      "toolCount": 170,
+      "schemaBytes": 622641
     }
   },
   "tools": [
@@ -2110,7 +2110,7 @@
     {
       "name": "dodo_media",
       "title": "Screen, image, media and speech",
-      "description": "Gateway: bounded screen/image views, local video/audio evidence, transcription, subtitles and local speech synthesis. Set operation to one of: multimodal_status, screen_observe, image_view, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract, resource_transform. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: image generation/crop/background removal, video generation, media saving, bounded screen/image views and local video/audio/speech. Set operation to one of: multimodal_status, screen_observe, image_view, image_generate, image_crop, image_remove_background, video_generate, video_edit, video_extend, creative_job, media_save, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract, resource_transform. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": false,
@@ -2123,6 +2123,14 @@
         "multimodal_status",
         "screen_observe",
         "image_view",
+        "image_generate",
+        "image_crop",
+        "image_remove_background",
+        "video_generate",
+        "video_edit",
+        "video_extend",
+        "creative_job",
+        "media_save",
         "media_open",
         "media_extract",
         "media_transcribe",
@@ -2178,6 +2186,14 @@
               "multimodal_status",
               "screen_observe",
               "image_view",
+              "image_generate",
+              "image_crop",
+              "image_remove_background",
+              "video_generate",
+              "video_edit",
+              "video_extend",
+              "creative_job",
+              "media_save",
               "media_open",
               "media_extract",
               "media_transcribe",

@@ -261,8 +261,8 @@ gateways Report ผูก revision, dataset, dependency lock, config และ h
 
 ## Tool surfaces
 
-- Complete capability catalog 162 individual definitions (Core 104 + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13 + Source Recovery 14 + Deployment 10)
-- Full live catalog ค่าเริ่มต้น 158 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 162
+- Complete capability catalog 170 individual definitions (Core 112, including eight Creative Media operations + Advanced Agent Runtime 17 + Sub-agents 4 + Android ADB 13 + Source Recovery 14 + Deployment 10)
+- Full live catalog ค่าเริ่มต้น 166 definitions; owner เปิด Sub-agent MCP exposure แล้วเป็น 170
 - Compact catalog 20 definitions: overview, discover และ gateways รวม `dodo_mobile`
 - Hybrid catalog 49 definitions: compact core ตามด้วย direct tools
 

@@ -97,7 +97,7 @@
       if(!await reload(generation))return;
       if(view==='overview')overview(body);
       if(view==='projects')await projects(body,generation);
-      if(view==='providers'){providers(body);profiles(body);}
+      if(view==='providers'){creativeMedia(body);providers(body);profiles(body);}
       if(view==='chat')chat(body);
       if(view==='runs')runs(body);
       if(view==='knowledge')await knowledge(body);
@@ -483,6 +483,49 @@
   const recoveryPanel=window.DodoRecovery({el,section,button,check,field,choice,notice,confirmDanger,help,api,refresh:()=>show('projects'),getSelected:()=>selected});
   const dataRecoveryPanel=window.DodoDataRecovery({el,section,button,check,field,choice,confirmDanger});
   const deploymentPanel=window.DodoDeployment({el,section,button,check,field,choice,notice,confirmDanger});
+
+  function creativeMedia(body) {
+    const defaults=state.mediaDefaults||{name:'OpenAI Media',baseUrl:'https://api.openai.com/v1',imageModel:'gpt-image-2.5-flare',videoModel:''};
+    const current=state.media||{enabled:false,connectionId:null,imageModel:defaults.imageModel,videoEnabled:false,videoModel:defaults.videoModel,allowImageUpload:false,projectIds:[]};
+    const s=section('Creative Media','สร้างภาพและลบพื้นหลังด้วย OpenAI เป็นค่าเริ่มต้น ส่วนครอปภาพทำในเครื่องได้โดยไม่ใช้ API key');s.id='wb-creative-media';body.append(s);
+    s.append(el('p','การสร้างสื่อส่ง prompt ไปยัง connection ที่เลือกและอาจมีค่าใช้จ่าย การบันทึกตั้งค่าไม่เรียกโมเดล ไม่สร้างสื่อ และไม่ส่งไฟล์ การลบพื้นหลังและวิดีโอจากภาพอ้างอิงต้องเปิดอนุญาตอัปโหลดภาพก่อน','muted'));
+    const setup=el('details');setup.append(el('summary','เพิ่ม OpenAI สำหรับงานสื่อ'));
+    const keyForm=el('form',undefined,'wb-form');keyForm.onsubmit=e=>e.preventDefault();setup.append(keyForm);s.append(setup);
+    const credentialStorage=choice(keyForm,'เก็บ API key','mediaCredentialStorage',[['session','เฉพาะรอบนี้ (ต้องใส่ใหม่เมื่อรีสตาร์ต)'],['keychain','macOS Keychain']],'session');
+    const key=field(keyForm,'OpenAI API key','mediaApiKey','','password');
+    keyForm.append(button('บันทึก OpenAI สำหรับงานสื่อ',async()=>{
+      const apiKey=key.value;key.value='';if(!apiKey)throw new Error('กรอก OpenAI API key ก่อนบันทึก');
+      const connection=await api('ai/connection',{connection:{name:defaults.name,provider:'openai',protocol:'responses',baseUrl:defaults.baseUrl,enabled:true,allowPrivateNetwork:false,credentialStorage:credentialStorage.value},apiKey});
+      await api('ai/media',{...current,connectionId:connection.id,videoEnabled:false});notice('เพิ่ม OpenAI แล้ว เลือกโปรเจกต์และเปิด Creative Media เพื่อใช้งาน');await show('providers');
+    },'btn primary'));
+    const f=el('form',undefined,'wb-form');f.onsubmit=e=>e.preventDefault();s.append(f);
+    const enabled=check(f,'เปิดสร้างสื่อผ่าน AI ในโปรเจกต์ที่เลือก','mediaEnabled',current.enabled);
+    const compatible=state.connections.filter(c=>c.enabled&&['openai','custom'].includes(c.provider)&&['responses','chat-completions'].includes(c.protocol));
+    const connection=choice(f,'การเชื่อมต่อสำหรับงานสื่อ','mediaConnection',[['','เลือก connection…'],...compatible.map(c=>[c.id,`${c.name} · key ${c.credentialPresent?'พร้อม':'ต้องใส่ใหม่'}`])],current.connectionId||'');
+    const imageModel=field(f,'โมเดลสร้างภาพ / ลบพื้นหลัง','mediaImageModel',current.imageModel);
+    const video=el('fieldset');video.append(el('legend','วิดีโอแบบ compatible'));f.append(video);
+    video.append(el('p','OpenAI ยุติ Sora 2 และ Videos API เมื่อ 24 กันยายน 2026 จึงปิดวิดีโอไว้และไม่ตั้งโมเดลให้อัตโนมัติ ตัวเชื่อมต่อนี้เตรียมไว้สำหรับ connection ที่ยังรองรับ ต้องตรวจสิทธิ์และโมเดลกับปลายทางก่อนเปิดใช้','muted'));
+    const videoEnabled=check(video,'เปิดวิดีโอสำหรับ connection ที่รองรับ','mediaVideoEnabled',current.videoEnabled===true);
+    const videoModel=field(video,'โมเดลวิดีโอที่ปลายทางรองรับ','mediaVideoModel',current.videoModel||'');videoModel.placeholder='กรอก Model ID หลังตรวจว่าปลายทางรองรับ';
+    const videoState=el('p',undefined,'muted');video.append(videoState);
+    const updateVideo=()=>{
+      const selectedConnection=compatible.find(c=>c.id===connection.value);let official=false;
+      try{official=!!selectedConnection&&new URL(selectedConnection.baseUrl).hostname.toLowerCase().replace(/\.$/,'')==='api.openai.com';}catch{/* invalid connections cannot be saved by the owner API */}
+      videoEnabled.disabled=!selectedConnection||official;
+      if(videoEnabled.disabled)videoEnabled.checked=false;
+      videoModel.disabled=videoEnabled.disabled||!videoEnabled.checked;
+      videoState.textContent=official?'connection นี้ใช้ OpenAI: สร้างภาพและลบพื้นหลังได้ แต่วิดีโอปิดให้บริการแล้ว':selectedConnection?'เปิดวิดีโอเฉพาะเมื่อปลายทางรองรับรูปแบบ compatible จริง การบันทึกไม่ทดสอบหรือเรียกโมเดล':'เลือก connection ที่รองรับก่อนตั้งค่าวิดีโอ';
+    };connection.onchange=updateVideo;videoEnabled.onchange=updateVideo;updateVideo();
+    const upload=check(f,'อนุญาตส่งภาพที่เลือกเพื่อลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอ','mediaAllowImageUpload',current.allowImageUpload);
+    const projects=el('fieldset');projects.append(el('legend','โปรเจกต์ที่อนุญาตให้เรียก AI สร้างสื่อ'));f.append(projects);
+    const boxes=state.projects.filter(p=>p.available).map(p=>[p.projectId,check(projects,p.displayName,`mediaProject-${p.projectId}`,current.projectIds.includes(p.projectId))]);
+    if(!boxes.length)projects.append(el('p','เพิ่มโปรเจกต์ที่พร้อมใช้งานก่อนเปิดสร้างสื่อ','muted'));
+    projects.append(el('p','ไม่เลือกโปรเจกต์ = ปิดการเรียก AI สร้างสื่อทุกโปรเจกต์ ครอปภาพในเครื่องยังใช้ได้','muted'));
+    f.append(button('บันทึก Creative Media',async()=>{
+      await api('ai/media',{enabled:enabled.checked,connectionId:connection.value||null,imageModel:imageModel.value,videoEnabled:videoEnabled.checked,videoModel:videoModel.value,allowImageUpload:upload.checked,projectIds:boxes.filter(([,box])=>box.checked).map(([id])=>id)});
+      notice('บันทึก Creative Media แล้ว โดยยังไม่ได้เรียกโมเดล');await show('providers');
+    },'btn primary'));
+  }
 
   function providers(body) {
     const s=section('AI Providers','เลือก preset หรือ Custom protocol แต่ละ connection เก็บ key แยกกัน การบันทึกไม่เรียกโมเดลและไม่ส่ง source code');body.append(s);
