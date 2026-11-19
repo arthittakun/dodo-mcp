@@ -1,8 +1,8 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.",
   "version": 1,
-  "toolCount": 170,
-  "defaultLiveToolCount": 166,
+  "toolCount": 173,
+  "defaultLiveToolCount": 169,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -32479,6 +32479,665 @@
       }
     },
     {
+      "name": "download_link_create",
+      "title": "Create a temporary token download link",
+      "description": "Publish ONE owned immutable resource as a token-protected download URL on this running HTTP server. First use resource_inspect for a guarded workspace file or creative_job for generated media. Requires read/write scopes, the exact expectedSha256 and execution policy approval. Choose 1, 2, 7, 14 or 30 days. Anyone holding the returned URL can download until expiry/revocation; share it only with the intended recipient. The bytes remain pinned after the resource reference expires. No arbitrary URL, filesystem path or public-domain override. A new call creates a new link; after a lost response inspect download_link_list and revoke unwanted links before creating another.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "resourceId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "expectedSha256": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$"
+          },
+          "expiresInDays": {
+            "default": 7,
+            "anyOf": [
+              {
+                "type": "number",
+                "const": 1
+              },
+              {
+                "type": "number",
+                "const": 2
+              },
+              {
+                "type": "number",
+                "const": 7
+              },
+              {
+                "type": "number",
+                "const": 14
+              },
+              {
+                "type": "number",
+                "const": 30
+              }
+            ]
+          },
+          "fileName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "resourceId",
+          "expectedSha256",
+          "expiresInDays"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "linkId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "resourceId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "fileName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 180
+                  },
+                  "mimeType": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 150
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^sha256:[a-f0-9]{64}$"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "expiresAt": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "revokedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "linkId",
+                  "resourceId",
+                  "fileName",
+                  "mimeType",
+                  "bytes",
+                  "sha256",
+                  "createdAt",
+                  "expiresAt",
+                  "revokedAt",
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "download_link_list",
+      "title": "List owned temporary download links",
+      "description": "List this client/workspace's temporary link metadata, including expiry/revocation, without returning secret tokens or URLs. Use linkId to revoke a link. Other clients/workspaces remain private. Link download authority is independent of the original resource reference expiry.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 128
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "links": {
+                    "maxItems": 128,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "linkId": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                        },
+                        "resourceId": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                        },
+                        "fileName": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 180
+                        },
+                        "mimeType": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 150
+                        },
+                        "bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^sha256:[a-f0-9]{64}$"
+                        },
+                        "createdAt": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "expiresAt": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "revokedAt": {
+                          "anyOf": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "linkId",
+                        "resourceId",
+                        "fileName",
+                        "mimeType",
+                        "bytes",
+                        "sha256",
+                        "createdAt",
+                        "expiresAt",
+                        "revokedAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "links"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "download_link_revoke",
+      "title": "Revoke an owned temporary download link",
+      "description": "Stop future downloads through one owned linkId before its expiry. Requires write scope and client/workspace ownership. Repeating revocation is safe; already downloaded bytes cannot be recalled. Unknown or other-client linkIds are unavailable.",
+      "requiredScope": "dodo:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "linkId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          }
+        },
+        "required": [
+          "workspaceId",
+          "workspaceEpoch",
+          "linkId"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "linkId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "revokedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "linkId",
+                  "revokedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "resource_inspect",
       "title": "Ingest or inspect one immutable resource",
       "description": "Create a workspace/principal-scoped reference to one guarded workspace path or owned media asset, or inspect an existing resourceId. Bytes enter the private content-addressed store only after path/link/file-identity checks and SHA-256 verification. A resourceId/URI is never authority and cannot cross clients or workspaces.",
@@ -36212,7 +36871,7 @@
     {
       "name": "agent_read",
       "title": "Read through an agent capability boundary",
-      "description": "Dispatch one dodo:read target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, git_status, git_diff, git_log, job_status, job_output, job_wait, list_jobs, environment_info, todo_read, fetch_url, diagnostics, change_history, approval_status, handoff_read, desktop_status, context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, runtime_session_status, runtime_task_observe, runtime_browser_collect, runtime_snapshot, runtime_evidence, runtime_diagnose, brain_status, brain_query, brain_symbol, multimodal_status, workflow_search, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract.",
+      "description": "Dispatch one dodo:read target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: list_files, read_files, read_image, read_instructions, search_code, glob_files, symbols, references, git_status, git_diff, git_log, job_status, job_output, job_wait, list_jobs, environment_info, todo_read, fetch_url, diagnostics, change_history, approval_status, handoff_read, desktop_status, context_for_task, analyze_impact, read_symbol, context_query, context_evidence, context_status, memory_search, memory_inspect, memory_status, runtime_session_status, runtime_task_observe, runtime_browser_collect, runtime_snapshot, runtime_evidence, runtime_diagnose, brain_status, brain_query, brain_symbol, multimodal_status, workflow_search, download_link_list, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": true,
@@ -36307,6 +36966,7 @@
               "brain_symbol",
               "multimodal_status",
               "workflow_search",
+              "download_link_list",
               "resource_inspect",
               "resource_read",
               "resource_read_range",
@@ -36434,7 +37094,7 @@
     {
       "name": "agent_write",
       "title": "Write through an agent capability boundary",
-      "description": "Dispatch one dodo:write target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_rename, preview_changes, apply_changes, todo_write, handoff_write, preview_refactor, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, workflow_save, media_save.",
+      "description": "Dispatch one dodo:write target through the normal invocation pipeline plus run/hypothesis capability, quota and intent checks. Target OAuth scope, ACL, trust, approval, path guards, expected hashes, sandbox, idempotency, audit and content blocks remain authoritative. Supported operations: write_file, edit_file, apply_patch, replace_in_files, delete_path, move_path, make_directory, preview_rename, preview_changes, apply_changes, todo_write, handoff_write, preview_refactor, memory_propose, memory_learning_propose, runtime_session_open, runtime_session_close, workflow_save, media_save, download_link_create, download_link_revoke.",
       "requiredScope": "dodo:write",
       "annotations": {
         "readOnlyHint": false,
@@ -36504,7 +37164,9 @@
               "runtime_session_open",
               "runtime_session_close",
               "workflow_save",
-              "media_save"
+              "media_save",
+              "download_link_create",
+              "download_link_revoke"
             ]
           },
           "args": {

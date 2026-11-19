@@ -38,6 +38,7 @@ const FULL_NAMES = [
   'browser_session', 'browser_observe', 'browser_action', 'game_session', 'game_step',
   'workflow_save', 'workflow_search', 'workflow_run',
   'image_generate', 'image_crop', 'image_remove_background', 'video_generate', 'video_edit', 'video_extend', 'creative_job', 'media_save',
+  'download_link_create', 'download_link_list', 'download_link_revoke',
   'resource_inspect', 'resource_read', 'resource_read_range', 'resource_preview', 'resource_extract', 'resource_transform',
   'agent_run_open', 'agent_run_status', 'agent_plan_set', 'agent_hypothesis_open', 'agent_intent_acquire',
   'agent_intent_release', 'agent_read', 'agent_write', 'agent_exec', 'agent_snapshot_create',
@@ -166,8 +167,8 @@ describe('compact surface catalog', () => {
     const compact = surfaceCatalog('compact', hidden);
     const hybrid = surfaceCatalog('hybrid', hidden);
 
-    expect(TOOL_CATALOG).toHaveLength(170); // the installed capability contract stays complete
-    expect(full).toHaveLength(166);
+    expect(TOOL_CATALOG).toHaveLength(173); // the installed capability contract stays complete
+    expect(full).toHaveLength(169);
     expect(compact).toHaveLength(20);
     expect(hybrid).toHaveLength(49);
     for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
@@ -183,10 +184,10 @@ describe('compact surface catalog', () => {
     const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
     expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
 
-    expect(surfaceStats('full', hidden).toolCount).toBe(166);
+    expect(surfaceStats('full', hidden).toolCount).toBe(169);
     expect(surfaceStats('compact', hidden).toolCount).toBe(20);
     expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
-    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(170);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(173);
     expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
     expect(instructionsFor('compact', hidden)).toContain('not exposed');
     expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
@@ -211,9 +212,9 @@ describe('dodo_discover', () => {
     expect(media.nextCursor).toBe('c25');
     const mediaNext = await call(discover, { ...WS, domain: 'media', limit: 25, cursor: media.nextCursor! });
     const matches = (value: typeof media) => (value.data as { matches: Array<{ operation: string; gateway: string }> }).matches;
-    expect(matches(media)).toHaveLength(25); expect(matches(mediaNext)).toHaveLength(1);
+    expect(matches(media)).toHaveLength(25); expect(matches(mediaNext)).toHaveLength(4);
     const ops = [...matches(media), ...matches(mediaNext)];
-    expect(ops.length).toBe(26);
+    expect(ops.length).toBe(29);
     expect(ops.every((m) => m.gateway === 'dodo_media')).toBe(true);
 
     const page1 = await call(discover, { ...WS, limit: 10 });
@@ -256,9 +257,35 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(170);
+    expect(TOOL_CATALOG).toHaveLength(173);
     expect(COMPACT_CATALOG).toHaveLength(20);
     expect(HYBRID_CATALOG).toHaveLength(49);
+  });
+
+  it('discovers temporary download links with bounded expiry and no authority overrides', async () => {
+    const result = await call(discover, { ...WS, operation: 'download_link_create' });
+    const data = result.data as { gateway: string; requiredScope: string; action: string; inputSchema: { properties: Record<string, unknown>; additionalProperties?: boolean } };
+    expect(data).toMatchObject({ gateway: 'dodo_media', requiredScope: 'dodo:write', action: 'exec' });
+    expect(data.inputSchema.additionalProperties).toBe(false);
+    expect(Object.keys(data.inputSchema.properties).sort()).toEqual(['expectedSha256', 'expiresInDays', 'fileName', 'resourceId']);
+    const def = TOOL_CATALOG.find((entry) => entry.name === 'download_link_create')!;
+    const schema = z.object(def.input as z.ZodRawShape).strict();
+    const source = { resourceId: 'res_fixture0001', expectedSha256: `sha256:${'1'.repeat(64)}` };
+    for (const expiresInDays of [1, 2, 7, 14, 30]) expect(schema.parse({ ...source, expiresInDays }).expiresInDays).toBe(expiresInDays);
+    for (const expiresInDays of [0, 3, 31, 1.5, '7']) expect(schema.safeParse({ ...source, expiresInDays }).success).toBe(false);
+    for (const fileName of ['../private.txt', 'folder/file.txt', 'folder\\file.txt', '..', 'line\r\nbreak']) expect(schema.safeParse({ ...source, fileName }).success).toBe(false);
+    for (const extra of [{ url: 'https://other.example' }, { token: 'injected' }, { path: '/private' }]) expect(schema.safeParse({ ...source, ...extra }).success).toBe(false);
+  });
+
+  it('keeps owned link listing read-only and revocation independently available with write permission', async () => {
+    const listing = await call(discover, { ...WS, operation: 'download_link_list' });
+    const revoking = await call(discover, { ...WS, operation: 'download_link_revoke' });
+    expect(listing.data).toMatchObject({ gateway: 'dodo_media', requiredScope: 'dodo:read', action: 'read' });
+    expect(revoking.data).toMatchObject({ gateway: 'dodo_media', requiredScope: 'dodo:write', action: 'job-control' });
+    const listDef = TOOL_CATALOG.find((entry) => entry.name === 'download_link_list')!;
+    const revokeDef = TOOL_CATALOG.find((entry) => entry.name === 'download_link_revoke')!;
+    expect(listDef.annotations.readOnlyHint).toBe(true);
+    expect(revokeDef.annotations.idempotentHint).toBe(true);
   });
 
   it('idempotency-capable operations carry the retry note; unknown operations are NOT_FOUND', async () => {

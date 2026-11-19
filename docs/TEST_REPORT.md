@@ -1,23 +1,41 @@
 # DODO MCP — Test Report
 
-## 1.5.1 Configurable image providers — Windows, 2026-11-19
+## 1.6.0 Image Auto and temporary downloads — Windows, 2026-11-19
 
-Build, typecheck, lint, UI syntax and diff checks passed. Focused checks use the
-latest passing result per file, including the credential-storage repair rerun.
+Build, typecheck, lint, UI syntax and diff checks passed. The consolidated focused
+run covers 19 files, including the image/provider, download and existing
+Full/Compact/Hybrid, resource, AI and media regressions.
 
 | Check | Passed | Failed | Skipped |
 |---|---:|---:|---:|
-| Image settings, protocols, jobs, owner UI and existing AI/catalog regressions | 111 | 0 | 1 |
+| Consolidated feature and regression coverage | 191 | 0 | 10 |
 | Fresh tarball install and packaging | 17 | 0 | 0 |
-| Total focused coverage | 128 | 0 | 1 |
+| Total focused coverage | 208 | 0 | 10 |
 
 Actual Chrome tests exercise editable official/custom presets, custom URL/key
-creation, editing by the same connection ID, key rotation, model loading/manual
-selection and browser-storage privacy. Owner HTTP tests use a real DODO server.
+creation, editing by the same connection ID, key rotation, automatic model
+loading, cached failures, stale-response guards, Auto/manual selection and
+browser-storage privacy. Owner HTTP tests use a real DODO server.
 Native Gemini and existing AI protocol tests use HTTP fixtures to verify headers,
 wire bodies, PNG decoding, size/error limits and refusal of unsupported video.
-The existing workbench case requiring bundled Chromium was skipped; the new
-media UI cases use installed system Chrome. This is not a full native release gate.
+The ten existing skips require bundled Chromium or local speech prerequisites;
+the three new media UI cases use installed system Chrome and pass. This is not a
+full native release gate.
+
+Auto integration tests verify actual advertised model selection, one paid
+submission, unchanged replay receipts and safe same-key retry when discovery
+fails before submission. Eight metadata transport cases cover the 15-second
+absolute deadline, cancellation during credential/DNS waits and trickling
+responses, no late HTTP send, lease release and the final authorization guard.
+
+Thirteen download service cases and eleven real HTTP/OAuth cases verify all five
+TTLs, token-hash-only persistence, caller/workspace ownership, exact hashes,
+current grant/client/project authority, expiry, revocation races, CAS corruption,
+GC pins beyond 24-hour resource expiry, quotas and upgrade from the preceding
+schema. Downloads survive actual workspace switches and server restarts. HTTP
+checks cover immutable bytes, HEAD, single/suffix ranges, invalid ranges, forced
+attachments, security headers and sanitized malformed URL errors. Active links
+remain discoverable ahead of revoked history.
 
 SQLite fault tests verify that a credential-update marker is committed before
 credential changes. Failed connection writes keep the connection blocked across
@@ -27,14 +45,17 @@ Endpoint/model/credential leases and existing authorization guards remain tested
 
 Live custom-provider smoke testing saved the supplied API base URL and session key
 only in in-memory settings, selected that connection, listed twelve models, and
-ran DODO's image job pipeline. It produced a real 1536 × 1024 PNG (661,553 bytes).
-No key appeared in returned settings; isolated workspace state was removed. The
+ran DODO's image job pipeline with both a manual model and Auto. Auto selected the
+advertised `gpt-image-2.5-flare` model and produced a real 1536 × 1024 PNG (614,618
+bytes); the manual smoke produced a 661,553-byte PNG. No key appeared in returned
+settings; isolated workspace state was removed. The
 private provider identity, endpoint and credential are not shipped as presets,
 examples, source, browser defaults or documentation. Official Gemini live
 acceptance is not claimed because no Gemini credential was supplied.
 
 `npm audit` reported zero advisories for the locked dependency tree. See
-[configuration and limits](CREATIVE_MEDIA.md) and [release details](RELEASE_1.5.1.md).
+[configuration and limits](CREATIVE_MEDIA.md), [download contracts](RESOURCES.md)
+and [release details](RELEASE_1.6.0.md).
 
 ## 1.5.0 Creative Media — Windows, 2026-11-17
 

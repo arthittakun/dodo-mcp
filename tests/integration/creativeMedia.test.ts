@@ -81,6 +81,44 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     error(await call('image_generate', { ...args, prompt: 'different prompt' }), 'IDEMPOTENCY_CONFLICT');
   });
 
+  it('resolves Auto from advertised image models once and records the actual model without a second paid call', async () => {
+    media({ imageModel: 'auto' });
+    const listing = vi.spyOn(settings(), 'models').mockResolvedValue([{ id: 'gpt-4o' }, { id: 'sora-2' }, { id: 'gpt-image-2.5-flare' }]);
+    const args = { prompt: 'Auto image fixture', idempotencyKey: 'creative-auto-image' };
+    const started = job(await call('image_generate', args)), output = await finished(started.jobId);
+    expect(output.data.status).toBe('completed'); expect(output.data.model).toBe('gpt-image-2.5-flare');
+    expect(vi.mocked(CreativeProvider.prototype.generateImage).mock.calls[0]?.[0].model).toBe('gpt-image-2.5-flare');
+    expect(job(await call('image_generate', args)).jobId).toBe(started.jobId);
+    expect(listing).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses Auto before paid creation when discovery finds only text/video models and permits a manual repair', async () => {
+    media({ imageModel: 'auto' });
+    vi.spyOn(settings(), 'models').mockResolvedValue([{ id: 'gpt-4o' }, { id: 'sora-2' }]);
+    const args = { prompt: 'Auto cannot guess a model', idempotencyKey: 'creative-auto-no-model' };
+    error(await call('image_generate', args), 'NOT_SUPPORTED');
+    expect(CreativeProvider.prototype.generateImage).not.toHaveBeenCalled();
+    media({ imageModel: 'fixture-image' });
+    const started = job(await call('image_generate', args)); expect((await finished(started.jobId)).data.status).toBe('completed');
+    expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a failed Auto discovery with the same key without modifying configuration or repeating paid creation', async () => {
+    media({ imageModel: 'auto' });
+    const original = settings().media();
+    const listing = vi.spyOn(settings(), 'models').mockRejectedValueOnce(new DodoError('CONFLICT', 'synthetic metadata connection interruption')).mockResolvedValueOnce([{ id: 'gpt-image-2.5-flare' }]);
+    const args = { prompt: 'Retry only metadata discovery', idempotencyKey: 'creative-auto-discovery-retry' };
+    error(await call('image_generate', args), 'NOT_SUPPORTED');
+    expect(listing).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.generateImage).not.toHaveBeenCalled();
+    expect(settings().media()).toEqual(original);
+    const started = job(await call('image_generate', args)), output = await finished(started.jobId);
+    expect(output.data.status).toBe('completed'); expect(output.data.model).toBe('gpt-image-2.5-flare');
+    expect(listing).toHaveBeenCalledTimes(2); expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
+    expect(settings().media()).toEqual(original);
+    expect(job(await call('image_generate', args)).jobId).toBe(started.jobId);
+    expect(listing).toHaveBeenCalledTimes(2); expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
+  });
+
   it('crops exact alpha pixels locally, saves through the journal and rolls back without changing source', async () => {
     const output = assertOk(await call('image_crop', { path: 'source.png', regions: [{ left: 1, top: 0, width: 2, height: 2 }], idempotencyKey: 'creative-crop-save' })) as { resources: unknown[] };
     const resource = ResourceInfo.parse(output.resources[0]);

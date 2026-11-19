@@ -3,7 +3,7 @@ import http from 'node:http';
 import { openDatabase } from '../../src/store/db.js';
 import { Store } from '../../src/store/store.js';
 import { AISettings } from '../../src/services/ai/settings.js';
-import { CREATIVE_IMAGE_PRESETS, CREATIVE_MEDIA_DEFAULTS, CreativeSettingsInput, isCreativeConnection, isOfficialOpenAIVideoConnection, supportsCreativeVideoConnection } from '../../src/services/multimodal/creativeSettings.js';
+import { CREATIVE_IMAGE_PRESETS, CREATIVE_MEDIA_DEFAULTS, CreativeSettingsInput, isCreativeConnection, isOfficialOpenAIVideoConnection, resolveAutoImageModel, supportsCreativeVideoConnection } from '../../src/services/multimodal/creativeSettings.js';
 
 describe('creative media owner configuration', () => {
   let settings: AISettings;
@@ -11,7 +11,7 @@ describe('creative media owner configuration', () => {
   afterEach(() => { vi.restoreAllMocks(); settings.credentials.close(); settings.store.db.close(); });
 
   it('defaults to public OpenAI with cloud disabled and no selected projects', () => {
-    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'gpt-image-2.5-flare', videoEnabled: false, videoModel: '', allowImageUpload: false, projectIds: [] });
+    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'auto', videoEnabled: false, videoModel: '', allowImageUpload: false, projectIds: [] });
     expect(settings.state().mediaDefaults.baseUrl).toBe('https://api.openai.com/v1');
     expect(settings.state().mediaDefaults).toEqual(CREATIVE_MEDIA_DEFAULTS);
   });
@@ -77,7 +77,7 @@ describe('creative media owner configuration', () => {
     expect(settings.state().mediaPresets).toEqual(CREATIVE_IMAGE_PRESETS);
     expect(CREATIVE_IMAGE_PRESETS.map(p => p.id)).toEqual(['openai', 'gemini', 'custom']);
     const custom = CREATIVE_IMAGE_PRESETS.find(p => p.id === 'custom')!;
-    expect(custom).toMatchObject({ provider: 'custom', protocol: 'responses', baseUrl: '', imageModel: '' });
+    expect(custom).toMatchObject({ provider: 'custom', protocol: 'responses', baseUrl: '', imageModel: 'auto' });
     const c = await settings.saveConnection({ name: 'Independent image service', provider: 'custom', protocol: 'responses', baseUrl: 'https://image-fixture.example/proxy/v3' }, 'synthetic-first-key');
     expect(settings.saveMedia({ enabled: true, connectionId: c.id, imageModel: 'independent-image-model' })).toMatchObject({ connectionId: c.id, imageModel: 'independent-image-model' });
     expect(settings.connection(c.id).baseUrl).toBe('https://image-fixture.example/proxy/v3');
@@ -238,5 +238,44 @@ describe('creative media owner configuration', () => {
     expect(() => settings.connection(c.id)).toThrow(/credentials need to be entered again/);
     await settings.remove('connection', c.id);
     expect(settings.get('connection', c.id)).toBeUndefined(); expect(settings.get('credential-update', c.id)).toBeUndefined();
+  });
+
+  it('defaults new image settings and all presets to Auto without changing a saved manual model', () => {
+    expect(CREATIVE_IMAGE_PRESETS.every(preset => preset.imageModel === 'auto')).toBe(true);
+    expect(CreativeSettingsInput.parse({}).imageModel).toBe('auto');
+    settings.put('settings', 'creative-media', { enabled: false, imageModel: 'owner-chosen-image-v3' });
+    expect(settings.media().imageModel).toBe('owner-chosen-image-v3');
+    expect(CreativeSettingsInput.parse({ imageModel: 'gpt-image-2.5-flare' }).imageModel).toBe('gpt-image-2.5-flare');
+  });
+
+  it('selects a deterministic known GPT image model independently of listing order', () => {
+    const ids = ['gpt-4o', 'sora-2', 'text-embedding-3-small', 'gpt-image-2.6-sunburst', 'gpt-image-2.5-flare', 'gpt-image-2.5-flare'];
+    for (const protocol of ['responses', 'chat-completions'] as const) {
+      expect(resolveAutoImageModel(protocol, ids)).toBe('gpt-image-2.5-flare');
+      expect(resolveAutoImageModel(protocol, [...ids].reverse())).toBe('gpt-image-2.5-flare');
+      expect(resolveAutoImageModel(protocol, ['openai/gpt-image-2.5-flare', 'gpt-image-2.5-flare'])).toBe('gpt-image-2.5-flare');
+    }
+  });
+
+  it('resolves native Gemini image IDs after normalizing model resource names', () => {
+    const ids = ['models/gemini-3-pro-image', 'gpt-image-2.5-flare', 'models/gemini-nano-banana-2.1', 'gemini-3.1-flash-image', 'gemini-2.5-flash'];
+    expect(resolveAutoImageModel('gemini', ids)).toBe('gemini-nano-banana-2.1');
+    expect(resolveAutoImageModel('gemini', [...ids].reverse())).toBe('gemini-nano-banana-2.1');
+    expect(resolveAutoImageModel('gemini', ['models/gemini-3.1-flash-image'])).toBe('gemini-3.1-flash-image');
+    expect(() => resolveAutoImageModel('gemini', ['gpt-image-2.5-flare', 'imagen-4.0-generate-001'])).toThrow(/choose a supported Model ID manually/);
+  });
+
+  it('recognizes compatible image aliases and preserves their exact advertised request IDs', () => {
+    expect(resolveAutoImageModel('responses', ['gemini-3-pro-image', '2k-gpt-image-2'])).toBe('2k-gpt-image-2');
+    expect(resolveAutoImageModel('responses', ['google/gemini-3.1-flash-image'])).toBe('google/gemini-3.1-flash-image');
+    expect(resolveAutoImageModel('responses', ['gemini-3.0-pro-image'])).toBe('gemini-3.0-pro-image');
+    expect(resolveAutoImageModel('responses', ['GPT-IMAGE-2.5-FLARE'])).toBe('GPT-IMAGE-2.5-FLARE');
+  });
+
+  it('fails Auto selection for unknown, text, video, retired or placeholder models without guessing', () => {
+    for (const ids of [[], ['gpt-4o', 'gemini-2.5-flash'], ['sora-2', 'veo-3'], ['auto'], ['gpt-image-1'], ['unknown-image-model'], ['text-gpt-image-2.5-flare'], ['gpt-image-2.5-flare\nInjected']]) {
+      expect(() => resolveAutoImageModel('responses', ids)).toThrow(/choose a supported Model ID manually/);
+    }
+    expect(() => resolveAutoImageModel('anthropic', ['gpt-image-2.5-flare'])).toThrow(/supported image protocol/);
   });
 });

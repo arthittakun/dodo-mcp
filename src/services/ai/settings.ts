@@ -3,7 +3,7 @@ import { digestOf, newId } from '../../util/hash.js';
 import { DodoError } from '../../errors.js';
 import { AICredentials } from './credentials.js';
 import { AILimits, PRESETS, ProviderInput, ProfileInput, ProjectAIInput, type Provider, type Profile, type ProjectAI } from './contracts.js';
-import { validateEndpoint, providerRequest } from './network.js';
+import { validateEndpoint, providerRequest, waitForProvider } from './network.js';
 import { generate } from './adapters.js';
 import { CREATIVE_IMAGE_PRESETS, CREATIVE_MEDIA_DEFAULTS, CreativeSettingsInput, isCreativeConnection, supportsCreativeVideoConnection, type CreativeSettings } from '../multimodal/creativeSettings.js';
 export class AISettings {
@@ -87,11 +87,16 @@ export class AISettings {
     } finally { done(); }
   }
   connection(id: string): Provider { if (this.credentialUpdatePending(id)) throw this.credentialReentryRequired(); const c = this.get<Provider>('connection', id); if (!c?.enabled) throw new DodoError('NOT_SUPPORTED', 'provider connection is missing or disabled'); return c; }
-  async models(id: string) {
+  async models(id: string, options: { signal?: AbortSignal | undefined; beforeSend?: (() => void) | undefined } = {}) {
     const release = this.lease(id);
+    const controller = new AbortController();
+    const signal = options.signal ? AbortSignal.any([controller.signal, options.signal]) : controller.signal;
+    // An absolute metadata deadline includes credential lookup, DNS and a response
+    // that keeps sending bytes; socket inactivity timeouts alone cannot bound it.
+    const timeout = setTimeout(() => controller.abort(), 15000); timeout.unref();
     try {
-    const c = this.connection(id); const key = await this.credentials.get(c.id, c.credentialStorage);
-    const response = await providerRequest(c, c.protocol === 'ollama' ? 'tags' : 'models', key, undefined, this.ports);
+    const c = this.connection(id); const key = await waitForProvider(this.credentials.get(c.id, c.credentialStorage), signal);
+    const response = await providerRequest(c, c.protocol === 'ollama' ? 'tags' : 'models', key, undefined, this.ports, signal, undefined, options.beforeSend);
     if ((response.status === 401 || response.status === 403) && !key) throw new DodoError('AUTH_REQUIRED', `model listing returned HTTP ${response.status}; edit the connection and enter its API key`);
     if (response.status >= 400) throw new DodoError('NOT_SUPPORTED', `model listing returned HTTP ${response.status}; enter a model ID manually`);
     if (key && response.text.includes(key)) throw new DodoError('FORBIDDEN', 'provider echoed credentials; response discarded');
@@ -99,7 +104,10 @@ export class AISettings {
     try { parsed = JSON.parse(response.text) as typeof parsed; } catch { throw new DodoError('NOT_SUPPORTED', 'model listing returned an unsupported response'); }
     if (key && JSON.stringify(parsed).includes(key)) throw new DodoError('FORBIDDEN','provider echoed credentials; response discarded');
     return (parsed.data ?? parsed.models ?? []).slice(0, 200).map(v => { const m = v as { id?: string; name?: string; model?: string }; const id = String(m.id ?? m.name ?? m.model ?? ''); return { id: (c.protocol === 'gemini' ? id.replace(/^models\//, '') : id).slice(0, 200) }; });
-    } finally { release(); }
+    } catch (error) {
+      if (signal.aborted && error instanceof DodoError && error.code === 'CONFLICT') throw new DodoError('NOT_SUPPORTED', 'model listing timed out or was canceled; retry listing or enter a model ID manually');
+      throw error;
+    } finally { clearTimeout(timeout); release(); }
   }
   async inspectModel(profileId: string) {
     const p = this.get<Profile>('profile',profileId); if (!p) throw new DodoError('NOT_FOUND','unknown profile');

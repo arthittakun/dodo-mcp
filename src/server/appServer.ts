@@ -33,6 +33,9 @@ import { DODO_VERSION } from './version.js';
 import type { TunnelRuntime } from '../tunnel/runtime.js';
 import { osCredentialAvailability, osTunnelCredentialRef, storeOsTunnelCredentialValue } from '../tunnel/credentials.js';
 import { RemoteConfigGateway, type RemoteConfigLease, type RemoteConfigStatus } from './remoteConfig.js';
+import { mountDownloadRouter } from './downloadRouter.js';
+import { DownloadLinkService } from '../services/resources/downloadLinkService.js';
+import { CasStore } from '../services/resources/casStore.js';
 
 export { DODO_VERSION };
 
@@ -216,6 +219,13 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const originAllowlist = ['127.0.0.1', 'localhost', '[::1]', ...config.allowedOrigins];
   if (issuer) originAllowlist.push(new URL(issuer).hostname);
   app.use(originValidation(originAllowlist));
+
+  if (issuer) {
+    ws0.services.downloadOrigin = issuer;
+    // Installation-owned storage keeps existing links available when the active
+    // workspace is switched or closed. The token is the download credential.
+    mountDownloadRouter(app, new DownloadLinkService(installStore, new CasStore(installStore, paths.resourceStoreDir, paths.resourceStagingDir)));
+  }
 
   // This router is inert (404) until the local owner explicitly opens a
   // bounded lease. It is mounted before OAuth's provider callback so the
@@ -431,6 +441,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     }),
   } : undefined;
   const resourcesFor = async (ws: BootstrappedWorkspace): Promise<WorkspaceResources> => {
+    if (issuer) ws.services.downloadOrigin = issuer;
     return startOwnerControl(ws, createIpcDispatcher({
       ws,
       transport: transportInfo(),

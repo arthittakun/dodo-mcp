@@ -1,11 +1,13 @@
 # DODO MCP — Release Notes
 
-## 1.5.1 — Configurable image providers
+## 1.6.0 — Image model Auto and temporary downloads
 
 - Create and edit image connections directly in Creative Media: provider name, protocol, API base URL, key, model and credential storage are editable. OpenAI and Google Gemini presets are starting points; external compatible services use Custom.
-- Add native Gemini Interactions image generation/edit requests alongside OpenAI-compatible Images, with protocol-specific authentication and bounded inline PNG output. Model listing and manual model IDs are both supported.
+- Add native Gemini Interactions image generation/edit requests alongside OpenAI-compatible Images, with protocol-specific authentication and bounded inline PNG output. Load model lists automatically, offer Auto as the new configuration default, and resolve one recognized advertised image model before a single paid request. Existing manual selections remain unchanged.
 - Require fresh credentials for endpoint/protocol/storage changes and keep private test configuration out of shipped files. A transparent request must produce actual transparent pixels.
-- See [release details](RELEASE_1.5.1.md), [configuration guide](CREATIVE_MEDIA.md) and [validation](TEST_REPORT.md).
+- Add `download_link_create`, `download_link_list` and `download_link_revoke` for immutable resource downloads on the active HTTP origin. Choose 1, 2, 7, 14 or 30 days (default 7). Store token hashes, retain active file snapshots independently of resource reference expiry, and honor expiry, revocation and live source authority after restart or workspace switches.
+- Full now has 173 capabilities (169 when sub-agents are hidden); Compact stays 20 and Hybrid 49. Download operations use `dodo_media` in gateway surfaces.
+- Includes the unpublished 1.5.1 image-provider changes. See [release details](RELEASE_1.6.0.md), [configuration guide](CREATIVE_MEDIA.md), [download guide](RESOURCES.md) and [validation](TEST_REPORT.md).
 
 ## 1.5.0 — Creative Media
 

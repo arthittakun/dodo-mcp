@@ -122,6 +122,7 @@ describe('bounded creative media provider', () => {
       else res.end(JSON.stringify({ id: 'video_fixture01', status: 'completed', progress: 100, url: 'https://untrusted.invalid/video.mp4' }));
     });
     const provider = new CreativeProvider(connection(url), key, []);
+    await expect(provider.generateImage({ ...imageInput, model: 'auto' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     const created = await provider.createVideo(videoInput);
     expect(created).toEqual({ id: 'video_fixture01', status: 'queued', progress: 0 });
     expect(paths).toEqual(['/v1/videos']); expect(fields).toContain('name="seconds"\r\n\r\n4');

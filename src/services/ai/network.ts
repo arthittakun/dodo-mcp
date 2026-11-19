@@ -5,6 +5,17 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import { DodoError } from '../../errors.js';
 import type { Provider } from './contracts.js';
+const canceledRequest = () => new DodoError('CONFLICT', 'provider connection failed or canceled; outcome uncertain, not retried');
+/** Bound waits that do not natively support AbortSignal, without abandoning their rejection handler. */
+export function waitForProvider<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return pending;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(canceledRequest());
+    if (signal.aborted) abort();
+    else signal.addEventListener('abort', abort, { once: true });
+    pending.then(value => { signal.removeEventListener('abort', abort); resolve(value); }, error => { signal.removeEventListener('abort', abort); reject(error); });
+  });
+}
 export function validateEndpoint(connection: Provider, adminPorts: number[]): URL {
   const u = new URL(connection.baseUrl);
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash) throw new DodoError('INVALID_INPUT', 'provider URL must be an HTTP(S) base URL without credentials, query or fragment');
@@ -16,9 +27,11 @@ export function validateEndpoint(connection: Provider, adminPorts: number[]): UR
 /** Resolve once, validate every address, then pin the selected address on the actual socket. */
 export async function providerRequest(connection: Provider, suffix: string, key: string, body: unknown | undefined,
   adminPorts: number[], signal?: AbortSignal, onChunk?: (line: string) => void, beforeSend?: () => void): Promise<{ status: number; text: string }> {
+  if (signal?.aborted) throw canceledRequest();
   const base = validateEndpoint(connection, adminPorts);
   const host = base.hostname.replace(/^\[|\]$/g, '');
-  const addresses = net.isIP(host) ? [{ address: host, family: net.isIP(host) }] : await dns.lookup(host, { all: true });
+  const addresses = net.isIP(host) ? [{ address: host, family: net.isIP(host) }] : await waitForProvider(dns.lookup(host, { all: true }), signal);
+  if (signal?.aborted) throw canceledRequest();
   if (!addresses.length) throw new DodoError('NOT_SUPPORTED', 'provider hostname has no address');
   for (const { address } of addresses) {
     const kind = addressClass(address);
@@ -38,8 +51,9 @@ export async function providerRequest(connection: Provider, suffix: string, key:
     else headers.authorization = `Bearer ${key}`;
   }
   if (connection.protocol === 'anthropic') headers['anthropic-version'] = '2023-06-01';
-  signal?.throwIfAborted();
+  if (signal?.aborted) throw canceledRequest();
   beforeSend?.();
+  if (signal?.aborted) throw canceledRequest();
   return new Promise((resolve, reject) => {
     const req = (url.protocol === 'https:' ? https : http).request(url, {
       method: payload === undefined ? 'GET' : 'POST', headers, agent: false, ...(signal ? { signal } : {}),

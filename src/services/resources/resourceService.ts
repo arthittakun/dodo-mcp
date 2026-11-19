@@ -12,6 +12,7 @@ import { imagePreview, inspectResourceFile, readTextFile, readZipEntries } from 
 import type { ResourceCapabilitiesData, ResourceInfoData, ResourceMetadataData } from './contracts.js';
 import { isWithinPath } from '../../platform/pathPolicy.js';
 import { ResourceProviderRegistry } from './providerRegistry.js';
+import { DownloadLinkService } from './downloadLinkService.js';
 
 const REF_TTL_MS = 24 * 60 * 60 * 1000;
 const REF_MAX_PER_ACTOR = 512;
@@ -46,6 +47,7 @@ function safeJson<T>(value: string, fallback: T): T {
 
 export class ResourceService {
   readonly cas: CasStore;
+  readonly downloads: DownloadLinkService;
   readonly configDir: string;
   readonly providers = new ResourceProviderRegistry();
   private readonly cursorKey: Buffer;
@@ -55,6 +57,7 @@ export class ResourceService {
   constructor(readonly services: AppServices, configDir: string, objectsDir: string, stagingDir: string, installSecret: string) {
     this.configDir = fs.realpathSync.native(configDir);
     this.cas = new CasStore(services.store, objectsDir, stagingDir);
+    this.downloads = new DownloadLinkService(services.store, this.cas);
     this.cursorKey = createHmac('sha256', installSecret).update('dodo-resource-range-v1').digest();
     this.gc();
     this.gcTimer = setInterval(() => { if (!this.closed) this.gc(); }, 15 * 60 * 1000);
@@ -218,13 +221,16 @@ export class ResourceService {
   gc(now = Date.now()): { expiredRefs: number; removedObjects: number } {
     const transaction = this.services.store.db.transaction(() => {
       const expired = this.services.store.db.prepare('DELETE FROM resource_refs WHERE expires_at<=?').run(now).changes;
+      this.services.store.db.prepare('DELETE FROM resource_download_links WHERE expires_at<=?').run(now);
       // A CAS object is committed before its first reference is derived. Keep
       // recently created/verified orphans so a concurrent ingest cannot be
       // collected between those two steps; crash leftovers remain bounded.
       const cutoff = now - ORPHAN_GRACE_MS;
-      const orphans = this.services.store.db.prepare('SELECT hash FROM resource_objects WHERE verified_at<=? AND NOT EXISTS (SELECT 1 FROM resource_refs WHERE object_hash=resource_objects.hash)').all(cutoff) as Array<{ hash: string }>;
+      const orphanPredicate = `verified_at<=? AND NOT EXISTS (SELECT 1 FROM resource_refs WHERE object_hash=resource_objects.hash)
+        AND NOT EXISTS (SELECT 1 FROM resource_download_links WHERE object_hash=resource_objects.hash AND revoked_at IS NULL AND expires_at>?)`;
+      const orphans = this.services.store.db.prepare(`SELECT hash FROM resource_objects WHERE ${orphanPredicate}`).all(cutoff, now) as Array<{ hash: string }>;
       for (const orphan of orphans) this.cas.removeObject(orphan.hash);
-      if (orphans.length > 0) this.services.store.db.prepare('DELETE FROM resource_objects WHERE verified_at<=? AND NOT EXISTS (SELECT 1 FROM resource_refs WHERE object_hash=resource_objects.hash)').run(cutoff);
+      if (orphans.length > 0) this.services.store.db.prepare(`DELETE FROM resource_objects WHERE ${orphanPredicate}`).run(cutoff, now);
       return { expiredRefs: expired, removedObjects: orphans.length };
     });
     return transaction.immediate();

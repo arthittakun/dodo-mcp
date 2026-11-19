@@ -114,6 +114,13 @@ export class CasStore {
   }
 
   async verify(hash: string, expectedBytes?: number): Promise<{ path: string; bytes: number }> {
+    const verified = await this.openVerified(hash, expectedBytes);
+    try { return { path: this.objectPath(hash), bytes: verified.bytes }; }
+    finally { await verified.handle.close(); }
+  }
+
+  /** Verify and return the same open inode that a download will stream. */
+  async openVerified(hash: string, expectedBytes?: number): Promise<{ handle: fs.promises.FileHandle; bytes: number }> {
     const objectPath = this.objectPath(hash);
     let stat: fs.Stats;
     try { stat = assertPrivatePath(objectPath); }
@@ -127,10 +134,11 @@ export class CasStore {
       const opened = await handle.stat();
       if (!opened.isFile() || opened.nlink !== 1 || !sameIdentity(stat, opened)) throw new DodoError('INTERNAL_ERROR', 'resource object identity verification failed');
       const actual = await digestFile(handle, opened.size);
-      if (actual !== hash) throw new DodoError('INTERNAL_ERROR', 'resource object hash verification failed');
+      const after = await handle.stat();
+      if (actual !== hash || !sameIdentity(opened, after)) throw new DodoError('INTERNAL_ERROR', 'resource object hash verification failed');
       this.store.db.prepare('UPDATE resource_objects SET verified_at=? WHERE hash=?').run(Date.now(), hash);
-      return { path: objectPath, bytes: opened.size };
-    } finally { await handle.close(); }
+      return { handle, bytes: opened.size };
+    } catch (error) { await handle.close(); throw error; }
   }
 
   async readRange(hash: string, expectedBytes: number, offset: number, length: number): Promise<Buffer> {

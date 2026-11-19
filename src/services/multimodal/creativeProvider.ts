@@ -166,7 +166,8 @@ export class CreativeProvider {
   }
 
   private validateModel(model: string): void {
-    if (!model || model.length > 200 || /[\x00-\x1f\x7f]/.test(model)) throw new DodoError('INVALID_INPUT', 'invalid creative media model ID');
+    if (typeof model !== 'string' || !model || model.length > 200 || /[\x00-\x1f\x7f]/.test(model)) throw new DodoError('INVALID_INPUT', 'invalid creative media model ID');
+    if (model.toLowerCase() === 'auto') throw new DodoError('INVALID_INPUT', 'Auto must be resolved through model discovery before creating media');
   }
   private validatePrompt(prompt: string): void {
     if (!prompt.trim() || prompt.length > 16000) throw new DodoError('INVALID_INPUT', 'creative media prompt must contain 1-16000 characters');

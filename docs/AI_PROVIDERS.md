@@ -1,6 +1,6 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.2.1 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
+DODO MCP 1.6.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
 
 ## เริ่มใช้งานผ่านเว็บ
 
@@ -19,15 +19,19 @@ DODO MCP 1.2.1 สามารถเปิด runtime ของหลายโ�
 
 ## สร้างภาพและวิดีโอผ่าน Creative Media
 
-ส่วน **Providers & Profiles → Creative Media** ใช้ connection/credential store เดียวกัน แต่เลือกโมเดลงานภาพและวิดีโอแยกจาก Agent Profile ไม่ต้องสร้าง profile เพื่อเรียกเครื่องมือสื่อ ฟอร์ม **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** รับชื่อ, รูปแบบ API, Base URL, key และ Model ID โดยตรง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ ค่าเริ่มต้นงานภาพยังเป็น OpenAI (`https://api.openai.com/v1`) และ `gpt-image-2.5-flare` วิดีโอมี `videoEnabled:false` และ `videoModel` ว่างจนเจ้าของตั้งค่าเอง
+ส่วน **Providers & Profiles → Creative Media** ใช้ connection/credential store เดียวกัน แต่เลือกโมเดลงานภาพและวิดีโอแยกจาก Agent Profile ไม่ต้องสร้าง profile เพื่อเรียกเครื่องมือสื่อ ฟอร์ม **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** รับชื่อ, รูปแบบ API, Base URL และ key โดยตรง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ ค่าเริ่มต้น provider ยังเป็น OpenAI (`https://api.openai.com/v1`) ส่วนโมเดลของ config/preset ใหม่เป็น **Auto** บันทึก Custom ได้โดยไม่ต้องกรอก Model ID ก่อน และไม่เปลี่ยนโมเดลที่เคยบันทึกเอง วิดีโอมี `videoEnabled:false` และ `videoModel` ว่างจนเจ้าของตั้งค่าเอง
 
 งานสร้างสื่อผ่าน AI เริ่มปิดไว้ ต้องเปิดและเลือกโปรเจกต์ที่อนุญาตก่อน วิดีโอต้องเปิดเพิ่มสำหรับ connection ที่รองรับ การส่งภาพไปลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอต้องเปิด image-upload permission เพิ่ม ส่วนครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ ใน managed mode ใช้ client allowlist ของสิทธิ์ AI รายโปรเจกต์ด้วย การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference และคีย์แบบ session ต้องใส่ใหม่หลังรีสตาร์ต
 
-Creative Media ใช้ OpenAI-compatible Images API กับ connections แบบ Responses/Chat Completions หรือ Gemini native Interactions ตาม protocol ที่เจ้าของเลือก ชื่อ provider เป็นป้ายชื่อ ไม่จำกัด protocol ของงานภาพ รายชื่อโมเดลโหลดผ่านปุ่มในส่วนงานภาพหรือพิมพ์เองได้ ชื่อ resource ของ Gemini จะตัด `models/` ก่อนใช้เป็น Model ID แต่การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้ เครื่องมือ MCP ไม่รับ URL/key/model/remote task ID และไม่มี fallback เปลี่ยน provider อัตโนมัติ
+Creative Media ใช้ OpenAI-compatible Images API กับ connections แบบ Responses/Chat Completions หรือ Gemini native Interactions ตาม protocol ที่เจ้าของเลือก ชื่อ provider เป็นป้ายชื่อ ไม่จำกัด protocol ของงานภาพ หน้าเว็บโหลดรายการโมเดลอัตโนมัติเมื่อเปิด/เปลี่ยน/บันทึก connection และมีปุ่มโหลดใหม่หรือกรอก ID เองเป็นทางเลือก ข้อผิดพลาดในการโหลดไม่บล็อกฟอร์ม ชื่อ resource ของ Gemini จะตัด `models/` ก่อนใช้เป็น Model ID แต่การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้ เครื่องมือ MCP ไม่รับ URL/key/model/remote task ID และไม่มี fallback เปลี่ยน provider อัตโนมัติ
+
+Auto สำหรับงานภาพขอรายการโมเดลใหม่จาก connection เดิม เลือก image model ที่รู้จักและอยู่ในรายการ แล้วส่งการสร้าง/แก้ภาพหนึ่งครั้ง ผล `creative_job.model` เป็น ID ที่เลือกจริง ไม่ส่ง `auto` ไปยัง provider ไม่เดาใช้ text/video model และไม่ retry งานเสียเงินด้วยโมเดลอื่นเมื่อผิดพลาด ถ้ารายการไม่มีโมเดลที่รู้จักหรือ model-list ใช้ไม่ได้ ต้องเลือก ID เอง การโหลดรายการใน UI ไม่สร้างภาพ
 
 Gemini native ใช้ `quality=auto`, ขอภาพ `1K` และแปลง size ที่เลือกเป็น aspect ratio; metadata แสดงขนาดภาพจริง คำขอ OpenAI-compatible ส่งตัวเลือกตาม Images API แต่ไม่รับรองว่าทุกบริการรองรับทุก quality/background การลบพื้นหลังยังต้องผ่านการตรวจ transparency จริง และ native Gemini ไม่ได้เปิด video compatibility ดู [Creative Media](CREATIVE_MEDIA.md), [OpenAI Images](https://developers.openai.com/api/docs/guides/image-generation) และ [Gemini Images](https://aistudio.google.com/docs/image-generation)
 
 OpenAI ระบุว่า Sora 2 และ Videos API ยุติบริการเมื่อ 24 กันยายน 2026 และไม่มี API ทดแทนตรงตัว ระบบจึงปฏิเสธการเปิดวิดีโอกับ `api.openai.com` และไม่ตั้ง `sora-2` ให้อัตโนมัติ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
+
+ผลภาพ/วิดีโอเป็น immutable resource ซึ่งใช้ `download_link_create` เพื่อแชร์ URL แบบ token บน HTTP origin ของ DODO ได้ เลือกอายุ 1, 2, 7, 14 หรือ 30 วัน และยกเลิกด้วย `download_link_revoke` ไม่ส่งไฟล์ให้ AI provider เพิ่มและไม่ใช้ API key ในลิงก์ ผู้ที่มี URL ดาวน์โหลดได้จนหมดอายุ/ถูกถอนสิทธิ์ จึงต้องเก็บ URL เป็นความลับ ส่วน `download_link_list` คืนเฉพาะ metadata ไม่มี token/URL ดู [คู่มือ download links](RESOURCES.md#temporary-token-download-links) ฟีเจอร์นี้แยกจาก connection/model settings และต้องมี HTTP server ที่ให้บริการไฟล์ได้
 
 ## Protocols
 

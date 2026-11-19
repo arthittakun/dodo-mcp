@@ -7,13 +7,15 @@ DODO รองรับสร้างภาพ ครอป/แบ่งภา�
 ## ตั้งค่า
 
 1. เปิด Local Config แล้วไปที่ **Providers & Profiles → Creative Media**
-2. เปิด **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก preset OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ connection, รูปแบบ API, API Base URL, คีย์ และ Model ID ตามบริการที่ใช้ ทุก preset เป็นค่าเริ่มต้นที่แก้ไขได้ ไม่บังคับ hostname ของงานภาพ
-3. กด **บันทึก Provider สำหรับภาพ** แล้วเลือก **การเชื่อมต่อสำหรับงานสื่อ** โหลดโมเดลด้วย **โหลดโมเดลสำหรับภาพ** หรือพิมพ์ Model ID เอง การโหลดโมเดลเป็นคำขอตรวจการเชื่อมต่อ แยกจากการสร้างภาพจริง และไม่ได้รับรองว่าโมเดลทุกตัวในรายการสร้างภาพได้
+2. เปิด **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก preset OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ connection, รูปแบบ API, API Base URL และคีย์ รุ่นใหม่ตั้งโมเดลเป็น **Auto** จึงบันทึก Custom ด้วย URL/key ได้โดยยังไม่ต้องรู้ Model ID ทุก preset แก้ไขได้และไม่บังคับ hostname ของงานภาพ
+3. กด **บันทึก Provider สำหรับภาพ** แล้วเลือก **การเชื่อมต่อสำหรับงานสื่อ** หน้าเว็บโหลดและแสดงรายชื่อโมเดลให้อัตโนมัติเมื่อมี connection ที่เลือก หลังเปิดหน้า เปลี่ยน connection หรือบันทึกค่าการเชื่อมต่อ เลือก Auto, โมเดลในรายการ หรือพิมพ์ Model ID เองได้ หากโหลดไม่สำเร็จยังกรอกเองได้โดยไม่บล็อกฟอร์ม และใช้ **โหลดโมเดลสำหรับภาพ** เพื่อโหลดใหม่ การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้
 4. เลือกโปรเจกต์ที่อนุญาต เปิดงานสร้างสื่อผ่าน AI แล้วกด **บันทึก Creative Media**
 5. หากต้องการลบพื้นหลังหรือสร้างวิดีโอจากภาพอ้างอิง ให้เปิดอนุญาตส่งภาพที่เลือกด้วย
 6. สำหรับวิดีโอ ให้เลือก connection ที่ตรวจแล้วว่ารองรับ video API เปิด `videoEnabled` และกรอก `videoModel` เอง ค่าเริ่มต้นคือปิดและโมเดลว่าง การเชื่อมต่อ OpenAI ทางการเปิดวิดีโอไม่ได้
 
-ค่าเริ่มต้นปิดงานผ่าน AI และวิดีโอ, ไม่เลือก connection/โปรเจกต์ และไม่อนุญาตอัปโหลดภาพ การบันทึกตั้งค่าไม่เรียกโมเดลและไม่คิดว่าการเชื่อมต่อผ่านการทดสอบแล้ว งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี Connection ที่สร้างจาก Creative Media ใช้ credential store เดียวกับ AI Providers และไม่ต้องสร้าง Agent Profile
+ค่าเริ่มต้นปิดงานผ่าน AI และวิดีโอ, ไม่เลือก connection/โปรเจกต์ และไม่อนุญาตอัปโหลดภาพ การตั้งค่าหรือโหลดรายชื่อโมเดลไม่สร้างภาพและไม่ถือเป็นการตรวจรับ inference การโหลดรายชื่อเป็นคำขอ API แบบอ่านแยกต่างหาก งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี Connection ที่สร้างจาก Creative Media ใช้ credential store เดียวกับ AI Providers และไม่ต้องสร้าง Agent Profile
+
+Auto เป็นค่าเริ่มต้นเฉพาะ config/preset ใหม่ ค่า Model ID ที่เคยบันทึกเองยังอยู่เดิม เมื่อส่งงานภาพด้วย Auto backend จะขอรายชื่อโมเดลใหม่จาก connection เดิม เลือกหนึ่ง image model ที่รู้จักและปรากฏในรายการ แล้วส่งคำขอสร้าง/แก้ภาพหนึ่งครั้ง ไม่ส่งคำว่า `auto` ไปยัง API และไม่เดาใช้ text/video model หากไม่มีโมเดลที่รู้จักหรือปลายทางไม่รองรับ model-list ให้เลือก Model ID เอง ผล `creative_job.model` แสดงโมเดลที่ใช้จริง หากโมเดลที่เลือกตอบผิดพลาด ระบบไม่เปลี่ยนโมเดลแล้วส่งงานเสียเงินซ้ำ
 
 เลือก connection แล้วกด **แก้ไข connection ที่เลือก** เพื่อเปลี่ยนชื่อ, URL, protocol, model หรือวิธีเก็บคีย์ ช่องคีย์ไม่เติมค่ากลับจาก server เว้นว่างได้เมื่อคง URL/protocol/storage เดิม หากเปลี่ยนค่าใดค่าหนึ่งในสามรายการนี้ต้องกรอกคีย์ใหม่ก่อนบันทึก ระบบไม่ส่งคีย์เดิมต่อไปยัง endpoint ใหม่
 
@@ -27,11 +29,11 @@ Session key อยู่ในหน่วยความจำ: ต้องก
 
 | Preset / รูปแบบ | ค่าเริ่มต้น | วิธีส่งคำขอ |
 |---|---|---|
-| OpenAI / OpenAI-compatible Images | `https://api.openai.com/v1` · `gpt-image-2.5-flare` | `POST /images/generations`, multipart `POST /images/edits`; Bearer key |
-| Google Gemini / Gemini Interactions | `https://generativelanguage.googleapis.com/v1beta` · `gemini-nano-banana-2.1` | `POST /interactions`; `x-goog-api-key`, inline PNG |
-| Custom / API ภายนอก | เจ้าของกรอก URL และ Model ID | เลือกรูปแบบ OpenAI-compatible Images หรือ Gemini Interactions ให้ตรงกับปลายทาง |
+| OpenAI / OpenAI-compatible Images | `https://api.openai.com/v1` · Auto | `POST /images/generations`, multipart `POST /images/edits`; Bearer key |
+| Google Gemini / Gemini Interactions | `https://generativelanguage.googleapis.com/v1beta` · Auto | `POST /interactions`; `x-goog-api-key`, inline PNG |
+| Custom / API ภายนอก | เจ้าของกรอก URL · Auto หรือ Model ID เอง | เลือกรูปแบบ OpenAI-compatible Images หรือ Gemini Interactions ให้ตรงกับปลายทาง |
 
-เลือกรูปแบบตาม API ที่บริการนั้นรับจริง ไม่เดาจากชื่อ provider หรือชื่อโมเดล ตัวอย่างเช่น gateway ที่ให้โมเดล Gemini ผ่าน `/images/generations` ต้องเลือก OpenAI-compatible Images ส่วน Gemini native ใช้ Interactions โหลดรายชื่อ Gemini แล้วระบบตัด `models/` ออกจากชื่อ resource เพื่อใช้เป็น Model ID
+เลือกรูปแบบตาม API ที่บริการนั้นรับจริง ไม่เดาจากชื่อ provider หรือชื่อโมเดล ตัวอย่างเช่น gateway ที่ให้โมเดล Gemini ผ่าน `/images/generations` ต้องเลือก OpenAI-compatible Images ส่วน Gemini native ใช้ Interactions โหลดรายชื่อ Gemini แล้วระบบตัด `models/` ออกจากชื่อ resource เพื่อใช้เป็น Model ID Auto ของ OpenAI-compatible เลือก GPT image ที่รู้จักก่อน เช่น `gpt-image-2.5-flare` เมื่อมีในรายการ ส่วน Gemini native เลือกเฉพาะ Gemini image IDs ที่รู้จัก เช่น `gemini-nano-banana-2.1` ไม่ใช่การเปลี่ยนค่า Model ID ที่บันทึกเอง
 
 อ่านรูปแบบและข้อจำกัดจาก [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation) และ [Google Gemini image generation](https://aistudio.google.com/docs/image-generation) การรองรับวิดีโอต้องตรวจจากปลายทางที่เลือกเอง Gemini image protocol ไม่ถือว่ารองรับ video compatibility เอกสาร OpenAI Videos API เป็นข้อมูลรูปแบบเดิม ไม่ใช่การรับรองว่าปลายทางนั้นยังเปิดบริการ
 
@@ -47,12 +49,38 @@ Session key อยู่ในหน่วยความจำ: ต้องก
 | `video_extend` | สร้างงานต่อวิดีโอจาก `jobId` ที่เสร็จแล้วของผู้เรียก พร้อมข้อความและระยะเวลาที่เลือก |
 | `creative_job` | อ่านสถานะและรับ resource ของงานเดิม โดยไม่เริ่มสร้างใหม่ |
 | `media_save` | บันทึก resource ที่สร้างแล้วลงโปรเจกต์ ผ่าน hash checks และ journal/rollback เดิม |
+| `download_link_create` | สร้าง URL แบบ token สำหรับ resource ที่เป็นเจ้าของ เลือกอายุ 1, 2, 7, 14 หรือ 30 วัน |
+| `download_link_list` | ดู metadata ของลิงก์ที่เป็นเจ้าของ โดยไม่ส่ง token/URL กลับ |
+| `download_link_revoke` | ยกเลิกลิงก์ที่เป็นเจ้าของก่อนหมดอายุ |
 
 Full surface มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ operations เดียวกันผ่าน `dodo_media` ตรวจ schema ล่าสุดด้วย `dodo_discover` และรับ `workspaceId`/`workspaceEpoch` จาก `project_overview` ก่อนเรียก ไม่มีเครื่องมือสร้างโมเดล 3D ในฟีเจอร์นี้
+
+รุ่น 1.6.0 มี Full 173 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 169), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
 
 งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 
 OpenAI-compatible Images ต้องคืน PNG แบบ `b64_json`; Gemini ต้องคืน inline base64 PNG จาก Interactions ไม่ดาวน์โหลดภาพจาก URL ที่ปลายทางส่งกลับ ไม่ตาม redirect และไม่ส่ง credentials ต่อไปยัง URL อื่น การตั้งค่าผ่านหรือการที่ text chat ใช้ได้ไม่รับรอง operation ภาพ/วิดีโอ หากรูปแบบไม่รองรับจะรายงานปัญหาโดยไม่ส่งงานซ้ำ การตรวจรับ Google Gemini native ใช้ protocol fixtures และยังไม่มี live acceptance ด้วยคีย์ทางการในการตรวจรับครั้งนี้ ดู [Test report](TEST_REPORT.md)
+
+## แชร์ไฟล์ด้วยลิงก์ชั่วคราว
+
+ใช้ `resourceId` และ `sha256` จากผล `creative_job` หรือ `image_crop` สร้างลิงก์ได้โดยไม่ต้องบันทึกภาพ/วิดีโอลง workspace ก่อน:
+
+```text
+dodo_media(
+  workspaceId="…", workspaceEpoch="…",
+  operation="download_link_create",
+  args={
+    resourceId:"res_…",
+    expectedSha256:"sha256:…",
+    expiresInDays:7,
+    fileName:"generated.png"
+  }
+)
+```
+
+เลือกอายุเป็น 1, 2, 7, 14 หรือ 30 วัน (เริ่มต้น 7) ผลคืน `linkId`, URL, hash และเวลาหมดอายุ URL อยู่บนโดเมนของ HTTP server ที่รันจริง เช่น `https://mcp.example.com/file/<token>/generated.png` ผู้ที่มี URL ดาวน์โหลดได้ จึงต้องเก็บ URL เป็นความลับ ลิงก์ผูกกับสำเนา CAS ที่ไม่เปลี่ยนตามไฟล์ต้นฉบับและมีอายุแยกจาก resource reference 24 ชั่วโมง
+
+`download_link_list` ดูลิงก์ที่ยังไม่หมดอายุของผู้เรียกโดยไม่แสดง token/URL; `download_link_revoke(linkId="dl_…")` ยกเลิกก่อนกำหนด การสร้างต้องมีสิทธิ์ read/write และผ่าน execution trust/approval ส่วนยกเลิกต้องมี write ลิงก์อยู่ข้ามรีสตาร์ต/เปลี่ยน workspace แต่หยุดเมื่อหมดอายุ ถูกยกเลิก หรือสิทธิ์ต้นทางถูกถอน การสร้างลิงก์ไม่เรียก image/video API เพิ่มและไม่ retry เอง STDIO อย่างเดียวสร้าง URL ที่ให้บริการไฟล์ไม่ได้ ดู [Temporary token download links](RESOURCES.md#temporary-token-download-links) สำหรับ HTTP/tunnel, permissions และข้อจำกัดทั้งหมด
 
 ## ครอปและลบพื้นหลัง
 

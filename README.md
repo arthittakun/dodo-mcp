@@ -15,7 +15,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface สำหรับเครื่องมือรายตัว แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จาก MCP; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
+- STDIO ใช้ Full Tool Surface 173 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 169 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -23,6 +23,7 @@
 - สร้างภาพผ่าน OpenAI, Google Gemini หรือ API ภายนอก โดยกรอก provider/URL/key/model ได้เอง ครอป/แบ่ง grid เป็น PNG ที่รักษาความโปร่งใส ลบพื้นหลัง พร้อม video compatibility สำหรับปลายทางที่รองรับ ([Creative Media](docs/CREATIVE_MEDIA.md))
 - ตรวจและควบคุมมือถือ Android ผ่าน ADB ได้ตั้งแต่ภาพหน้าจอ/UI/logcat ไปจนถึง input, apps, APK, file transfer และ device-side shell โดยจำกัดเฉพาะ serial ที่เจ้าของอนุญาต ([คู่มือ](docs/ANDROID.md))
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
+- ให้ AI สร้างลิงก์ดาวน์โหลดชั่วคราวบนโดเมน MCP ด้วย token เลือกอายุ 1, 2, 7, 14 หรือ 30 วัน และยกเลิกก่อนหมดอายุได้ ([คู่มือ](docs/RESOURCES.md#temporary-token-download-links))
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
 - มี Context Engine สำหรับ goal-driven retrieval แบบมี budget, provenance, confidence, freshness และ L0–L6 dependency cache
 - มี owner-reviewed Memory สำหรับ fact/decision/fix/convention ที่ผูก source evidence, retention และ freshness พร้อม learning proposal ที่ไม่ติดตั้งหรือรันเอง
@@ -40,20 +41,28 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp
+npm install -g dodo-mcp@1.6.0
 dodo setup --check
 dodo --cli
 ```
 
 ### สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ
 
-เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL, key และ Model ID ได้เอง Preset เป็นเพียงค่าเริ่มต้นที่แก้ไขได้ จากนั้นเลือก connection/โปรเจกต์และเปิดงานภาพผ่าน AI โหลดรายชื่อโมเดลจาก connection หรือพิมพ์ ID เองได้ การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องเปิดอนุญาตอัปโหลดภาพ ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
+เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL และ key ได้เอง ค่าโมเดลเริ่มต้นของ config/preset ใหม่เป็น **Auto** จึงยังไม่ต้องรู้ Model ID เมื่อบันทึก Custom หน้าเว็บแสดงรายการโมเดลอัตโนมัติหลังเลือก/บันทึก connection และยังพิมพ์ ID เองได้เมื่อโหลดไม่สำเร็จ ค่าโมเดลที่เคยบันทึกเองไม่เปลี่ยน จากนั้นเลือกโปรเจกต์และเปิดงานภาพผ่าน AI การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องอนุญาตอัปโหลดภาพ ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
+
+เมื่อส่งงานด้วย Auto backend จะขอรายการโมเดลใหม่ เลือก image model ที่รู้จักจริงจากรายการ แล้วส่งงานภาพหนึ่งครั้ง ผลงานบอก Model ID ที่ใช้จริง ไม่ส่งค่า `auto` หรือเดาใช้โมเดลข้อความ หากไม่พบตัวเลือกให้กรอก ID เอง ไม่มีการสลับโมเดลแล้วส่งงานเสียเงินซ้ำเมื่อเกิดข้อผิดพลาด
 
 เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage ไม่เปลี่ยน การเปลี่ยนสามค่านี้ต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
 เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) ติดตามงานด้วย `creative_job` และบันทึก PNG/MP4 ด้วย `media_save` งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
 
 วิดีโอเริ่มปิดไว้และไม่มีโมเดลเริ่มต้น ต้องเลือก connection ที่รองรับจริงและเปิดเอง OpenAI ยุติ Sora 2/Videos API เมื่อ 24 กันยายน 2026 จึงไม่ส่งงานวิดีโอไปที่ OpenAI ทางการ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
+
+### ลิงก์ดาวน์โหลดชั่วคราว
+
+ให้ AI เรียก `resource_inspect` กับไฟล์ที่ต้องการ แล้วใช้ `download_link_create` พร้อม `resourceId`, `expectedSha256` และ `expiresInDays` เป็น 1, 2, 7, 14 หรือ 30 (เริ่มต้น 7 วัน) ภาพ/วิดีโอที่สร้างแล้วใช้ resource จาก `creative_job` ได้โดยตรง ผลคืน URL เช่น `https://mcp.example.com/file/<token>/image.png` บน origin ของ HTTP server ที่รันจริง ไม่มีการเปิดแชร์ไฟล์อื่นในโฟลเดอร์ ลิงก์ชี้สำเนา immutable จึงไม่เปลี่ยนตามไฟล์ต้นฉบับ และอยู่ต่อได้ตามอายุที่เลือกแม้ resource reference 24 ชั่วโมงหมดอายุ
+
+URL นี้เป็นความลับ: ผู้ที่มีลิงก์ดาวน์โหลดได้โดยไม่ต้องล็อกอิน MCP เพิ่ม ใช้ `download_link_list` ดู metadata โดยไม่คืน token/URL และ `download_link_revoke` ยกเลิกลิงก์ก่อนกำหนดได้ ลิงก์เก็บข้ามรีสตาร์ต/สลับ workspace แต่ยังหยุดเมื่อหมดอายุ ถูกยกเลิก หรือ grant/สิทธิ์โปรเจกต์ต้นทางไม่อนุญาตแล้ว ต้องมี HTTP server และ origin ที่ตั้งค่าไว้; STDIO อย่างเดียวให้บริการไฟล์ไม่ได้ ส่วน URL แบบ localhost ใช้ได้เฉพาะเครื่องนั้น ดู [ตัวอย่างเรียก tools และสิทธิ์ที่ต้องมี](docs/RESOURCES.md#temporary-token-download-links)
 
 ### Android / ADB และ Termux
 
@@ -564,6 +573,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 ## เอกสาร
 
 - [Release 1.0.0](docs/RELEASE_1.0.0.md)
+- [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
 - [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)

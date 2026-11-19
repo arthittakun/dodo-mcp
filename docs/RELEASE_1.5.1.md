@@ -1,5 +1,9 @@
 # DODO MCP 1.5.1 — Configurable image providers
 
+This version was not published. Its changes are included in
+[DODO 1.6.0](RELEASE_1.6.0.md), together with Auto model selection and temporary
+download links. Upgrade using the published 1.6.0 package.
+
 The Creative Media panel now creates and edits image provider connections
 directly. Owners can enter a name, API protocol, API Base URL, API key, credential
 storage and model ID instead of using a fixed OpenAI setup shortcut. OpenAI is
@@ -9,20 +13,30 @@ available. No private test provider, endpoint or credential is built into them.
 ## Upgrade and configure
 
 ```bash
-npm install -g dodo-mcp@1.5.1
+npm install -g dodo-mcp@1.6.0
 ```
 
 Restart DODO, then open **Local Config → Providers & Profiles → Creative Media →
 เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ**. Choose a preset and edit its values, or
-choose Custom and enter the service's base URL and supported model ID. The URL
+choose Custom and enter the service's base URL and key. New configurations and
+all presets select **Auto** for the image model, so a concrete model ID is not
+required at setup. Previously saved manual model IDs remain unchanged. The URL
 must stop at an API base such as `/v1` or `/v1beta`, not a specific operation.
 Save the provider, select its connection and allowed projects, then enable media
 creation. Saving configuration does not call an image model.
 
-Use **โหลดโมเดลสำหรับภาพ** to query the selected connection, or enter a model ID
-manually. Model listing is a separate authenticated request and does not prove
-that every listed model supports image generation. Gemini `models/` resource
-prefixes are removed when presenting IDs for native Interactions requests.
+The panel loads and displays model IDs automatically when a saved connection is
+opened, selected or saved. **โหลดโมเดลสำหรับภาพ** refreshes the list, and manual
+model entry remains available if loading fails. Model listing is a separate
+authenticated read request and does not prove that every model supports images.
+Gemini `models/` resource prefixes are removed for native Interactions requests.
+
+At execution time, Auto obtains a fresh model list from the same connection,
+selects one recognized image model advertised there and sends one image request.
+It never sends the literal `auto`, guesses a text/video model, or retries a paid
+image request using a different model after an error. If the list is unsupported
+or contains no recognized image model, the owner must choose a supported ID
+manually. The job's `model` field reports the actual selected model.
 
 Use **แก้ไข connection ที่เลือก** to change an existing connection. A blank key
 retains the existing credential only when URL, protocol and storage are unchanged.
@@ -41,7 +55,8 @@ metadata write failure.
   base URL with Bearer authentication. Custom services can use their own names,
   URLs and model IDs when they implement this wire format.
 - Google Gemini native uses Interactions and `x-goog-api-key`, with inline PNG
-  inputs/outputs. The default preset is `gemini-nano-banana-2.1`.
+  inputs/outputs. Auto selects only known Gemini image IDs present in the list;
+  `gemini-nano-banana-2.1` is preferred when advertised by that connection.
 - Gemini accepts automatic quality and requests 1K output with an aspect ratio
   derived from the selected size. The resource metadata reports actual decoded
   dimensions rather than promising OpenAI pixel dimensions.

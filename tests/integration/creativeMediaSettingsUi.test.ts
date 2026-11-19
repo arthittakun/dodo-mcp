@@ -6,10 +6,15 @@ import { CREATIVE_MEDIA_DEFAULTS, CREATIVE_IMAGE_PRESETS, CreativeSettingsInput 
 
 const executablePath = process.env['DODO_TEST_CHROMIUM_EXECUTABLE'] ?? chromium.executablePath();
 interface Connection { id: string; name: string; provider: string; protocol: string; baseUrl: string; enabled: boolean; credentialPresent: boolean; credentialStorage: string; allowPrivateNetwork: boolean }
+interface FixtureOptions {
+  connections?: Connection[];
+  media?: Record<string, unknown>;
+  models?: (connectionId: string) => Promise<{ data?: Array<{ id: string }>; status?: number; error?: string }>;
+}
 
-async function fixture() {
+async function fixture(options: FixtureOptions = {}) {
   const browser = await chromium.launch({ headless: true, executablePath }), page = await browser.newPage();
-  const state = { presets: [], connections: [] as Connection[], profiles: [], permissions: [], projects: [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse({}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
+  const state = { presets: [], connections: options.connections ?? [] as Connection[], profiles: [], permissions: [], projects: [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('https://owner-fixture.invalid/**', async route => {
@@ -26,7 +31,11 @@ async function fixture() {
       if (previous) state.connections.splice(state.connections.indexOf(previous), 1, connection); else state.connections.push(connection);
       data = connection;
     } else if (url.pathname === '/api/ai/media') { state.media = CreativeSettingsInput.parse(body); data = state.media; }
-    else if (url.pathname === '/api/ai/models') data = [{ id: 'fixture-image-a' }, { id: 'fixture-image-b' }];
+    else if (url.pathname === '/api/ai/models') {
+      const response = options.models ? await options.models(String(body!['connectionId'])) : { data: [{ id: 'fixture-image-a' }, { id: 'fixture-image-b' }] };
+      if (response.error) { await route.fulfill({ status: response.status ?? 400, contentType: 'application/json', body: JSON.stringify({ ok: false, error: response.error }) }); return; }
+      data = response.data ?? [];
+    }
     else throw new Error(`unexpected route ${url.pathname}`);
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
   });
@@ -46,19 +55,20 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
     try {
       expect(await panel.locator('input[name=mediaBaseUrl]').inputValue()).toBe('https://api.openai.com/v1');
       expect(await panel.locator('input[name=mediaBaseUrl]').isEditable()).toBe(true);
-      expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('gpt-image-2.5-flare');
+      expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('auto');
       expect(await panel.locator('input[name=mediaVideoEnabled]').isChecked()).toBe(false);
       expect(await panel.locator('input[name=mediaVideoModel]').inputValue()).toBe('');
+      expect(await panel.locator('select[name=mediaModelPicker] option[value=auto]').textContent()).toContain('Auto');
       await panel.locator('summary').click();
       await panel.locator('select[name=mediaProviderPreset]').selectOption('gemini');
       expect(await panel.locator('select[name=mediaProtocol]').inputValue()).toBe('gemini');
       expect(await panel.locator('input[name=mediaBaseUrl]').inputValue()).toBe('https://generativelanguage.googleapis.com/v1beta');
-      expect(await panel.locator('input[name=mediaProviderModel]').inputValue()).toBe('gemini-nano-banana-2.1');
+      expect(await panel.locator('input[name=mediaProviderModel]').inputValue()).toBe('auto');
       await panel.locator('input[name=mediaApiKey]').fill(key);
       await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
       await expect.poll(() => state.media.connectionId).toBe('ai_fixture0001');
       expect(state.connections[0]).toMatchObject({ provider: 'gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' });
-      expect(state.media.imageModel).toBe('gemini-nano-banana-2.1');
+      expect(state.media.imageModel).toBe('auto');
       await expect.poll(() => panel.locator('select[name=mediaConnection]').inputValue()).toBe('ai_fixture0001');
       expect(await panel.locator('input[name=mediaVideoEnabled]').isDisabled()).toBe(true);
       await panel.locator('input[name=mediaEnabled]').check();
@@ -94,19 +104,20 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
       await panel.locator('summary').click();
       await panel.locator('select[name=mediaProviderPreset]').selectOption('custom');
       expect(await panel.locator('input[name=mediaBaseUrl]').inputValue()).toBe('');
-      expect(await panel.locator('input[name=mediaProviderModel]').inputValue()).toBe('');
+      expect(await panel.locator('input[name=mediaProviderModel]').inputValue()).toBe('auto');
       await panel.locator('input[name=mediaProviderName]').fill('Custom image fixture');
       await panel.locator('input[name=mediaBaseUrl]').fill(endpoint);
-      await panel.locator('input[name=mediaProviderModel]').fill('fixture-image-a');
+      await panel.locator('input[name=mediaProviderModel]').fill('');
       expect(await panel.locator('input[name=mediaBaseUrl]').inputValue()).toBe(endpoint);
       await panel.locator('input[name=mediaApiKey]').fill(key);
       await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
       await expect.poll(() => state.media.connectionId).toBe('ai_fixture0001');
+      expect(state.media.imageModel).toBe('auto');
       expect(state.connections[0]).toMatchObject({ provider: 'custom', protocol: 'responses', baseUrl: endpoint, credentialPresent: true });
       await expect.poll(() => panel.locator('select[name=mediaConnection]').inputValue()).toBe('ai_fixture0001');
       await panel.locator('input[name=mediaImageModel]').fill('manual-model');
       await panel.getByRole('button', { name: 'โหลดโมเดลสำหรับภาพ', exact: true }).click();
-      await expect.poll(() => panel.locator('select[name=mediaModelPicker] option').count()).toBe(3);
+      await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=fixture-image-b]').count()).toBe(1);
       expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('manual-model');
       await panel.locator('select[name=mediaModelPicker]').selectOption('fixture-image-b');
       expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('fixture-image-b');
@@ -136,5 +147,57 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
       for (const secret of [key, replacementKey]) { expect(storage).not.toContain(secret); expect(JSON.stringify(state)).not.toContain(secret); }
       expect(errors).toEqual([]);
     } finally { await browser.close(); }
+  });
+
+  it('automatically discovers models once per connection, deduplicates pending loads and preserves Auto/manual fallback', async () => {
+    const connections: Connection[] = ['a', 'b', 'c'].map((name, index) => ({ id: `ai_fixture000${index + 1}`, name: `Image fixture ${name}`, provider: 'custom', protocol: 'responses', baseUrl: `https://images-${name}.example/v1`, enabled: true, credentialPresent: true, credentialStorage: 'session', allowPrivateNetwork: false }));
+    const counts = new Map<string, number>();
+    let releaseA: (value: { data: Array<{ id: string }> }) => void = () => undefined;
+    const first = new Promise<{ data: Array<{ id: string }> }>(resolve => { releaseA = resolve; });
+    const { browser, page, panel, state, requests, errors } = await fixture({
+      connections, media: { connectionId: 'ai_fixture0001', imageModel: 'auto' },
+      models: async id => {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+        if (id === 'ai_fixture0001') return first;
+        if (id === 'ai_fixture0002') return { data: [{ id: 'b-image' }] };
+        return { status: 404, error: 'Model listing is unavailable' };
+      },
+    });
+    try {
+      await expect.poll(() => counts.get('ai_fixture0001')).toBe(1);
+      expect(await panel.locator('select[name=mediaModelPicker]').inputValue()).toBe('auto');
+      await panel.getByRole('button', { name: 'โหลดโมเดลสำหรับภาพ', exact: true }).click();
+      expect(counts.get('ai_fixture0001')).toBe(1);
+      await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0002');
+      await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=b-image]').count()).toBe(1);
+      const firstResponse = page.waitForResponse(response => response.url().endsWith('/api/ai/models') && response.request().postDataJSON()?.connectionId === 'ai_fixture0001');
+      releaseA({ data: [{ id: 'a-image' }] }); await firstResponse;
+      await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0001');
+      await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=a-image]').count()).toBe(1);
+      await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0002');
+      await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=b-image]').count()).toBe(1);
+      expect(await panel.locator('select[name=mediaModelPicker] option[value=a-image]').count()).toBe(0);
+      expect(counts.get('ai_fixture0001')).toBe(1); expect(counts.get('ai_fixture0002')).toBe(1);
+      expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('auto');
+      await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0003');
+      await expect.poll(() => panel.textContent()).toContain('กรอก Model ID เองได้');
+      expect(counts.get('ai_fixture0003')).toBe(1);
+      expect(await panel.locator('select[name=mediaModelPicker] option[value=auto]').count()).toBe(1);
+      await panel.locator('input[name=mediaImageModel]').fill('manual-fallback-image');
+      await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
+      await expect.poll(() => state.media.imageModel).toBe('manual-fallback-image');
+      await expect.poll(() => panel.locator('select[name=mediaConnection]').inputValue()).toBe('ai_fixture0003');
+      await expect.poll(() => panel.textContent()).toContain('กรอก Model ID เองได้');
+      expect(counts.get('ai_fixture0003')).toBe(1);
+      await panel.getByRole('button', { name: 'โหลดโมเดลสำหรับภาพ', exact: true }).click();
+      await expect.poll(() => counts.get('ai_fixture0003')).toBe(2);
+      await panel.locator('select[name=mediaModelPicker]').selectOption('auto');
+      expect(await panel.locator('input[name=mediaImageModel]').inputValue()).toBe('auto');
+      await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
+      await expect.poll(() => state.media.imageModel).toBe('auto');
+      expect(counts.get('ai_fixture0003')).toBe(2);
+      expect(requests.every(request => ['/api/ai/state', '/api/ai/media', '/api/ai/models'].includes(request.path))).toBe(true);
+      expect(errors).toEqual([]);
+    } finally { releaseA({ data: [] }); await browser.close(); }
   });
 });

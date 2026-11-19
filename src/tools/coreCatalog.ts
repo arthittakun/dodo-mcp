@@ -14,6 +14,7 @@ import { runCommandTool, runCommandsTool, execCommandTool, runTaskTool, jobStatu
 import { diagnosticsTool, approvalStatusTool, handoffWriteTool, handoffReadTool } from './metaTools.js';
 import { todoWriteTool, todoReadTool, environmentInfoTool, fetchUrlTool } from './agentTools.js';
 import { RESOURCE_TOOLS } from './resourceTools.js';
+import { DOWNLOAD_TOOLS } from './downloadTools.js';
 import { BRAIN_TOOLS } from './brainTools.js';
 import { CONTEXT_TOOLS } from './contextTools.js';
 import { MEMORY_TOOLS } from './memoryTools.js';
@@ -81,5 +82,6 @@ export const CORE_TOOL_CATALOG: AnyToolDef[] = [
   ...BRAIN_TOOLS,
   ...MULTIMODAL_TOOLS,
   ...CREATIVE_TOOLS,
+  ...DOWNLOAD_TOOLS,
   ...RESOURCE_TOOLS,
 ];

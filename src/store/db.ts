@@ -760,6 +760,24 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
   `CREATE TABLE creative_jobs (id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, owner TEXT NOT NULL,
     payload TEXT NOT NULL, updated_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
    CREATE INDEX creative_jobs_owner ON creative_jobs(workspace_id,owner,expires_at);`,
+  `CREATE TABLE resource_download_links (
+    id TEXT PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    workspace_id TEXT NOT NULL,
+    principal TEXT NOT NULL,
+    authority TEXT NOT NULL,
+    registry_id TEXT,
+    resource_id TEXT NOT NULL,
+    object_hash TEXT NOT NULL REFERENCES resource_objects(hash) ON DELETE CASCADE,
+    mime_type TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked_at INTEGER
+  );
+  CREATE INDEX idx_resource_download_links_owner ON resource_download_links(workspace_id,principal,expires_at);
+  CREATE INDEX idx_resource_download_links_pin ON resource_download_links(object_hash,expires_at) WHERE revoked_at IS NULL;
+  CREATE INDEX idx_resource_download_links_expiry ON resource_download_links(expires_at);`,
 ];
 
 /**

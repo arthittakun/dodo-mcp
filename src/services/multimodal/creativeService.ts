@@ -6,7 +6,7 @@ import { isPersonalMode } from '../../security/accessMode.js';
 import { isOwner } from '../../security/projectAuthority.js';
 import { CreativeProvider, type CreativeImageInput, type CreativeVideoInput } from './creativeProvider.js';
 import { cropCreativeImage, normalizeCreativeImage, gridCreativeRegions, type CreativeGrid } from './creativeImages.js';
-import { isCreativeConnection, supportsCreativeVideoConnection } from './creativeSettings.js';
+import { isCreativeConnection, supportsCreativeVideoConnection, resolveAutoImageModel } from './creativeSettings.js';
 import { loadSharpBackend } from './sharpBackend.js';
 import { MediaStorage, actorKey, liveAccess } from './storage.js';
 import type { CropRect } from './contracts.js';
@@ -70,7 +70,7 @@ export class CreativeService {
     let available = false, videoAvailable = false;
     try { this.configuration(ctx); available = true; } catch { /* Read status never requests credentials or a model. */ }
     try { this.videoConfiguration(ctx); videoAvailable = true; } catch { /* Availability only, no inference. */ }
-    return { enabled: config?.enabled ?? false, available, imageModel: config?.imageModel ?? 'gpt-image-2.5-flare', videoModel: config?.videoModel ?? '', videoAvailable,
+    return { enabled: config?.enabled ?? false, available, imageModel: config?.imageModel ?? 'auto', videoModel: config?.videoModel ?? '', videoAvailable,
       videoNote: 'OpenAI Videos API retired on 2026-09-24. Video tools require explicit compatible-provider configuration; no video model is selected by default.',
       localCrop: true, imageUploadEnabled: config?.allowImageUpload ?? false, modelCalls: false as const,
       note: 'Cloud creation is explicit and may cost money. Crop runs locally. Background removal is a generative edit and can alter details. No 3D tools.' };
@@ -167,7 +167,24 @@ export class CreativeService {
     let key: string;
     try { key = await cfg.settings.credentials.get(cfg.connection.id, cfg.connection.credentialStorage); } catch (error) { release(); throw error; }
     let provider: CreativeProvider;
-    try { provider = new CreativeProvider(cfg.connection, key, cfg.settings.ports); configForRequest(); source?.guard(); checkParent(); }
+    let model = kind === 'video' ? cfg.config.videoModel : cfg.config.imageModel;
+    try {
+      provider = new CreativeProvider(cfg.connection, key, cfg.settings.ports); configForRequest(); source?.guard(); checkParent();
+      if (kind !== 'video' && model.toLowerCase() === 'auto') {
+        const models = await cfg.settings.models(cfg.connection.id, { beforeSend: () => {
+          if (configForRequest().digest !== cfg.digest) throw new DodoError('FORBIDDEN', 'media configuration changed during model discovery');
+          source?.guard(); checkParent();
+        } }).catch((error: unknown) => {
+          // Discovery is metadata-only and precedes every paid submission. A
+          // transport/parse failure here is safe to retry with the same key.
+          if (error instanceof DodoError && error.code !== 'CONFLICT') throw error;
+          throw new DodoError('NOT_SUPPORTED', 'image model discovery is unavailable; retry discovery or choose a Model ID manually');
+        });
+        if (configForRequest().digest !== cfg.digest) throw new DodoError('FORBIDDEN', 'media configuration changed during model discovery');
+        model = resolveAutoImageModel(cfg.connection.protocol, models.map(item => item.id));
+        source?.guard();
+      }
+    }
     catch (error) { release(); throw error; }
     try {
       this.sweep();
@@ -178,7 +195,7 @@ export class CreativeService {
       const remote = pending.filter(r => r.remote_id !== null || activeGlobal.has(r.id));
       if (this.active.size >= 2 || activeGlobal.size >= 4 || count.n >= 32 || remote.filter(r => r.workspace_id === this.storage.services.workspaceId).length >= 2 || remote.length >= 4) throw new DodoError('RESOURCE_LIMIT', 'creative media job budget reached; collect current jobs or wait for history expiry');
     } catch (error) { release(); throw error; }
-    const jobId = newId('creative'), record: RecordData = { jobId, kind, status: 'queued', model: kind === 'video' ? cfg.config.videoModel : cfg.config.imageModel,
+    const jobId = newId('creative'), record: RecordData = { jobId, kind, status: 'queued', model,
       progress: 0, resource: null, error: null, createdAt: Date.now(), expiresAt: Date.now() + TTL, note: 'Submitted once. Poll creative_job with this jobId; never repeat a paid request to check progress.',
       epoch: this.storage.services.epoch, connectionId: cfg.connection.id, configuration: cfg.digest };
     try { this.save(ctx, record); } catch (error) { release(); throw error; }

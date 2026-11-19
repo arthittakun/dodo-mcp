@@ -66,6 +66,8 @@ export interface AppServices {
   multimodal?: MultimodalService;
   /** Installation CAS with workspace/principal-scoped references. */
   resources?: ResourceService;
+  /** Active HTTP listener origin; absent for stdio and unconfigured listeners. */
+  downloadOrigin?: string;
   schedules: ScheduleService;
   version: string;
   config: GlobalConfig;
