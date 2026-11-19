@@ -6,7 +6,7 @@ import { DodoError } from '../../errors.js';
 import { digestOf, newId, sha256Bytes } from '../../util/hash.js';
 import { decodeUtf8Strict } from '../../util/bytes.js';
 import { liveAccess } from '../multimodal/storage.js';
-import { CasStore, RESOURCE_RANGE_MAX_BYTES } from './casStore.js';
+import { CasStore, RESOURCE_RANGE_MAX_BYTES, RESOURCE_STORE_MAX_BYTES } from './casStore.js';
 import { isTextMime, resourceFamily, sniffType } from './mime.js';
 import { imagePreview, inspectResourceFile, readTextFile, readZipEntries } from './providers.js';
 import type { ResourceCapabilitiesData, ResourceInfoData, ResourceMetadataData } from './contracts.js';
@@ -59,12 +59,42 @@ export class ResourceService {
     this.cas = new CasStore(services.store, objectsDir, stagingDir);
     this.downloads = new DownloadLinkService(services.store, this.cas);
     this.cursorKey = createHmac('sha256', installSecret).update('dodo-resource-range-v1').digest();
-    this.gc();
-    this.gcTimer = setInterval(() => { if (!this.closed) this.gc(); }, 15 * 60 * 1000);
+    this.maintain();
+    this.gcTimer = setInterval(() => { if (!this.closed) this.maintain(); }, 15 * 60 * 1000);
     this.gcTimer.unref();
   }
 
   close(): void { this.closed = true; clearInterval(this.gcTimer); }
+
+  private maintain(): void { try { this.gc(); } catch { try { this.services.logEvent?.('resource.cleanup.failed', { code: 'STORAGE_UNAVAILABLE' }); } catch { /* cleanup must not throw from a timer */ } } }
+
+  /** Reserve worst-case output and one reference before submitting paid provider work. */
+  reserveGeneratedOutput(ctx: ToolCtx, jobId: string, maxBytes = 64 * 1024 * 1024): void {
+    this.check(); liveAccess(ctx, 'dodo:exec');
+    const owner = principalKey(ctx), db = this.services.store.db;
+    const transaction = db.transaction(() => {
+      if (db.prepare('SELECT 1 FROM creative_output_reservations WHERE job_id=? AND workspace_id=? AND owner=?').get(jobId, this.services.workspaceId, owner)) return;
+      const used = db.prepare('SELECT COALESCE(SUM(bytes),0) AS bytes FROM resource_objects').get() as { bytes: number };
+      const reserved = db.prepare('SELECT COALESCE(SUM(max_bytes),0) AS bytes FROM creative_output_reservations').get() as { bytes: number };
+      const refs = db.prepare('SELECT COUNT(*) AS n FROM resource_refs WHERE workspace_id=? AND principal=? AND expires_at>?').get(this.services.workspaceId, owner, Date.now()) as { n: number };
+      const slots = db.prepare('SELECT COUNT(*) AS n FROM creative_output_reservations WHERE workspace_id=? AND owner=? AND max_bytes>0').get(this.services.workspaceId, owner) as { n: number };
+      if (used.bytes + reserved.bytes + maxBytes > RESOURCE_STORE_MAX_BYTES || refs.n + slots.n >= REF_MAX_PER_ACTOR) throw new DodoError('RESOURCE_LIMIT', 'insufficient reserved output capacity; remove expired media before creating a paid job');
+      const space = fs.statfsSync(this.cas.stagingDir);
+      if (Number(space.bavail) * Number(space.bsize) < maxBytes * 2) throw new DodoError('RESOURCE_LIMIT', 'insufficient disk space for a durable provider output');
+      db.prepare('INSERT INTO creative_output_reservations(job_id,workspace_id,owner,max_bytes,created_at) VALUES(?,?,?,?,?)').run(jobId, this.services.workspaceId, owner, maxBytes, Date.now());
+    }); transaction.immediate();
+  }
+  releaseGeneratedOutput(jobId: string): void { this.services.store.db.prepare('DELETE FROM creative_output_reservations WHERE job_id=? AND workspace_id=?').run(jobId, this.services.workspaceId); }
+
+  async generatedForJob(ctx: ToolCtx, jobId: string): Promise<ResourceInfoData | undefined> {
+    this.check(); liveAccess(ctx, 'dodo:exec');
+    const row = this.services.store.db.prepare(`SELECT r.*,o.bytes FROM resource_refs r JOIN resource_objects o ON o.hash=r.object_hash WHERE r.workspace_id=? AND r.principal=? AND r.source_kind='generated' AND r.source_label=? ORDER BY r.created_at DESC LIMIT 1`).get(this.services.workspaceId, principalKey(ctx), jobId) as ResourceRow | undefined;
+    if (!row) return undefined;
+    await this.cas.verify(row.object_hash, row.bytes); liveAccess(ctx, 'dodo:exec');
+    row.expires_at = Math.max(row.expires_at, Date.now() + REF_TTL_MS);
+    this.services.store.db.prepare('UPDATE resource_refs SET expires_at=? WHERE id=?').run(row.expires_at, row.id);
+    return this.toInfo(row);
+  }
 
   async ingestWorkspace(ctx: ToolCtx, inputPath: string, expectedHash?: string, expectedMimeType?: string): Promise<ResourceInfoData> {
     this.check(); liveAccess(ctx, 'dodo:read');
@@ -112,9 +142,11 @@ export class ResourceService {
     this.check(); liveAccess(ctx, 'dodo:exec');
     if (bytes.length > 64 * 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'generated media exceeds 64 MiB');
     if (!/^(?:creative|crop)_[a-z0-9]{8,64}$/.test(label) || sniffType(bytes.subarray(0, 64 * 1024)).mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
-    const object = await this.cas.ingestBuffer(bytes);
+    const reservation = this.services.store.db.prepare('SELECT max_bytes FROM creative_output_reservations WHERE job_id=? AND workspace_id=? AND owner=?').get(label, this.services.workspaceId, principalKey(ctx)) as { max_bytes: number } | undefined;
+    if (reservation && reservation.max_bytes > 0 && bytes.length > reservation.max_bytes) throw new DodoError('RESOURCE_LIMIT', 'provider output exceeds its reserved capacity');
+    const object = await this.cas.ingestBuffer(bytes, undefined, reservation ? label : undefined);
     this.check(); liveAccess(ctx, 'dodo:exec'); ctx.revalidate?.();
-    return this.createReference(ctx, object, mimeType, 'generated', label, metadata);
+    return this.createReference(ctx, object, mimeType, 'generated', label, metadata, reservation ? label : undefined);
   }
 
   /** Owned, verified binary input for journaled media_save. Budgets apply before allocation. */
@@ -220,7 +252,7 @@ export class ResourceService {
 
   gc(now = Date.now()): { expiredRefs: number; removedObjects: number } {
     const transaction = this.services.store.db.transaction(() => {
-      const expired = this.services.store.db.prepare('DELETE FROM resource_refs WHERE expires_at<=?').run(now).changes;
+      const expired = this.services.store.db.prepare(`DELETE FROM resource_refs WHERE expires_at<=? AND NOT (source_kind='generated' AND EXISTS(SELECT 1 FROM creative_jobs j WHERE j.id=resource_refs.source_label AND j.workspace_id=resource_refs.workspace_id AND j.owner=resource_refs.principal AND (json_extract(j.payload,'$.status') IN ('queued','running') OR EXISTS(SELECT 1 FROM creative_output_reservations r WHERE r.job_id=j.id))))`).run(now).changes;
       this.services.store.db.prepare('DELETE FROM resource_download_links WHERE expires_at<=?').run(now);
       // A CAS object is committed before its first reference is derived. Keep
       // recently created/verified orphans so a concurrent ingest cannot be
@@ -229,11 +261,13 @@ export class ResourceService {
       const orphanPredicate = `verified_at<=? AND NOT EXISTS (SELECT 1 FROM resource_refs WHERE object_hash=resource_objects.hash)
         AND NOT EXISTS (SELECT 1 FROM resource_download_links WHERE object_hash=resource_objects.hash AND revoked_at IS NULL AND expires_at>?)`;
       const orphans = this.services.store.db.prepare(`SELECT hash FROM resource_objects WHERE ${orphanPredicate}`).all(cutoff, now) as Array<{ hash: string }>;
-      for (const orphan of orphans) this.cas.removeObject(orphan.hash);
+      for (const orphan of orphans) this.services.store.db.prepare('INSERT OR IGNORE INTO resource_gc_queue(hash,queued_at) VALUES(?,?)').run(orphan.hash, now);
       if (orphans.length > 0) this.services.store.db.prepare(`DELETE FROM resource_objects WHERE ${orphanPredicate}`).run(cutoff, now);
       return { expiredRefs: expired, removedObjects: orphans.length };
     });
-    return transaction.immediate();
+    const result = transaction.immediate();
+    this.cas.collectQueued();
+    return result;
   }
 
   private async lookup(ctx: ToolCtx, resourceId: string, expectedHash?: string, scope: 'dodo:read' | 'dodo:exec' = 'dodo:read'): Promise<ResourceRow> {
@@ -248,18 +282,31 @@ export class ResourceService {
     return row;
   }
 
-  private createReference(ctx: ToolCtx, object: { hash: string; bytes: number; deduplicated: boolean }, mimeType: string, sourceKind: ResourceRow['source_kind'], sourceLabel: string, metadata: ResourceMetadataData): ResourceInfoData {
+  private createReference(ctx: ToolCtx, object: { hash: string; bytes: number; deduplicated: boolean }, mimeType: string, sourceKind: ResourceRow['source_kind'], sourceLabel: string, metadata: ResourceMetadataData, reservationId?: string): ResourceInfoData {
     const owner = principalKey(ctx), now = Date.now(), expiresAt = now + REF_TTL_MS;
     const capabilities = this.capabilities(mimeType, object.bytes);
     const id = newId('res');
     const insert = this.services.store.db.transaction(() => {
+      if (sourceKind === 'generated' && /^creative_[a-z0-9]{8,64}$/.test(sourceLabel)) {
+        const existing = this.services.store.db.prepare(`SELECT r.*,o.bytes FROM resource_refs r JOIN resource_objects o ON o.hash=r.object_hash WHERE r.workspace_id=? AND r.principal=? AND r.source_kind='generated' AND r.source_label=? LIMIT 1`).get(this.services.workspaceId, owner, sourceLabel) as ResourceRow | undefined;
+        if (existing) {
+          if (existing.object_hash !== object.hash || existing.mime_type !== mimeType) throw new DodoError('FILE_CHANGED', 'creative job already has different immutable output');
+          this.services.store.db.prepare('UPDATE resource_refs SET expires_at=? WHERE id=?').run(expiresAt, existing.id);
+          if (reservationId) this.services.store.db.prepare('UPDATE creative_output_reservations SET max_bytes=0 WHERE job_id=? AND workspace_id=? AND owner=?').run(reservationId, this.services.workspaceId, owner);
+          return this.toInfo({ ...existing, expires_at: expiresAt });
+        }
+      }
       const count = this.services.store.db.prepare('SELECT COUNT(*) AS count FROM resource_refs WHERE workspace_id=? AND principal=? AND expires_at>?').get(this.services.workspaceId, owner, now) as { count: number };
-      if (count.count >= REF_MAX_PER_ACTOR) throw new DodoError('RESOURCE_LIMIT', 'resource reference limit reached for this client/workspace');
+      const reserved = this.services.store.db.prepare('SELECT COUNT(*) AS n FROM creative_output_reservations WHERE workspace_id=? AND owner=? AND job_id<>? AND max_bytes>0').get(this.services.workspaceId, owner, reservationId ?? '') as { n: number };
+      if (count.count + reserved.n >= REF_MAX_PER_ACTOR) throw new DodoError('RESOURCE_LIMIT', 'resource reference limit reached for this client/workspace');
       this.services.store.db.prepare(`INSERT INTO resource_refs(id,workspace_id,principal,object_hash,mime_type,source_kind,source_label,capabilities,metadata,created_at,expires_at)
         VALUES (?,?,?,?,?,?,?,?,?,?,?)`).run(id, this.services.workspaceId, owner, object.hash, mimeType, sourceKind, sourceLabel, JSON.stringify(capabilities), JSON.stringify(metadata), now, expiresAt);
+      // Retain a zero-byte recovery pin until the final job receipt is durable.
+      // The CAS object/ref now consume their own bytes and slot.
+      if (reservationId) this.services.store.db.prepare('UPDATE creative_output_reservations SET max_bytes=0 WHERE job_id=? AND workspace_id=? AND owner=?').run(reservationId, this.services.workspaceId, owner);
+      return { resourceId: id, uri: this.uri(id), mimeType, bytes: object.bytes, sha256: object.hash, source: { kind: sourceKind, label: sourceLabel }, capabilities, metadata, createdAt: now, expiresAt, deduplicated: object.deduplicated };
     });
-    insert.immediate();
-    return { resourceId: id, uri: this.uri(id), mimeType, bytes: object.bytes, sha256: object.hash, source: { kind: sourceKind, label: sourceLabel }, capabilities, metadata, createdAt: now, expiresAt, deduplicated: object.deduplicated };
+    return insert.immediate();
   }
 
   private toInfo(row: ResourceRow): ResourceInfoData {

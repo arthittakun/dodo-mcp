@@ -268,7 +268,7 @@ describe('bounded creative media provider', () => {
     let calls = 0; const url = await fixture((_req, res) => { calls++; res.write(' '); });
     const provider = new CreativeProvider(connection(url), key, []); const before = vi.fn();
     const stopped = new AbortController(); stopped.abort();
-    await expect(provider.generateImage(imageInput, stopped.signal, before)).rejects.toMatchObject({ code: 'CONFLICT' });
+    await expect(provider.generateImage(imageInput, stopped.signal, before)).rejects.toMatchObject({ code: 'CANCELED', detail: { outcome: 'not_sent' } });
     expect(before).not.toHaveBeenCalled(); expect(calls).toBe(0);
     const controller = new AbortController(); const pending = provider.generateImage(imageInput, controller.signal, before);
     setTimeout(() => controller.abort(), 30);
@@ -281,7 +281,7 @@ describe('bounded creative media provider', () => {
     const controller = new AbortController(), before = vi.fn();
     const pending = provider.generateImage(imageInput, controller.signal, before);
     controller.abort();
-    await expect(pending).rejects.toMatchObject({ code: 'CONFLICT' }); expect(before).not.toHaveBeenCalled();
+    await expect(pending).rejects.toMatchObject({ code: 'CANCELED', detail: { outcome: 'not_sent' } }); expect(before).not.toHaveBeenCalled();
   });
 
   it('rejects noncanonical base64, wrong raster output and mismatched video jobs', async () => {

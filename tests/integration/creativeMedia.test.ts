@@ -142,12 +142,19 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     const resource = ResourceInfo.parse(output.resources[0]);
     const args = { resourceId: resource.resourceId, expectedSha256: resource.sha256, path: 'existing.png', idempotencyKey: 'creative-save-overwrite' };
     fs.writeFileSync(path.join(ctx.fixtureDir, 'existing.png'), opaque);
+    if (process.platform !== 'win32') fs.chmodSync(path.join(ctx.fixtureDir, 'existing.png'), 0o640);
+    const originalMode = fs.statSync(path.join(ctx.fixtureDir, 'existing.png')).mode & 0o777;
     error(await call('media_save', args), 'INVALID_INPUT');
     error(await call('media_save', { ...args, expectedHash: `sha256:${'0'.repeat(64)}` }), 'FILE_CHANGED');
     expect(fs.readFileSync(path.join(ctx.fixtureDir, 'existing.png'))).toEqual(opaque);
+    const putPlan = vi.spyOn(ctx.server.services.store, 'putPlan');
     const saved = assertOk(await call('media_save', { ...args, expectedHash: sha256Bytes(opaque) })) as { changesetId: string };
+    const plan = JSON.parse(putPlan.mock.calls[0]![0].payload) as { files: Array<{ mode: number }> };
+    expect(plan.files[0]!.mode).toBe(originalMode);
+    expect(fs.statSync(path.join(ctx.fixtureDir, 'existing.png')).mode & 0o777).toBe(originalMode);
     assertOk(await call('rollback_changes', { changesetId: saved.changesetId, idempotencyKey: 'creative-rollback-overwrite' }));
     expect(fs.readFileSync(path.join(ctx.fixtureDir, 'existing.png'))).toEqual(opaque);
+    expect(fs.statSync(path.join(ctx.fixtureDir, 'existing.png')).mode & 0o777).toBe(originalMode);
     error(await call('media_save', { ...args, idempotencyKey: 'creative-export-wrong-sha', expectedSha256: `sha256:${'f'.repeat(64)}` }), 'FILE_CHANGED');
     error(await call('media_save', { ...args, idempotencyKey: 'creative-export-wrong-ext', path: 'wrong.js' }), 'INVALID_INPUT');
     error(await call('media_save', { ...args, idempotencyKey: 'creative-export-traversal', path: '../outside.png' }), 'PATH_DENIED');
@@ -250,17 +257,17 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     const db = ctx.server.services.store.db;
     const originalPayload = (db.prepare('SELECT payload FROM creative_jobs WHERE id=?').get(parent.jobId) as { payload: string }).payload;
     error(await call('video_edit', { jobId: parent.jobId, prompt: 'Wrong owner', idempotencyKey: 'creative-transform-other' }, other.accessToken), 'NOT_FOUND');
-    media({ videoModel: 'different-video-model' });
-    error(await call('video_edit', { jobId: parent.jobId, prompt: 'Wrong model', idempotencyKey: 'creative-transform-model' }), 'FORBIDDEN');
     const alternative = await settings().saveConnection({ name: 'Other compatibility fixture', provider: 'custom', protocol: 'responses', baseUrl: 'https://other-media-fixture.example/v1' }, 'other-fixture-media-credential');
     media({ connectionId: alternative.id });
     error(await call('video_extend', { jobId: parent.jobId, prompt: 'Wrong connection', idempotencyKey: 'creative-transform-connection' }), 'FORBIDDEN');
     media(); await settings().remove('connection', alternative.id);
+    media({ videoModel: 'different-video-model', imageModel: 'different-image-default' });
     const editArgs = { jobId: parent.jobId, prompt: 'Change the color', idempotencyKey: 'creative-transform-edit' };
     const extendArgs = { jobId: parent.jobId, prompt: 'Continue the movement', seconds: 8, idempotencyKey: 'creative-transform-extend' };
     const edited = job(await call('video_edit', editArgs)), extended = job(await call('video_extend', extendArgs));
     expect(edited.jobId).not.toBe(parent.jobId); expect(extended.jobId).not.toBe(parent.jobId); expect(extended.jobId).not.toBe(edited.jobId);
     expect((await finished(edited.jobId)).data.status).toBe('completed'); expect((await finished(extended.jobId)).data.status).toBe('completed');
+    expect(edited.model).toBe(parent.model); expect(extended.model).toBe(parent.model);
     expect(job(await call('video_edit', editArgs)).jobId).toBe(edited.jobId);
     expect(job(await call('video_extend', extendArgs)).jobId).toBe(extended.jobId);
     expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.editVideo).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.extendVideo).toHaveBeenCalledTimes(1);
@@ -314,21 +321,23 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(2); expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(1);
   });
 
-  it('limits pending remote renders to two and frees a slot only after collecting an existing job', async () => {
-    let creates = 0;
+  it('limits active remote renders to two and reconciles completed slots without another render', async () => {
+    let creates = 0, ready = false;
     vi.mocked(CreativeProvider.prototype.createVideo).mockImplementation(async (_input, _signal, beforeSend) => { beforeSend?.(); creates++; return { id: `video_capacity_${creates}`, status: 'queued', progress: 0 }; });
+    vi.mocked(CreativeProvider.prototype.videoStatus).mockImplementation(async (id, _signal, beforeSend) => { beforeSend?.(); return { id, status: ready ? 'completed' : 'in_progress', progress: ready ? 100 : 50 }; });
     const first = job(await call('video_generate', { prompt: 'Capacity first', idempotencyKey: 'creative-capacity-first' }));
     const second = job(await call('video_generate', { prompt: 'Capacity second', idempotencyKey: 'creative-capacity-second' }));
     const args = { prompt: 'Capacity third', idempotencyKey: 'creative-capacity-third' };
     error(await call('video_generate', args), 'RESOURCE_LIMIT');
     expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(2);
-    expect((await finished(first.jobId)).data.status).toBe('completed');
+    ready = true;
     const third = job(await call('video_generate', args));
+    expect((await finished(first.jobId)).data.status).toBe('completed');
     expect(third.jobId).not.toBe(first.jobId); expect(third.jobId).not.toBe(second.jobId);
     const results = await Promise.all([finished(second.jobId), finished(third.jobId)]);
     expect(results.every(result => result.data.status === 'completed')).toBe(true);
     expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(3);
-    expect(CreativeProvider.prototype.videoStatus).toHaveBeenCalledTimes(3);
+    expect(CreativeProvider.prototype.videoStatus).toHaveBeenCalledTimes(5);
     expect(CreativeProvider.prototype.videoContent).toHaveBeenCalledTimes(3);
   });
 
@@ -389,9 +398,9 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
       expect(refs.n).toBe(1); expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
       db.exec('DROP TRIGGER creative_test_receipt_failure');
       const recovered = job(await call('creative_job', { jobId: started.jobId }));
-      expect(recovered.status).toBe('uncertain'); expect(recovered.error).toBe('RECEIPT_PERSISTENCE_FAILED'); expect(recovered.resource?.resourceId).toBe(resource.resourceId);
+      expect(recovered.status).toBe('completed'); expect(recovered.error).toBeNull(); expect(recovered.resource?.resourceId).toBe(resource.resourceId);
       const stored = db.prepare('SELECT payload FROM creative_jobs WHERE id=?').get(started.jobId) as { payload: string };
-      expect(JSON.parse(stored.payload)).toMatchObject({ status: 'uncertain', error: 'RECEIPT_PERSISTENCE_FAILED', resource: { resourceId: resource.resourceId } });
+      expect(JSON.parse(stored.payload)).toMatchObject({ status: 'completed', error: null, resource: { resourceId: resource.resourceId } });
       expect(job(await call('image_generate', args)).jobId).toBe(started.jobId);
       expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
       const read = ResourceChunk.parse(assertOk(await call('resource_read', { resourceId: resource.resourceId, expectedSha256: resource.sha256 })));
@@ -449,11 +458,11 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
       db.exec('DROP TRIGGER creative_test_video_receipt_failure');
       for (let index = 0; index < 2; index++) {
         const recovered = job(await call('creative_job', { jobId: started.jobId }));
-        expect(recovered.status).toBe('uncertain'); expect(recovered.error).toBe('RECEIPT_PERSISTENCE_FAILED'); expect(recovered.resource?.resourceId).toBe(resource.resourceId);
+        expect(recovered.status).toBe('completed'); expect(recovered.error).toBeNull(); expect(recovered.resource?.resourceId).toBe(resource.resourceId);
       }
       expect(job(await call('video_generate', args)).jobId).toBe(started.jobId);
       const stored = db.prepare('SELECT payload FROM creative_jobs WHERE id=?').get(started.jobId) as { payload: string };
-      expect(JSON.parse(stored.payload)).toMatchObject({ status: 'uncertain', resource: { resourceId: resource.resourceId } });
+      expect(JSON.parse(stored.payload)).toMatchObject({ status: 'completed', resource: { resourceId: resource.resourceId } });
       const refs = db.prepare('SELECT count(*) AS n FROM resource_refs WHERE source_kind=? AND source_label=?').get('generated', started.jobId) as { n: number };
       expect(refs.n).toBe(1);
       expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.videoStatus).toHaveBeenCalledTimes(1); expect(CreativeProvider.prototype.videoContent).toHaveBeenCalledTimes(1);

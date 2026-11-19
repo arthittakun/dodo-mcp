@@ -19,6 +19,7 @@ import type { TunnelRuntime } from '../tunnel/runtime.js';
 import type { TunnelCredentialRef } from '../config/tunnelConfig.js';
 import type { ConnectionMode } from '../config/tunnelConfig.js';
 import { accessMode } from '../security/accessMode.js';
+import { runtimeIdentity } from './version.js';
 
 /**
  * Owner-only control plane (ADR-017, ADR-019), deliberately NOT mounted on the
@@ -52,10 +53,11 @@ export interface LocalConfigInfo {
 }
 
 export interface LocalConfigServer {
-  /** Private URL including the capability in the fragment — print it, never log it elsewhere. */
+  /** Private URL for explicit owner access; never send to a general logger. */
   url: string;
   /** Origin without the capability (safe to display). */
   origin: string;
+  renewLocalSession(): { url: string; expiresAt: number };
   /** Internal bridge only; independent of the local browser's eight-hour link. */
   createRemoteSession(expiresAt: number): ConfigSession;
   close(): Promise<void>;
@@ -112,7 +114,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   const host: WorkspaceHost = isHost(target) ? target : staticHost(target);
   const switchSupported = isHost(target);
   const hasWorkspace = () => info.workspaceSelected?.() ?? true;
-  const localSession = createConfigSession(Date.now() + TOKEN_TTL_MS);
+  let localSession = createConfigSession(Date.now() + TOKEN_TTL_MS);
   let remoteSession: ConfigSession | undefined;
   let closed = false;
   const requestSessions = new WeakMap<Request, ConfigSession>();
@@ -195,7 +197,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
     const supplied = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
     const session = [localSession, remoteSession].find(candidate => candidate?.accepts(supplied));
     if (!session) {
-      res.status(401).json({ error: 'Open the private Config URL printed in the DODO terminal. It expires after 8 hours; restart DODO to renew.' });
+      res.status(401).json({ error: 'Open a fresh private Config session with dodo web --local. Local sessions expire after 8 hours.' });
       return;
     }
     requestSessions.set(req, session);
@@ -225,6 +227,7 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
       ?? (transport?.publicUrl ? cfg.tunnel.connectionMode === 'local' ? 'external' : cfg.tunnel.connectionMode : 'local');
     res.json({
       version: info.version ?? ws.services.version,
+      runtime: runtimeIdentity(),
       state: host.state(),
       generatedAt: Date.now(),
       controlContext: { workspaceId: ws.workspaceId, epoch: ws.epoch },
@@ -587,8 +590,14 @@ export async function startLocalConfig(target: Target, port = 21731, info: Local
   actualPort = (server.address() as { port: number }).port;
   const origin = `http://127.0.0.1:${actualPort}`;
   return {
-    url: `${origin}/#${localSession.capability}`,
+    get url() { return `${origin}/#${localSession.capability}`; },
     origin,
+    renewLocalSession() {
+      if (closed) throw new DodoError('CONFLICT', 'Local Config is closed');
+      localSession.revoke();
+      localSession = createConfigSession(Date.now() + TOKEN_TTL_MS);
+      return { url: `${origin}/#${localSession.capability}`, expiresAt: localSession.expiresAt };
+    },
     createRemoteSession(expiresAt) {
       if (closed) throw new DodoError('CONFLICT', 'Local Config is closed');
       if (!Number.isSafeInteger(expiresAt) || expiresAt <= Date.now() || expiresAt > Date.now() + 60 * 60 * 1000) {

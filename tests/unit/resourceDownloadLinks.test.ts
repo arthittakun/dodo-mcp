@@ -212,12 +212,13 @@ describe('persistent temporary resource downloads', () => {
     await expect(resources.downloads.create(caller, input, ORIGIN)).resolves.toHaveProperty('url');
   });
 
-  it('upgrades the preceding schema while preserving existing auth, metadata and resource rows', () => {
+  it('upgrades the schema before download links while preserving existing auth, metadata and resource rows', () => {
     const upgradePath = path.join(configDir, 'upgrade-state.db');
     const legacy = new Store(openDatabase(upgradePath));
     const version = (legacy.db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as { version: number }).version;
-    legacy.db.exec('DROP TABLE resource_download_links');
-    legacy.db.prepare('DELETE FROM schema_migrations WHERE version=?').run(version);
+    // Download links are the penultimate migration; output reservations/GC follow it.
+    legacy.db.exec('DROP TABLE resource_download_links; DROP TABLE creative_output_reservations; DROP TABLE resource_gc_queue');
+    legacy.db.prepare('DELETE FROM schema_migrations WHERE version>=?').run(version - 1);
     legacy.setMeta('upgrade-sentinel', 'preserve-this-value');
     legacy.putOAuthClient('legacy-client', { client_id: 'legacy-client' });
     const identity = resolveWorkspaceRoot(root);
@@ -235,6 +236,8 @@ describe('persistent temporary resource downloads', () => {
       expect(upgraded.getGrant('legacy-grant')).toMatchObject({ scopes: ['dodo:read', 'dodo:write'], revokedAt: null });
       expect(upgraded.db.prepare('SELECT object_hash FROM resource_refs WHERE id=?').get('res_legacy1234')).toMatchObject({ object_hash: hash });
       expect(upgraded.db.prepare('SELECT COUNT(*) AS count FROM resource_download_links').get()).toEqual({ count: 0 });
+      expect(upgraded.db.prepare('SELECT COUNT(*) AS count FROM creative_output_reservations').get()).toEqual({ count: 0 });
+      expect(upgraded.db.prepare('SELECT COUNT(*) AS count FROM resource_gc_queue').get()).toEqual({ count: 0 });
       expect(upgraded.db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get()).toEqual({ version });
       expect(upgraded.db.pragma('foreign_key_check')).toEqual([]);
     } finally { upgraded.db.close(); }

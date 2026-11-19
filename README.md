@@ -15,7 +15,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 174 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 170 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
+- STDIO ใช้ Full Tool Surface 176 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 172 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -42,10 +42,24 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp@1.9.0
+npm install -g dodo-mcp@1.10.0
 dodo setup --check
 dodo --cli
 ```
+
+### ตรวจเซิร์ฟเวอร์และเปิดหน้าตั้งค่าอย่างปลอดภัย
+
+`dodo status --json` ตรวจเวอร์ชันและ entrypoint ของ process ที่รันจริง พร้อมเทียบกับ CLI ใน PATH และเตือนเมื่อชี้คนละเวอร์ชัน/คนละพาธ ไม่ต้องเปิดจากโฟลเดอร์โปรเจกต์เดิม Startup log รวมถึง `--quiet` ไม่พิมพ์ token หรือ pairing code
+
+เปิดหน้าตั้งค่า local ด้วยคำสั่ง owner ผ่าน IPC จาก terminal ส่วนตัว:
+
+```bash
+dodo web --local
+# ถ้าทำงานแบบ non-interactive ให้ระบุไฟล์ส่วนตัวใหม่
+dodo web --local --output-file /absolute/private/path/config-access.json
+```
+
+ลิงก์ local ที่ออกใหม่ยกเลิก session เดิม ห้ามนำ URL ในไฟล์ไปใส่ log หรือส่งให้บุคคลอื่น ดูการสำรอง/ย้อน installation state ด้วย `dodo state list` และ [Recovery](docs/RECOVERY.md#installation-state-checkpoints-1100)
 
 ### เก็บ API Key ถาวรในเครื่อง
 
@@ -63,7 +77,7 @@ dodo --cli
 
 เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage/ชื่อตัวแปร Env ไม่เปลี่ยน การเปลี่ยนค่าใดค่าหนึ่งต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
-เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) แบบ global ได้โดยไม่ส่ง `workspaceId`/`workspaceEpoch` และไม่ต้องเรียก `project_overview` ก่อน ติดตามงานด้วย `creative_job` แล้วดู resource หรือสร้างลิงก์ดาวน์โหลดได้จากแชต เมื่อจะอ่านไฟล์หรือบันทึก PNG/MP4 ลงโปรเจกต์ด้วย `media_save` จึงส่ง context ของโปรเจกต์ปลายทาง งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
+เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) แบบ global ได้โดยไม่ส่ง `workspaceId`/`workspaceEpoch` และไม่ต้องเรียก `project_overview` ก่อน ติดตามงานด้วย `creative_job` หรือค้นงานเดิมด้วย `creative_jobs` หลังแชตหลุด/รีสตาร์ต ใช้ `creative_job_control` เพื่อบันทึกผลที่มีแล้วใหม่โดยไม่ render ซ้ำ แล้วดู resource หรือสร้างลิงก์ดาวน์โหลดได้จากแชต เมื่อจะอ่านไฟล์หรือบันทึก PNG/MP4 ลงโปรเจกต์ด้วย `media_save` จึงส่ง context ของโปรเจกต์ปลายทาง งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
 
 วิดีโอเริ่มปิดไว้และไม่มีโมเดลเริ่มต้น ต้องเลือก connection ที่รองรับจริงและเปิดเอง OpenAI ยุติ Sora 2/Videos API เมื่อ 24 กันยายน 2026 จึงไม่ส่งงานวิดีโอไปที่ OpenAI ทางการ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
 
@@ -586,6 +600,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
 - [Release 1.7.0: Env API Key ถาวรบนเครื่องเซิร์ฟเวอร์](docs/RELEASE_1.7.0.md)
 - [Release 1.8.0: สร้างภาพและวิดีโอจากแชตโดยไม่ต้องมีโปรเจกต์](docs/RELEASE_1.8.0.md)
+- [Release 1.10.0: Media reliability, safe configuration and upgrade checkpoints](docs/RELEASE_1.10.0.md)
 - [Release 1.9.0: AI เลือกโมเดลสร้างภาพและวิดีโอในแต่ละคำขอ](docs/RELEASE_1.9.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
 - [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)

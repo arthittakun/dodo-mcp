@@ -64,7 +64,19 @@ export const CreativeSettingsInput = z.object({
   allowImageUpload: z.boolean().default(false),
   projectIds: z.array(z.string().regex(/^prj_[a-z0-9_-]{8,64}$/)).max(1000).default([]),
 }).strict().refine(value => !value.videoEnabled || value.videoModel.length > 0, { path: ['videoModel'], message: 'enter a supported video model before enabling compatibility video' });
-export type CreativeSettings = z.infer<typeof CreativeSettingsInput>;
+/** Patch fields have no defaults: omission must preserve the saved value. */
+export const CreativeSettingsPatchInput = z.object({
+  enabled: z.boolean().optional(),
+  connectionId: z.string().regex(/^ai_[a-z0-9_-]{8,64}$/).nullable().optional(),
+  imageModel: Model.optional(),
+  videoEnabled: z.boolean().optional(),
+  videoModel: z.union([Model, z.literal('')]).optional(),
+  allowImageUpload: z.boolean().optional(),
+  projectIds: z.array(z.string().regex(/^prj_[a-z0-9_-]{8,64}$/)).max(1000).optional(),
+  expectedRevision: z.number().int().nonnegative().optional(),
+  revision: z.number().int().nonnegative().optional(),
+}).strict();
+export type CreativeSettings = z.infer<typeof CreativeSettingsInput> & { revision: number };
 
 export function isCreativeConnection(connection: Provider): boolean {
   return connection.enabled && ['responses', 'chat-completions', 'gemini'].includes(connection.protocol);

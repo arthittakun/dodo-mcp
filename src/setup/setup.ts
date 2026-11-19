@@ -19,7 +19,8 @@ import { prepareWindowsChromiumSandboxAcl } from './windowsChromiumAcl.js';
 import { verifySandbox } from './sandboxProbe.js';
 import { verifyInstalledComponent } from './componentProbes.js';
 import { buildChildEnv } from '../security/env.js';
-import { loadGlobalConfig, GlobalConfigSchema, type GlobalConfig } from '../config/globalConfig.js';
+import { loadGlobalConfig, saveGlobalConfig, GlobalConfigSchema, type GlobalConfig } from '../config/globalConfig.js';
+import { withInstallationStateLock } from '../config/stateCheckpoint.js';
 import { sandboxAvailability } from '../services/jobs/sandbox.js';
 import { NativeDesktopBackend, setupNativeDesktop } from '../services/desktop/nativeBackend.js';
 import { activateManagedTools, registerManagedPath } from './managedTools.js';
@@ -357,21 +358,19 @@ export async function runSetup(options: SetupOptions, log: (text: string) => voi
 }
 
 function updateOwnerConfig(configDir: string, update: (current: GlobalConfig) => GlobalConfig): void {
-  const file = path.join(configDir, 'config.json');
-  if (fs.existsSync(file)) {
-    const stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new DodoError('PATH_DENIED', 'owner configuration cannot be a link');
-    if (stat.size > 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'owner configuration is oversized');
-  }
-  const before = fs.existsSync(file) ? { bytes: fs.readFileSync(file), mtime: fs.statSync(file, { bigint: true }).mtimeNs } : undefined;
-  const current = before ? GlobalConfigSchema.parse(JSON.parse(before.bytes.toString('utf8'))) : GlobalConfigSchema.parse({});
-  const content = JSON.stringify(GlobalConfigSchema.parse(update(current)), null, 2) + '\n';
-  const tmp = `${file}.${randomUUID()}.tmp`;
-  fs.writeFileSync(tmp, content, { mode: 0o600, flag: 'wx' });
-  try {
+  withInstallationStateLock(configDir, () => {
+    const file = path.join(configDir, 'config.json');
+    if (fs.existsSync(file)) {
+      const stat = fs.lstatSync(file);
+      if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new DodoError('PATH_DENIED', 'owner configuration cannot be a link');
+      if (stat.size > 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'owner configuration is oversized');
+    }
+    const before = fs.existsSync(file) ? { bytes: fs.readFileSync(file), mtime: fs.statSync(file, { bigint: true }).mtimeNs } : undefined;
+    const current = before ? loadGlobalConfig(file) : GlobalConfigSchema.parse({});
+    const next = GlobalConfigSchema.parse(update(current));
     if (before ? !fs.existsSync(file) || fs.statSync(file, { bigint: true }).mtimeNs !== before.mtime || !fs.readFileSync(file).equals(before.bytes) : fs.existsSync(file)) throw new DodoError('FILE_CHANGED', 'owner config changed concurrently; setup did not overwrite it');
-    renameWithRetry(tmp, file);
-  } finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
+    saveGlobalConfig(file, next);
+  });
 }
 
 export const SETUP_MODULE_FILE = fileURLToPath(import.meta.url); // Useful to verify the shipped CLI uses its own implementation.

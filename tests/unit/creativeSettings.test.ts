@@ -11,7 +11,7 @@ describe('creative media owner configuration', () => {
   afterEach(() => { vi.restoreAllMocks(); settings.credentials.close(); settings.store.db.close(); });
 
   it('defaults to public OpenAI with no provider selected and no project or upload gate', () => {
-    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'auto', videoEnabled: false, videoModel: '', allowImageUpload: true, projectIds: [] });
+    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'auto', videoEnabled: false, videoModel: '', allowImageUpload: true, projectIds: [], revision: 0 });
     expect(settings.state().mediaDefaults.baseUrl).toBe('https://api.openai.com/v1');
     expect(settings.state().mediaDefaults).toEqual(CREATIVE_MEDIA_DEFAULTS);
   });

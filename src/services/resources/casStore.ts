@@ -97,7 +97,7 @@ export class CasStore {
     }
   }
 
-  async ingestBuffer(bytes: Buffer, expectedHash?: string): Promise<CasObject> {
+  async ingestBuffer(bytes: Buffer, expectedHash?: string, reservationId?: string): Promise<CasObject> {
     if (bytes.length > RESOURCE_OBJECT_MAX_BYTES) throw new DodoError('FILE_TOO_LARGE', 'resource exceeds the 512 MiB object limit');
     const digest = `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
     if (expectedHash !== undefined && digest !== expectedHash) throw new DodoError('FILE_CHANGED', 'resource hash does not match expectedSha256', { detail: { expectedHash, actualHash: digest } });
@@ -107,7 +107,7 @@ export class CasStore {
       // FlushFileBuffers on Windows requires a writable handle.
       const handle = fs.openSync(stage, 'r+');
       try { fs.fsyncSync(handle); } finally { fs.closeSync(handle); }
-      return await this.commitStage(stage, digest, bytes.length);
+      return await this.commitStage(stage, digest, bytes.length, reservationId);
     } finally {
       if (fs.existsSync(stage)) removeWithRetry(stage);
     }
@@ -159,9 +159,20 @@ export class CasStore {
     if (fs.existsSync(objectPath)) removeWithRetry(objectPath);
   }
 
+  /** Serialized tombstones prevent a retried ingest from racing orphan deletion. */
+  collectQueued(onlyHash?: string): void {
+    const rows = (onlyHash ? this.store.db.prepare('SELECT hash FROM resource_gc_queue WHERE hash=?').all(onlyHash) : this.store.db.prepare('SELECT hash FROM resource_gc_queue LIMIT 256').all()) as Array<{ hash: string }>;
+    for (const row of rows) this.store.db.transaction(() => {
+      if (!this.store.db.prepare('SELECT 1 FROM resource_gc_queue WHERE hash=?').get(row.hash)) return;
+      if (!this.store.db.prepare('SELECT 1 FROM resource_objects WHERE hash=?').get(row.hash)) this.removeObject(row.hash);
+      this.store.db.prepare('DELETE FROM resource_gc_queue WHERE hash=?').run(row.hash);
+    }).immediate();
+  }
+
   private stagePath(): string { return path.join(this.stagingDir, `${process.pid}-${randomUUID()}.part`); }
 
-  private async commitStage(stage: string, hash: string, bytes: number): Promise<CasObject> {
+  private async commitStage(stage: string, hash: string, bytes: number, reservationId?: string): Promise<CasObject> {
+    this.collectQueued(hash);
     const existing = this.store.db.prepare('SELECT bytes FROM resource_objects WHERE hash=?').get(hash) as { bytes: number } | undefined;
     if (existing) {
       // Refresh the orphan grace lease before the async verification. If GC
@@ -173,7 +184,7 @@ export class CasStore {
         return { hash, bytes, path: this.objectPath(hash), deduplicated: true };
       }
     }
-    this.assertQuota(bytes);
+    this.assertQuota(bytes, reservationId);
     const target = this.objectPath(hash);
     ensurePrivateDirectory(path.dirname(target));
     let won = false;
@@ -199,7 +210,12 @@ export class CasStore {
       if (!verified) throw new DodoError('INTERNAL_ERROR', 'existing CAS object failed verification');
     }
     try {
-      this.store.db.prepare('INSERT OR IGNORE INTO resource_objects(hash,bytes,created_at,verified_at) VALUES (?,?,?,?)').run(hash, bytes, Date.now(), Date.now());
+      this.store.db.transaction(() => {
+        if (!this.store.db.prepare('SELECT 1 FROM resource_objects WHERE hash=?').get(hash)) this.assertQuota(bytes, reservationId);
+        const current = assertPrivatePath(target);
+        if (current.size !== bytes) throw new DodoError('FILE_CHANGED', 'resource publication changed before metadata commit');
+        this.store.db.prepare('INSERT OR IGNORE INTO resource_objects(hash,bytes,created_at,verified_at) VALUES (?,?,?,?)').run(hash, bytes, Date.now(), Date.now());
+      }).immediate();
     } catch (error) {
       // Another process can observe the atomically published inode and commit
       // the same hash before this connection reaches SQLite. Never unlink an
@@ -223,9 +239,10 @@ export class CasStore {
     } catch { return false; }
   }
 
-  private assertQuota(incoming: number): void {
+  private assertQuota(incoming: number, reservationId?: string): void {
     const row = this.store.db.prepare('SELECT COALESCE(SUM(bytes),0) AS bytes FROM resource_objects').get() as { bytes: number };
-    if (row.bytes + incoming > RESOURCE_STORE_MAX_BYTES) throw new DodoError('RESOURCE_LIMIT', 'private resource store quota is 2 GiB; let expired references be collected before ingesting more');
+    const reserved = this.store.db.prepare('SELECT COALESCE(SUM(max_bytes),0) AS bytes FROM creative_output_reservations WHERE job_id<>?').get(reservationId ?? '') as { bytes: number };
+    if (row.bytes + reserved.bytes + incoming > RESOURCE_STORE_MAX_BYTES) throw new DodoError('RESOURCE_LIMIT', 'private resource store quota including reserved outputs is 2 GiB; collect expired resources before ingesting more');
   }
 
   private cleanupStaging(): void {
@@ -259,8 +276,10 @@ export class CasStore {
         if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) throw new DodoError('PATH_DENIED', 'resource CAS contains an unexpected object');
         if (stat.mtimeMs >= cutoff) continue;
         const hash = `sha256:${name}`;
-        const row = this.store.db.prepare('SELECT 1 FROM resource_objects WHERE hash=?').get(hash);
-        if (!row) removeWithRetry(target);
+        this.store.db.transaction(() => {
+          const row = this.store.db.prepare('SELECT 1 FROM resource_objects WHERE hash=?').get(hash);
+          if (!row && fs.existsSync(target)) removeWithRetry(target);
+        }).immediate();
       }
     }
   }

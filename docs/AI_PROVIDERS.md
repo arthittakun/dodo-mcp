@@ -1,6 +1,6 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.9.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ ส่วนเครื่องมือสร้างภาพจากแชตใช้ connection ได้โดยไม่ต้องสร้างโปรเจกต์หรือ profile
+DODO MCP 1.10.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ ส่วนเครื่องมือสร้างภาพจากแชตใช้ connection ได้โดยไม่ต้องสร้างโปรเจกต์หรือ profile
 
 ## เริ่มใช้งานผ่านเว็บ
 
@@ -142,3 +142,9 @@ History เก็บใน private SQLite แยก project/caller ไม่เ�
 - Owner controls ที่ไม่ใช่งานประจำบางรายการใช้แบบฟอร์ม advanced operation/JSON ร่วม validation เดิม; เริ่มโปรแกรม/ปลด Keychain/macOS permissions ยังเป็นการกระทำของเจ้าของบนเครื่อง
 - ทดสอบ protocol fixtures ทั้งเจ็ด presets ไม่เท่ากับ live provider integration ต้องดู `docs/TEST_REPORT.md` และ manual checklist แยก provider/แพลตฟอร์ม
 - งานนี้ไม่เพิ่ม native Windows support, Git worktrees, training หรือ publish release อัตโนมัติ
+
+## การตรวจการเชื่อมต่อและการบันทึกพร้อมกัน (1.10.0)
+
+Creative Media มีปุ่ม **ทดสอบการเชื่อมต่อ (ไม่สร้างภาพ)** ซึ่งตรวจคีย์กับ model metadata เท่านั้น พร้อมเวลาและ latency ไม่ทดสอบ inference, สิทธิ์โมเดลภาพ หรือเครดิต รายการโมเดลอ่าน upstream pagination แบบจำกัด 10 หน้า/2,000 IDs/8 MiB และบอก `truncated` เมื่อข้อมูลยังไม่ครบ โดยไม่ตัด Model ID ให้กลายเป็นชื่อใหม่
+
+`POST /api/ai/media` รองรับ partial update: field ที่ไม่ส่งคงเดิม ส่ง `connectionId:null` เพื่อล้าง selection และส่ง `expectedRevision` จาก state เพื่อป้องกันแท็บเก่าเขียนทับ หาก revision ไม่ตรงจะได้ 409 โดยไม่แก้ media state หน้าเว็บรายงานแยกเมื่อ provider บันทึกสำเร็จแล้วแต่การเลือกใช้กับงานสื่อล้ม คีย์ยังไม่ถูกล้างเมื่อ validation ในเครื่องไม่ผ่าน และล้างก่อนส่ง request จริง

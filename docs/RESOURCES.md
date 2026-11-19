@@ -188,3 +188,9 @@ directory and are SHA-256 verified before reads. Resource content and decoder ou
 remain untrusted data. A complete fsynced staging inode is published with
 create-if-absent hard-link semantics, so concurrent writers cannot replace a CAS
 winner with partial bytes.
+
+## Generated output and maintenance reliability (1.10.0)
+
+Paid creative submissions reserve bounded output/ref capacity before the provider request. Generated results can be staged privately and finalized again through `creative_job_control(action="retry_save")` without another render. Caller ownership, live authorization and hashes remain required; a local save failure is not permission to repeat paid work.
+
+Background cleanup reports a maintenance failure and retries without bringing down the server. File deletion and metadata finalization use retryable cleanup state; a failed filesystem deletion is not treated as a completed cleanup. Existing resource and token-link retention remains independent from active creative-job tracking.

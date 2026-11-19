@@ -41,7 +41,10 @@ export function assertSetupPrivatePaths(objects: string[]): void {
     if (process.platform !== 'win32' && (st.uid !== process.getuid?.() || (st.mode & 0o077) !== 0)) throw new DodoError('PATH_DENIED', 'managed tool manifest/directory must be owner-private');
   }
   if (process.platform === 'win32') {
-    const result = spawnSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'), ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ACL_PROBE, 'utf16le').toString('base64')], { shell: false, windowsHide: true, timeout: 15000, maxBuffer: 4096, encoding: 'utf8', env: { ...process.env, DODO_SETUP_PATHS: JSON.stringify(objects) } });
+    // PowerShell 7's inherited PSModulePath can make Windows PowerShell 5 load
+    // incompatible security modules. Use its normal trusted module discovery.
+    const env: NodeJS.ProcessEnv = { SYSTEMROOT: envValue(process.env, 'SystemRoot'), WINDIR: envValue(process.env, 'windir'), USERPROFILE: envValue(process.env, 'USERPROFILE'), TEMP: envValue(process.env, 'TEMP'), TMP: envValue(process.env, 'TMP'), DODO_SETUP_PATHS: JSON.stringify(objects) };
+    const result = spawnSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'), ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(ACL_PROBE, 'utf16le').toString('base64')], { shell: false, windowsHide: true, timeout: 15000, maxBuffer: 4096, encoding: 'utf8', env });
     if (result.error || result.status !== 0 || result.stdout.trim() !== 'private') throw new DodoError('PATH_DENIED', 'managed-tool ACL verification failed; no tool PATH entries were loaded');
   }
 }

@@ -14,7 +14,7 @@ DODO รองรับภาพ เสียง วิดีโอ เบรา
 
 Compact surface ใช้ `dodo_media`, `dodo_browser` และ `dodo_game` ส่วน Full surface มี tool รายตัวครบ
 
-รุ่น 1.9.0 มี Full 174 capabilities (ค่าเริ่มต้น 170 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
+รุ่น 1.10.0 มี Full 176 capabilities (ค่าเริ่มต้น 172 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
 
 ## Creative Media
 
@@ -58,3 +58,9 @@ dodo-media-setup --check
 ```
 
 เมื่อ capability ไม่พร้อม ให้ใช้ผล `NOT_SUPPORTED` และติดตั้ง dependency/model ด้วย owner action ที่ตรวจสอบแหล่งที่มาเอง
+
+## ความพร้อม งานเดิม และการกู้ผล (1.10.0)
+
+`multimodal_status` แสดง `serverVersion`, readiness และ blockers โดยไม่เรียกโมเดล ปุ่มตรวจการเชื่อมต่อใน Creative Media ตรวจ metadata/key เท่านั้น ไม่รับรอง inference หรือเครดิต งานที่รับแล้วเก็บผลต่อได้เมื่อ presentation token หมดอายุ; ตอนรับไฟล์ยังตรวจ live grant/client/scope และต้องใช้ token ที่ใช้ได้
+
+ใช้ `creative_jobs` เพื่อค้นประวัติของผู้เรียกเองหรือกู้ job จาก idempotency key เดิม และ `creative_job_control` กับ `retry_save` เพื่อ finalize ผลเดิมโดยไม่สร้างใหม่ `stop_tracking` หยุดติดตามในเครื่องและไม่รับรองการยกเลิกที่ provider/คืนเงิน ประวัติงานที่เสร็จไม่กิน active slots และงานยังไม่จบไม่ถูกลบเพียงเพราะครบ24ชั่วโมง ดู [รายละเอียด](CREATIVE_MEDIA.md#งาน-asynchronous-และรีสตาร์ต)

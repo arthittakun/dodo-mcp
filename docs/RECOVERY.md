@@ -550,3 +550,20 @@ Anonymous/OAuth calls cannot use these owner controls; public MCP has no admin
 routes. Existing private owner expiry, Host/Origin, project context and rate limits
 remain in force. Automated fixtures and manual provider/platform tests are reported
 separately in [TEST_REPORT](TEST_REPORT.md) and [MANUAL_ACCEPTANCE](MANUAL_ACCEPTANCE.md).
+
+## Installation state checkpoints (1.10.0)
+
+These checkpoints protect the DODO installation during upgrades. They are separate from project/source Recovery, require no registered project, and are never exposed through MCP restore tools. Existing installations receive a private checkpoint before schema/version-changing writable opens. Global config saves use a private staged/fsynced atomic replacement with bounded raw-config history. A failed checkpoint prevents the migration from starting. `dodo doctor` inspects state without migrating it.
+
+The bundle contains a SQLite-consistent snapshot including committed WAL rows, the raw global config, DODO-owned Env credential files, and installation signing/cookie keys. It records schema, runtime identity and hashes without guessing an unknown former package version. It does not copy project files, generated image/video CAS bytes, inherited external Env values or OS-vault secret values. Treat checkpoint storage as private credential material, protected by 0700/0600 on POSIX or private Windows ACLs. The latest five complete checkpoints are retained; in-progress restore targets are protected during the operation.
+
+```bash
+dodo state list
+dodo state inspect <checkpointId>
+# Stop every DODO runtime sharing DODO_CONFIG_DIR before restoring.
+dodo state restore <checkpointId> --hash <manifestHash-from-inspect> --yes
+```
+
+`dodo state create` creates an explicit checkpoint with other runtimes stopped. Restore verifies the exact manifest/hash/schema, preserves the current installation in an emergency checkpoint, and refuses to race live runtimes. It restores the checkpoint state rather than reverse-running SQL migrations. Later settings/authentication changes are rolled back; a resumable restore journal blocks normal boot if restoration was interrupted. Restored OAuth grants/tokens/sessions are revoked by default so rollback cannot resurrect previously revoked access. Sign in again after an installation-state restore; normal upgrades preserve login.
+
+Use a binary compatible with the restored schema/config. Unknown future security fields remain errors; DODO does not silently ignore them for downgrades. External Env variables are untouched, and keys changed independently in an OS vault may require owner reentry. Generated-media references restored from an old DB do not recover CAS files that were already removed; source/media backups remain separate.

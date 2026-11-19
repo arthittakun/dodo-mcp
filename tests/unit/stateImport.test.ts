@@ -179,17 +179,19 @@ describe('security-scoped Dodo state import', () => {
     expect(fs.existsSync(f.target)).toBe(false);
   });
 
-  it('fails closed when the source or config is linked', () => {
+  it('fails closed when the source directory is linked', () => {
     const linkedRoot = fixture();
     ensurePrivateDirectory(path.join(linkedRoot.base, 'outside'));
     fs.symlinkSync(path.join(linkedRoot.base, 'outside'), linkedRoot.source, process.platform === 'win32' ? 'junction' : 'dir');
     expect(planStateImport(linkedRoot.target, [linkedRoot.source]).state).toBe('blocked');
-
+  });
+  it('fails closed when the config is linked on a host supporting file symlinks', ({ skip }) => {
     const linkedConfig = fixture();
     ensurePrivateDirectory(linkedConfig.source);
     const outside = path.join(linkedConfig.base, 'outside.json');
     writePrivate(outside, '{"version":1}\n');
-    fs.symlinkSync(outside, path.join(linkedConfig.source, 'config.json'), 'file');
+    try { fs.symlinkSync(outside, path.join(linkedConfig.source, 'config.json'), 'file'); }
+    catch (error) { if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) { skip(); return; } throw error; }
     expect(planStateImport(linkedConfig.target, [linkedConfig.source]).state).toBe('blocked');
   });
 });

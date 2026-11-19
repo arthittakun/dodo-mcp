@@ -4,6 +4,8 @@ import { LimitsSchema, DEFAULT_LIMITS, type Limits } from './limits.js';
 import { DodoError } from '../errors.js';
 import { RecoveryInstallationSchema } from '../services/recovery/contracts.js';
 import { TunnelConfigSchema } from './tunnelConfig.js';
+import path from 'node:path';
+import { atomicPrivateWrite, checkpointBeforeConfigWrite, recordStateRuntimeVersion, withInstallationStateLock } from './stateCheckpoint.js';
 
 /**
  * Trusted global configuration (spec §5). Lives in the user-owned config dir,
@@ -167,14 +169,11 @@ export function loadGlobalConfig(configFile: string): GlobalConfig {
 
 export function saveGlobalConfig(configFile: string, config: GlobalConfig): void {
   const data = JSON.stringify(GlobalConfigSchema.parse(config), null, 2) + '\n';
-  fs.writeFileSync(configFile, data, { mode: 0o600 });
-  if (process.platform !== 'win32') {
-    try {
-      fs.chmodSync(configFile, 0o600);
-    } catch {
-      /* best effort */
-    }
-  }
+  withInstallationStateLock(path.dirname(path.resolve(configFile)), () => {
+    checkpointBeforeConfigWrite(configFile, data);
+    atomicPrivateWrite(configFile, data);
+    recordStateRuntimeVersion(path.dirname(path.resolve(configFile)));
+  });
 }
 
 export function effectiveLimits(config: GlobalConfig): Limits {

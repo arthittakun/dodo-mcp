@@ -1,5 +1,57 @@
 # DODO MCP — Test Report
 
+## 1.10.0 Media reliability and upgrade recovery — Windows/Linux, 2026-11-19
+
+Results use the latest complete result for each file. The Windows run covers
+168 files, followed by targeted reruns of corrected failures and added cases.
+Linux covers 29 focused files in a Debian container running Node v22.23.5;
+Windows runs Node v24.22.1. Private evidence retains the original failures and
+the replacement results rather than counting repeated runs as additional tests.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Windows feature/regression coverage | 1,137 | 0 | 76 |
+| Linux Node 22 focused coverage | 320 | 0 | 0 |
+
+The 12 Administrators-owner ACL cases are **environment-blocked**, separate from
+the table: this Windows process has no enabled Administrators token. The strict
+suite remains unchanged and its failed prerequisite is retained; these cases
+are not a Windows administrator acceptance pass. Other Windows skips reflect
+platform/browser/tool prerequisites, including file symlinks denied by this
+host. Directory-junction, traversal, hardlink, secret and normal private-file
+checks still execute. Linux exercises the actual file-symlink and loop guards.
+
+Sixteen paid-output reliability cases cover redacted quota/rate diagnostics,
+expired submission tokens, live grant revocation, capacity checks before a
+provider POST, history without a hidden daily cap, remote status reconciliation,
+cleanup faults, partial outbox publication and receipt failure across restart.
+They verify same-key recovery without another render, retention beyond 24 hours
+when output remains recoverable, concurrent collection deduplication, and stop
+races including cancellation before dispatch from another service instance.
+POSIX overwrite/rollback preserves the original 0640 permissions.
+
+Fifteen checkpoint cases cover WAL-consistent snapshots, failed backups before
+migration, future-schema refusal, interrupted restore resumption and restored
+login revocation. They also check cross-process lock waiting/crash release and
+the restore-journal recheck after waiting for the lock. Three rounds of six
+concurrent CLI registrations pass on both platforms. The lock-only database
+uses memory journals; the main state database retains WAL/FULL durability.
+
+Provider settings, pagination, stale revisions, safe audit metadata, readiness,
+global/project job history and actual Chrome owner flows pass. CLI checks retain
+private output-file permissions, token renewal, read-only doctor behavior,
+version/path reporting and correct status/kill routing among HTTP/STDIO servers.
+Typecheck, ESLint, UI syntax and diff checks pass. Candidate packaging separately
+installs the retained tarball and exercises its shipped schemas, CLI and media
+preview paths before publication; published bytes are compared with that exact
+candidate.
+
+Provider requests use synthetic credentials and local HTTP fixtures; no live
+paid inference, native macOS acceptance, administrator ACL acceptance or upgrade
+of the reported AlmaLinux deployment is claimed. The locked dependency audit
+reports zero advisories. Private provider URLs, API keys and installation state
+are excluded from the package. See [release details](RELEASE_1.10.0.md).
+
 ## 1.9.0 AI-selected media models — Windows, 2026-11-19
 
 Build, typecheck, lint, UI syntax and diff checks passed. The final results across

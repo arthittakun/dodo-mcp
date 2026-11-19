@@ -15,8 +15,9 @@ const execute = { readOnlyHint: false, destructiveHint: false, idempotentHint: f
 const source = { path: Path.optional(), assetId: Id.optional(), resourceId: Id.optional() };
 const Seconds = z.union([z.literal(4), z.literal(8), z.literal(12), z.literal(16), z.literal(20)]);
 const Prompt = z.string().trim().min(1).max(16000);
-const Job = z.object({ jobId: Id, kind: z.enum(['image', 'background_removal', 'video']), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted']),
-  model: z.string(), progress: z.number().min(0).max(100), resource: ResourceInfo.nullable(), error: z.string().nullable(), createdAt: z.number(), expiresAt: z.number(), note: z.string(), replayed: z.boolean().optional() });
+const Diagnostics = z.object({ outcome: z.enum(['rejected', 'unknown', 'not_sent']), httpStatus: z.number().int().min(100).max(599).optional(), providerCode: z.string().max(128).optional(), message: z.string().max(1024).optional(), requestId: z.string().max(128).optional(), retryAfterMs: z.number().nonnegative().optional(), phase: z.string().max(64).optional(), retryable: z.boolean().optional() });
+const Job = z.object({ jobId: Id, kind: z.enum(['image', 'background_removal', 'video']), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted', 'stopped']),
+  model: z.string(), progress: z.number().min(0).max(100), resource: ResourceInfo.nullable(), error: z.string().nullable(), createdAt: z.number(), expiresAt: z.number(), note: z.string(), replayed: z.boolean().optional(), diagnostics: Diagnostics.optional() });
 function use(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:exec' = 'dodo:exec') {
   liveAccess(ctx, scope); const mm = ctx.services.multimodal;
   if (!mm) throw new DodoError('NOT_SUPPORTED', 'creative media service is unavailable'); mm.storage.check(); return mm;
@@ -99,7 +100,7 @@ const save = defineTool({
       let beforeHash: string | null = null, beforeMode: number | undefined, beforeSize = 0;
       if (target.stat) {
         if (!args.expectedHash) throw new DodoError('INVALID_INPUT', 'replacing media requires expectedHash of the existing file');
-        const current = s.wfs.readFileBytes(target.rel, cap); beforeHash = sha256Bytes(current.bytes); beforeSize = current.bytes.length; beforeMode = s.wfs.assertRegularFileForDirectAccess(target).mode;
+        const current = s.wfs.readFileBytes(target.rel, cap); beforeHash = sha256Bytes(current.bytes); beforeSize = current.bytes.length; beforeMode = s.wfs.assertRegularFileForDirectAccess(target).mode & 0o777;
         if (beforeHash !== args.expectedHash) throw new DodoError('FILE_CHANGED', 'target media changed; read it again before overwriting');
       } else if (args.expectedHash) throw new DodoError('FILE_CHANGED', 'target media no longer exists');
       const created = target.stat ? undefined : s.wfs.resolveForCreate(target.rel, args.createParents);
@@ -122,9 +123,26 @@ export const CREATIVE_TOOLS: AnyToolDef[] = [...[generate, crop, removeBackgroun
 export const CREATIVE_MODEL_TOOLS: AnyToolDef[] = [defineTool({
   name: 'creative_models', title: 'List image and video models for AI selection',
   description: 'Read the configured media provider\'s actual model IDs without generating or paying for a render. In Auto mode, inspect this list, choose a model suited to the user\'s task, and pass model to image_generate, image_remove_background or video_generate. Media hints come from names and are not verified capabilities. Supports query and pagination. No project needed; never returns the API key or endpoint. An explicit known model can be used even if listing is unsupported.',
-  input: { query: z.string().trim().max(200).optional(), limit: z.number().int().min(1).max(100).default(50), cursor: z.number().int().min(0).max(200).optional() },
-  output: z.object({ protocol: z.string(), imageModel: z.string(), videoModel: z.string(), videoEnabled: z.boolean(), models: z.array(z.object({ id: z.string().min(1).max(200), mediaHint: z.enum(['image', 'video', 'unknown']), hintSource: z.literal('name') }).strict()).max(100), nextCursor: z.number().int().nonnegative().nullable(), note: z.string() }).strict(),
+  input: { query: z.string().trim().max(200).optional(), limit: z.number().int().min(1).max(100).default(50), cursor: z.number().int().min(0).max(2000).optional() },
+  output: z.object({ protocol: z.string(), imageModel: z.string(), videoModel: z.string(), videoEnabled: z.boolean(), models: z.array(z.object({ id: z.string().min(1).max(200), mediaHint: z.enum(['image', 'video', 'unknown']), hintSource: z.literal('name') }).strict()).max(100), nextCursor: z.number().int().nonnegative().nullable(), truncated: z.boolean().optional(), providerPages: z.number().int().nonnegative().optional(), note: z.string() }).strict(),
   requiredScope: 'dodo:read', action: 'read', optionalWorkspaceContext: true,
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (args, ctx) => ({ data: await use(ctx, 'dodo:read').creative.models(ctx, args) }),
+})];
+
+export const CREATIVE_HISTORY_TOOLS: AnyToolDef[] = [defineTool({
+  name: 'creative_jobs', title: 'Find your image and video jobs',
+  description: 'List only your own media jobs and recover a submission by its original idempotencyKey after a lost response/restart. Never submits a render. Active and unfinished jobs remain discoverable. Inspect existing job receipts before deciding whether to create another paid request.',
+  input: { limit: z.number().int().min(1).max(100).default(25), cursor: z.number().int().min(0).max(1000000).optional(), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted', 'stopped']).optional(), idempotencyKey: Key.optional() },
+  output: z.object({ jobs: z.array(Job).max(100), nextCursor: z.number().int().nonnegative().nullable() }),
+  requiredScope: 'dodo:read', action: 'read', optionalWorkspaceContext: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (args, ctx) => ({ data: await use(ctx, 'dodo:read').creative.list(ctx, args) }),
+}), defineTool({
+  name: 'creative_job_control', title: 'Recover saved media or stop tracking an owned job',
+  description: 'retry_save finalizes already generated output without starting another paid render. stop_tracking stops local tracking/collection of your job; it does NOT promise provider cancellation or refunds. It never controls another caller\'s job. Use creative_job or creative_jobs to inspect the resulting receipt.',
+  input: { jobId: Id, action: z.enum(['retry_save', 'stop_tracking']) }, output: Job,
+  requiredScope: 'dodo:exec', action: 'job-control', optionalWorkspaceContext: true,
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (args, ctx) => ({ data: await use(ctx).creative.control(ctx, args) }),
 })];

@@ -8,7 +8,7 @@ import type { TrustMode } from '../store/store.js';
 import { phraseFor } from '../util/hash.js';
 import { TRUST_MODE_DESCRIPTIONS } from '../security/policy.js';
 import { addStaticClient, listStaticClients } from '../auth/clients.js';
-import { DODO_VERSION } from './version.js';
+import { DODO_VERSION, runtimeIdentity } from './version.js';
 import { INSTALLATION_AUTHORITY_EPOCH, INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
 import { accessMode } from '../security/accessMode.js';
 import { z } from 'zod';
@@ -25,6 +25,7 @@ export interface IpcContext {
   transport: { kind: 'http' | 'stdio'; port: number; locked: boolean; publicUrl: string | null; connectionMode?: ConnectionMode };
   requestStop: () => void;
   revalidateOwner?: () => void;
+  localConfig?: { open(): { url: string; expiresAt: number } };
   remoteConfig?: {
     open(args: Record<string, unknown>): Promise<{ url: string; pairingCode: string; expiresAt: number }>;
     close(): void;
@@ -36,8 +37,15 @@ export function createIpcDispatcher(ctx: IpcContext): IpcHandler {
   const { store, services, rootInfo, workspaceId, epoch } = ctx.ws;
   return async (cmd, args) => {
     switch (cmd) {
+      case 'localConfig.open': {
+        if (!ctx.localConfig) throw new DodoError('NOT_SUPPORTED', 'Local Config is not running; start DODO with its Config listener enabled');
+        const result = ctx.localConfig.open();
+        store.audit({ principal: 'local-cli-owner', workspaceId, tool: 'local.config.open', result: 'renewed-eight-hour-session' });
+        return result;
+      }
       case 'status': {
         const data: StatusData = {
+          ...runtimeIdentity(),
           version: DODO_VERSION,
           pid: process.pid,
           root: rootInfo.root,

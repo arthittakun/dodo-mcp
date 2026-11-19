@@ -7,6 +7,7 @@ import { DodoError } from '../../errors.js';
 import { addressClass } from '../../security/outboundAddress.js';
 import type { Provider } from '../ai/contracts.js';
 import { validateEndpoint } from '../ai/network.js';
+import { providerFailure } from './creativeDiagnostics.js';
 
 const MiB = 1024 * 1024;
 const IMAGE_CAP = 16 * MiB;
@@ -56,9 +57,10 @@ export class CreativeProvider {
     const host = base.hostname.replace(/^\[|\]$/g, '');
     const deadline = AbortSignal.timeout(DEADLINE_MS);
     const active = signal ? AbortSignal.any([signal, deadline]) : deadline;
-    if (active.aborted) throw new DodoError('CONFLICT', 'creative media request canceled before sending');
+    const beforeFailure = () => new DodoError('CANCELED', 'creative media request canceled before sending', { detail: { phase: 'before_send', outcome: 'not_sent', retryable: false } });
+    if (active.aborted) throw beforeFailure();
     const addresses: Array<{ address: string; family: number }> = net.isIP(host) ? [{ address: host, family: net.isIP(host) }] : await new Promise((resolve, reject) => {
-      const abort = () => reject(new DodoError('CONFLICT', 'creative media request canceled before sending'));
+      const abort = () => reject(beforeFailure());
       active.addEventListener('abort', abort, { once: true });
       void dns.lookup(host, { all: true }).then(resolve, () => reject(new DodoError('NOT_SUPPORTED', 'creative media hostname could not be resolved'))).finally(() => active.removeEventListener('abort', abort));
     });
@@ -71,11 +73,14 @@ export class CreativeProvider {
     const url = new URL(`${base.toString().replace(/\/$/, '')}/${suffix}`);
     const uploadCap = this.connection.protocol === 'gemini' ? JSON_CAP : IMAGE_CAP + MiB;
     if ((body?.bytes.length ?? 0) > uploadCap) throw new DodoError('RESOURCE_LIMIT', 'creative media request exceeds its upload budget');
-    if (active.aborted) throw new DodoError('CONFLICT', 'creative media request canceled before sending');
+    if (active.aborted) throw beforeFailure();
     beforeSend?.();
     return new Promise((resolve, reject) => {
-      let request: http.ClientRequest;
-      const failed = () => reject(new DodoError('CONFLICT', 'creative media connection failed or was canceled; outcome may be uncertain and was not retried'));
+      let request: http.ClientRequest | undefined;
+      const failed = () => {
+        const sent = Boolean(request?.writableFinished || (request?.socket?.bytesWritten ?? 0) > 0);
+        reject(new DodoError(sent ? 'CONFLICT' : active.aborted ? 'CANCELED' : 'REQUEST_NOT_SENT', sent ? 'creative media connection ended after submission; outcome is unknown and was not retried' : 'creative media connection failed before sending the request', { detail: { phase: sent ? 'request_sent' : 'before_send', outcome: sent ? 'unknown' : 'not_sent', retryable: !sent } }));
+      };
       try {
         request = (url.protocol === 'https:' ? https : http).request(url, {
           method: body ? 'POST' : 'GET', agent: false, signal: active,
@@ -90,21 +95,22 @@ export class CreativeProvider {
             response.destroy(); reject(new DodoError('FORBIDDEN', 'creative media redirects are refused; credentials were not forwarded')); return;
           }
           if (status < 200 || status >= 300) {
-            response.destroy();
-            const code = status === 401 || status === 403 ? 'AUTH_REQUIRED' : [400, 404, 405, 422].includes(status) ? 'NOT_SUPPORTED' : status === 413 ? 'RESOURCE_LIMIT' : 'CONFLICT';
-            reject(new DodoError(code, `creative media provider returned HTTP ${status}; request was not retried`, { detail: { httpStatus: status } })); return;
+            const chunks: Buffer[] = []; let size = 0, done = false;
+            const finish = () => { if (done) return; done = true; reject(providerFailure(status, Buffer.concat(chunks), response.headers, [this.key, this.connection.baseUrl, host])); };
+            response.on('data', (chunk: Buffer) => { const remaining = 16384 - size; if (remaining > 0) { chunks.push(chunk.subarray(0, remaining)); size += Math.min(remaining, chunk.length); } if (chunk.length > remaining) { finish(); response.destroy(); } });
+            response.on('end', finish); response.on('aborted', finish); response.on('error', finish); response.on('close', finish); return;
           }
           if (response.headers['content-encoding'] && response.headers['content-encoding'] !== 'identity') {
-            request.destroy(); reject(new DodoError('NOT_SUPPORTED', 'compressed creative media responses are not supported')); return;
+            request?.destroy(); reject(new DodoError('NOT_SUPPORTED', 'compressed creative media responses are not supported')); return;
           }
           const declared = Number(response.headers['content-length']);
           if (Number.isFinite(declared) && declared > cap) {
-            request.destroy(); reject(new DodoError('RESOURCE_LIMIT', 'creative media response exceeds its size budget')); return;
+            request?.destroy(); reject(new DodoError('RESOURCE_LIMIT', 'creative media response exceeds its size budget')); return;
           }
           const chunks: Buffer[] = []; let bytes = 0;
           response.on('data', (chunk: Buffer) => {
             bytes += chunk.length;
-            if (bytes > cap) { request.destroy(); reject(new DodoError('RESOURCE_LIMIT', 'creative media response exceeds its size budget')); }
+            if (bytes > cap) { request?.destroy(); reject(new DodoError('RESOURCE_LIMIT', 'creative media response exceeds its size budget')); }
             else chunks.push(chunk);
           });
           response.on('error', failed); response.on('aborted', failed);

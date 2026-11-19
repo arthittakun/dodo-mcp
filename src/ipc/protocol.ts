@@ -15,6 +15,11 @@ export type IpcResponse = { id: number; ok: true; data: unknown } | { id: number
 
 export interface StatusData {
   version: string;
+  serverVersion?: string;
+  nodeExecutable?: string;
+  entryPoint?: string;
+  packageRoot?: string;
+  startedAt?: number;
   pid: number;
   root: string;
   workspaceId: string;

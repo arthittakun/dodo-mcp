@@ -146,6 +146,14 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
   const mutations = new MutationQueue();
   jobs.mutations = mutations;
   const services: AppServices = {
+    logEvent: (event, details) => {
+      const safe: Record<string, string | number> = { event: /^[a-z0-9_.-]{1,80}$/i.test(event) ? event : 'diagnostic' };
+      if (details.jobId && /^[a-z0-9_-]{1,128}$/i.test(details.jobId)) safe['jobId'] = details.jobId;
+      if (details.code && /^[A-Z0-9_]{1,80}$/.test(details.code)) safe['code'] = details.code;
+      if (Number.isInteger(details.httpStatus) && details.httpStatus! >= 100 && details.httpStatus! <= 599) safe['httpStatus'] = details.httpStatus!;
+      if (details.requestId && /^[a-z0-9_-]{1,128}$/i.test(details.requestId) && !/^sk[-_]/i.test(details.requestId)) safe['requestId'] = details.requestId;
+      log(`[dodo] ${JSON.stringify(safe)}`);
+    },
     mutations,
     federation: new FederationService(store, config, limits),
     schedules: new ScheduleService({store,workspaceId,epoch,wfs,jobs,config,limits}),

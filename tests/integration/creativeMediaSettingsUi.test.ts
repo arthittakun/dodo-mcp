@@ -13,11 +13,13 @@ interface FixtureOptions {
   credentialStorageOptions?: Array<{ id: string; available: boolean }>;
   existingEnvVars?: string[];
   models?: (connectionId: string) => Promise<{ data?: Array<{ id: string }>; status?: number; error?: string }>;
+  failMediaSave?: boolean;
+  jobs?: Array<{ jobId: string; kind: string; model: string; status: string; progress: number; createdAt: number; note: string; error?: string; diagnostics?: Record<string, unknown> }>;
 }
 
 async function fixture(options: FixtureOptions = {}) {
   const browser = await chromium.launch({ headless: true, executablePath }), page = await browser.newPage();
-  const state = { presets: [], connections: options.connections ?? [] as Connection[], credentialStorageOptions: options.credentialStorageOptions, profiles: [], permissions: [], projects: options.projects ?? [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
+  const state = { presets: [], connections: options.connections ?? [] as Connection[], credentialStorageOptions: options.credentialStorageOptions, profiles: [], permissions: [], projects: options.projects ?? [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: { ...CreativeSettingsInput.parse(options.media ?? {}), revision: 0 }, mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('https://owner-fixture.invalid/**', async route => {
@@ -34,11 +36,19 @@ async function fixture(options: FixtureOptions = {}) {
       if (connection.credentialStorage === 'env' && !connection.credentialEnvVar) connection.credentialEnvVar = `DODO_AI_KEY_${connection.id.toUpperCase()}`;
       if (previous) state.connections.splice(state.connections.indexOf(previous), 1, connection); else state.connections.push(connection);
       data = connection;
-    } else if (url.pathname === '/api/ai/media') { state.media = CreativeSettingsInput.parse(body); data = state.media; }
-    else if (url.pathname === '/api/ai/models') {
+    } else if (url.pathname === '/api/ai/media') {
+      if (options.failMediaSave || body!['expectedRevision'] !== state.media.revision) { await route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ ok: false, error: 'Creative Media changed in another session; refresh' }) }); return; }
+      const { expectedRevision: _expectedRevision, revision: _revision, ...patch } = body!;
+      const { revision: _savedRevision, ...previousMedia } = state.media; state.media = { ...CreativeSettingsInput.parse({ ...previousMedia, ...patch }), revision: state.media.revision + 1 }; data = state.media;
+    }
+    else if (url.pathname === '/api/ai/media/status') data = { available: !!state.media.connectionId, blockers: state.media.connectionId ? [] : ['connection_missing'] };
+    else if (url.pathname === '/api/ai/media/check') data = { checkedAt: Date.now(), latencyMs: 7, modelCount: 2, truncated: false, inferenceTested: false, billingVerified: false };
+    else if (url.pathname === '/api/ai/media/jobs') data = { jobs: options.jobs ?? [], nextCursor: null };
+    else if (/^\/api\/ai\/media\/jobs\/[^/]+\/control$/.test(url.pathname)) data = { jobId: url.pathname.split('/').at(-2), status: body!['action'] === 'retry_save' ? 'completed' : 'stopped' };
+    else if (url.pathname === '/api/ai/models' || url.pathname === '/api/ai/models/page') {
       const response = options.models ? await options.models(String(body!['connectionId'])) : { data: [{ id: 'fixture-image-a' }, { id: 'fixture-image-b' }] };
       if (response.error) { await route.fulfill({ status: response.status ?? 400, contentType: 'application/json', body: JSON.stringify({ ok: false, error: response.error }) }); return; }
-      data = response.data ?? [];
+      data = url.pathname.endsWith('/page') ? { models: response.data ?? [], truncated: false, pages: 1, rejectedIds: 0 } : response.data ?? [];
     }
     else throw new Error(`unexpected route ${url.pathname}`);
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true, data }) });
@@ -307,7 +317,7 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
       expect(counts.get('ai_fixture0001')).toBe(1);
       await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0002');
       await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=b-image]').count()).toBe(1);
-      const firstResponse = page.waitForResponse(response => response.url().endsWith('/api/ai/models') && response.request().postDataJSON()?.connectionId === 'ai_fixture0001');
+      const firstResponse = page.waitForResponse(response => response.url().endsWith('/api/ai/models/page') && response.request().postDataJSON()?.connectionId === 'ai_fixture0001');
       releaseA({ data: [{ id: 'a-image' }] }); await firstResponse;
       await panel.locator('select[name=mediaConnection]').selectOption('ai_fixture0001');
       await expect.poll(() => panel.locator('select[name=mediaModelPicker] option[value=a-image]').count()).toBe(1);
@@ -333,8 +343,64 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
       await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
       await expect.poll(() => state.media.imageModel).toBe('auto');
       expect(counts.get('ai_fixture0003')).toBe(2);
-      expect(requests.every(request => ['/api/ai/state', '/api/ai/media', '/api/ai/models'].includes(request.path))).toBe(true);
+      expect(requests.every(request => ['/api/ai/state', '/api/ai/media', '/api/ai/models/page', '/api/ai/media/status'].includes(request.path))).toBe(true);
       expect(errors).toEqual([]);
     } finally { releaseA({ data: [] }); await browser.close(); }
   });
+  it('preserves a typed key on local validation failure and reports a committed provider when media selection fails', async () => {
+    const original: Connection = { id: 'ai_fixture0001', name: 'Current media', provider: 'custom', protocol: 'responses', baseUrl: 'https://current-media.example/v1', enabled: true, credentialPresent: true, credentialStorage: 'session', allowPrivateNetwork: false };
+    const { browser, panel, page, state, requests, errors } = await fixture({ connections: [original], media: { connectionId: original.id, imageModel: 'original-image' }, failMediaSave: true, credentialStorageOptions: [{ id: 'session', available: true }, { id: 'env', available: true }] });
+    try {
+      await panel.locator('summary').click();
+      await panel.locator('input[name=mediaProviderName]').fill('New provider');
+      await panel.locator('input[name=mediaApiKey]').fill('synthetic-preserved-user-key');
+      await panel.locator('input[name=mediaCredentialEnvVar]').fill('invalid-name');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('ชื่อตัวแปร Env');
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('synthetic-preserved-user-key');
+      expect(requests.filter(request => request.path === '/api/ai/connection')).toHaveLength(0);
+      await panel.locator('input[name=mediaCredentialEnvVar]').fill('DODO_NEW_MEDIA_KEY');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.connections.length).toBe(2);
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('บันทึก Provider แล้ว แต่ยังเลือกใช้กับงานสื่อไม่ได้');
+      expect(state.media.connectionId).toBe(original.id); expect(state.media.imageModel).toBe('original-image');
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe(''); expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+  it('rejects a stale media tab and labels the connection check as metadata-only', async () => {
+    const original: Connection = { id: 'ai_fixture0001', name: 'Current media', provider: 'custom', protocol: 'responses', baseUrl: 'https://current-media.example/v1', enabled: true, credentialPresent: true, credentialStorage: 'session', allowPrivateNetwork: false };
+    const { browser, panel, page, state, requests, errors } = await fixture({ connections: [original], media: { connectionId: original.id, imageModel: 'original-image' } });
+    try {
+      await panel.getByRole('button', { name: 'ทดสอบการเชื่อมต่อ (ไม่สร้างภาพ)', exact: true }).click();
+      await expect.poll(() => panel.textContent()).toContain('ไม่ได้ทดสอบสร้างภาพ วิดีโอ หรือเครดิต');
+      expect(requests.filter(request => request.path === '/api/ai/media/check')).toHaveLength(1);
+      state.media.revision = 1;
+      await panel.locator('input[name=mediaImageModel]').fill('stale-image');
+      await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('another session');
+      expect(state.media.imageModel).toBe('original-image'); expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
+  it('shows private owner job history and calls only explicit recovery/tracking controls', async () => {
+    const { browser, page, panel, requests, errors } = await fixture({ jobs: [{ jobId: 'creative_fixture0001', kind: 'image', model: 'fixture-image', status: 'uncertain', progress: 0, createdAt: Date.now(), note: 'Existing generated output can be recovered', error: 'RECEIPT_PERSISTENCE_FAILED', diagnostics: { outcome: 'unknown', requestId: 'fixture-request-1' } }] });
+    try {
+      await panel.getByRole('button', { name: 'โหลดประวัติงาน', exact: true }).click();
+      await expect.poll(() => panel.textContent()).toContain('creative_fixture0001');
+      expect(await panel.textContent()).toContain('fixture-request-1');
+      await panel.getByRole('button', { name: 'กู้การบันทึกผลเดิม', exact: true }).click();
+      await expect.poll(() => requests.filter(request => request.path.endsWith('/control')).length).toBe(1);
+      expect(requests.find(request => request.path.endsWith('/control'))?.body).toEqual({ action: 'retry_save' });
+      const namespaceRequest=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/ai/media/jobs'&&new URL(response.url()).searchParams.get('projectId')==='prj_fixture0001');
+      await panel.locator('select[name=mediaHistoryProject]').selectOption('prj_fixture0001');
+      await namespaceRequest;
+      await expect.poll(() => panel.getByRole('button', { name: 'หยุดติดตามในเครื่อง', exact: true }).count()).toBe(1);
+      await panel.getByRole('button', { name: 'หยุดติดตามในเครื่อง', exact: true }).click();
+      await expect.poll(() => requests.filter(request => request.path.endsWith('/control')).length).toBe(2);
+      expect(requests.filter(request => request.path.includes('/images/') || request.path.endsWith('/image_generate'))).toEqual([]);
+      expect(requests.filter(request=>request.path.endsWith('/control')).at(-1)?.body).toEqual({action:'stop_tracking',projectId:'prj_fixture0001'});
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
 });

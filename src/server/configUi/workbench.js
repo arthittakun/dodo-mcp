@@ -507,9 +507,13 @@
 
   function creativeMedia(body) {
     const defaults=state.mediaDefaults||{name:'OpenAI Media',baseUrl:'https://api.openai.com/v1',imageModel:'auto',videoModel:''};
-    const current=state.media||{enabled:false,connectionId:null,imageModel:defaults.imageModel,videoEnabled:false,videoModel:defaults.videoModel,allowImageUpload:false,projectIds:[]};
+    const current=state.media||{enabled:false,connectionId:null,imageModel:defaults.imageModel,videoEnabled:false,videoModel:defaults.videoModel,allowImageUpload:false,projectIds:[],revision:0};
     const s=section('Creative Media','สร้างภาพและลบพื้นหลังจากแชตได้โดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ตั้งค่า provider, API URL และคีย์ครั้งเดียว ส่วนครอปภาพทำในเครื่อง');s.id='wb-creative-media';body.append(s);
     s.append(el('p','เมื่อบันทึก connection แล้ว AI เรียกเครื่องมือสร้างภาพได้ทันที งานสร้างสื่อส่ง prompt และภาพที่เลือกไปยัง connection นี้และอาจมีค่าใช้จ่าย หน้านี้โหลดรายชื่อโมเดลอัตโนมัติเมื่อ API รองรับ โดยยังไม่สร้างภาพหรือส่งไฟล์','muted'));
+    const readiness=el('p','กำลังตรวจสถานะการตั้งค่าในเครื่อง…','wb-status');readiness.setAttribute('role','status');s.append(readiness);
+    const blockerNames={connection_missing:'ยังไม่ได้เลือก connection',connection_disabled:'connection ปิดอยู่',credential_missing:'ยังไม่มี API key',credential_reentry_required:'ต้องบันทึก API key ใหม่',protocol_unsupported:'รูปแบบ API ไม่รองรับภาพ',scope_missing:'สิทธิ์เรียกงานไม่พอ',video_not_configured:'ยังไม่ได้ตั้งค่าวิดีโอ'};
+    const refreshReadiness=async()=>{try{const status=await api('ai/media/status');if(!s.isConnected)return;const blockers=status.blockers||[];readiness.textContent=status.available?'การตั้งค่าพร้อมส่งคำขอ — ยังไม่ได้ทดสอบสร้างภาพหรือเครดิต':`ยังไม่พร้อม: ${blockers.map(code=>blockerNames[code]||code).join(', ')||'ตรวจสอบ provider และคีย์'}`;}catch(error){if(s.isConnected)readiness.textContent=`ตรวจสถานะไม่สำเร็จ: ${error.message}`;}};
+    s.append(button('ตรวจสถานะการตั้งค่า',refreshReadiness));void refreshReadiness();
     const presets=state.mediaPresets||[
       {id:'openai',name:'OpenAI',provider:'openai',protocol:'responses',baseUrl:'https://api.openai.com/v1',imageModel:defaults.imageModel},
       {id:'gemini',name:'Google Gemini',provider:'gemini',protocol:'gemini',baseUrl:'https://generativelanguage.googleapis.com/v1beta',imageModel:'auto'},
@@ -529,16 +533,18 @@
     const providerEnabled=check(keyForm,'เปิดใช้งาน connection นี้','mediaProviderEnabled',true);
     const connectionState=el('p','กรอก Base URL ของ API โดยไม่ต่อชื่อ operation การเปลี่ยน URL, รูปแบบ API, วิธีเก็บคีย์ หรือชื่อตัวแปร Env ต้องกรอกคีย์ใหม่','wb-status');connectionState.setAttribute('role','status');keyForm.append(connectionState);
     keyForm.append(button('บันทึก Provider สำหรับภาพ',async()=>{
-      const apiKey=key.value;key.value='';
+      const apiKey=key.value;
       if(!providerName.value.trim()||!baseUrl.value.trim())throw new Error('กรอกชื่อ connection และ API Base URL ก่อนบันทึก');
       credentials.validate();
       if(!editing&&!apiKey&&!(credentials.storage.value==='env'&&credentials.envVar.value.trim()))throw new Error('กรอก API key หรือชื่อตัวแปร Env สำหรับ connection ใหม่');
       const previous=editing?state.connections.find(c=>c.id===editing):undefined;
       if(previous&&!apiKey&&(previous.baseUrl!==baseUrl.value.trim()||previous.protocol!==protocol.value||credentials.changed(previous)))throw new Error('กรอก API key ใหม่เมื่อเปลี่ยน URL, รูปแบบ API, วิธีเก็บคีย์ หรือชื่อตัวแปร Env');
       if(editing===current.connectionId&&current.videoEnabled&&!videoEligible({protocol:protocol.value,baseUrl:baseUrl.value.trim()}))throw new Error('ปิดวิดีโอและบันทึก Creative Media ก่อนเปลี่ยน connection นี้เป็นรูปแบบภาพที่ไม่รองรับวิดีโอ');
+      key.value='';
       const saved=await api('ai/connection',{connection:{...(editing?{id:editing}:{}),name:providerName.value.trim(),provider:providerType,protocol:protocol.value,baseUrl:baseUrl.value.trim(),enabled:providerEnabled.checked,allowPrivateNetwork:privateNetwork.checked,...credentials.values()},...(apiKey?{apiKey}:{})});
       if(saved.enabled){
-        await api('ai/media',{...current,enabled:true,connectionId:saved.id,imageModel:providerModel.value.trim()||'auto',allowImageUpload:true,projectIds:[],videoEnabled:current.connectionId===saved.id&&current.videoEnabled===true&&videoEligible(saved)});
+        try{await api('ai/media',{...current,expectedRevision:current.revision||0,enabled:true,connectionId:saved.id,imageModel:providerModel.value.trim()||'auto',allowImageUpload:true,projectIds:[],videoEnabled:current.connectionId===saved.id&&current.videoEnabled===true&&videoEligible(saved)});}
+        catch(error){await show('providers');notice(`บันทึก Provider แล้ว แต่ยังเลือกใช้กับงานสื่อไม่ได้: ${error.message} — connection ถูกเก็บไว้แล้ว กรุณาตรวจค่าล่าสุดและเลือกอีกครั้ง`,true);return;}
         notice('บันทึก Provider สำหรับภาพแล้ว เรียกสร้างภาพจากแชตได้โดยไม่ต้องเลือกโปรเจกต์');
       }else notice('บันทึก Provider สำหรับภาพที่ปิดใช้งานไว้แล้ว เปิด connection ก่อนเลือกใช้สร้างภาพ');
       await show('providers');
@@ -563,15 +569,16 @@
       modelState.textContent='กำลังโหลดรายชื่อโมเดล…';
       let pending=mediaModelRequests.get(cacheKey),cached=force?undefined:mediaModelCatalog.get(cacheKey);
       if(!pending&&!cached){
-        pending=api('ai/models',{connectionId:selectedConnection.id}).then(models=>({connectionId:selectedConnection.id,ids:[...new Set(models.map(m=>String(m.id||'')).filter(Boolean))],error:null})).catch(error=>({connectionId:selectedConnection.id,ids:[],error:error.message})).then(entry=>{if(mediaModelCacheKey(selectedConnection)===cacheKey){mediaModelCatalog.set(cacheKey,entry);if(!entry.error)modelCatalog.set(selectedConnection.id,entry.ids);}return entry;}).finally(()=>mediaModelRequests.delete(cacheKey));
+        pending=api('ai/models/page',{connectionId:selectedConnection.id}).then(result=>({connectionId:selectedConnection.id,ids:[...new Set(result.models.map(m=>String(m.id||'')).filter(Boolean))],truncated:result.truncated===true,error:null})).catch(error=>({connectionId:selectedConnection.id,ids:[],error:error.message})).then(entry=>{if(mediaModelCacheKey(selectedConnection)===cacheKey){mediaModelCatalog.set(cacheKey,entry);if(!entry.error)modelCatalog.set(selectedConnection.id,entry.ids);}return entry;}).finally(()=>mediaModelRequests.delete(cacheKey));
         mediaModelRequests.set(cacheKey,pending);
       }
       // Cached entries must also yield until the newly rendered panel is mounted.
       const entry=await (pending??cached);
       if(selectedModelCacheKey()!==cacheKey||!s.isConnected)return;
-      refreshModels();modelState.textContent=entry.error?`โหลดโมเดลลิสต์ไม่สำเร็จ: ${entry.error} — กรอก Model ID เองได้ หรือกดโหลดเพื่อลองใหม่`:(entry.ids.length?`พบ ${entry.ids.length} โมเดล เลือกโมเดลที่รองรับภาพ, Auto หรือพิมพ์เอง`:'ปลายทางไม่ส่งรายชื่อโมเดล เลือก Auto เมื่อรองรับ หรือกรอก Model ID เอง');
+      refreshModels();modelState.textContent=entry.error?`โหลดโมเดลลิสต์ไม่สำเร็จ: ${entry.error} — กรอก Model ID เองได้ หรือกดโหลดเพื่อลองใหม่`:(entry.ids.length?`พบ ${entry.ids.length} โมเดล${entry.truncated?' (รายการยังไม่ครบตามขอบเขตการโหลด)':''} เลือกโมเดลที่รองรับภาพ, Auto หรือพิมพ์เอง`:'ปลายทางไม่ส่งรายชื่อโมเดล เลือก Auto เมื่อรองรับ หรือกรอก Model ID เอง');
     };
     f.append(button('โหลดโมเดลสำหรับภาพ',()=>loadModels(true)));
+    f.append(button('ทดสอบการเชื่อมต่อ (ไม่สร้างภาพ)',async()=>{if(!connection.value)throw new Error('เลือก connection ก่อนทดสอบ');const checked=await api('ai/media/check',{connectionId:connection.value});modelState.textContent=`ยืนยันคีย์และ metadata แล้ว ${checked.modelCount} โมเดล · ${checked.latencyMs} ms · ${new Date(checked.checkedAt).toLocaleString('th-TH')}${checked.truncated?' · รายการถูกจำกัดตามขอบเขต':''} — ไม่ได้ทดสอบสร้างภาพ วิดีโอ หรือเครดิต`;await refreshReadiness();}));
     const fillPreset=()=>{
       const preset=presets.find(p=>p.id===providerPreset.value);if(!preset)return;
       editing=undefined;providerType=preset.provider;providerName.value=preset.name;protocol.value=preset.protocol;baseUrl.value=preset.baseUrl;key.value='';credentials.reset();providerEnabled.checked=true;privateNetwork.checked=false;
@@ -601,9 +608,24 @@
       videoState.textContent=official?'connection นี้ใช้ OpenAI: สร้างภาพและลบพื้นหลังได้ แต่วิดีโอปิดให้บริการแล้ว':selectedConnection?.protocol==='gemini'?'Gemini image connection ใช้สำหรับภาพเท่านั้น ตัวเชื่อมต่อวิดีโอต้องรองรับรูปแบบ video compatible':selectedConnection?'เปิดวิดีโอเฉพาะเมื่อปลายทางรองรับรูปแบบ compatible จริง การบันทึกไม่ทดสอบหรือเรียกโมเดล':'เลือก connection ที่รองรับก่อนตั้งค่าวิดีโอ';
     };connection.onchange=()=>{updateVideo();refreshModels();void loadModels();};videoEnabled.onchange=updateVideo;updateVideo();refreshModels();void loadModels();
     f.append(button('บันทึก Creative Media',async()=>{
-      await api('ai/media',{enabled:!!connection.value,connectionId:connection.value||null,imageModel:imageModel.value.trim()||'auto',videoEnabled:videoEnabled.checked,videoModel:videoModel.value,allowImageUpload:true,projectIds:[]});
+      await api('ai/media',{expectedRevision:current.revision||0,enabled:!!connection.value,connectionId:connection.value||null,imageModel:imageModel.value.trim()||'auto',videoEnabled:videoEnabled.checked,videoModel:videoModel.value,allowImageUpload:true,projectIds:[]});
       notice('บันทึก Creative Media แล้ว โดยยังไม่ได้เรียกโมเดล');await show('providers');
     },'btn primary'));
+    const history=section('ประวัติงานภาพและวิดีโอ','เจ้าของเลือกดูงาน global หรือโปรเจกต์ที่ลงทะเบียนได้ หน้าเว็บไม่ส่งคำขอสร้างภาพหรือ render ใหม่');s.append(history);
+    const historyProject=choice(history,'พื้นที่ประวัติงาน','mediaHistoryProject',[['','Global / ส่วนกลาง'],...state.projects.filter(project=>project.available).map(project=>[project.projectId,project.displayName])],'');
+    const historyFilter=choice(history,'สถานะงาน','mediaHistoryStatus',[['','ทุกสถานะ'],...['queued','running','completed','failed','uncertain','interrupted','stopped'].map(value=>[value,STATUS_TH[value]||value])],'');
+    const historyBody=el('div');history.append(historyBody);let historyCursor=0,historyGeneration=0;
+    const loadHistory=async(append=false)=>{
+      const generation=++historyGeneration,jobProject=historyProject.value;if(!append)historyBody.replaceChildren(el('p','กำลังโหลดประวัติงาน…','muted'));
+      const response=await api(`ai/media/jobs?limit=25${append?`&cursor=${historyCursor}`:''}${historyProject.value?`&projectId=${encodeURIComponent(historyProject.value)}`:''}${historyFilter.value?`&status=${encodeURIComponent(historyFilter.value)}`:''}`);
+      if(!history.isConnected||generation!==historyGeneration||jobProject!==historyProject.value)return;if(!append)historyBody.replaceChildren();
+      if(!response.jobs.length&&!append)historyBody.append(el('p','ยังไม่มีงานสื่อส่วนกลาง','muted'));
+      for(const job of response.jobs){const card=section(`${job.jobId} · ${STATUS_TH[job.status]||job.status}`,`${job.kind} · ${job.model} · ${job.progress}% · ${new Date(job.createdAt).toLocaleString('th-TH')}`);historyBody.append(card);card.append(el('p',job.note||''));if(job.error)card.append(el('p',`รหัสปัญหา: ${job.error}`,'error'));if(job.diagnostics)output(card,job.diagnostics);if(job.resource)card.append(el('p',`Resource: ${job.resource.resourceId} · ${job.resource.mimeType} · ${job.resource.bytes} bytes`));
+        for(const [action,label] of [['retry_save','กู้การบันทึกผลเดิม'],['stop_tracking','หยุดติดตามในเครื่อง']])card.append(button(label,async()=>{await api(`ai/media/jobs/${encodeURIComponent(job.jobId)}/control`,{action,...(jobProject?{projectId:jobProject}:{})});await loadHistory(false);notice(action==='retry_save'?'ตรวจและบันทึกผลเดิมแล้ว โดยไม่ส่งงานสร้างใหม่':'หยุดติดตามในเครื่องแล้ว ไม่ใช่การยืนยันยกเลิกที่ provider หรือคืนเงิน');}));}
+      historyCursor=response.nextCursor;moreHistory.hidden=historyCursor===null;
+    };
+    const moreHistory=button('โหลดประวัติถัดไป',()=>loadHistory(true));moreHistory.hidden=true;history.append(button('โหลดประวัติงาน',()=>loadHistory(false)),moreHistory);historyFilter.onchange=()=>{historyCursor=0;void loadHistory(false).catch(error=>notice(error.message,true));};
+    historyProject.onchange=()=>{historyCursor=0;void loadHistory(false).catch(error=>notice(error.message,true));};
   }
 
   function providers(body) {
@@ -619,13 +641,14 @@
     preset.onchange=()=>{const p=state.presets.find(p=>p.provider===preset.value);if(p){name.value=p.name;url.value=p.baseUrl;protocol.value=p.protocol;if(!editing&&p.protocol==='ollama')credentials.reset({credentialStorage:'session'});}};
     f.append(button('บันทึก connection',async()=>{
       if(!name.value.trim()||!url.value.trim()){saveState.dataset.kind='error';saveState.textContent='✕ กรอกชื่อ connection และ Base URL ก่อนบันทึก';throw new Error('กรอกชื่อ connection และ Base URL ก่อนบันทึก');}
-      const apiKey=key.value;key.value='';
+      const apiKey=key.value;
       saveState.dataset.kind='';saveState.textContent=`กำลังบันทึก ${name.value}…`;
       try{
         credentials.validate();
         const previous=editing?state.connections.find(c=>c.id===editing):undefined;
         if(!editing&&!apiKey&&credentials.storage.value==='env'&&!credentials.envVar.value.trim())throw new Error('กรอก API key หรือชื่อตัวแปร Env สำหรับ connection ใหม่');
         if(previous&&!apiKey&&(previous.baseUrl!==url.value.trim()||previous.protocol!==protocol.value||credentials.changed(previous)))throw new Error('กรอก API key ใหม่เมื่อเปลี่ยน URL, รูปแบบ API, วิธีเก็บคีย์ หรือชื่อตัวแปร Env');
+        key.value='';
         await api('ai/connection',{connection:{...(editing?{id:editing}:{}),name:name.value,provider:preset.value,protocol:protocol.value,baseUrl:url.value,enabled:enabled.checked,allowPrivateNetwork:privateNet.checked,...credentials.values()},...(apiKey?{apiKey}:{})});
         saveState.dataset.kind='ok';saveState.textContent=`✓ บันทึก ${name.value} แล้ว · ${timeText()} (backend ยืนยัน)`;
         notice('บันทึก connection แล้ว');await show('providers');
@@ -636,7 +659,7 @@
     for(const c of state.connections){const card=section(c.name,`${c.protocol} · ${c.enabled?'เปิดใช้งาน':'ปิดใช้งาน'} · key ${c.credentialPresent?'มีแล้ว':'ยังไม่มี/ต้องใส่ใหม่'}`);card.append(el('code',c.baseUrl));
       card.append(button('แก้ไข',()=>{editing=c.id;preset.value=c.provider;name.value=c.name;url.value=c.baseUrl;protocol.value=c.protocol;credentials.reset(c);privateNet.checked=c.allowPrivateNetwork;enabled.checked=c.enabled;key.value='';name.focus();}));
       const modelState=el('div',c.credentialPresent?'ยังไม่ได้โหลดรายชื่อโมเดลในรอบนี้':'ต้องใส่ API key ก่อนโหลดรายชื่อโมเดล','wb-model-state');modelState.setAttribute('role','status');modelState.setAttribute('aria-live','polite');
-      card.append(button('โหลดรายชื่อโมเดล',async()=>{modelState.classList.remove('error');modelState.textContent=`กำลังโหลดรายชื่อโมเดลจาก ${c.name}… (credential test)`;try{const models=await api('ai/models',{connectionId:c.id});const ids=models.map(item=>String(item.id||'')).filter(Boolean);modelCatalog.set(c.id,ids);refreshProfileModels(c.id);modelState.replaceChildren();if(!ids.length){modelState.textContent=`Endpoint ของ ${c.name} ไม่ส่ง Model ID กลับมา (ทดสอบเมื่อ ${timeText()}) กรุณากรอก Model ID เองในส่วน Agent Profiles`;notice('ไม่พบ Model ID จาก endpoint',true);return;}const title=el('p',`พบ ${ids.length} โมเดล จาก ${c.name} · credential ใช้ได้ · ${timeText()} — เลือกจากช่อง Model ID ได้ทันที`);const list=el('ul',undefined,'wb-model-list');for(const id of ids){const row=el('li');row.append(el('code',id),button('ใช้โมเดลนี้',async()=>{const modelInput=document.querySelector('#wb-body input[name="model"]');const connectionInput=document.querySelector('#wb-body select[name="connection"]');if(modelInput&&connectionInput&&connectionInput.value===c.id){modelInput.value=id;modelInput.focus();notice(`เลือก ${id} สำหรับ Agent แล้ว`);}else{await navigator.clipboard.writeText(id);notice(`คัดลอก Model ID ${id} แล้ว`);}}));list.append(row);}modelState.append(title,list);notice(`โหลดรายชื่อโมเดลแล้ว ${ids.length} รายการ`);}catch(e){modelState.classList.add('error');modelState.textContent=`โหลดรายชื่อโมเดลไม่สำเร็จ: ${e.message} · ${c.name} · ${timeText()} — ระบบไม่ retry อัตโนมัติ`;alerts()?.error({title:'โหลดรายชื่อโมเดลไม่สำเร็จ',text:e.message});throw e;}}));
+      card.append(button('โหลดรายชื่อโมเดล',async()=>{modelState.classList.remove('error');modelState.textContent=`กำลังโหลดรายชื่อโมเดลจาก ${c.name}… (credential test)`;try{const listing=await api('ai/models/page',{connectionId:c.id});const ids=listing.models.map(item=>String(item.id||'')).filter(Boolean);modelCatalog.set(c.id,ids);refreshProfileModels(c.id);modelState.replaceChildren();if(!ids.length){modelState.textContent=`Endpoint ของ ${c.name} ไม่ส่ง Model ID กลับมา (ทดสอบเมื่อ ${timeText()}) กรุณากรอก Model ID เองในส่วน Agent Profiles`;notice('ไม่พบ Model ID จาก endpoint',true);return;}const title=el('p',`พบ ${ids.length} โมเดล จาก ${c.name} · credential ใช้ได้ · ${timeText()} — เลือกจากช่อง Model ID ได้ทันที`);const list=el('ul',undefined,'wb-model-list');for(const id of ids){const row=el('li');row.append(el('code',id),button('ใช้โมเดลนี้',async()=>{const modelInput=document.querySelector('#wb-body input[name="model"]');const connectionInput=document.querySelector('#wb-body select[name="connection"]');if(modelInput&&connectionInput&&connectionInput.value===c.id){modelInput.value=id;modelInput.focus();notice(`เลือก ${id} สำหรับ Agent แล้ว`);}else{await navigator.clipboard.writeText(id);notice(`คัดลอก Model ID ${id} แล้ว`);}}));list.append(row);}modelState.append(title,list);notice(`โหลดรายชื่อโมเดลแล้ว ${ids.length} รายการ${listing.truncated?' — รายการยังไม่ครบตามขอบเขตการโหลด':''}`);}catch(e){modelState.classList.add('error');modelState.textContent=`โหลดรายชื่อโมเดลไม่สำเร็จ: ${e.message} · ${c.name} · ${timeText()} — ระบบไม่ retry อัตโนมัติ`;alerts()?.error({title:'โหลดรายชื่อโมเดลไม่สำเร็จ',text:e.message});throw e;}}));
       card.append(modelState);
       card.append(button('ลบ connection',async()=>{if(await confirmDanger('ลบ connection นี้?',`ลบ ${c.name} — profile ที่อ้าง connection นี้จะใช้ไม่ได้จนกว่าจะชี้ connection ใหม่ API key ที่เก็บไว้ถูกลบด้วย`,'ลบ connection')){await api('ai/remove',{kind:'connection',id:c.id,confirmId:c.id});notice(`ลบ ${c.name} แล้ว`);await show('providers');}}));s.append(card);}
   }
@@ -691,7 +714,7 @@
     f.append(button('โหลดโมเดลสำหรับ Agent',async()=>{
       const current=state.connections.find(c=>c.id===connection.value);if(!current)throw new Error('เลือก Provider connection ก่อน');
       modelStatus.dataset.kind='';modelStatus.textContent=`กำลังโหลดโมเดลจาก ${current.name}…`;
-      try{const models=await api('ai/models',{connectionId:current.id});const ids=models.map(item=>String(item.id||'')).filter(Boolean);modelCatalog.set(current.id,ids);updateModelChoices(true);if(!ids.length)throw new Error('Endpoint ไม่ส่งรายชื่อโมเดล กรุณากรอก Model ID เอง');notice(`พร้อมเลือกโมเดล ${ids.length} รายการ`);}
+      try{const listing=await api('ai/models/page',{connectionId:current.id});const ids=listing.models.map(item=>String(item.id||'')).filter(Boolean);modelCatalog.set(current.id,ids);updateModelChoices(true);if(!ids.length)throw new Error('Endpoint ไม่ส่งรายชื่อโมเดล กรุณากรอก Model ID เอง');notice(`พร้อมเลือกโมเดล ${ids.length} รายการ${listing.truncated?' — รายการยังไม่ครบตามขอบเขตการโหลด':''}`);}
       catch(e){modelStatus.dataset.kind='error';modelStatus.textContent=`✕ โหลดโมเดลไม่สำเร็จ: ${e.message} — ยังพิมพ์ Model ID เองได้`;throw e;}
     }));
     f.append(modelStatus);

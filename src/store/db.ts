@@ -2,6 +2,9 @@ import Database from 'better-sqlite3';
 import { decodeAccessScopes } from './scopeEncoding.js';
 import fs from 'node:fs';
 import { DodoError } from '../errors.js';
+import path from 'node:path';
+import { assertNoPendingStateRestore, createStateCheckpoint, databaseSchemaVersion, recordedRuntimeVersion, recordStateRuntimeVersion, withInstallationStateLock, liveStateRuntimePids } from '../config/stateCheckpoint.js';
+import { DODO_VERSION } from '../server/version.js';
 
 /**
  * Durable state (spec §5). WAL mode so the CLI can perform offline writes
@@ -778,7 +781,13 @@ const MIGRATIONS: Array<string | ((db: Database.Database) => void)> = [
   CREATE INDEX idx_resource_download_links_owner ON resource_download_links(workspace_id,principal,expires_at);
   CREATE INDEX idx_resource_download_links_pin ON resource_download_links(object_hash,expires_at) WHERE revoked_at IS NULL;
   CREATE INDEX idx_resource_download_links_expiry ON resource_download_links(expires_at);`,
+  `CREATE TABLE IF NOT EXISTS creative_output_reservations (
+    job_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, owner TEXT NOT NULL, max_bytes INTEGER NOT NULL, created_at INTEGER NOT NULL);
+   CREATE INDEX IF NOT EXISTS idx_creative_output_owner ON creative_output_reservations(workspace_id,owner);
+   CREATE TABLE IF NOT EXISTS resource_gc_queue (hash TEXT PRIMARY KEY, queued_at INTEGER NOT NULL);`,
 ];
+
+export const CURRENT_SCHEMA_VERSION = MIGRATIONS.length;
 
 /**
  * Read-only open with NO migration — for CLI helpers (status/approve) that
@@ -797,6 +806,21 @@ export function openDatabaseReadonly(dbFile: string): Database.Database | undefi
 }
 
 export function openDatabase(dbFile: string): Database.Database {
+  if (dbFile === ':memory:') return openDatabaseLocked(dbFile, false);
+  assertNoPendingStateRestore(path.dirname(path.resolve(dbFile)));
+  let existing = false;
+  try {
+    const stat = fs.lstatSync(dbFile);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || (process.platform !== 'win32' && stat.uid !== process.getuid?.())) throw new DodoError('PATH_DENIED', 'state database must be a regular owner file, not a link');
+    existing = stat.size > 0;
+  } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
+  return withInstallationStateLock(path.dirname(path.resolve(dbFile)), () => {
+    assertNoPendingStateRestore(path.dirname(path.resolve(dbFile)));
+    return openDatabaseLocked(dbFile, existing);
+  });
+}
+
+function openDatabaseLocked(dbFile: string, existing: boolean): Database.Database {
   let db: Database.Database;
   try {
     db = new Database(dbFile, { timeout: 10000 });
@@ -813,7 +837,18 @@ export function openDatabase(dbFile: string): Database.Database {
     withBusyRetry(() => db.pragma('journal_mode = WAL'));
     db.pragma('synchronous = FULL');
     db.pragma('foreign_keys = ON');
+    const schema = databaseSchemaVersion(db);
+    if (schema > CURRENT_SCHEMA_VERSION) throw new DodoError('INTERNAL_ERROR', 'state database is from a newer DODO version; refusing to run', { recovery: 'use the matching newer binary, or stop DODO and restore a compatible installation checkpoint with dodo state restore' });
+    if (existing) {
+      const configDir = path.dirname(path.resolve(dbFile));
+      const pending = schema < CURRENT_SCHEMA_VERSION || Number((db.prepare('SELECT COUNT(*) AS count FROM schema_migrations WHERE version BETWEEN 1 AND ?').get(CURRENT_SCHEMA_VERSION) as { count: number }).count) < CURRENT_SCHEMA_VERSION;
+      if (pending || recordedRuntimeVersion(configDir, db) !== DODO_VERSION) {
+        if (liveStateRuntimePids(configDir).length) throw new DodoError('CONFLICT', 'stop all other DODO processes using this state before upgrading', { recovery: 'run dodo kill with this DODO_CONFIG_DIR, then start the intended DODO binary again' });
+        createStateCheckpoint(configDir, { db, reason: pending ? 'before-migration' : 'before-version-open', targetSchemaVersion: CURRENT_SCHEMA_VERSION });
+      }
+    }
     migrateWithRetry(db);
+    if (dbFile !== ':memory:') recordStateRuntimeVersion(path.dirname(path.resolve(dbFile)), db);
   } catch (err) {
     db.close();
     if (err instanceof DodoError) throw err;

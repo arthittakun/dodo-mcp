@@ -100,11 +100,18 @@ describe('R02 caller-owned reviewed restore',()=>{
   await expect(apply(p)).rejects.toThrow();expect(read('a')).toBe('after');expect(read('b')).toBe('after');expect(f.ws.services.applier.recoveryBlocked()).toBeUndefined();
  });
 
- it('traversal, secret paths, symlinks and hardlinks remain denied during preview/apply',async()=>{
+ it('traversal, secret paths and hardlinks remain denied during preview/apply',async()=>{
   setup({'a':'before','.env':'private'});const cp=await f.call('checkpoint_create',{idempotencyKey:f.key()});await f.call('write_file',{path:'a',content:'after'});const p=await f.call('restore_preview',{checkpointId:cp.checkpointId});
   await expect(f.call('restore_preview',{checkpointId:cp.checkpointId,paths:['../a']})).rejects.toThrow('PATH_DENIED');
+  expect(await f.call('restore_preview',{checkpointId:cp.checkpointId,paths:['.env']})).toMatchObject({applicable:false,files:[],planId:null});expect(read('.env')).toBe('private');
   fs.linkSync(path.join(f.root,'a'),path.join(f.root,'hard'));await expect(apply(p)).rejects.toThrow();expect(read('a')).toBe('after');fs.unlinkSync(path.join(f.root,'hard'));
-  fs.unlinkSync(path.join(f.root,'a'));fs.symlinkSync(path.join(f.root,'.env'),path.join(f.root,'a'));await expect(f.call('restore_preview',{checkpointId:cp.checkpointId})).rejects.toThrow('PATH_DENIED');expect(read('.env')).toBe('private');
+ });
+ it('file symlink substitutions remain denied without exposing secret target bytes',async(t)=>{
+  setup({'a':'before','.env':'private'});const cp=await f.call('checkpoint_create',{idempotencyKey:f.key()});await f.call('write_file',{path:'a',content:'after'});
+  fs.unlinkSync(path.join(f.root,'a'));
+  try{fs.symlinkSync(path.join(f.root,'.env'),path.join(f.root,'a'));}
+  catch(error){if(process.platform==='win32'&&['EPERM','EACCES'].includes((error as NodeJS.ErrnoException).code??''))return t.skip();throw error;}
+  await expect(f.call('restore_preview',{checkpointId:cp.checkpointId})).rejects.toThrow('PATH_DENIED');expect(read('.env')).toBe('private');
  });
  it('queued restore rechecks hashes and live authority after waiting and after backup',async()=>{
   setup({'a':'before'});const cp=await f.call('checkpoint_create',{idempotencyKey:f.key()});await f.call('write_file',{path:'a',content:'after'});const p=await f.call('restore_preview',{checkpointId:cp.checkpointId});

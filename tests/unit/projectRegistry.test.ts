@@ -3,7 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectRegistry } from '../../src/projects/registry.js';
-import { openDatabase } from '../../src/store/db.js';
+import { openDatabase, openDatabaseReadonly } from '../../src/store/db.js';
+import { listStateCheckpoints } from '../../src/config/stateCheckpoint.js';
 import { Store } from '../../src/store/store.js';
 import { encodeFileIdentity } from '../../src/platform/fileIdentity.js';
 
@@ -210,7 +211,7 @@ describe('installation project registry', () => {
     } finally { if (f.db.open) f.db.close(); }
   });
 
-  it('defaults new projects to full access and migration 26 unblocks stuck state and upgrades read/inspect permissions on upgrade', () => {
+  it('defaults new projects to full access and migration 27 unblocks stuck state and upgrades read/inspect permissions on upgrade', () => {
     const f = fixture();
     const root = path.join(f.base, 'upgraded-project'); fs.mkdirSync(root);
     try {
@@ -229,11 +230,17 @@ describe('installation project registry', () => {
         .run(added.project.workspaceId);
       f.db.prepare('INSERT INTO recovery_policies (workspace_id, payload) VALUES (?, ?)')
         .run(added.project.workspaceId, JSON.stringify({ version: 1, enabled: true, strictEnforcement: true, skipSecretContentFiles: false, gitRequired: true }));
-      f.db.exec('DELETE FROM schema_migrations WHERE version = (SELECT MAX(version) FROM schema_migrations)');
+      f.db.exec('DELETE FROM schema_migrations WHERE version = 27');
       f.db.close();
 
       const reopened = openDatabase(path.join(f.base, 'config', 'state.db'));
       try {
+        const checkpoints = listStateCheckpoints(path.join(f.base, 'config'));
+        expect(checkpoints).toHaveLength(1);
+        expect(checkpoints[0]?.reason).toBe('before-migration');
+        const checkpointDb = openDatabaseReadonly(path.join(f.base, 'config', 'state-checkpoints', checkpoints[0]!.id, 'state.db'))!;
+        try { expect(checkpointDb.prepare('SELECT access_level FROM project_registry WHERE id=?').get(added.project.projectId)).toEqual({ access_level: 'read' }); }
+        finally { checkpointDb.close(); }
         const store = new Store(reopened);
         const registry = new ProjectRegistry(store);
         expect(registry.get(added.project.projectId).accessLevel).toBe('full');

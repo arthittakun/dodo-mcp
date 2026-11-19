@@ -9,6 +9,7 @@ describe('FS: path traversal & secret policy via tools', () => {
   let ctx: TestContext;
   let tokens: TokenSet;
   let outsideDir: string;
+  let fileSymlinkAvailable = true;
 
   beforeAll(async () => {
     outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-outside-'));
@@ -26,7 +27,11 @@ describe('FS: path traversal & secret policy via tools', () => {
       trust: 'edit',
     });
     // Add a symlink pointing outside the root.
-    fs.symlinkSync(path.join(outsideDir, 'secret.txt'), path.join(ctx.fixtureDir, 'evil-link.txt'));
+    try { fs.symlinkSync(path.join(outsideDir, 'secret.txt'), path.join(ctx.fixtureDir, 'evil-link.txt')); }
+    catch (error) {
+      if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) fileSymlinkAvailable = false;
+      else throw error;
+    }
     tokens = await obtainToken(ctx);
   }, 120_000);
 
@@ -46,7 +51,8 @@ describe('FS: path traversal & secret policy via tools', () => {
     }
   });
 
-  it('FS-02: reading through a symlink out of the root is denied', async () => {
+  it('FS-02: reading through a symlink out of the root is denied', async (t) => {
+    if (!fileSymlinkAvailable) return t.skip();
     const res = await callToolLegacy(ctx, tokens.accessToken, 'read_files', { ...wsArgs(ctx), files: [{ path: 'evil-link.txt' }] });
     const data = res.envelope['data'] as { files: unknown[]; errors: Array<{ error: { code: string } }> };
     expect(data.files).toHaveLength(0);

@@ -105,6 +105,7 @@ export interface RunningServer {
  */
 export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const log = opts.onLog ?? (() => undefined);
+  log(`[dodo] serverVersion=${DODO_VERSION} pid=${process.pid}`);
   const runMode = opts.runMode;
   let closing = false;
   let shutdownPromise: Promise<void> | undefined;
@@ -236,7 +237,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   remoteConfigGateway?.mount(app);
 
   app.get('/healthz', (_req: Request, res: Response) => {
-    res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, authConfigured: !locked, workspaceSelected });
+    res.setHeader('Cache-Control', 'no-store').json({ status: 'ok', name: 'dodo', version: DODO_VERSION, serverVersion: DODO_VERSION, authConfigured: !locked, workspaceSelected });
   });
 
   let mcpHandlerClose: (() => Promise<void>) | undefined;
@@ -440,12 +441,17 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
       tunnel: opts.tunnelRuntime?.status() ?? { available: false, running: false, current: null, lastKnown: null },
     }),
   } : undefined;
+  let localConfig: LocalConfigServer | undefined;
   const resourcesFor = async (ws: BootstrappedWorkspace): Promise<WorkspaceResources> => {
     if (issuer) ws.services.downloadOrigin = issuer;
     return startOwnerControl(ws, createIpcDispatcher({
       ws,
       transport: transportInfo(),
       requestStop: () => void shutdown(),
+      localConfig: { open: () => {
+        if (!localConfig) throw new DodoError('NOT_SUPPORTED', 'Local Config listener is not enabled');
+        return localConfig.renewLocalSession();
+      } },
       ...(remoteConfigControl ? { remoteConfig: remoteConfigControl } : {}),
     }));
   };
@@ -500,7 +506,6 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   installation.defaultReady = () => theHost.state() === 'ready';
 
   // ---- owner-only Local Config plane ------------------------------------
-  let localConfig: LocalConfigServer | undefined;
   let initialRemoteConfig: RemoteConfigLease | null = null;
   try {
     if (opts.configPort !== undefined) {
@@ -588,10 +593,9 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
         : 'Connection: loopback only',
     `State: ${configDir}${configDirEnvVar ? ` (from ${configDirEnvVar})` : configDirSource === 'env' ? ' (from explicit environment override)' : ''}`,
   ];
-  if (localConfig) log(`[dodo] Private config (expires in 8h): ${localConfig.url}`);
+  if (localConfig) log(`[dodo] Local Config: ${localConfig.origin} — obtain access with dodo web --local`);
   if (initialRemoteConfig) {
-    log(`[dodo] Remote Config (expires in 1h): ${initialRemoteConfig.url}`);
-    log(`[dodo] Remote Config pairing code (shown once): ${initialRemoteConfig.pairingCode}`);
+    log('[dodo] Remote Config enabled — obtain access with dodo web');
   }
   if (runMode) log(`[dodo] ${runMode}: trusted OS-user execution for this run; OAuth, client/path access and file guards remain required.`);
   if (!opts.quiet) banner.forEach((l) => log(l));
@@ -618,7 +622,7 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
     get services() {
       return theHost.current().services;
     },
-    configUrl: localConfig?.url ?? null,
+    get configUrl() { return localConfig?.url ?? null; },
     remoteConfig: initialRemoteConfig,
     remoteConfigStatus: () => remoteConfigGateway?.status() ?? null,
     host: theHost,

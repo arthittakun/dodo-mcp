@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { describe, expect, it } from 'vitest';
 import { launch } from '../helpers/testServer.js';
 import { CREATIVE_IMAGE_PRESETS, CREATIVE_MEDIA_DEFAULTS } from '../../src/services/multimodal/creativeSettings.js';
@@ -79,4 +80,36 @@ describe('owner-only creative media settings API', () => {
       expect(settings.connection(saved.id).baseUrl).toBe(changed.baseUrl);
     } finally { await ctx.cleanup(); }
   });
+  it('merges media patches, rejects stale owners and checks metadata without submitting images', async () => {
+    const key = 'synthetic-owner-media-metadata-key', calls: string[] = [];
+    const provider = http.createServer((request,response) => { calls.push(request.url!); response.setHeader('content-type','application/json'); if(request.headers.authorization !== 'Bearer '+key){response.statusCode=401;response.end('{}');return;} response.end(JSON.stringify({data:[{id:'synthetic-image-model'}]})); });
+    await new Promise<void>(resolve=>provider.listen(0,'127.0.0.1',resolve));
+    const ctx = await launch({ trust: 'trusted', configPort: 0 });
+    try {
+      const url = new URL(ctx.configUrl!), capability = url.hash.slice(1);
+      const headers = { authorization: 'Bearer '+capability, 'content-type':'application/json', 'x-dodo-workspace':ctx.server.workspaceId,'x-dodo-epoch':ctx.server.epoch };
+      const post = (path: string, body: unknown) => fetch(url.origin+'/api/ai/'+path,{method:'POST',headers,body:JSON.stringify(body)});
+      const saved = await post('connection',{connection:{name:'Synthetic metadata provider',provider:'custom',protocol:'responses',baseUrl:'http://127.0.0.1:'+(provider.address() as {port:number}).port+'/v1',allowPrivateNetwork:true},apiKey:key});
+      expect(saved.status).toBe(200); const connectionId = (await saved.json() as {data:{id:string}}).data.id;
+      const first = await post('media',{connectionId,imageModel:'first-image',expectedRevision:0}); expect(first.status).toBe(200); const initial = (await first.json() as {data:{revision:number}}).data;
+      const patch = await post('media',{imageModel:'second-image',expectedRevision:initial.revision}); expect(patch.status).toBe(200); const current = (await patch.json() as {data:{revision:number;connectionId:string;imageModel:string}}).data;
+      expect(current).toMatchObject({connectionId,imageModel:'second-image',revision:initial.revision+1});
+      expect((await post('media',{connectionId:null,expectedRevision:initial.revision})).status).toBe(409);
+      const checked = await post('media/check',{connectionId}); expect(checked.status).toBe(200); expect((await checked.json() as {data:unknown}).data).toMatchObject({inferenceTested:false,billingVerified:false,modelCount:1});
+      expect(calls).toEqual(['/v1/models']);
+      const page = await post('models/page',{connectionId}); expect((await page.json() as {data:unknown}).data).toMatchObject({models:[{id:'synthetic-image-model'}],truncated:false,pages:1});
+      expect((await fetch(url.origin+'/api/ai/media/jobs')).status).toBe(401);
+      const history = await fetch(url.origin+'/api/ai/media/jobs?limit=25',{headers}); expect(history.status).toBe(200); expect((await history.json() as {data:unknown}).data).toEqual({jobs:[],nextCursor:null});
+      const registered = new ProjectRegistry(ctx.server.services.installation!.store).add(ctx.fixtureDir,'Historical media namespace').project;
+      const projectHistory = await fetch(url.origin+'/api/ai/media/jobs?limit=25&projectId='+registered.projectId,{headers}); expect(projectHistory.status).toBe(200); expect((await projectHistory.json() as {data:unknown}).data).toEqual({jobs:[],nextCursor:null});
+      expect((await fetch(url.origin+'/api/ai/media/jobs?projectId=prj_missing0001',{headers})).status).not.toBe(200);
+      expect((await post('media/jobs/creative_unknown0001/control',{action:'retry_save',apiKey:'not-accepted'})).status).toBe(400);
+      expect((await post('media/jobs/creative_unknown0001/control',{action:'retry_save',projectId:registered.projectId})).status).not.toBe(200);
+      const rows = ctx.server.services.installation!.store.db.prepare("SELECT principal,result FROM audit_events WHERE tool='settings.creative-media'").all();
+      expect(rows).toHaveLength(2); expect(JSON.stringify(rows)).not.toContain(key); expect(JSON.stringify(rows)).not.toContain('second-image');
+      expect((await post('media',{connectionId:null,expectedRevision:current.revision})).status).toBe(200);
+      expect(ctx.server.services.installation!.ai.settings.media()).toMatchObject({connectionId:null,enabled:false});
+    } finally { await ctx.cleanup(); await new Promise<void>(resolve=>{provider.close(()=>resolve());provider.closeAllConnections();}); }
+  });
+
 });

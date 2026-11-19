@@ -15,10 +15,12 @@ import type { ToolCtx } from '../../src/tools/context.js';
 describe('multimodal security and failure boundaries', () => {
   let ctx: TestContext, owner: TokenSet, other: TokenSet, reader: TokenSet, fake: ImageDesktop;
   let originalConfig: string;
+  let sourceSymlinkAvailable = false;
   beforeAll(async () => {
     ctx = await launch({ toolSurface: 'full',  fixtureFiles: { 'index.html': BROWSER_FIXTURE, '.env': 'private secret', 'clip.srt': '1\n00:00:00,000 --> 00:00:01,000\nhello\n\n', 'input.mp4': 'invalid media for preflight tests' } });
     fs.writeFileSync(path.join(ctx.fixtureDir, 'image.png'), await sharp({ create: { width: 100, height: 80, channels: 3, background: '#223344' } }).png().toBuffer());
-    fs.symlinkSync('image.png', path.join(ctx.fixtureDir, 'symlink.png'));
+    try { fs.symlinkSync('image.png', path.join(ctx.fixtureDir, 'symlink.png')); sourceSymlinkAvailable = true; }
+    catch (error) { if (process.platform !== 'win32' || !['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error; }
     fs.copyFileSync(path.join(ctx.fixtureDir, 'image.png'), path.join(ctx.fixtureDir, 'hard-source.png'));
     fs.linkSync(path.join(ctx.fixtureDir, 'hard-source.png'), path.join(ctx.fixtureDir, 'hard-link.png'));
     await ctx.server.services.desktop.close(); fake = new ImageDesktop(); await fake.prepare();
@@ -84,14 +86,18 @@ describe('multimodal security and failure boundaries', () => {
     error(await call('media_read', { assetId: image.asset.assetId }, other.accessToken), 'NOT_FOUND');
     error(await call('image_view', { path: 'image.png', workspaceEpoch: 'stale' }), 'STALE_WORKSPACE');
   });
-  it('preserves secret/traversal/symlink/hardlink guards on every direct source image read', async () => {
-    for (const [file, code] of [['.env', 'SECRET_PATH_DENIED'], ['../image.png', 'PATH_DENIED'], ['symlink.png', 'PATH_DENIED'], ['hard-link.png', 'PATH_DENIED']] as const) error(await call('image_view', { path: file }), code);
+  it('preserves secret/traversal/hardlink guards on every direct source image read', async () => {
+    for (const [file, code] of [['.env', 'SECRET_PATH_DENIED'], ['../image.png', 'PATH_DENIED'], ['hard-link.png', 'PATH_DENIED']] as const) error(await call('image_view', { path: file }), code);
     const mm = ctx.server.services.multimodal!;
     for (const file of ['.env', '../input.mp4', 'hard-link.png']) {
       const directory = mm.storage.directory();
       try { await expect(mm.storage.copySource(file, directory)).rejects.toThrow(); }
       finally { mm.storage.removeDirectory(directory); }
     }
+  });
+  it('rejects a source image symlink when the host permits creating one', async context => {
+    if (!sourceSymlinkAvailable) { context.skip(); return; }
+    error(await call('image_view', { path: 'symlink.png' }), 'PATH_DENIED');
   });
   it('remembers procedures as data only, checks revisions and separates client memories', async () => {
     const definition = { name: 'Remember demo', goal: 'No privilege granted', steps: [{ instruction: 'Press Save', expectedBefore: 'Ready', expectedAfter: 'Saved', action: { target: 'desktop', action: { kind: 'click', x: 10, y: 10 } } }] };

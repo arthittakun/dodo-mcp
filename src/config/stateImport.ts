@@ -6,6 +6,7 @@ import { GlobalConfigSchema, migrateLegacyGlobalConfig, type GlobalConfig } from
 import { assertPrivatePath, ensurePrivateDirectory } from '../platform/privateFs.js';
 import { renameWithRetry } from '../platform/fsRetry.js';
 import { existingConfigDirs } from './paths.js';
+import { atomicPrivateWrite } from './stateCheckpoint.js';
 
 /**
  * Existing-state import intentionally carries only non-authority preferences.
@@ -286,7 +287,7 @@ export function importState(plan: StateImportPlan): StateImportResult {
     const inspected = inspectConfig(path.join(sourceDir, CONFIG_FILE));
     ensurePrivateDirectory(stage);
     const configFile = path.join(stage, CONFIG_FILE);
-    fs.writeFileSync(configFile, JSON.stringify(inspected.clean, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    atomicPrivateWrite(configFile, JSON.stringify(inspected.clean, null, 2) + '\n');
     assertPrivatePath(configFile, false);
     const receipt = path.join(stage, 'migration.json');
     const receiptBody = {
@@ -302,9 +303,10 @@ export function importState(plan: StateImportPlan): StateImportResult {
       configSha256: current.configSha256,
       sourcePreserved: true,
     };
-    fs.writeFileSync(receipt, JSON.stringify(receiptBody, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    atomicPrivateWrite(receipt, JSON.stringify(receiptBody, null, 2) + '\n');
     assertPrivatePath(receipt, false);
     renameWithRetry(stage, targetDir);
+    if (process.platform !== 'win32') { const descriptor = fs.openSync(parent, fs.constants.O_RDONLY); try { fs.fsyncSync(descriptor); } finally { fs.closeSync(descriptor); } }
     return {
       schemaVersion: 1,
       sourceDir,

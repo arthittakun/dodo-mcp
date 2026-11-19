@@ -7,6 +7,10 @@
 const invokedCwd = process.cwd();
 
 import fs from 'node:fs';
+import path from 'node:path';
+import { requirePrivateOutput, writePrivateOutput } from './privateOutput.js';
+import { runtimeIdentity } from '../server/version.js';
+import { registerStateCommands } from './stateCommands.js';
 import { Command } from 'commander';
 import { registerDataRecoveryCommands } from './dataRecovery.js';
 import { registerDeploymentCommands } from './deployment.js';
@@ -16,7 +20,7 @@ import { resolveConfigDir, ensureConfigDir, statePaths, ipcSocketPath } from '..
 import { loadGlobalConfig, saveGlobalConfig, validatePublicUrl, GlobalConfigSchema } from '../config/globalConfig.js';
 import { resolveWorkspaceRoot } from '../workspace/root.js';
 import { mintWorkspaceId } from '../workspace/identity.js';
-import { openDatabase, openDatabaseReadonly } from '../store/db.js';
+import { openDatabase, openDatabaseReadonly, CURRENT_SCHEMA_VERSION } from '../store/db.js';
 import { Store, type TrustMode } from '../store/store.js';
 import { ipcCall, IpcError } from '../ipc/client.js';
 import { ownerCommandTimeout } from '../ipc/timeouts.js';
@@ -38,6 +42,7 @@ import { INSTALLATION_AUTHORITY_ID } from '../auth/constants.js';
 
 const program = new Command();
 registerDeploymentCommands(program, ipcForCwd);
+registerStateCommands(program);
 program.name('dodo').description('DODO — local-first, single-owner, project-scoped coding MCP server').version(DODO_VERSION);
 
 function fail(message: string, code = 1): never {
@@ -160,6 +165,7 @@ interface HttpLaunchOptions {
 }
 
 async function launchHttp(opts: HttpLaunchOptions): Promise<void> {
+  if (opts.web) requirePrivateOutput();
   if (Boolean(opts.allow) !== Boolean(opts.all)) fail('use --allow and --all together');
   if (opts.tools !== undefined && !['compact', 'full', 'hybrid'].includes(opts.tools)) fail('--tools must be compact, full or hybrid');
 
@@ -612,6 +618,7 @@ program.command('cli')
 type RemoteConfigCliResult = { url: string; pairingCode: string; expiresAt: number };
 
 function printRemoteConfig(result: RemoteConfigCliResult): void {
+  requirePrivateOutput();
   console.log(`Remote Config: ${result.url}`);
   console.log(`Pairing code (shown once): ${result.pairingCode}`);
   console.log(`Expires: ${new Date(result.expiresAt).toISOString()} (ไม่เกิน 1 ชั่วโมง)`);
@@ -620,6 +627,7 @@ function printRemoteConfig(result: RemoteConfigCliResult): void {
 }
 
 async function openRemoteConfigFromCli(): Promise<void> {
+  requirePrivateOutput();
   try {
     printRemoteConfig(await ipcForInstallation('remoteConfig.open') as RemoteConfigCliResult);
   } catch (error) {
@@ -629,18 +637,34 @@ async function openRemoteConfigFromCli(): Promise<void> {
 }
 
 const web = program.command('web')
-  .description('open or renew the one-hour Remote Config page through the public MCP tunnel')
+  .description('retrieve owner access explicitly; --local opens loopback Config without a tunnel')
+  .option('--local', 'renew the eight-hour loopback Local Config link', false)
+  .option('--output-file <path>', 'write access details to a new private file instead of the terminal')
   .option('--close', 'close the Remote Config lease without stopping MCP or Tunnel', false)
   .option('--status', 'show the current non-secret Remote Config lease status', false)
-  .action(async (opts: { close: boolean; status: boolean }) => {
+  .action(async (opts: { close: boolean; status: boolean; local: boolean; outputFile?: string }) => {
     if (opts.close && opts.status) fail('choose --close or --status');
     try {
+      if (opts.local && (opts.close || opts.status)) fail('--local retrieves a fresh session; do not combine it with remote --close/--status');
+      if (opts.local) {
+        requirePrivateOutput(opts.outputFile);
+        const result = await ipcForInstallation('localConfig.open') as { url: string; expiresAt: number };
+        if (opts.outputFile) console.log(`Private access saved to ${writePrivateOutput(opts.outputFile, result)}`);
+        else { console.log(`Local Config: ${result.url}`); console.log(`Expires: ${new Date(result.expiresAt).toISOString()}`); }
+        return;
+      }
       if (opts.close) {
         console.log(JSON.stringify(await ipcForInstallation('remoteConfig.close'), null, 2));
         return;
       }
       if (opts.status) {
         console.log(JSON.stringify(await ipcForInstallation('remoteConfig.status'), null, 2));
+        return;
+      }
+      if (opts.outputFile) {
+        requirePrivateOutput(opts.outputFile);
+        const result = await ipcForInstallation('remoteConfig.open') as RemoteConfigCliResult;
+        console.log(`Private access saved to ${writePrivateOutput(opts.outputFile, result)}`);
         return;
       }
       await openRemoteConfigFromCli();
@@ -835,11 +859,8 @@ program
     let cfgOk = true;
     let cfgNote = dir;
     try {
-      ensureConfigDir(dir);
-      const { activateManagedTools } = await import('../setup/managedTools.js');
-      activateManagedTools(dir, invokedCwd);
-      const st = fs.statSync(dir);
-      if (process.platform !== 'win32' && (st.mode & 0o077) !== 0) {
+      const st = fs.existsSync(dir) ? fs.statSync(dir) : undefined;
+      if (st && process.platform !== 'win32' && (st.mode & 0o077) !== 0) {
         cfgOk = false;
         cfgNote = `${dir} has group/other permissions (expected 0700)`;
       }
@@ -850,9 +871,11 @@ program
     checks.push({ name: 'config-dir', ok: cfgOk, note: cfgNote });
     try {
       const paths = statePaths(dir);
-      const db = openDatabase(paths.dbFile);
+      const db = openDatabaseReadonly(paths.dbFile);
+      if (!db) throw new Error('no state database to inspect (doctor never creates or migrates state)');
       try {
-        checks.push({ name: 'state-db', ok: true, note: 'opens and migrates' });
+        const schema = db.prepare('SELECT MAX(version) AS version FROM schema_migrations').get() as { version: number };
+        checks.push({ name: 'state-db', ok: schema.version <= CURRENT_SCHEMA_VERSION, note: `readonly schema=${schema.version}, supported=${CURRENT_SCHEMA_VERSION}; no migration performed` });
         const projects = new ProjectRegistry(new Store(db)).list();
         const invalid = projects.filter((entry) => entry.availability === 'invalid').length;
         const unavailable = projects.filter((entry) => !entry.available && entry.availability !== 'invalid').length;
@@ -913,14 +936,24 @@ program
   .option('--json', 'machine-readable output', false)
   .action(async (opts: { json: boolean }) => {
     try {
-      const data = (await ipcForCwd('status')) as StatusData;
-      printJsonOrLines(opts.json, data, () => [
+      const data = await ipcForCwd('status').catch(async error => {
+        if (error instanceof IpcError && error.message.startsWith('no running DODO server')) return ipcForInstallation('status');
+        throw error;
+      }) as StatusData;
+      const cli = runtimeIdentity();
+      const versionMismatch = data.version !== DODO_VERSION;
+      const pathMismatch = Boolean(data.packageRoot && path.resolve(data.packageRoot) !== path.resolve(cli.packageRoot));
+      const result = { ...data, cliVersion: DODO_VERSION, cliEntryPoint: cli.entryPoint, cliPackageRoot: cli.packageRoot, versionMismatch, pathMismatch };
+      printJsonOrLines(opts.json, result, () => [
         `DODO ${data.version}  pid ${data.pid}`,
         `Workspace: ${data.root}`,
         `Workspace ID: ${data.workspaceId}  epoch: ${data.workspaceEpoch}`,
         `Port: ${data.port}  ${data.locked ? 'LOCKED (no public URL)' : `Public: ${data.publicUrl}`}`,
         `Trust mode: ${data.trustMode}`,
         `Running jobs: ${data.runningJobs}`,
+        ...(data.entryPoint ? [`Server entry: ${data.entryPoint}`, `Node: ${data.nodeExecutable}`] : []),
+        `CLI: ${DODO_VERSION} (${cli.entryPoint})`,
+        ...(versionMismatch || pathMismatch ? ['CLI and running server differ. Restart the service using the intended absolute server entry path.'] : []),
         ...(data.recoveryRequired.length > 0 ? [`RECOVERY REQUIRED: ${data.recoveryRequired.join(', ')} (run: dodo recover)`] : []),
       ]);
     } catch (err) {

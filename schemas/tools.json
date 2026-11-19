@@ -1,8 +1,8 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.",
   "version": 1,
-  "toolCount": 174,
-  "defaultLiveToolCount": 170,
+  "toolCount": 176,
+  "defaultLiveToolCount": 172,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -19902,6 +19902,9 @@
               {
                 "type": "object",
                 "properties": {
+                  "serverVersion": {
+                    "type": "string"
+                  },
                   "media": {
                     "type": "object",
                     "properties": {
@@ -20014,6 +20017,25 @@
                       "imageUploadEnabled": {
                         "type": "boolean"
                       },
+                      "readiness": {
+                        "type": "string",
+                        "enum": [
+                          "ready",
+                          "blocked"
+                        ]
+                      },
+                      "blockers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "videoBlockers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
                       "modelCalls": {
                         "type": "boolean",
                         "const": false
@@ -20048,6 +20070,7 @@
                   }
                 },
                 "required": [
+                  "serverVersion",
                   "media",
                   "browser",
                   "desktop",
@@ -29662,7 +29685,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -29838,6 +29862,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -30443,7 +30512,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -30619,6 +30689,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -30875,7 +30990,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -31051,6 +31167,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -31250,7 +31411,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -31426,6 +31588,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -31651,7 +31858,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -31827,6 +32035,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -32014,7 +32267,8 @@
                       "completed",
                       "failed",
                       "uncertain",
-                      "interrupted"
+                      "interrupted",
+                      "stopped"
                     ]
                   },
                   "model": {
@@ -32190,6 +32444,51 @@
                   },
                   "replayed": {
                     "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
                   }
                 },
                 "required": [
@@ -46060,7 +46359,7 @@
           "cursor": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 200
+            "maximum": 2000
           }
         },
         "required": [
@@ -46148,6 +46447,14 @@
                       }
                     ]
                   },
+                  "truncated": {
+                    "type": "boolean"
+                  },
+                  "providerPages": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
                   "note": {
                     "type": "string"
                   }
@@ -46159,6 +46466,881 @@
                   "videoEnabled",
                   "models",
                   "nextCursor",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "creative_jobs",
+      "title": "Find your image and video jobs",
+      "description": "List only your own media jobs and recover a submission by its original idempotencyKey after a lost response/restart. Never submits a render. Active and unfinished jobs remain discoverable. Inspect existing job receipts before deciding whether to create another paid request.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "limit": {
+            "default": 25,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "completed",
+              "failed",
+              "uncertain",
+              "interrupted",
+              "stopped"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobs": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "jobId": {
+                          "type": "string",
+                          "maxLength": 100,
+                          "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "image",
+                            "background_removal",
+                            "video"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running",
+                            "completed",
+                            "failed",
+                            "uncertain",
+                            "interrupted",
+                            "stopped"
+                          ]
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "resource": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "resourceId": {
+                                  "type": "string",
+                                  "maxLength": 100,
+                                  "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                                },
+                                "uri": {
+                                  "type": "string",
+                                  "pattern": "^dodo-resource:\\/\\/"
+                                },
+                                "mimeType": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 150
+                                },
+                                "bytes": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "sha256": {
+                                  "type": "string",
+                                  "pattern": "^sha256:[a-f0-9]{64}$"
+                                },
+                                "source": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "workspace",
+                                        "media_asset",
+                                        "transform",
+                                        "generated"
+                                      ]
+                                    },
+                                    "label": {
+                                      "type": "string",
+                                      "maxLength": 1024
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "label"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "capabilities": {
+                                  "type": "object",
+                                  "properties": {
+                                    "read": {
+                                      "type": "boolean",
+                                      "const": true
+                                    },
+                                    "stream": {
+                                      "type": "boolean",
+                                      "const": true
+                                    },
+                                    "seek": {
+                                      "type": "boolean",
+                                      "const": true
+                                    },
+                                    "preview": {
+                                      "type": "boolean"
+                                    },
+                                    "transform": {
+                                      "type": "boolean"
+                                    },
+                                    "extractText": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "required": [
+                                    "read",
+                                    "stream",
+                                    "seek",
+                                    "preview",
+                                    "transform",
+                                    "extractText"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "metadata": {
+                                  "type": "object",
+                                  "properties": {
+                                    "provider": {
+                                      "type": "string",
+                                      "maxLength": 80
+                                    },
+                                    "width": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "height": {
+                                      "type": "integer",
+                                      "exclusiveMinimum": 0,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "format": {
+                                      "type": "string",
+                                      "maxLength": 40
+                                    },
+                                    "entries": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "createdAt": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "expiresAt": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "deduplicated": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": [
+                                "resourceId",
+                                "uri",
+                                "mimeType",
+                                "bytes",
+                                "sha256",
+                                "source",
+                                "capabilities",
+                                "metadata",
+                                "createdAt",
+                                "expiresAt"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "expiresAt": {
+                          "type": "number"
+                        },
+                        "note": {
+                          "type": "string"
+                        },
+                        "replayed": {
+                          "type": "boolean"
+                        },
+                        "diagnostics": {
+                          "type": "object",
+                          "properties": {
+                            "outcome": {
+                              "type": "string",
+                              "enum": [
+                                "rejected",
+                                "unknown",
+                                "not_sent"
+                              ]
+                            },
+                            "httpStatus": {
+                              "type": "integer",
+                              "minimum": 100,
+                              "maximum": 599
+                            },
+                            "providerCode": {
+                              "type": "string",
+                              "maxLength": 128
+                            },
+                            "message": {
+                              "type": "string",
+                              "maxLength": 1024
+                            },
+                            "requestId": {
+                              "type": "string",
+                              "maxLength": 128
+                            },
+                            "retryAfterMs": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "phase": {
+                              "type": "string",
+                              "maxLength": 64
+                            },
+                            "retryable": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "outcome"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "jobId",
+                        "kind",
+                        "status",
+                        "model",
+                        "progress",
+                        "resource",
+                        "error",
+                        "createdAt",
+                        "expiresAt",
+                        "note"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "nextCursor": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "jobs",
+                  "nextCursor"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "creative_job_control",
+      "title": "Recover saved media or stop tracking an owned job",
+      "description": "retry_save finalizes already generated output without starting another paid render. stop_tracking stops local tracking/collection of your job; it does NOT promise provider cancellation or refunds. It never controls another caller's job. Use creative_job or creative_jobs to inspect the resulting receipt.",
+      "requiredScope": "dodo:exec",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "jobId": {
+            "type": "string",
+            "maxLength": 100,
+            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "retry_save",
+              "stop_tracking"
+            ]
+          }
+        },
+        "required": [
+          "jobId",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "jobId": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "background_removal",
+                      "video"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "queued",
+                      "running",
+                      "completed",
+                      "failed",
+                      "uncertain",
+                      "interrupted",
+                      "stopped"
+                    ]
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "progress": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "resource": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "resourceId": {
+                            "type": "string",
+                            "maxLength": 100,
+                            "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
+                          },
+                          "uri": {
+                            "type": "string",
+                            "pattern": "^dodo-resource:\\/\\/"
+                          },
+                          "mimeType": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 150
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "sha256": {
+                            "type": "string",
+                            "pattern": "^sha256:[a-f0-9]{64}$"
+                          },
+                          "source": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "workspace",
+                                  "media_asset",
+                                  "transform",
+                                  "generated"
+                                ]
+                              },
+                              "label": {
+                                "type": "string",
+                                "maxLength": 1024
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "label"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "capabilities": {
+                            "type": "object",
+                            "properties": {
+                              "read": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "stream": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "seek": {
+                                "type": "boolean",
+                                "const": true
+                              },
+                              "preview": {
+                                "type": "boolean"
+                              },
+                              "transform": {
+                                "type": "boolean"
+                              },
+                              "extractText": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "read",
+                              "stream",
+                              "seek",
+                              "preview",
+                              "transform",
+                              "extractText"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "properties": {
+                              "provider": {
+                                "type": "string",
+                                "maxLength": 80
+                              },
+                              "width": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "format": {
+                                "type": "string",
+                                "maxLength": 40
+                              },
+                              "entries": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "deduplicated": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "resourceId",
+                          "uri",
+                          "mimeType",
+                          "bytes",
+                          "sha256",
+                          "source",
+                          "capabilities",
+                          "metadata",
+                          "createdAt",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "expiresAt": {
+                    "type": "number"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "replayed": {
+                    "type": "boolean"
+                  },
+                  "diagnostics": {
+                    "type": "object",
+                    "properties": {
+                      "outcome": {
+                        "type": "string",
+                        "enum": [
+                          "rejected",
+                          "unknown",
+                          "not_sent"
+                        ]
+                      },
+                      "httpStatus": {
+                        "type": "integer",
+                        "minimum": 100,
+                        "maximum": 599
+                      },
+                      "providerCode": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "message": {
+                        "type": "string",
+                        "maxLength": 1024
+                      },
+                      "requestId": {
+                        "type": "string",
+                        "maxLength": 128
+                      },
+                      "retryAfterMs": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "phase": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "outcome"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "jobId",
+                  "kind",
+                  "status",
+                  "model",
+                  "progress",
+                  "resource",
+                  "error",
+                  "createdAt",
+                  "expiresAt",
                   "note"
                 ],
                 "additionalProperties": false

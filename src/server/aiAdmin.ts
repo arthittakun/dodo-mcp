@@ -13,7 +13,6 @@ import { CORE_TOOL_CATALOG } from '../tools/coreCatalog.js';
 import { AGENT_RUNTIME_TOOLS } from '../tools/agentRuntimeTools.js';
 import { accessMode, setAccessMode } from '../security/accessMode.js';
 import { discoverExposure, normalizeDisabledDiscoverOperations } from '../tools/surface.js';
-import { CreativeSettingsInput } from '../services/multimodal/creativeSettings.js';
 
 const ACTIONS = ['status','trust.set','schedule.list','schedule.propose','schedule.show','schedule.history','schedule.approve','schedule.revoke','memory.pending','memory.show','memory.list','memory.approve','memory.reject','memory.reverify','memory.prune','memory.learning.pending','memory.learning.show','memory.learning.review','agent.skill.pending','agent.skill.show','agent.skill.review','desktop.status','desktop.policy','approvals.pending','approvals.approve','approvals.deny','auth.pending','auth.approve','auth.deny','auth.addClient','auth.listClients','auth.grants','auth.revoke','audit.recent','recover.list','recover.resolve','recover.rollback','deployment.targets','deployment.configure','deployment.prepare','deployment.list','deployment.inspect','deployment.compare','deployment.build','deployment.apply','deployment.observe','deployment.source_preview','deployment.rollback_prepare','deployment.maintenance','recovery.status','recovery.reset','recovery.git.status','recovery.git.checkpoint','recovery.git.preview','recovery.git.restore','recovery.config.list','recovery.config.configure','recovery.config.backup','recovery.config.preview','recovery.config.apply','recovery.config.rotate','recovery.database.list','recovery.database.configure','recovery.database.inspect','recovery.database.bind','recovery.database.unbind','recovery.evidence.list','recovery.evidence.inspect','recovery.mark','recovery.pin','recovery.cleanup.preview','recovery.drift.scan','recovery.drift.acknowledge','recovery.configure','recovery.checkpoint','recovery.recovery_storage_status','recovery.recovery_cleanup_preview','recovery.recovery_settings_preview','recovery.recovery_maintenance_apply','recovery.restore_status','recovery.checkpoint_list','recovery.checkpoint_inspect','recovery.checkpoint_create','recovery.recovery_session_list','recovery.recovery_session_inspect','recovery.recovery_session_begin','recovery.recovery_session_end','recovery.restore_preview','recovery.restore_apply'] as const;
 /**
@@ -41,6 +40,11 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
     ownerSession(req).assertActive();
     if (req.headers['x-dodo-workspace'] !== workspaceId || req.headers['x-dodo-epoch'] !== epoch) throw new DodoError('STALE_WORKSPACE', 'refresh the selected project before making changes');
   };
+  const historyTarget = (projectId: string | undefined, workspaceId: string) => {
+    if (!projectId) return;
+    const target = new ProjectRegistry(manager().store).get(projectId);
+    if (!target.available || target.workspaceId !== workspaceId) throw new DodoError('STALE_WORKSPACE', 'history project changed; refresh before accessing this job');
+  };
   route('get', '/api/ai/state', req => ({ ...manager().ai.settings.state(), accessMode: accessMode(manager().store), projects: new ProjectRegistry(manager().store).list(), runtimes: manager().status(), runs: manager().ai.list(owner(req)), controlContext: { workspaceId: host.current().workspaceId, workspaceEpoch: host.current().epoch }, ownerActions: ACTIONS }));
   route('post','/api/ai/knowledge',async req=>{
     const b=z.object({projectId:z.string(),operation:z.enum(['brain_status','context_status','memory_status','memory_search','agent_skill_search']),query:z.string().min(1).max(1000).optional()}).strict().parse(req.body);
@@ -55,8 +59,30 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   route('post', '/api/ai/limits', req => { reviewed(req); return manager().ai.settings.saveLimits(req.body); });
   route('post', '/api/ai/media', req => {
     reviewed(req);
-    const value = CreativeSettingsInput.parse(req.body);
-    return manager().ai.settings.saveMedia(value);
+    return manager().ai.settings.saveMedia(req.body, { principal: owner(req).grantId, workspaceId: host.current().workspaceId });
+  });
+  route('get', '/api/ai/media/status', req => {
+    const lease = manager().acquireGlobal();
+    try { return lease.services.multimodal!.creative.status({ services: lease.services, principal: owner(req), trustMode: lease.services.trustMode() }); }
+    finally { lease.release(); }
+  });
+  route('post', '/api/ai/media/check', req => {
+    reviewed(req);
+    const body = z.object({ connectionId: z.string() }).strict().parse(req.body);
+    return manager().ai.settings.checkMediaConnection(body.connectionId);
+  });
+  route('get', '/api/ai/media/jobs', async req => {
+    const { projectId, ...input } = z.object({ projectId: z.string().regex(/^prj_[a-z0-9_-]{8,64}$/).optional(), limit: z.coerce.number().int().min(1).max(100).default(25), cursor: z.coerce.number().int().min(0).max(1000000).optional(), status: z.enum(['queued','running','completed','failed','uncertain','interrupted','stopped']).optional() }).strict().parse(req.query);
+    const lease = projectId ? await manager().acquire(projectId, owner(req)) : manager().acquireGlobal();
+    try { return await lease.services.multimodal!.creative.adminList({ services: lease.services, principal: owner(req), trustMode: lease.services.trustMode(), revalidate: () => { ownerSession(req).assertActive(); historyTarget(projectId,lease.services.workspaceId); } }, input); }
+    finally { lease.release(); }
+  });
+  route('post', '/api/ai/media/jobs/:id/control', async req => {
+    reviewed(req);
+    const { projectId, ...input } = z.object({ projectId: z.string().regex(/^prj_[a-z0-9_-]{8,64}$/).optional(), action: z.enum(['retry_save','stop_tracking']) }).strict().parse(req.body);
+    const lease = projectId ? await manager().acquire(projectId, owner(req)) : manager().acquireGlobal();
+    try { return await lease.services.multimodal!.creative.adminControl({ services: lease.services, principal: owner(req), trustMode: lease.services.trustMode(), revalidate: () => { ownerSession(req).assertActive(); reviewed(req); historyTarget(projectId,lease.services.workspaceId); } }, { jobId: z.string().min(1).max(128).parse(req.params.id), ...input }); }
+    finally { lease.release(); }
   });
   route('post', '/api/ai/access-mode', req => {
     reviewed(req);
@@ -81,6 +107,7 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   });
   route('post', '/api/ai/remove', async req => { reviewed(req); const b = z.object({ kind: z.enum(['connection','profile']), id: z.string(), confirmId: z.string() }).strict().parse(req.body); if (b.id !== b.confirmId) throw new DodoError('INVALID_INPUT', 'confirmation does not match'); await manager().ai.settings.remove(b.kind,b.id); return { removed: true }; });
   route('post', '/api/ai/models', req => { reviewed(req); return manager().ai.settings.models(z.object({ connectionId: z.string() }).strict().parse(req.body).connectionId); });
+  route('post', '/api/ai/models/page', req => { reviewed(req); return manager().ai.settings.modelsPage(z.object({ connectionId: z.string() }).strict().parse(req.body).connectionId); });
   route('post', '/api/ai/metadata', req => { reviewed(req); return manager().ai.settings.inspectModel(z.object({profileId:z.string()}).strict().parse(req.body).profileId); });
   route('post', '/api/ai/probe', req => { reviewed(req); const b = z.object({ profileId: z.string(), mode: z.enum(['inference','tools']), confirmUsage: z.literal(true) }).strict().parse(req.body); return manager().ai.settings.probe(b.profileId,b.mode); });
   route('post', '/api/ai/project', async req => {

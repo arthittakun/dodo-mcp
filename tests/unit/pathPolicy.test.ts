@@ -39,20 +39,31 @@ describe('WorkspaceFS path policy', () => {
     expect(wfs.normalizeRel('sub//nested.txt')).toBe('sub/nested.txt');
   });
 
-  it('FS-02: never follows a symlink that points outside the root', () => {
+  it('FS-02: never follows a file symlink that points outside the root', context => {
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-outside-'));
-    fs.writeFileSync(path.join(outside, 'secret.txt'), 'TOPSECRET');
-    fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'));
-    fs.symlinkSync(outside, path.join(root, 'linkdir'));
-    expect(() => wfs.resolve('link.txt')).toThrow(/symlink/);
-    expect(() => wfs.resolve('linkdir/secret.txt')).toThrow(/symlink/);
-    expect(() => wfs.readFileBytes('link.txt', 1024)).toThrow(/symlink/);
-    fs.rmSync(outside, { recursive: true, force: true });
+    try {
+      fs.writeFileSync(path.join(outside, 'secret.txt'), 'TOPSECRET');
+      try { fs.symlinkSync(path.join(outside, 'secret.txt'), path.join(root, 'link.txt')); }
+      catch (error) { if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) { context.skip(); return; } throw error; }
+      expect(() => wfs.resolve('link.txt')).toThrow(/symlink/);
+      expect(() => wfs.readFileBytes('link.txt', 1024)).toThrow(/symlink/);
+    } finally { fs.rmSync(outside, { recursive: true, force: true }); }
   });
 
-  it('FS-02: rejects a symlink loop instead of hanging', () => {
-    fs.symlinkSync(path.join(root, 'loopb'), path.join(root, 'loopa'));
-    fs.symlinkSync(path.join(root, 'loopa'), path.join(root, 'loopb'));
+  it('FS-02: never follows a directory symlink or junction outside the root', () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'dodo-outside-dir-'));
+    try {
+      fs.writeFileSync(path.join(outside, 'secret.txt'), 'TOPSECRET');
+      fs.symlinkSync(outside, path.join(root, 'linkdir'), process.platform === 'win32' ? 'junction' : 'dir');
+      expect(() => wfs.resolve('linkdir/secret.txt')).toThrow(/symlink/);
+    } finally { fs.rmSync(outside, { recursive: true, force: true }); }
+  });
+
+  it('FS-02: rejects a symlink loop instead of hanging', context => {
+    try {
+      fs.symlinkSync(path.join(root, 'loopb'), path.join(root, 'loopa'));
+      fs.symlinkSync(path.join(root, 'loopa'), path.join(root, 'loopb'));
+    } catch (error) { if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) { context.skip(); return; } throw error; }
     expect(() => wfs.resolve('loopa/x')).toThrow(DodoError);
   });
 

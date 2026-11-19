@@ -29,8 +29,10 @@ export class MultimodalService {
     this.creative = new CreativeService(this.storage);
     this.cleanupTimer = setInterval(() => {
       if (this.storage.closed || this.sweeping) return;
-      this.storage.sweep(); this.games.sweep(); this.workflows.sweep(); this.creative.sweep();
-      this.sweeping = Promise.all([this.media.sweep(), this.browser.sweep()]).then(() => undefined).catch(() => undefined).finally(() => { this.sweeping = undefined; });
+      this.sweeping = Promise.resolve().then(async () => {
+        this.storage.sweep(); this.games.sweep(); this.workflows.sweep(); this.creative.sweep();
+        await Promise.all([this.media.sweep(), this.browser.sweep()]);
+      }).catch(() => { try { services.logEvent?.('media.cleanup.failed', { code: 'STORAGE_UNAVAILABLE' }); } catch { /* diagnostics cannot break maintenance */ } }).finally(() => { this.sweeping = undefined; });
     }, 15000);
     this.cleanupTimer.unref();
   }

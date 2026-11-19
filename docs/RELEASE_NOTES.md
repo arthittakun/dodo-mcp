@@ -1,5 +1,14 @@
 # DODO MCP — Release Notes
 
+## 1.10.0 — Reliable creative jobs, private startup and safe state upgrades
+
+- Preserve sanitized provider diagnostics and explicit failure/uncertainty categories, local readiness blockers and metadata-only connection checks.
+- Add owned creative-job history/key recovery and save/stop-tracking controls; reserve output capacity before paid work and recover durable results after token expiry, receipt failure or restart without rerendering.
+- Separate active work from terminal history, reconcile stale remote slots, preserve unfinished jobs, and stop cosmetic/default changes from blocking existing video collection.
+- Merge partial media updates with revision checks/audit, expose bounded upstream model pagination/truncation without clipped IDs, and report provider-save partial success accurately.
+- Keep capability URLs/pairing codes out of startup logs, retrieve local access through owner IPC, show runtime/CLI identity mismatch, use atomic config writes and private WAL-correct upgrade checkpoints with offline restore.
+- Full 176 (default 172), Compact 20, Hybrid 49. See [upgrade/recovery details](RELEASE_1.10.0.md), [Creative Media](CREATIVE_MEDIA.md) and [validation](TEST_REPORT.md).
+
 ## 1.9.0 — AI chooses media models per request
 
 - Add global `creative_models` so the calling AI can read configured defaults and actual provider model IDs, with bounded query/pagination and name-based media hints. Listing does not generate media or return provider URLs/keys.

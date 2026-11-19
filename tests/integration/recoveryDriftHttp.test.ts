@@ -7,6 +7,8 @@ import { chromium } from 'playwright';
 import { launch, obtainToken, callToolLegacy, wsArgs, type TestContext } from '../helpers/testServer.js';
 import { ProjectRegistry } from '../../src/projects/registry.js';
 
+const executablePath = process.env['DODO_TEST_CHROMIUM_EXECUTABLE'] ?? chromium.executablePath();
+
 describe('R03 owner drift review through real HTTP and browser',()=>{
  let c:TestContext;
  afterEach(async()=>await c?.cleanup());
@@ -19,7 +21,8 @@ describe('R03 owner drift review through real HTTP and browser',()=>{
   expect((await post('recovery.drift.acknowledge',args)).status).toBe(401);expect((await post('recovery.drift.acknowledge',args,token.accessToken)).status).toBe(401);expect((await post('recovery.drift.acknowledge',args,token.accessToken,c.baseUrl)).status).toBe(404);
   expect((await post('recovery.drift.acknowledge',{...args,confirm:false},url.hash.slice(1))).status).toBe(400);
   expect((await post('recovery.drift.acknowledge',{...args,workspaceEpoch:'old'},url.hash.slice(1))).status).toBe(409);
-  const denied=await callToolLegacy(c,token.accessToken,'dodo_write',{...wsArgs(c),operation:'write_file',args:{path:'a.txt',content:'unsafe'}});expect(denied.envelope.error).toMatchObject({code:'FILE_CHANGED'});
+  const denied=await callToolLegacy(c,token.accessToken,'dodo_write',{...wsArgs(c),operation:'write_file',args:{path:'a.txt',content:'unsafe',expectedHash:`sha256:${'0'.repeat(64)}`}});expect(denied.envelope.error).toMatchObject({code:'FILE_CHANGED'});
+  expect(fs.readFileSync(path.join(c.fixtureDir,'a.txt'),'utf8')).toBe('outside');
   expect((await post('recovery.drift.acknowledge',args,url.hash.slice(1))).status).toBe(200);
   expect((await callToolLegacy(c,token.accessToken,'dodo_write',{...wsArgs(c),operation:'write_file',args:{path:'a.txt',content:'journaled'}})).envelope.ok).toBe(true);
  });
@@ -28,8 +31,8 @@ describe('R03 owner drift review through real HTTP and browser',()=>{
   const scan=await cli(['scan','--limit','1']);expect(scan.changedCount).toBe(1);
   const args=['acknowledge',scan.digest,'--workspace',c.server.workspaceId,'--epoch',c.server.epoch];await expect(cli(args)).rejects.toThrow('--yes');expect((await cli([...args,'--yes'])).changedCount).toBe(0);
  });
- it.skipIf(!fs.existsSync(chromium.executablePath()))('desktop and narrow browser scan, compare and owner confirmation actually change the drift baseline',async()=>{
-  const p=await setup(),browser=await chromium.launch({headless:true}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.name));
+ it.skipIf(!fs.existsSync(executablePath))('desktop and narrow browser scan, compare and owner confirmation actually change the drift baseline',async()=>{
+  const p=await setup(),browser=await chromium.launch({headless:true,executablePath}),page=await browser.newPage({viewport:{width:1440,height:1000}}),errors:string[]=[];page.on('pageerror',e=>errors.push(e.name));
   const out=path.resolve('release-evidence/recovery/R04/20260920/browser');fs.mkdirSync(out,{recursive:true});
   const started=Date.now();let phase='navigate';const phases:{phase:string;elapsedMs:number}[]=[];
   const mark=(value:string)=>{phase=value;phases.push({phase,elapsedMs:Date.now()-started});};
@@ -51,8 +54,8 @@ describe('R03 owner drift review through real HTTP and browser',()=>{
     await browser.close();
   }
  },60000);
- it.skipIf(!fs.existsSync(chromium.executablePath()))('a delayed initial overview cannot replace the project controls being used by the owner',async()=>{
-  const p=await setup(),browser=await chromium.launch({headless:true}),page=await browser.newPage();
+ it.skipIf(!fs.existsSync(executablePath))('a delayed initial overview cannot replace the project controls being used by the owner',async()=>{
+  const p=await setup(),browser=await chromium.launch({headless:true,executablePath}),page=await browser.newPage();
   let release!:()=>void,arrived!:()=>void;
   const held=new Promise<void>(resolve=>{release=resolve;}),started=new Promise<void>(resolve=>{arrived=resolve;});
   let first=true;

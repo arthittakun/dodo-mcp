@@ -46,6 +46,7 @@ export const STDIO_PRINCIPAL = {
 
 export async function startStdioServer(opts: StdioOptions): Promise<RunningStdioServer> {
   const log = opts.onLog ?? ((line: string) => process.stderr.write(`${line}\n`));
+  log(`[dodo] serverVersion=${DODO_VERSION} pid=${process.pid}`);
   const ws = bootstrapWorkspace({
     invokedCwd: opts.invokedCwd,
     ...(opts.rootOverride !== undefined ? { rootOverride: opts.rootOverride } : {}),

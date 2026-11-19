@@ -68,12 +68,16 @@ describe('task assistance analysis', () => {
     const b = ContextSchema.parse(runAnalysis(env, req));
     expect(a.files[0]?.hash).not.toBe(b.files[0]?.hash);
   });
-  it('rejects direct secret/traversal/symlink targets instead of silently searching elsewhere', () => {
+  it('rejects direct secret/traversal targets instead of silently searching elsewhere', () => {
     const env = fixture({ ...source, '.env': 'secret' });
     for (const file of ['.env', '../outside.ts']) {
       expect(() => runAnalysis(env, { op: 'assist_context', goal: 'oauth', terms: [], files: [file], maxFiles: 2, maxBytes: 4096 })).toThrow();
     }
-    fs.symlinkSync(path.join(env.wfs.root, 'src/oauth.ts'), path.join(env.wfs.root, 'linked.ts'));
+  });
+  it('rejects a direct symlink target when the host permits creating one', context => {
+    const env = fixture(source);
+    try { fs.symlinkSync(path.join(env.wfs.root, 'src/oauth.ts'), path.join(env.wfs.root, 'linked.ts')); }
+    catch (error) { if (process.platform === 'win32' && ['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) { context.skip(); return; } throw error; }
     expect(() => runAnalysis(env, { op: 'assist_symbol', file: 'linked.ts', symbol: 'refreshToken', maxBytes: 4096 })).toThrow();
   });
   it('reads qualified symbols and refuses ambiguity and unsupported languages', () => {

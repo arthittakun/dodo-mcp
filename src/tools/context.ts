@@ -49,6 +49,8 @@ export interface Principal {
 }
 
 export interface AppServices {
+  /** Structured diagnostics only; never pass credentials, URLs, prompts or raw provider bodies. */
+  logEvent?: (event: string, details: { jobId?: string; code?: string; httpStatus?: number; requestId?: string }) => void;
   installation?: InstallationRuntime;
   /** Private installation media namespace, independent of any user project. */
   installationScoped?: boolean;
@@ -306,7 +308,7 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
       const projects = services.installation.list(principal);
       if (projects.length) {
         services.store.audit({principal:principal.grantId,workspaceId:services.workspaceId,tool:def.name,result:'ok',inputDigest:digestOf(opts.args).slice(0,24)});
-        return { envelope: { ...okEnvelope(ws, { selectProjectRequired: true, projects }), workspaceId: null, workspaceEpoch: null }, extraBlocks: [] };
+        return { envelope: { ...okEnvelope(ws, { serverVersion: services.version, selectProjectRequired: true, projects }), workspaceId: null, workspaceEpoch: null }, extraBlocks: [] };
       }
     }
     if (principal.scopes.length === 0) {

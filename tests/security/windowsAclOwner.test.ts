@@ -5,7 +5,7 @@ import net from 'node:net';
 import { execFileSync } from 'node:child_process';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ensurePrivateDirectory, assertPrivatePath } from '../../src/platform/privateFs.js';
-import { windowsSystemExecutable } from '../../src/platform/system.js';
+import { envValue, windowsSystemExecutable } from '../../src/platform/system.js';
 import { removeWithRetry } from '../../src/platform/fsRetry.js';
 import { ipcSocketPath } from '../../src/config/paths.js';
 import { credentialPath } from '../../src/ipc/authentication.js';
@@ -17,12 +17,16 @@ const ADMIN = 'S-1-5-32-544';
 const FOREIGN = 'S-1-5-18'; // SYSTEM is permitted as a trustee, NOT as an initial owner.
 const T = 120000;
 
+function powershellEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return { SYSTEMROOT: envValue(process.env, 'SystemRoot'), WINDIR: envValue(process.env, 'windir'), USERPROFILE: envValue(process.env, 'USERPROFILE'), TEMP: envValue(process.env, 'TEMP'), TMP: envValue(process.env, 'TMP'), ...extra };
+}
+
 // These tests change ONLY disposable fixtures. Native Windows + an enabled
 // Administrators token are required. POSIX skips are never Windows evidence.
 function powershell(source: string, target = ''): string {
   return execFileSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'),
     ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from("$ErrorActionPreference = 'Stop'\n" + source, 'utf16le').toString('base64')],
-    { env: { ...process.env, DODO_ACL_TEST_PATH: target }, shell: false, windowsHide: true, timeout: 15000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+    { env: powershellEnv({ DODO_ACL_TEST_PATH: target }), shell: false, windowsHide: true, timeout: 15000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 function setOwner(target: string, sid: string): void {
   execFileSync(windowsSystemExecutable('icacls.exe'), [target, '/setowner', `*${sid}`, '/q'],
@@ -114,7 +118,7 @@ $p = [Security.Principal.WindowsPrincipal]::new($i)
     const dir = directory();
     const run = (mode: 'protect' | 'verify') => execFileSync(windowsSystemExecutable('WindowsPowerShell/v1.0/powershell.exe'),
       ['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script!, 'utf16le').toString('base64')],
-      {env:{...process.env,DODO_PRIVATE_PATH:dir,DODO_PRIVATE_MODE:mode},stdio:'pipe',encoding:'utf8',timeout:15000});
+      {env:powershellEnv({DODO_PRIVATE_PATH:dir,DODO_PRIVATE_MODE:mode}),stdio:'pipe',encoding:'utf8',timeout:15000});
     expect(run('protect')).toBe('private');
     const before = security(dir);
     expect(run('protect')).toBe('private');

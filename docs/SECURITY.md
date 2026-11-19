@@ -496,3 +496,9 @@ source files. Pending cleanup only processes stored private references, not path
 supplied by callers. Shared objects and active installation captures block reclamation;
 I/O failure is reported as pending rather than successful deletion. No integrity
 failure is silently repaired by accepting the current source.
+
+## Private startup links and installation recovery (1.10.0)
+
+General startup logging never receives Local Config capability URLs or Remote Config pairing secrets. Quiet and redirected/non-TTY starts print safe runtime identity/status, not bearer capabilities. STDIO stdout remains reserved for MCP. Owner access is explicitly retrieved through authenticated IPC (`dodo web --local`); a fresh local link revokes the previous local session. Non-interactive retrieval requires a new private output file, with no secret printed into ordinary logs. Moving secrets from stdout to stderr alone is not treated as redaction.
+
+Installation checkpoints contain private DB/config/owned Env/signing material and require private permissions. Offline restoration verifies hashes and creates an emergency checkpoint; restored authorization is revoked to prevent revival of previously revoked grants. Checkpoints do not export external Env or OS vault secret values, and must not enter a repository or public tarball. Ordinary config writes use atomic private replacement. Background maintenance errors remain reported/retryable instead of escaping the timer and crashing the process. See [installation recovery](RECOVERY.md#installation-state-checkpoints-1100).

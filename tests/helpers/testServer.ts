@@ -29,6 +29,8 @@ export interface TestContext {
 }
 
 export interface LaunchOptions {
+  onLog?: (line: string) => void;
+  quiet?: boolean;
   fixtureFiles?: Record<string, string>;
   trust?: TrustMode;
   locked?: boolean;
@@ -185,7 +187,8 @@ export async function launch(opts: LaunchOptions = {}): Promise<TestContext> {
       invokedCwd: opts.rootOverride ?? fixtureDir,
       ...(opts.deferWorkspace ? { deferWorkspace: true } : {}),
       portOverride: port,
-      quiet: true,
+      quiet: opts.quiet ?? true,
+      ...(opts.onLog ? { onLog: opts.onLog } : {}),
       ...(opts.configPort !== undefined ? { configPort: opts.configPort } : {}),
       ...(opts.toolSurface !== undefined ? { toolSurface: opts.toolSurface } : {}),
       ...(opts.drainTimeoutMs !== undefined ? { drainTimeoutMs: opts.drainTimeoutMs } : {}),

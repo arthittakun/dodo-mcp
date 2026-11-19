@@ -22,7 +22,8 @@ export const projectOverviewTool = defineTool({
   handler: async (args, ctx) => {
     const s = ctx.services;
     if (args.projectId !== undefined) {
-      return await s.federation.overview(args.projectId, ctx.principal, { workspaceId: s.workspaceId, workspaceEpoch: s.epoch });
+      const result = await s.federation.overview(args.projectId, ctx.principal, { workspaceId: s.workspaceId, workspaceEpoch: s.epoch });
+      return { ...result, data: { ...result.data, serverVersion: s.version } };
     }
     const data = await s.overview.build({
       workspaceId: s.workspaceId,
@@ -78,6 +79,7 @@ export const projectOverviewTool = defineTool({
     const federation = s.federation.listAuthorized(ctx.principal);
     return {
       data: {
+        serverVersion: s.version,
         ...data,
         recovery: s.recovery?.summary() ?? { state: 'unavailable' },
         brain,

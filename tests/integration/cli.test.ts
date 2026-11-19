@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { installationIpcCall } from '../../src/ipc/installationClient.js';
 
 /** A. CLI, root, configuration (CLI-01..10, CFG-03..05). Drives the REAL built CLI. */
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -70,7 +71,7 @@ describe('CLI', () => {
     expect(init.code).toBe(0);
     const nonInteractive = runCli(['start', '--web'], { cwd: proj, configDir: cfg, expectFail: true });
     expect(nonInteractive.code).not.toBe(0);
-    expect(nonInteractive.stderr).toMatch(/Remote Config requires a public Cloudflare connection/i);
+    expect(nonInteractive.stderr).toMatch(/private access links are not printed to redirected output/i);
   });
 
   it('CLI: init writes a global config and does not touch the repo', () => {
@@ -280,8 +281,10 @@ describe('CLI', () => {
     let log = '';
     child.stdout.on('data', c => { log += String(c); });
     try {
-      await waitFor(async () => log.includes('Private config') ? 'ready' : undefined, 15000);
-      const url = new URL(log.match(/http:\/\/127\.0\.0\.1:\d+\/#([a-f0-9]+)/)![0]);
+      await waitFor(async () => log.includes('Local Config:') ? 'ready' : undefined, 15000);
+      expect(log).not.toMatch(/\/#(?:[a-f0-9]{64})/);
+      const access = await installationIpcCall(cfg, 'localConfig.open') as { url: string };
+      const url = new URL(access.url);
       const res = await fetch(`${url.origin}/api/state`, {headers:{authorization:`Bearer ${url.hash.slice(1)}`}});
       expect(res.status).toBe(200);
       const state = await res.json() as { workspace: { root: string; switchSupported: boolean }; permissions: { effectiveMode: string; savedMode: string; override: string | null } };
@@ -308,8 +311,10 @@ describe('CLI', () => {
     child.stdout.on('data', (chunk) => { log += String(chunk); });
     child.stderr.on('data', (chunk) => { log += String(chunk); });
     try {
-      await waitFor(async () => log.includes('Private config') ? 'ready' : undefined, 15000);
-      const privateUrl = new URL(log.match(/http:\/\/127\.0\.0\.1:\d+\/#([a-f0-9]+)/)![0]);
+      await waitFor(async () => log.includes('Local Config:') ? 'ready' : undefined, 15000);
+      expect(log).not.toMatch(/\/#(?:[a-f0-9]{64})/);
+      const access = await installationIpcCall(cfg, 'localConfig.open') as { url: string };
+      const privateUrl = new URL(access.url);
       const response = await fetch(`${privateUrl.origin}/api/state`, { headers: { authorization: `Bearer ${privateUrl.hash.slice(1)}` } });
       expect(response.status).toBe(200);
       const state = await response.json() as { workspace: null; connection: { workspaceSelected: boolean } };
