@@ -1,5 +1,41 @@
 # DODO MCP — Test Report
 
+## 1.5.1 Configurable image providers — Windows, 2026-11-19
+
+Build, typecheck, lint, UI syntax and diff checks passed. Focused checks use the
+latest passing result per file, including the credential-storage repair rerun.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Image settings, protocols, jobs, owner UI and existing AI/catalog regressions | 111 | 0 | 1 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total focused coverage | 128 | 0 | 1 |
+
+Actual Chrome tests exercise editable official/custom presets, custom URL/key
+creation, editing by the same connection ID, key rotation, model loading/manual
+selection and browser-storage privacy. Owner HTTP tests use a real DODO server.
+Native Gemini and existing AI protocol tests use HTTP fixtures to verify headers,
+wire bodies, PNG decoding, size/error limits and refusal of unsupported video.
+The existing workbench case requiring bundled Chromium was skipped; the new
+media UI cases use installed system Chrome. This is not a full native release gate.
+
+SQLite fault tests verify that a credential-update marker is committed before
+credential changes. Failed connection writes keep the connection blocked across
+restart; model/probe calls cannot read the mismatched key. Explicit reentry repairs
+the binding, and storage changes commit metadata before removing the old key.
+Endpoint/model/credential leases and existing authorization guards remain tested.
+
+Live custom-provider smoke testing saved the supplied API base URL and session key
+only in in-memory settings, selected that connection, listed twelve models, and
+ran DODO's image job pipeline. It produced a real 1536 × 1024 PNG (661,553 bytes).
+No key appeared in returned settings; isolated workspace state was removed. The
+private provider identity, endpoint and credential are not shipped as presets,
+examples, source, browser defaults or documentation. Official Gemini live
+acceptance is not claimed because no Gemini credential was supplied.
+
+`npm audit` reported zero advisories for the locked dependency tree. See
+[configuration and limits](CREATIVE_MEDIA.md) and [release details](RELEASE_1.5.1.md).
+
 ## 1.5.0 Creative Media — Windows, 2026-11-17
 
 Build, typecheck, lint, UI JavaScript syntax and diff checks passed. Focused

@@ -1,23 +1,39 @@
 # Creative Media
 
-DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลัง โดยใช้ OpenAI เป็นค่าเริ่มต้นสำหรับงานภาพ ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือไม่มีช่องให้ส่ง API URL, API key, remote task ID หรือเปลี่ยนโมเดลเป็นรายคำขอ เจ้าของเลือก connection และโมเดลใน Local Config ส่วนงานครอปทำในเครื่องโดยไม่เรียกโมเดล
+DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลัง ตั้งค่าได้ทั้ง OpenAI ทางการ, Google Gemini ทางการ และบริการภายนอกที่ใช้รูปแบบ API ที่รองรับ OpenAI เป็นค่าเริ่มต้นที่แก้ไขได้ เจ้าของกรอกชื่อ provider, API Base URL, คีย์ และโมเดลใน Local Config ได้โดยตรง ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือ MCP ไม่รับ URL, key, remote task ID หรือเปลี่ยนโมเดลเป็นรายคำขอ งานครอปทำในเครื่องโดยไม่เรียกโมเดล
 
 ตรวจเอกสารทางการเมื่อ 17 พฤศจิกายน 2026: OpenAI ระบุว่า Sora 2 และ Videos API ปิดบริการเมื่อ 24 กันยายน 2026 และไม่มี API ทดแทนตรงตัว จึงไม่ตั้ง `sora-2` เป็นค่าเริ่มต้นหรือส่งวิดีโอไปที่ OpenAI โดยอัตโนมัติ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api) และ [คู่มือวิดีโอที่เก็บไว้เป็นประวัติ](https://developers.openai.com/api/docs/guides/video-generation)
 
 ## ตั้งค่า
 
 1. เปิด Local Config แล้วไปที่ **Providers & Profiles → Creative Media**
-2. เปิด **เพิ่ม OpenAI สำหรับงานสื่อ** กรอก OpenAI API key และเลือกวิธีเก็บคีย์ ปุ่มนี้ใช้ `https://api.openai.com/v1` เป็นค่าเริ่มต้น โดยไม่ต้องกรอก URL หรือสร้าง Agent Profile
-3. เลือก **การเชื่อมต่อสำหรับงานสื่อ** ค่าโมเดลภาพเริ่มต้นคือ `gpt-image-2.5-flare` สามารถเปลี่ยนเป็น Model ID ที่ connection รองรับได้
+2. เปิด **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก preset OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ connection, รูปแบบ API, API Base URL, คีย์ และ Model ID ตามบริการที่ใช้ ทุก preset เป็นค่าเริ่มต้นที่แก้ไขได้ ไม่บังคับ hostname ของงานภาพ
+3. กด **บันทึก Provider สำหรับภาพ** แล้วเลือก **การเชื่อมต่อสำหรับงานสื่อ** โหลดโมเดลด้วย **โหลดโมเดลสำหรับภาพ** หรือพิมพ์ Model ID เอง การโหลดโมเดลเป็นคำขอตรวจการเชื่อมต่อ แยกจากการสร้างภาพจริง และไม่ได้รับรองว่าโมเดลทุกตัวในรายการสร้างภาพได้
 4. เลือกโปรเจกต์ที่อนุญาต เปิดงานสร้างสื่อผ่าน AI แล้วกด **บันทึก Creative Media**
 5. หากต้องการลบพื้นหลังหรือสร้างวิดีโอจากภาพอ้างอิง ให้เปิดอนุญาตส่งภาพที่เลือกด้วย
 6. สำหรับวิดีโอ ให้เลือก connection ที่ตรวจแล้วว่ารองรับ video API เปิด `videoEnabled` และกรอก `videoModel` เอง ค่าเริ่มต้นคือปิดและโมเดลว่าง การเชื่อมต่อ OpenAI ทางการเปิดวิดีโอไม่ได้
 
-ค่าเริ่มต้นปิดงานผ่าน AI และวิดีโอ, ไม่เลือก connection/โปรเจกต์ และไม่อนุญาตอัปโหลดภาพ การบันทึกตั้งค่าไม่เรียกโมเดลและไม่คิดว่าการเชื่อมต่อผ่านการทดสอบแล้ว งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี หน้า Creative Media ไม่มีช่อง API URL; ใช้ connection ที่เจ้าของจัดการผ่านระบบ AI Providers เดิม
+ค่าเริ่มต้นปิดงานผ่าน AI และวิดีโอ, ไม่เลือก connection/โปรเจกต์ และไม่อนุญาตอัปโหลดภาพ การบันทึกตั้งค่าไม่เรียกโมเดลและไม่คิดว่าการเชื่อมต่อผ่านการทดสอบแล้ว งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี Connection ที่สร้างจาก Creative Media ใช้ credential store เดียวกับ AI Providers และไม่ต้องสร้าง Agent Profile
+
+เลือก connection แล้วกด **แก้ไข connection ที่เลือก** เพื่อเปลี่ยนชื่อ, URL, protocol, model หรือวิธีเก็บคีย์ ช่องคีย์ไม่เติมค่ากลับจาก server เว้นว่างได้เมื่อคง URL/protocol/storage เดิม หากเปลี่ยนค่าใดค่าหนึ่งในสามรายการนี้ต้องกรอกคีย์ใหม่ก่อนบันทึก ระบบไม่ส่งคีย์เดิมต่อไปยัง endpoint ใหม่
+
+API Base URL ต้องจบที่ฐาน API เช่น `/v1` หรือ `/v1beta` ไม่ต่อ `/images/generations`, `/images/edits`, `/interactions` หรือ operation อื่น Public endpoint ต้องเป็น HTTPS; loopback/LAN ต้องอนุญาต private endpoint แยกต่างหาก ระบบตรวจ DNS และไม่ตาม redirect พร้อม credentials ไม่มี provider ทดสอบส่วนตัวหรือคีย์ตัวอย่างจริงฝังใน preset
 
 Session key อยู่ในหน่วยความจำ: ต้องกรอกใหม่หลัง DODO รีสตาร์ต ส่วน macOS Keychain ใช้เก็บคีย์ข้ามรอบได้ การตั้งค่าโมเดล/โปรเจกต์ยังอยู่ใน private state เมื่อไม่มีคีย์ ระบบรายงานข้อผิดพลาดโดยไม่เปลี่ยนไปใช้ connection อื่นเอง ใน managed mode เจ้าของต้องอนุญาต client ในสิทธิ์ AI ของโปรเจกต์ด้วย
 
-อ่านรูปแบบและข้อจำกัดโมเดลภาพจาก [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation) ส่วนการรองรับวิดีโอต้องตรวจจากปลายทางที่เลือกเอง เอกสาร OpenAI Videos API เป็นข้อมูลรูปแบบเดิม ไม่ใช่การรับรองว่าปลายทางนั้นยังเปิดบริการ
+หากการบันทึกคีย์และ connection ไม่สำเร็จครบ ระบบจะพักการใช้ connection นั้นและขอให้กรอกคีย์ใหม่ แม้รีสตาร์ตแล้วก็จะไม่ส่งคีย์ที่อาจจับคู่กับ URL ผิดออกไป เมื่อยืนยัน URL/protocol/storage และบันทึกคีย์ใหม่สำเร็จจึงใช้งานต่อได้
+
+## รูปแบบ API สำหรับภาพ
+
+| Preset / รูปแบบ | ค่าเริ่มต้น | วิธีส่งคำขอ |
+|---|---|---|
+| OpenAI / OpenAI-compatible Images | `https://api.openai.com/v1` · `gpt-image-2.5-flare` | `POST /images/generations`, multipart `POST /images/edits`; Bearer key |
+| Google Gemini / Gemini Interactions | `https://generativelanguage.googleapis.com/v1beta` · `gemini-nano-banana-2.1` | `POST /interactions`; `x-goog-api-key`, inline PNG |
+| Custom / API ภายนอก | เจ้าของกรอก URL และ Model ID | เลือกรูปแบบ OpenAI-compatible Images หรือ Gemini Interactions ให้ตรงกับปลายทาง |
+
+เลือกรูปแบบตาม API ที่บริการนั้นรับจริง ไม่เดาจากชื่อ provider หรือชื่อโมเดล ตัวอย่างเช่น gateway ที่ให้โมเดล Gemini ผ่าน `/images/generations` ต้องเลือก OpenAI-compatible Images ส่วน Gemini native ใช้ Interactions โหลดรายชื่อ Gemini แล้วระบบตัด `models/` ออกจากชื่อ resource เพื่อใช้เป็น Model ID
+
+อ่านรูปแบบและข้อจำกัดจาก [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation) และ [Google Gemini image generation](https://aistudio.google.com/docs/image-generation) การรองรับวิดีโอต้องตรวจจากปลายทางที่เลือกเอง Gemini image protocol ไม่ถือว่ารองรับ video compatibility เอกสาร OpenAI Videos API เป็นข้อมูลรูปแบบเดิม ไม่ใช่การรับรองว่าปลายทางนั้นยังเปิดบริการ
 
 ## เครื่องมือ
 
@@ -34,9 +50,9 @@ Session key อยู่ในหน่วยความจำ: ต้องก
 
 Full surface มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ operations เดียวกันผ่าน `dodo_media` ตรวจ schema ล่าสุดด้วย `dodo_discover` และรับ `workspaceId`/`workspaceEpoch` จาก `project_overview` ก่อนเรียก ไม่มีเครื่องมือสร้างโมเดล 3D ในฟีเจอร์นี้
 
-งานสร้างภาพรองรับขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` พร้อม quality และ background ที่เลือกได้ Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามความสามารถของปลายทาง/โมเดล ไม่มีการลดขนาด เปลี่ยนโมเดล หรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
+งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 
-การเชื่อมต่อภาพที่เข้ากันได้ต้องคืน PNG แบบ `b64_json` ส่วนวิดีโอต้องรองรับ operation ที่เรียกจริง ไม่อนุมานจากการที่ text chat หรือภาพใช้ได้ ไม่ดาวน์โหลดภาพจาก URL ที่ปลายทางส่งกลับ ไม่ตาม redirect และไม่ส่ง credentials ต่อไปยัง URL อื่น หากรูปแบบไม่รองรับจะรายงานปัญหาโดยไม่ส่งงานซ้ำ
+OpenAI-compatible Images ต้องคืน PNG แบบ `b64_json`; Gemini ต้องคืน inline base64 PNG จาก Interactions ไม่ดาวน์โหลดภาพจาก URL ที่ปลายทางส่งกลับ ไม่ตาม redirect และไม่ส่ง credentials ต่อไปยัง URL อื่น การตั้งค่าผ่านหรือการที่ text chat ใช้ได้ไม่รับรอง operation ภาพ/วิดีโอ หากรูปแบบไม่รองรับจะรายงานปัญหาโดยไม่ส่งงานซ้ำ การตรวจรับ Google Gemini native ใช้ protocol fixtures และยังไม่มี live acceptance ด้วยคีย์ทางการในการตรวจรับครั้งนี้ ดู [Test report](TEST_REPORT.md)
 
 ## ครอปและลบพื้นหลัง
 
@@ -46,7 +62,7 @@ Full surface มีเครื่องมือรายตัว ส่วน
 
 เลือก `regions` หรือ `grid` อย่างใดอย่างหนึ่ง `grid` รับ `rows`, `columns`, `gap` และ `margin` เป็นจำนวนเต็มพิกเซล ค่า gap/margin เริ่มต้นเป็น 0 และมีได้ไม่เกิน 16 ช่องรวม เรียงผลจากซ้ายไปขวาแล้วลงแถวถัดไป เมื่อหารพิกเซลไม่ลงตัว ช่องต้นแถว/คอลัมน์จะรับส่วนเกิน ทำให้ขนาดต่างกันไม่เกิน 1 พิกเซลและไม่ทิ้งพื้นที่ที่แบ่งได้
 
-การลบพื้นหลังใช้ generative image edit จึงอาจเปลี่ยนรายละเอียดของวัตถุได้ ระบบตรวจว่าผล PNG มีพิกเซลโปร่งใสจริง หากได้ภาพทึบจะรายงานปัญหาและไม่อ้างว่าลบพื้นหลังสำเร็จ ไม่มีการส่งภาพอื่นหรือทั้งโปรเจกต์เพิ่มเอง
+การลบพื้นหลังใช้ generative image edit จึงอาจเปลี่ยนรายละเอียดของวัตถุได้ แต่ละบริการ/โมเดลอาจรองรับ transparency และการปรับคุณภาพไม่เท่ากัน ระบบตรวจว่าผล PNG มีพิกเซลโปร่งใสจริง หากได้ภาพทึบจะรายงานปัญหาและไม่อ้างว่าลบพื้นหลังสำเร็จ ไม่มีการส่งภาพอื่นหรือทั้งโปรเจกต์เพิ่มเอง
 
 ตัวอย่างครอปผ่าน Compact surface:
 

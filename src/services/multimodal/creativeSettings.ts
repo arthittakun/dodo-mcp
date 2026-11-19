@@ -11,6 +11,13 @@ export const CREATIVE_MEDIA_DEFAULTS = {
   videoModel: '',
 } as const;
 
+/** Image protocol presets are editable starting points, not routing restrictions. */
+export const CREATIVE_IMAGE_PRESETS = [
+  { id: 'openai', name: 'OpenAI', provider: 'openai', protocol: 'responses', baseUrl: 'https://api.openai.com/v1', imageModel: 'gpt-image-2.5-flare' },
+  { id: 'gemini', name: 'Google Gemini', provider: 'gemini', protocol: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', imageModel: 'gemini-nano-banana-2.1' },
+  { id: 'custom', name: 'OpenAI-compatible / Custom', provider: 'custom', protocol: 'responses', baseUrl: '', imageModel: '' },
+] as const;
+
 const Model = z.string().trim().min(1).max(200).regex(/^[a-zA-Z0-9_./:-]+$/);
 export const CreativeSettingsInput = z.object({
   enabled: z.boolean().default(false),
@@ -24,8 +31,7 @@ export const CreativeSettingsInput = z.object({
 export type CreativeSettings = z.infer<typeof CreativeSettingsInput>;
 
 export function isCreativeConnection(connection: Provider): boolean {
-  return connection.enabled && ['openai', 'custom'].includes(connection.provider)
-    && ['responses', 'chat-completions'].includes(connection.protocol);
+  return connection.enabled && ['responses', 'chat-completions', 'gemini'].includes(connection.protocol);
 }
 
 /** The official Videos API is retired; changing a display label cannot make it available. */
@@ -35,5 +41,6 @@ export function isOfficialOpenAIVideoConnection(connection: Provider): boolean {
 }
 
 export function supportsCreativeVideoConnection(connection: Provider): boolean {
-  return isCreativeConnection(connection) && !isOfficialOpenAIVideoConnection(connection);
+  return connection.enabled && ['responses', 'chat-completions'].includes(connection.protocol)
+    && !isOfficialOpenAIVideoConnection(connection);
 }

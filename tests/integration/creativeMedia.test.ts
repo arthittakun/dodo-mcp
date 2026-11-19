@@ -161,6 +161,15 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     expect(CreativeProvider.prototype.removeBackground).toHaveBeenCalledTimes(1);
   });
 
+  it('does not report transparent generation as success when a provider returns opaque pixels', async () => {
+    vi.mocked(CreativeProvider.prototype.generateImage).mockImplementation(async (_input, _signal, beforeSend) => { beforeSend?.(); return { bytes: opaque, mimeType: 'image/png' }; });
+    const args = { prompt: 'Transparent output fixture', background: 'transparent', idempotencyKey: 'creative-generate-opaque' };
+    const started = job(await call('image_generate', args)), output = await finished(started.jobId);
+    expect(output.data.status).toBe('uncertain'); expect(output.data.error).toBe('UNSUPPORTED_ENCODING'); expect(output.data.resource).toBeNull();
+    expect(job(await call('image_generate', args)).jobId).toBe(started.jobId);
+    expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(1);
+  });
+
   it('submits one video and only polls/downloads that render into an owned MP4 resource', async () => {
     let polls = 0;
     vi.mocked(CreativeProvider.prototype.videoStatus).mockImplementation(async (id, _signal, beforeSend) => { beforeSend?.(); polls++; return { id, status: polls === 1 ? 'in_progress' : 'completed', progress: polls === 1 ? 50 : 100 }; });

@@ -8,7 +8,7 @@ import type { Provider } from './contracts.js';
 export function validateEndpoint(connection: Provider, adminPorts: number[]): URL {
   const u = new URL(connection.baseUrl);
   if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash) throw new DodoError('INVALID_INPUT', 'provider URL must be an HTTP(S) base URL without credentials, query or fragment');
-  if (/(?:^|\/)(?:models|responses|messages|interactions|chat\/completions|chat|tags|show)\/?$/.test(u.pathname)) throw new DodoError('INVALID_INPUT', 'provider URL must stop at the API base (for example /v1); remove /models, /responses, /messages or /chat/completions');
+  if (/(?:^|\/)(?:models(?:\/[^/]+)?|responses|messages|interactions(?:\/[^/]+)?|chat\/completions|chat|tags|show|images(?:\/(?:generations|edits))?|videos(?:\/[^/]+(?:\/content)?)?)\/?$/.test(u.pathname)) throw new DodoError('INVALID_INPUT', 'provider URL must stop at the API base (for example /v1 or /v1beta); remove endpoint paths such as /models, /images/generations, /interactions or /chat/completions');
   if (u.protocol === 'http:' && !connection.allowPrivateNetwork) throw new DodoError('FORBIDDEN', 'HTTP requires explicit private endpoint permission');
   if (adminPorts.includes(Number(u.port || (u.protocol === 'https:' ? 443 : 80)))) throw new DodoError('FORBIDDEN', 'DODO control and MCP ports cannot be AI endpoints');
   return u;

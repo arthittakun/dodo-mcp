@@ -21,7 +21,7 @@ function use(ctx: ToolCtx) {
 }
 const generate = defineTool({
   name: 'image_generate', title: 'Generate an image',
-  description: 'Start ONE paid image generation with the owner-configured OpenAI-compatible media connection (OpenAI default). No API URL/key/model override in tool arguments. Requires owner enablement for this project and existing exec policy. Returns jobId immediately; call creative_job to collect a real image resource and preview. No automatic retries; reuse the SAME idempotencyKey to recover a lost response.',
+  description: 'Start ONE paid image generation with the owner-configured image connection: OpenAI-compatible Images or native Gemini. The owner can configure provider, API base URL, key and model in Creative Media settings. No URL/key override in tool arguments. Requires project enablement and exec policy. Returns jobId; creative_job collects output. No automatic retries; reuse the same idempotencyKey after a lost response.',
   input: { prompt: z.string().trim().min(1).max(16000), size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('1024x1024'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'), background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key },
   output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'image_generate', idempotencyKey, input, () => mm.creative.start(ctx, 'image', input), true, ['AUTH_REQUIRED']) }; },

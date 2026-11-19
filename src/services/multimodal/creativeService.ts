@@ -54,7 +54,7 @@ export class CreativeService {
     }
     if (upload && !config.allowImageUpload) throw new DodoError('FORBIDDEN', 'owner has not enabled image upload for this media operation');
     const connection = settings.connection(config.connectionId);
-    if (!isCreativeConnection(connection)) throw new DodoError('NOT_SUPPORTED', 'Creative Media needs an enabled OpenAI-compatible connection');
+    if (!isCreativeConnection(connection)) throw new DodoError('NOT_SUPPORTED', 'Creative Media needs an enabled OpenAI-compatible Images or Gemini image connection');
     return { settings, config, connection, digest: digestOf({ connection, imageModel: config.imageModel, videoModel: config.videoModel }) };
   }
   private videoConfiguration(ctx: ToolCtx, upload = false) {
@@ -198,7 +198,8 @@ export class CreativeService {
         const result = kind === 'background_removal' ? await provider.removeBackground({ model: record.model, image: image! }, controller.signal, beforeSend)
           : await provider.generateImage({ ...input as Omit<CreativeImageInput, 'model'>, model: record.model }, controller.signal, beforeSend);
         this.configuration(ctx, kind === 'background_removal'); source?.guard();
-        const normalized = await normalizeCreativeImage(result.bytes, kind === 'background_removal');
+        const transparent = kind === 'background_removal' || (input as Partial<CreativeImageInput>).background === 'transparent';
+        const normalized = await normalizeCreativeImage(result.bytes, transparent);
         record.resource = await this.resources().ingestGenerated(ctx, normalized.bytes, 'image/png', jobId, { width: normalized.width, height: normalized.height, format: 'png' });
         record.status = 'completed'; record.progress = 100;
       }

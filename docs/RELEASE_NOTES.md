@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.5.1 — Configurable image providers
+
+- Create and edit image connections directly in Creative Media: provider name, protocol, API base URL, key, model and credential storage are editable. OpenAI and Google Gemini presets are starting points; external compatible services use Custom.
+- Add native Gemini Interactions image generation/edit requests alongside OpenAI-compatible Images, with protocol-specific authentication and bounded inline PNG output. Model listing and manual model IDs are both supported.
+- Require fresh credentials for endpoint/protocol/storage changes and keep private test configuration out of shipped files. A transparent request must produce actual transparent pixels.
+- See [release details](RELEASE_1.5.1.md), [configuration guide](CREATIVE_MEDIA.md) and [validation](TEST_REPORT.md).
+
 ## 1.5.0 — Creative Media
 
 - Add image generation, lossless local PNG regions/grid crops and transparent-background edits, with OpenAI as the image default.

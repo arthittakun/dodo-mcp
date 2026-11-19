@@ -487,35 +487,87 @@
   function creativeMedia(body) {
     const defaults=state.mediaDefaults||{name:'OpenAI Media',baseUrl:'https://api.openai.com/v1',imageModel:'gpt-image-2.5-flare',videoModel:''};
     const current=state.media||{enabled:false,connectionId:null,imageModel:defaults.imageModel,videoEnabled:false,videoModel:defaults.videoModel,allowImageUpload:false,projectIds:[]};
-    const s=section('Creative Media','สร้างภาพและลบพื้นหลังด้วย OpenAI เป็นค่าเริ่มต้น ส่วนครอปภาพทำในเครื่องได้โดยไม่ใช้ API key');s.id='wb-creative-media';body.append(s);
+    const s=section('Creative Media','สร้างภาพและลบพื้นหลังด้วยบริการทางการหรือ API ภายนอกที่รองรับ เลือก preset หรือกรอก API URL และคีย์เองได้ ส่วนครอปภาพทำในเครื่อง');s.id='wb-creative-media';body.append(s);
     s.append(el('p','การสร้างสื่อส่ง prompt ไปยัง connection ที่เลือกและอาจมีค่าใช้จ่าย การบันทึกตั้งค่าไม่เรียกโมเดล ไม่สร้างสื่อ และไม่ส่งไฟล์ การลบพื้นหลังและวิดีโอจากภาพอ้างอิงต้องเปิดอนุญาตอัปโหลดภาพก่อน','muted'));
-    const setup=el('details');setup.append(el('summary','เพิ่ม OpenAI สำหรับงานสื่อ'));
+    const presets=state.mediaPresets||[
+      {id:'openai',name:'OpenAI',provider:'openai',protocol:'responses',baseUrl:'https://api.openai.com/v1',imageModel:defaults.imageModel},
+      {id:'gemini',name:'Google Gemini',provider:'gemini',protocol:'gemini',baseUrl:'https://generativelanguage.googleapis.com/v1beta',imageModel:'gemini-nano-banana-2.1'},
+      {id:'custom',name:'Custom / API ภายนอก',provider:'custom',protocol:'responses',baseUrl:'',imageModel:''},
+    ];
+    const setup=el('details');setup.append(el('summary','เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ'));
     const keyForm=el('form',undefined,'wb-form');keyForm.onsubmit=e=>e.preventDefault();setup.append(keyForm);s.append(setup);
+    let editing,providerType='openai';
+    const providerPreset=choice(keyForm,'Provider preset','mediaProviderPreset',presets.map(p=>[p.id,p.name]),'openai');
+    const providerName=field(keyForm,'ชื่อ connection','mediaProviderName',defaults.name||'OpenAI Media');
+    const protocol=choice(keyForm,'รูปแบบ API สำหรับภาพ','mediaProtocol',[['responses','OpenAI-compatible Images API'],['chat-completions','OpenAI-compatible Images API (Chat connection)'],['gemini','Gemini Interactions API']],'responses');
+    const baseUrl=field(keyForm,'API Base URL','mediaBaseUrl',defaults.baseUrl||'https://api.openai.com/v1');baseUrl.placeholder='https://api.example.com/v1';
+    const providerModel=field(keyForm,'Model ID สำหรับ connection นี้','mediaProviderModel',defaults.imageModel);providerModel.autocomplete='off';providerModel.spellcheck=false;
     const credentialStorage=choice(keyForm,'เก็บ API key','mediaCredentialStorage',[['session','เฉพาะรอบนี้ (ต้องใส่ใหม่เมื่อรีสตาร์ต)'],['keychain','macOS Keychain']],'session');
-    const key=field(keyForm,'OpenAI API key','mediaApiKey','','password');
-    keyForm.append(button('บันทึก OpenAI สำหรับงานสื่อ',async()=>{
-      const apiKey=key.value;key.value='';if(!apiKey)throw new Error('กรอก OpenAI API key ก่อนบันทึก');
-      const connection=await api('ai/connection',{connection:{name:defaults.name,provider:'openai',protocol:'responses',baseUrl:defaults.baseUrl,enabled:true,allowPrivateNetwork:false,credentialStorage:credentialStorage.value},apiKey});
-      await api('ai/media',{...current,connectionId:connection.id,videoEnabled:false});notice('เพิ่ม OpenAI แล้ว เลือกโปรเจกต์และเปิด Creative Media เพื่อใช้งาน');await show('providers');
+    const key=field(keyForm,'API key ใหม่ (เว้นว่างเพื่อใช้คีย์เดิมเมื่อแก้ไข)','mediaApiKey','','password');key.autocomplete='new-password';
+    const privateNetwork=check(keyForm,'อนุญาต connection นี้เข้าปลายทาง loopback / LAN','mediaPrivateNetwork');
+    const providerEnabled=check(keyForm,'เปิดใช้งาน connection นี้','mediaProviderEnabled',true);
+    const connectionState=el('p','กรอก Base URL ของ API โดยไม่ต่อชื่อ operation การเปลี่ยน URL, รูปแบบ API หรือวิธีเก็บคีย์ต้องกรอกคีย์ใหม่','wb-status');connectionState.setAttribute('role','status');keyForm.append(connectionState);
+    keyForm.append(button('บันทึก Provider สำหรับภาพ',async()=>{
+      const apiKey=key.value;key.value='';
+      if(!providerName.value.trim()||!baseUrl.value.trim())throw new Error('กรอกชื่อ connection และ API Base URL ก่อนบันทึก');
+      if(!providerModel.value.trim())throw new Error('กรอก Model ID ที่ provider นี้รองรับก่อนบันทึก');
+      if(!editing&&!apiKey)throw new Error('กรอก API key สำหรับ connection ใหม่');
+      const previous=editing?state.connections.find(c=>c.id===editing):undefined;
+      if(previous&&!apiKey&&(previous.baseUrl!==baseUrl.value.trim()||previous.protocol!==protocol.value||previous.credentialStorage!==credentialStorage.value))throw new Error('กรอก API key ใหม่เมื่อเปลี่ยน URL, รูปแบบ API หรือวิธีเก็บคีย์');
+      if(editing===current.connectionId&&current.videoEnabled&&!videoEligible({protocol:protocol.value,baseUrl:baseUrl.value.trim()}))throw new Error('ปิดวิดีโอและบันทึก Creative Media ก่อนเปลี่ยน connection นี้เป็นรูปแบบภาพที่ไม่รองรับวิดีโอ');
+      const saved=await api('ai/connection',{connection:{...(editing?{id:editing}:{}),name:providerName.value.trim(),provider:providerType,protocol:protocol.value,baseUrl:baseUrl.value.trim(),enabled:providerEnabled.checked,allowPrivateNetwork:privateNetwork.checked,credentialStorage:credentialStorage.value},...(apiKey?{apiKey}:{})});
+      modelCatalog.delete(saved.id);
+      await api('ai/media',{...current,connectionId:saved.id,imageModel:providerModel.value.trim(),videoEnabled:current.connectionId===saved.id&&current.videoEnabled===true&&videoEligible(saved)});
+      notice('บันทึก Provider สำหรับภาพแล้ว เลือกโปรเจกต์และเปิด Creative Media เพื่อใช้งาน');await show('providers');
     },'btn primary'));
     const f=el('form',undefined,'wb-form');f.onsubmit=e=>e.preventDefault();s.append(f);
     const enabled=check(f,'เปิดสร้างสื่อผ่าน AI ในโปรเจกต์ที่เลือก','mediaEnabled',current.enabled);
-    const compatible=state.connections.filter(c=>c.enabled&&['openai','custom'].includes(c.provider)&&['responses','chat-completions'].includes(c.protocol));
+    const compatible=state.connections.filter(c=>c.enabled&&['responses','chat-completions','gemini'].includes(c.protocol));
     const connection=choice(f,'การเชื่อมต่อสำหรับงานสื่อ','mediaConnection',[['','เลือก connection…'],...compatible.map(c=>[c.id,`${c.name} · key ${c.credentialPresent?'พร้อม':'ต้องใส่ใหม่'}`])],current.connectionId||'');
     const imageModel=field(f,'โมเดลสร้างภาพ / ลบพื้นหลัง','mediaImageModel',current.imageModel);
+    const modelPicker=choice(f,'โมเดลที่โหลดได้','mediaModelPicker',[['','เลือก Model ID…']],'');modelPicker.parentElement.hidden=true;
+    const modelState=el('p','กรอก Model ID เอง หรือโหลดรายชื่อโมเดลของ connection ที่เลือก','wb-status');modelState.setAttribute('role','status');f.append(modelState);
+    const refreshModels=()=>{
+      const ids=modelCatalog.get(connection.value)||[];modelPicker.replaceChildren();
+      for(const [id,label] of [['','เลือก Model ID…'],...ids.map(id=>[id,id])]){const option=el('option',label);option.value=id;modelPicker.append(option);}
+      modelPicker.parentElement.hidden=!ids.length;modelPicker.value=ids.includes(imageModel.value)?imageModel.value:'';
+    };
+    modelPicker.onchange=()=>{if(modelPicker.value)imageModel.value=modelPicker.value;};
+    f.append(button('โหลดโมเดลสำหรับภาพ',async()=>{
+      if(!connection.value)throw new Error('เลือก connection ก่อนโหลดโมเดล');
+      const requestedConnection=connection.value;
+      modelState.textContent='กำลังโหลดรายชื่อโมเดล…';
+      try{const models=await api('ai/models',{connectionId:requestedConnection});const ids=[...new Set(models.map(m=>String(m.id||'')).filter(Boolean))];modelCatalog.set(requestedConnection,ids);if(connection.value!==requestedConnection)return;refreshModels();modelState.textContent=ids.length?`พบ ${ids.length} โมเดล เลือก Model ID ที่รองรับภาพ หรือพิมพ์เอง`:'ปลายทางไม่ส่งรายชื่อโมเดล กรุณากรอก Model ID เอง';}
+      catch(error){if(connection.value!==requestedConnection)return;modelState.textContent=`โหลดโมเดลไม่สำเร็จ: ${error.message} — กรอก Model ID เองได้ ระบบไม่ retry อัตโนมัติ`;throw error;}
+    }));
+    const fillPreset=()=>{
+      const preset=presets.find(p=>p.id===providerPreset.value);if(!preset)return;
+      editing=undefined;providerType=preset.provider;providerName.value=preset.name;protocol.value=preset.protocol;baseUrl.value=preset.baseUrl;key.value='';providerEnabled.checked=true;privateNetwork.checked=false;
+      providerModel.value=preset.imageModel||'';connectionState.textContent='กำลังสร้าง connection ใหม่ กรอก URL, API key และโมเดลที่ปลายทางรองรับ';
+    };providerPreset.onchange=fillPreset;
+    keyForm.append(button('สร้าง connection ใหม่',()=>{providerPreset.value='openai';fillPreset();setup.open=true;}));
+    f.append(button('แก้ไข connection ที่เลือก',()=>{
+      const selectedConnection=state.connections.find(c=>c.id===connection.value);if(!selectedConnection)throw new Error('เลือก connection ที่ต้องการแก้ไขก่อน');
+      editing=selectedConnection.id;providerType=selectedConnection.provider;
+      providerPreset.value=presets.find(p=>p.provider===selectedConnection.provider&&p.protocol===selectedConnection.protocol&&p.baseUrl===selectedConnection.baseUrl)?.id||'custom';
+      providerName.value=selectedConnection.name;protocol.value=selectedConnection.protocol;baseUrl.value=selectedConnection.baseUrl;credentialStorage.value=selectedConnection.credentialStorage||'session';privateNetwork.checked=selectedConnection.allowPrivateNetwork===true;providerEnabled.checked=selectedConnection.enabled;key.value='';
+      providerModel.value=imageModel.value;
+      connectionState.textContent='กำลังแก้ไข connection เดิม เว้นคีย์ว่างเพื่อคงคีย์เดิมได้เมื่อ URL, รูปแบบ API และวิธีเก็บคีย์ไม่เปลี่ยน';setup.open=true;providerName.focus();
+    }));
     const video=el('fieldset');video.append(el('legend','วิดีโอแบบ compatible'));f.append(video);
     video.append(el('p','OpenAI ยุติ Sora 2 และ Videos API เมื่อ 24 กันยายน 2026 จึงปิดวิดีโอไว้และไม่ตั้งโมเดลให้อัตโนมัติ ตัวเชื่อมต่อนี้เตรียมไว้สำหรับ connection ที่ยังรองรับ ต้องตรวจสิทธิ์และโมเดลกับปลายทางก่อนเปิดใช้','muted'));
     const videoEnabled=check(video,'เปิดวิดีโอสำหรับ connection ที่รองรับ','mediaVideoEnabled',current.videoEnabled===true);
     const videoModel=field(video,'โมเดลวิดีโอที่ปลายทางรองรับ','mediaVideoModel',current.videoModel||'');videoModel.placeholder='กรอก Model ID หลังตรวจว่าปลายทางรองรับ';
     const videoState=el('p',undefined,'muted');video.append(videoState);
+    const videoEligible=c=>{if(!c||!['responses','chat-completions'].includes(c.protocol))return false;try{return new URL(c.baseUrl).hostname.toLowerCase().replace(/\.$/,'')!=='api.openai.com';}catch{return false;}};
     const updateVideo=()=>{
       const selectedConnection=compatible.find(c=>c.id===connection.value);let official=false;
       try{official=!!selectedConnection&&new URL(selectedConnection.baseUrl).hostname.toLowerCase().replace(/\.$/,'')==='api.openai.com';}catch{/* invalid connections cannot be saved by the owner API */}
-      videoEnabled.disabled=!selectedConnection||official;
+      videoEnabled.disabled=!videoEligible(selectedConnection);
       if(videoEnabled.disabled)videoEnabled.checked=false;
       videoModel.disabled=videoEnabled.disabled||!videoEnabled.checked;
-      videoState.textContent=official?'connection นี้ใช้ OpenAI: สร้างภาพและลบพื้นหลังได้ แต่วิดีโอปิดให้บริการแล้ว':selectedConnection?'เปิดวิดีโอเฉพาะเมื่อปลายทางรองรับรูปแบบ compatible จริง การบันทึกไม่ทดสอบหรือเรียกโมเดล':'เลือก connection ที่รองรับก่อนตั้งค่าวิดีโอ';
-    };connection.onchange=updateVideo;videoEnabled.onchange=updateVideo;updateVideo();
+      videoState.textContent=official?'connection นี้ใช้ OpenAI: สร้างภาพและลบพื้นหลังได้ แต่วิดีโอปิดให้บริการแล้ว':selectedConnection?.protocol==='gemini'?'Gemini image connection ใช้สำหรับภาพเท่านั้น ตัวเชื่อมต่อวิดีโอต้องรองรับรูปแบบ video compatible':selectedConnection?'เปิดวิดีโอเฉพาะเมื่อปลายทางรองรับรูปแบบ compatible จริง การบันทึกไม่ทดสอบหรือเรียกโมเดล':'เลือก connection ที่รองรับก่อนตั้งค่าวิดีโอ';
+    };connection.onchange=()=>{updateVideo();refreshModels();modelState.textContent='กรอก Model ID เอง หรือโหลดรายชื่อโมเดลของ connection ที่เลือก';};videoEnabled.onchange=updateVideo;updateVideo();refreshModels();
     const upload=check(f,'อนุญาตส่งภาพที่เลือกเพื่อลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอ','mediaAllowImageUpload',current.allowImageUpload);
     const projects=el('fieldset');projects.append(el('legend','โปรเจกต์ที่อนุญาตให้เรียก AI สร้างสื่อ'));f.append(projects);
     const boxes=state.projects.filter(p=>p.available).map(p=>[p.projectId,check(projects,p.displayName,`mediaProject-${p.projectId}`,current.projectIds.includes(p.projectId))]);

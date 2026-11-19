@@ -15,6 +15,7 @@ const VIDEO_CAP = 64 * MiB;
 const DEADLINE_MS = 180000;
 const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const VIDEO_ID = /^[a-zA-Z0-9_-]{1,200}$/;
+const REMOVE_BACKGROUND = 'Remove only the background from this image. Preserve the main foreground subject, its colors, fine details, shape and proportions. Do not add objects, shadows or text. Return the isolated foreground on a fully transparent background.';
 
 export interface CreativeImageInput {
   model: string;
@@ -41,10 +42,10 @@ function multipart(fields: Record<string, string>, image?: Buffer, imageField: '
   return { bytes: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
 }
 
-/** OpenAI image/video endpoints only. Credentials and provider-controlled URLs never reach tool results. */
+/** OpenAI-compatible Images/video and native Gemini Interactions. Credentials and provider-controlled URLs never reach tool results. */
 export class CreativeProvider {
   constructor(private readonly connection: Provider, private readonly key: string, private readonly ports: number[]) {
-    if (!connection.enabled || !['responses', 'chat-completions'].includes(connection.protocol)) throw new DodoError('NOT_SUPPORTED', 'creative media requires an enabled OpenAI-compatible connection');
+    if (!connection.enabled || !['responses', 'chat-completions', 'gemini'].includes(connection.protocol)) throw new DodoError('NOT_SUPPORTED', 'creative media requires an enabled OpenAI-compatible or Gemini image connection');
     validateEndpoint(connection, ports);
     if (!key) throw new DodoError('AUTH_REQUIRED', 'configure an API key for creative media first');
     if (key.length > 4096 || /[\x00-\x20\x7f]/.test(key)) throw new DodoError('INVALID_INPUT', 'invalid creative media credential');
@@ -68,7 +69,8 @@ export class CreativeProvider {
     }
     const chosen = addresses.find(entry => entry.family === 4) ?? addresses[0]!;
     const url = new URL(`${base.toString().replace(/\/$/, '')}/${suffix}`);
-    if ((body?.bytes.length ?? 0) > IMAGE_CAP + MiB) throw new DodoError('RESOURCE_LIMIT', 'creative media request exceeds its upload budget');
+    const uploadCap = this.connection.protocol === 'gemini' ? JSON_CAP : IMAGE_CAP + MiB;
+    if ((body?.bytes.length ?? 0) > uploadCap) throw new DodoError('RESOURCE_LIMIT', 'creative media request exceeds its upload budget');
     if (active.aborted) throw new DodoError('CONFLICT', 'creative media request canceled before sending');
     beforeSend?.();
     return new Promise((resolve, reject) => {
@@ -77,7 +79,7 @@ export class CreativeProvider {
       try {
         request = (url.protocol === 'https:' ? https : http).request(url, {
           method: body ? 'POST' : 'GET', agent: false, signal: active,
-          headers: { authorization: `Bearer ${this.key}`, accept: suffix.endsWith('/content') ? 'video/mp4' : 'application/json', 'accept-encoding': 'identity', ...(body ? { 'content-type': body.contentType, 'content-length': String(body.bytes.length) } : {}) },
+          headers: { ...(this.connection.protocol === 'gemini' ? { 'x-goog-api-key': this.key, 'api-revision': '2026-05-20' } : { authorization: `Bearer ${this.key}` }), accept: suffix.endsWith('/content') ? 'video/mp4' : 'application/json', 'accept-encoding': 'identity', ...(body ? { 'content-type': body.contentType, 'content-length': String(body.bytes.length) } : {}) },
           lookup: (_hostname, options, callback) => {
             if (typeof options === 'object' && options.all) callback(null, [chosen]);
             else callback(null, chosen.address, chosen.family);
@@ -128,12 +130,39 @@ export class CreativeProvider {
     const response = this.json(bytes);
     const item = Array.isArray(response.data) && response.data.length === 1 ? response.data[0] as { b64_json?: unknown } : undefined;
     if (!item || typeof item.b64_json !== 'string') throw new DodoError('NOT_SUPPORTED', 'creative media must return one base64 PNG image; remote image URLs are not downloaded');
-    const encoded = item.b64_json;
+    return this.png(item.b64_json);
+  }
+
+  private png(encoded: string): CreativeImageResult {
     if (encoded.length > Math.ceil(IMAGE_CAP / 3) * 4) throw new DodoError('RESOURCE_LIMIT', 'generated image exceeds 16 MiB');
     const decoded = Buffer.from(encoded, 'base64');
     if (decoded.length > IMAGE_CAP) throw new DodoError('RESOURCE_LIMIT', 'generated image exceeds 16 MiB');
     if (decoded.toString('base64') !== encoded || !decoded.subarray(0, PNG_HEADER.length).equals(PNG_HEADER)) throw new DodoError('NOT_SUPPORTED', 'creative media did not return a supported PNG image');
     return { bytes: decoded, mimeType: 'image/png' };
+  }
+
+  private geminiImage(bytes: Buffer): CreativeImageResult {
+    const response = this.json(bytes);
+    if (response.status !== undefined && response.status !== 'completed') throw new DodoError('NOT_SUPPORTED', 'Gemini image generation did not complete; request was not retried');
+    const object = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    let images: Record<string, unknown>[];
+    if (Array.isArray(response.steps)) {
+      images = response.steps.flatMap(step => {
+        const value = object(step);
+        return value.type === 'model_output' && Array.isArray(value.content) ? value.content.map(object).filter(item => item.type === 'image') : [];
+      });
+    } else if (response.output_image !== undefined) images = [object(response.output_image)];
+    else images = Array.isArray(response.outputs) ? response.outputs.map(object).filter(item => item.type === 'image') : [];
+    if (images.length !== 1 || typeof images[0]!.data !== 'string' || (images[0]!.mime_type !== undefined && images[0]!.mime_type !== 'image/png')) throw new DodoError('NOT_SUPPORTED', 'Gemini must return one inline base64 PNG image; remote image URLs are not downloaded');
+    return this.png(images[0]!.data as string);
+  }
+
+  /** Current native contract: https://aistudio.google.com/docs/image-generation.
+   * API revision and stateless mode are explicit; no provider URL is taken from a response.
+   */
+  private async geminiRequest(model: string, input: string | Array<Record<string, string>>, format: Record<string, string>, signal?: AbortSignal, beforeSend?: () => void): Promise<CreativeImageResult> {
+    const bytes = Buffer.from(JSON.stringify({ model, input, store: false, stream: false, response_format: { type: 'image', mime_type: 'image/png', ...format } }));
+    return this.geminiImage(await this.request('interactions', { bytes, contentType: 'application/json' }, JSON_CAP, signal, beforeSend));
   }
 
   private validateModel(model: string): void {
@@ -147,6 +176,7 @@ export class CreativeProvider {
    * remains available only for owner-configured compatibility providers.
    */
   private requireVideoCompatibility(): void {
+    if (this.connection.protocol === 'gemini') throw new DodoError('NOT_SUPPORTED', 'Gemini image connections do not implement OpenAI-compatible video operations');
     const hostname = new URL(this.connection.baseUrl).hostname.toLowerCase().replace(/\.+$/, '');
     if (hostname === 'api.openai.com') throw new DodoError('NOT_SUPPORTED', 'OpenAI Videos API retired on 2026-09-24; configure a compatible video provider before using video operations');
   }
@@ -154,6 +184,12 @@ export class CreativeProvider {
   async generateImage(input: CreativeImageInput, signal?: AbortSignal, beforeSend?: () => void): Promise<CreativeImageResult> {
     this.validateModel(input.model); this.validatePrompt(input.prompt);
     if (!['auto', '1024x1024', '1536x1024', '1024x1536'].includes(input.size) || !['auto', 'low', 'medium', 'high'].includes(input.quality) || !['auto', 'opaque', 'transparent'].includes(input.background)) throw new DodoError('INVALID_INPUT', 'invalid creative image options');
+    if (this.connection.protocol === 'gemini') {
+      if (input.quality !== 'auto') throw new DodoError('NOT_SUPPORTED', 'Gemini native image generation supports quality=auto; OpenAI quality levels are not silently translated');
+      const background = input.background === 'transparent' ? '\nReturn the image on a fully transparent background.' : input.background === 'opaque' ? '\nUse a fully opaque background.' : '';
+      const aspectRatio = input.size === '1536x1024' ? '3:2' : input.size === '1024x1536' ? '2:3' : input.size === '1024x1024' ? '1:1' : undefined;
+      return this.geminiRequest(input.model, input.prompt + background, { image_size: '1K', ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}) }, signal, beforeSend);
+    }
     const body = Buffer.from(JSON.stringify({ ...input, n: 1, output_format: 'png' }));
     return this.image(await this.request('images/generations', { bytes: body, contentType: 'application/json' }, JSON_CAP, signal, beforeSend));
   }
@@ -162,7 +198,8 @@ export class CreativeProvider {
     this.validateModel(input.model);
     if (input.image.length > IMAGE_CAP) throw new DodoError('RESOURCE_LIMIT', 'background removal image exceeds 16 MiB');
     if (!input.image.subarray(0, PNG_HEADER.length).equals(PNG_HEADER)) throw new DodoError('INVALID_INPUT', 'background removal input must be a PNG image');
-    const body = multipart({ model: input.model, prompt: 'Remove only the background from this image. Preserve the main foreground subject, its colors, fine details, shape and proportions. Do not add objects, shadows or text. Return the isolated foreground on a fully transparent background.', n: '1', background: 'transparent', output_format: 'png', size: 'auto' }, input.image);
+    if (this.connection.protocol === 'gemini') return this.geminiRequest(input.model, [{ type: 'text', text: REMOVE_BACKGROUND }, { type: 'image', mime_type: 'image/png', data: input.image.toString('base64') }], {}, signal, beforeSend);
+    const body = multipart({ model: input.model, prompt: REMOVE_BACKGROUND, n: '1', background: 'transparent', output_format: 'png', size: 'auto' }, input.image);
     return this.image(await this.request('images/edits', body, JSON_CAP, signal, beforeSend));
   }
 

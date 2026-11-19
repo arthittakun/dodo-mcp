@@ -20,7 +20,7 @@
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
-- สร้างภาพด้วยค่าเริ่มต้น OpenAI ครอป/แบ่ง grid เป็น PNG ที่รักษาความโปร่งใส ลบพื้นหลัง พร้อม video compatibility สำหรับสร้างจากข้อความ/ภาพ แก้ไข และต่อคลิปผ่านปลายทางที่รองรับ ([Creative Media](docs/CREATIVE_MEDIA.md))
+- สร้างภาพผ่าน OpenAI, Google Gemini หรือ API ภายนอก โดยกรอก provider/URL/key/model ได้เอง ครอป/แบ่ง grid เป็น PNG ที่รักษาความโปร่งใส ลบพื้นหลัง พร้อม video compatibility สำหรับปลายทางที่รองรับ ([Creative Media](docs/CREATIVE_MEDIA.md))
 - ตรวจและควบคุมมือถือ Android ผ่าน ADB ได้ตั้งแต่ภาพหน้าจอ/UI/logcat ไปจนถึง input, apps, APK, file transfer และ device-side shell โดยจำกัดเฉพาะ serial ที่เจ้าของอนุญาต ([คู่มือ](docs/ANDROID.md))
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - มี Project Brain ที่ทำ incremental AST index สำหรับ symbols, references, imports, routes, tests และ dependencies พร้อม source-hash freshness
@@ -47,7 +47,9 @@ dodo --cli
 
 ### สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ
 
-เปิด **Local Config → Providers & Profiles → Creative Media** เพื่อใส่ OpenAI API key เลือกโมเดล/โปรเจกต์ แล้วเปิดงานภาพผ่าน AI ค่าเริ่มต้นใช้ `gpt-image-2.5-flare` การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องเปิดอนุญาตอัปโหลดภาพที่เลือกเพิ่ม ส่วนครอปแบบ `regions` หรือ `grid` ทำในเครื่องโดยไม่ใช้คีย์
+เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL, key และ Model ID ได้เอง Preset เป็นเพียงค่าเริ่มต้นที่แก้ไขได้ จากนั้นเลือก connection/โปรเจกต์และเปิดงานภาพผ่าน AI โหลดรายชื่อโมเดลจาก connection หรือพิมพ์ ID เองได้ การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องเปิดอนุญาตอัปโหลดภาพ ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
+
+เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage ไม่เปลี่ยน การเปลี่ยนสามค่านี้ต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
 เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) ติดตามงานด้วย `creative_job` และบันทึก PNG/MP4 ด้วย `media_save` งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
 

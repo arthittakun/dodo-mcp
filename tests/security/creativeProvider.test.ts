@@ -42,6 +42,67 @@ describe('bounded creative media provider', () => {
     expect(captured).toEqual([{ path: '/v1/images/generations', auth: `Bearer ${key}`, data: { ...imageInput, n: 1, output_format: 'png' } }]);
   });
 
+  it('uses native Gemini Interactions with scoped headers and stateless PNG output settings', async () => {
+    const captured: Array<{ path: string; auth: string | undefined; key: string | undefined; revision: string | undefined; data: unknown }> = [];
+    const url = await fixture(async (req, res) => {
+      captured.push({ path: req.url!, auth: req.headers.authorization, key: req.headers['x-goog-api-key'] as string | undefined, revision: req.headers['api-revision'] as string | undefined, data: JSON.parse((await body(req)).toString()) });
+      res.end(JSON.stringify({ status: 'completed', steps: [{ type: 'thought', content: [{ type: 'image', uri: 'https://untrusted.invalid/ignored.png' }] }, { type: 'model_output', content: [{ type: 'text', text: 'Generated.' }, { type: 'image', mime_type: 'image/png', data: png.toString('base64') }] }] }));
+    });
+    const before = vi.fn();
+    const input = { ...imageInput, quality: 'auto' as const, background: 'auto' as const, size: '1536x1024' };
+    const result = await new CreativeProvider({ ...connection(url), provider: 'gemini', protocol: 'gemini' }, key, []).generateImage(input, undefined, before);
+    expect(result).toEqual({ bytes: png, mimeType: 'image/png' }); expect(before).toHaveBeenCalledTimes(1);
+    expect(captured).toEqual([{ path: '/v1/interactions', auth: undefined, key, revision: '2026-05-20', data: { model: input.model, input: input.prompt, store: false, stream: false, response_format: { type: 'image', mime_type: 'image/png', image_size: '1K', aspect_ratio: '3:2' } } }]);
+  });
+
+  it('uploads only the selected normalized PNG for Gemini background editing and accepts SDK image output', async () => {
+    let captured: Record<string, unknown> | undefined;
+    const url = await fixture(async (req, res) => {
+      expect(req.url).toBe('/v1/interactions'); expect(req.headers['content-type']).toBe('application/json');
+      captured = JSON.parse((await body(req)).toString()) as Record<string, unknown>;
+      res.end(JSON.stringify({ status: 'completed', output_image: { mime_type: 'image/png', data: png.toString('base64') } }));
+    });
+    const output = await new CreativeProvider({ ...connection(url), protocol: 'gemini' }, key, []).removeBackground({ model: 'fixture-gemini-image', image: png });
+    expect(output.bytes).toEqual(png);
+    expect(captured).toMatchObject({ model: 'fixture-gemini-image', store: false, stream: false, response_format: { type: 'image', mime_type: 'image/png' } });
+    const input = captured!.input as Array<Record<string, string>>;
+    expect(input).toHaveLength(2); expect(input[0]!.text).toContain('Remove only the background');
+    expect(input[1]).toEqual({ type: 'image', mime_type: 'image/png', data: png.toString('base64') });
+  });
+
+  it('accepts a single inline Gemini outputs image and refuses partial, URL, multiple or malformed results', async () => {
+    const item = { type: 'image', mime_type: 'image/png', data: png.toString('base64') };
+    const replies: unknown[] = [
+      { status: 'completed', outputs: [item] },
+      { status: 'in_progress', output_image: item },
+      { status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', uri: 'https://untrusted.invalid/image.png' }] }] },
+      { status: 'completed', outputs: [item, item] },
+      { status: 'completed', output_image: { ...item, mime_type: 'image/svg+xml' } },
+      { status: 'completed', output_image: { ...item, data: 'not-base64' } },
+      { status: 'completed', output_image: { ...item, data: key } },
+    ];
+    let calls = 0;
+    const url = await fixture((_req, res) => { res.end(JSON.stringify(replies[calls++])); });
+    const provider = new CreativeProvider({ ...connection(url), protocol: 'gemini' }, key, []);
+    const input = { ...imageInput, quality: 'auto' as const };
+    expect((await provider.generateImage(input)).bytes).toEqual(png);
+    for (let index = 1; index < replies.length - 1; index++) await expect(provider.generateImage(input)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.generateImage(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(calls).toBe(replies.length);
+  });
+
+  it('does not silently translate Gemini quality or send unsupported video operations', async () => {
+    let calls = 0; const url = await fixture((_req, res) => { calls++; image(res); });
+    const provider = new CreativeProvider({ ...connection(url), protocol: 'gemini' }, key, []), before = vi.fn();
+    await expect(provider.generateImage(imageInput, undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.createVideo(videoInput, undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.editVideo({ id: 'video_fixture01', prompt: 'Edit' }, undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.extendVideo({ id: 'video_fixture01', prompt: 'Continue', seconds: 4 }, undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.videoStatus('video_fixture01', undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    await expect(provider.videoContent('video_fixture01', undefined, before)).rejects.toMatchObject({ code: 'NOT_SUPPORTED' });
+    expect(before).not.toHaveBeenCalled(); expect(calls).toBe(0);
+  });
+
   it('uploads normalized PNG to image edits with explicit transparent-background instructions', async () => {
     let uploaded: Buffer | undefined, contentType: string | undefined;
     const url = await fixture(async (req, res) => { expect(req.url).toBe('/v1/images/edits'); contentType = req.headers['content-type']; uploaded = await body(req); image(res); });
