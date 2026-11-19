@@ -508,8 +508,8 @@
   function creativeMedia(body) {
     const defaults=state.mediaDefaults||{name:'OpenAI Media',baseUrl:'https://api.openai.com/v1',imageModel:'auto',videoModel:''};
     const current=state.media||{enabled:false,connectionId:null,imageModel:defaults.imageModel,videoEnabled:false,videoModel:defaults.videoModel,allowImageUpload:false,projectIds:[]};
-    const s=section('Creative Media','สร้างภาพและลบพื้นหลังด้วยบริการทางการหรือ API ภายนอกที่รองรับ เลือก preset หรือกรอก API URL และคีย์เองได้ ส่วนครอปภาพทำในเครื่อง');s.id='wb-creative-media';body.append(s);
-    s.append(el('p','การสร้างสื่อส่ง prompt ไปยัง connection ที่เลือกและอาจมีค่าใช้จ่าย หน้านี้โหลดรายชื่อโมเดลอัตโนมัติเมื่อ API รองรับ แต่ไม่เรียกสร้างภาพหรือส่งไฟล์ การลบพื้นหลังและวิดีโอจากภาพอ้างอิงต้องเปิดอนุญาตอัปโหลดภาพก่อน','muted'));
+    const s=section('Creative Media','สร้างภาพและลบพื้นหลังจากแชตได้โดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ตั้งค่า provider, API URL และคีย์ครั้งเดียว ส่วนครอปภาพทำในเครื่อง');s.id='wb-creative-media';body.append(s);
+    s.append(el('p','เมื่อบันทึก connection แล้ว AI เรียกเครื่องมือสร้างภาพได้ทันที งานสร้างสื่อส่ง prompt และภาพที่เลือกไปยัง connection นี้และอาจมีค่าใช้จ่าย หน้านี้โหลดรายชื่อโมเดลอัตโนมัติเมื่อ API รองรับ โดยยังไม่สร้างภาพหรือส่งไฟล์','muted'));
     const presets=state.mediaPresets||[
       {id:'openai',name:'OpenAI',provider:'openai',protocol:'responses',baseUrl:'https://api.openai.com/v1',imageModel:defaults.imageModel},
       {id:'gemini',name:'Google Gemini',provider:'gemini',protocol:'gemini',baseUrl:'https://generativelanguage.googleapis.com/v1beta',imageModel:'auto'},
@@ -537,11 +537,13 @@
       if(previous&&!apiKey&&(previous.baseUrl!==baseUrl.value.trim()||previous.protocol!==protocol.value||credentials.changed(previous)))throw new Error('กรอก API key ใหม่เมื่อเปลี่ยน URL, รูปแบบ API, วิธีเก็บคีย์ หรือชื่อตัวแปร Env');
       if(editing===current.connectionId&&current.videoEnabled&&!videoEligible({protocol:protocol.value,baseUrl:baseUrl.value.trim()}))throw new Error('ปิดวิดีโอและบันทึก Creative Media ก่อนเปลี่ยน connection นี้เป็นรูปแบบภาพที่ไม่รองรับวิดีโอ');
       const saved=await api('ai/connection',{connection:{...(editing?{id:editing}:{}),name:providerName.value.trim(),provider:providerType,protocol:protocol.value,baseUrl:baseUrl.value.trim(),enabled:providerEnabled.checked,allowPrivateNetwork:privateNetwork.checked,...credentials.values()},...(apiKey?{apiKey}:{})});
-      await api('ai/media',{...current,connectionId:saved.id,imageModel:providerModel.value.trim()||'auto',videoEnabled:current.connectionId===saved.id&&current.videoEnabled===true&&videoEligible(saved)});
-      notice('บันทึก Provider สำหรับภาพแล้ว เลือกโปรเจกต์และเปิด Creative Media เพื่อใช้งาน');await show('providers');
+      if(saved.enabled){
+        await api('ai/media',{...current,enabled:true,connectionId:saved.id,imageModel:providerModel.value.trim()||'auto',allowImageUpload:true,projectIds:[],videoEnabled:current.connectionId===saved.id&&current.videoEnabled===true&&videoEligible(saved)});
+        notice('บันทึก Provider สำหรับภาพแล้ว เรียกสร้างภาพจากแชตได้โดยไม่ต้องเลือกโปรเจกต์');
+      }else notice('บันทึก Provider สำหรับภาพที่ปิดใช้งานไว้แล้ว เปิด connection ก่อนเลือกใช้สร้างภาพ');
+      await show('providers');
     },'btn primary'));
     const f=el('form',undefined,'wb-form');f.onsubmit=e=>e.preventDefault();s.append(f);
-    const enabled=check(f,'เปิดสร้างสื่อผ่าน AI ในโปรเจกต์ที่เลือก','mediaEnabled',current.enabled);
     const compatible=state.connections.filter(c=>c.enabled&&['responses','chat-completions','gemini'].includes(c.protocol));
     const connection=choice(f,'การเชื่อมต่อสำหรับงานสื่อ','mediaConnection',[['','เลือก connection…'],...compatible.map(c=>[c.id,`${c.name} · key ${c.credentialPresent?'พร้อม':'ต้องใส่ใหม่'}`])],current.connectionId||'');
     const imageModel=field(f,'โมเดลสร้างภาพ / ลบพื้นหลัง','mediaImageModel',current.imageModel||'auto');imageModel.placeholder='auto';
@@ -597,13 +599,8 @@
       videoModel.disabled=videoEnabled.disabled||!videoEnabled.checked;
       videoState.textContent=official?'connection นี้ใช้ OpenAI: สร้างภาพและลบพื้นหลังได้ แต่วิดีโอปิดให้บริการแล้ว':selectedConnection?.protocol==='gemini'?'Gemini image connection ใช้สำหรับภาพเท่านั้น ตัวเชื่อมต่อวิดีโอต้องรองรับรูปแบบ video compatible':selectedConnection?'เปิดวิดีโอเฉพาะเมื่อปลายทางรองรับรูปแบบ compatible จริง การบันทึกไม่ทดสอบหรือเรียกโมเดล':'เลือก connection ที่รองรับก่อนตั้งค่าวิดีโอ';
     };connection.onchange=()=>{updateVideo();refreshModels();void loadModels();};videoEnabled.onchange=updateVideo;updateVideo();refreshModels();void loadModels();
-    const upload=check(f,'อนุญาตส่งภาพที่เลือกเพื่อลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอ','mediaAllowImageUpload',current.allowImageUpload);
-    const projects=el('fieldset');projects.append(el('legend','โปรเจกต์ที่อนุญาตให้เรียก AI สร้างสื่อ'));f.append(projects);
-    const boxes=state.projects.filter(p=>p.available).map(p=>[p.projectId,check(projects,p.displayName,`mediaProject-${p.projectId}`,current.projectIds.includes(p.projectId))]);
-    if(!boxes.length)projects.append(el('p','เพิ่มโปรเจกต์ที่พร้อมใช้งานก่อนเปิดสร้างสื่อ','muted'));
-    projects.append(el('p','ไม่เลือกโปรเจกต์ = ปิดการเรียก AI สร้างสื่อทุกโปรเจกต์ ครอปภาพในเครื่องยังใช้ได้','muted'));
     f.append(button('บันทึก Creative Media',async()=>{
-      await api('ai/media',{enabled:enabled.checked,connectionId:connection.value||null,imageModel:imageModel.value.trim()||'auto',videoEnabled:videoEnabled.checked,videoModel:videoModel.value,allowImageUpload:upload.checked,projectIds:boxes.filter(([,box])=>box.checked).map(([id])=>id)});
+      await api('ai/media',{enabled:!!connection.value,connectionId:connection.value||null,imageModel:imageModel.value.trim()||'auto',videoEnabled:videoEnabled.checked,videoModel:videoModel.value,allowImageUpload:true,projectIds:[]});
       notice('บันทึก Creative Media แล้ว โดยยังไม่ได้เรียกโมเดล');await show('providers');
     },'btn primary'));
   }

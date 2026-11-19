@@ -21,15 +21,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 64000
+      "schemaBytes": 63938
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 144882
+      "schemaBytes": 144820
     },
     "full": {
       "toolCount": 173,
-      "schemaBytes": 632728
+      "schemaBytes": 632037
     }
   },
   "tools": [
@@ -254,8 +254,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "limit"
         ],
         "additionalProperties": false
@@ -2229,8 +2227,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "operation",
           "args"
         ],

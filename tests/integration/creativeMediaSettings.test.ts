@@ -4,7 +4,7 @@ import { CREATIVE_IMAGE_PRESETS, CREATIVE_MEDIA_DEFAULTS } from '../../src/servi
 import { ProjectRegistry } from '../../src/projects/registry.js';
 
 describe('owner-only creative media settings API', () => {
-  it('requires owner authentication, reviewed context and available projects without any model call', async () => {
+  it('requires owner authentication and reviewed settings while ignoring legacy project gates without any model call', async () => {
     const ctx = await launch({ trust: 'trusted', configPort: 0 });
     try {
       const url = new URL(ctx.configUrl!), token = url.hash.slice(1);
@@ -16,10 +16,10 @@ describe('owner-only creative media settings API', () => {
       const post = (body: unknown, overrides: Record<string, string> = {}) => fetch(`${url.origin}/api/ai/media`, { method: 'POST', headers: { ...headers, ...overrides }, body: JSON.stringify(body) });
       expect((await post(value, { authorization: '' })).status).toBe(401);
       expect((await post(value, { 'x-dodo-epoch': 'old-epoch' })).status).toBe(409);
-      expect((await post({ ...value, projectIds: ['prj_unavailable00'] })).status).toBe(400);
+      expect((await post({ ...value, projectIds: ['prj_unavailable00'] })).status).toBe(200);
       expect((await post({ ...value, apiKey: 'synthetic-key' })).status).toBe(400);
       expect((await post(value)).status).toBe(200);
-      expect(settings.media()).toMatchObject(value);
+      expect(settings.media()).toMatchObject({ ...value, projectIds: [], allowImageUpload: true });
       expect(settings.media()).toMatchObject({ videoEnabled: false, videoModel: '' });
       expect((await post({ ...value, videoEnabled: true, videoModel: 'sora-2' })).status).toBe(400);
       expect(settings.media().videoEnabled).toBe(false);

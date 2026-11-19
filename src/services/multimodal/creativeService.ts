@@ -2,8 +2,6 @@ import { DodoError } from '../../errors.js';
 import { digestOf, newId } from '../../util/hash.js';
 import type { ToolCtx } from '../../tools/context.js';
 import type { ResourceInfoData } from '../resources/contracts.js';
-import { isPersonalMode } from '../../security/accessMode.js';
-import { isOwner } from '../../security/projectAuthority.js';
 import { CreativeProvider, type CreativeImageInput, type CreativeVideoInput } from './creativeProvider.js';
 import { cropCreativeImage, normalizeCreativeImage, gridCreativeRegions, type CreativeGrid } from './creativeImages.js';
 import { isCreativeConnection, supportsCreativeVideoConnection, resolveAutoImageModel } from './creativeSettings.js';
@@ -33,7 +31,7 @@ export class CreativeService {
   private readonly unsaved = new Map<string, RecordData>();
   constructor(private readonly storage: MediaStorage) {
     // A previous image POST has no remote retrieval handle. Never silently send it again.
-    storage.services.store.db.prepare(`UPDATE creative_jobs SET payload=json_set(payload,'$.status','interrupted','$.error','SERVER_RESTARTED')
+    if (!storage.services.installationScoped) storage.services.store.db.prepare(`UPDATE creative_jobs SET payload=json_set(payload,'$.status','interrupted','$.error','SERVER_RESTARTED')
       WHERE workspace_id=? AND json_extract(payload,'$.epoch')<>? AND json_extract(payload,'$.remoteId') IS NULL
       AND json_extract(payload,'$.status') IN ('queued','running')`).run(storage.services.workspaceId, storage.services.epoch);
   }
@@ -41,24 +39,18 @@ export class CreativeService {
     this.storage.check(); liveAccess(ctx, 'dodo:exec'); ctx.revalidate?.();
     if (ctx.principal.expiresAt !== undefined && ctx.principal.expiresAt * 1000 <= Date.now()) throw new DodoError('AUTH_REQUIRED', 'client authorization expired');
   }
-  private configuration(ctx: ToolCtx, upload = false) {
+  private configuration(ctx: ToolCtx) {
     this.check(ctx);
     const installation = this.storage.services.installation;
     if (!installation) throw new DodoError('NOT_SUPPORTED', 'creative media needs the installation provider settings');
     const settings = installation.ai.settings, config = settings.media();
-    const project = installation.list(ctx.principal).find(p => p.workspaceId === this.storage.services.workspaceId);
-    if (!config.enabled || !config.connectionId || !project || !config.projectIds.includes(project.projectId)) throw new DodoError('FORBIDDEN', 'enable Creative Media for this project in Local Config > Providers');
-    if (!isPersonalMode(installation.store) && !isOwner(ctx.principal)) {
-      const permission = settings.get<{ allowedClientIds: string[] }>('project', project.projectId);
-      if (!permission?.allowedClientIds.includes(ctx.principal.clientId)) throw new DodoError('FORBIDDEN', 'owner must authorize this client for cloud media in this project');
-    }
-    if (upload && !config.allowImageUpload) throw new DodoError('FORBIDDEN', 'owner has not enabled image upload for this media operation');
+    if (!config.connectionId) throw new DodoError('AUTH_REQUIRED', 'configure an image provider URL and API key in Local Config > Providers > Creative Media');
     const connection = settings.connection(config.connectionId);
     if (!isCreativeConnection(connection)) throw new DodoError('NOT_SUPPORTED', 'Creative Media needs an enabled OpenAI-compatible Images or Gemini image connection');
     return { settings, config, connection, digest: digestOf({ connection, imageModel: config.imageModel, videoModel: config.videoModel }) };
   }
-  private videoConfiguration(ctx: ToolCtx, upload = false) {
-    const cfg = this.configuration(ctx, upload);
+  private videoConfiguration(ctx: ToolCtx) {
+    const cfg = this.configuration(ctx);
     if (!cfg.config.videoEnabled || !cfg.config.videoModel) throw new DodoError('NOT_SUPPORTED', 'video compatibility is not configured; select a supported connection and model in Creative Media');
     if (!supportsCreativeVideoConnection(cfg.connection)) throw new DodoError('NOT_SUPPORTED', 'OpenAI Videos API is retired; use an explicitly configured compatible video connection');
     return cfg;
@@ -70,9 +62,9 @@ export class CreativeService {
     let available = false, videoAvailable = false;
     try { this.configuration(ctx); available = true; } catch { /* Read status never requests credentials or a model. */ }
     try { this.videoConfiguration(ctx); videoAvailable = true; } catch { /* Availability only, no inference. */ }
-    return { enabled: config?.enabled ?? false, available, imageModel: config?.imageModel ?? 'auto', videoModel: config?.videoModel ?? '', videoAvailable,
+    return { enabled: Boolean(config?.connectionId), available, imageModel: config?.imageModel ?? 'auto', videoModel: config?.videoModel ?? '', videoAvailable,
       videoNote: 'OpenAI Videos API retired on 2026-09-24. Video tools require explicit compatible-provider configuration; no video model is selected by default.',
-      localCrop: true, imageUploadEnabled: config?.allowImageUpload ?? false, modelCalls: false as const,
+      localCrop: true, imageUploadEnabled: true, modelCalls: false as const,
       note: 'Cloud creation is explicit and may cost money. Crop runs locally. Background removal is a generative edit and can alter details. No 3D tools.' };
   }
   private resources() {
@@ -124,6 +116,7 @@ export class CreativeService {
       try { this.save(ctx, record); this.unsaved.delete(id); } catch { /* retain the truthful volatile receipt */ }
     }
     if (record.epoch !== this.storage.services.epoch && !record.remoteId && ['queued', 'running'].includes(record.status)) {
+      if (this.storage.services.installationScoped) return { ...record, status: 'uncertain', error: 'SERVER_INSTANCE_CHANGED', note: 'This job was submitted by another server instance. Its outcome may be uncertain; inspect this job again rather than resubmitting a paid request.' };
       record.status = 'interrupted'; record.error = 'SERVER_RESTARTED'; record.note = 'Work was interrupted; its outcome may be uncertain. It was not automatically resubmitted.'; this.save(ctx, record);
     }
     return record;
@@ -141,8 +134,7 @@ export class CreativeService {
   async start(ctx: ToolCtx, kind: RecordData['kind'], input: Omit<CreativeImageInput, 'model'> | VideoRequest | VideoTransform | ImageSource): Promise<CreativeJobData> {
     const video = kind === 'video' && !('sourceJobId' in input) ? input as VideoRequest : undefined;
     const transform = kind === 'video' && 'sourceJobId' in input ? input : undefined;
-    const upload = kind === 'background_removal' || video?.reference !== undefined;
-    const configForRequest = () => kind === 'video' ? this.videoConfiguration(ctx, upload) : this.configuration(ctx, upload);
+    const configForRequest = () => kind === 'video' ? this.videoConfiguration(ctx) : this.configuration(ctx);
     const cfg = configForRequest(); this.resources();
     if (kind !== 'video') await loadSharpBackend(); // Fail before spending if the output decoder is unavailable.
     let source: Awaited<ReturnType<CreativeService['imageSource']>> | undefined;
@@ -214,7 +206,7 @@ export class CreativeService {
       } else {
         const result = kind === 'background_removal' ? await provider.removeBackground({ model: record.model, image: image! }, controller.signal, beforeSend)
           : await provider.generateImage({ ...input as Omit<CreativeImageInput, 'model'>, model: record.model }, controller.signal, beforeSend);
-        this.configuration(ctx, kind === 'background_removal'); source?.guard();
+        this.configuration(ctx); source?.guard();
         const transparent = kind === 'background_removal' || (input as Partial<CreativeImageInput>).background === 'transparent';
         const normalized = await normalizeCreativeImage(result.bytes, transparent);
         record.resource = await this.resources().ingestGenerated(ctx, normalized.bytes, 'image/png', jobId, { width: normalized.width, height: normalized.height, format: 'png' });

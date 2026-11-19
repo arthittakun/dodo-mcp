@@ -19876,10 +19876,6 @@
             "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
           }
         },
-        "required": [
-          "workspaceId",
-          "workspaceEpoch"
-        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -29524,7 +29520,7 @@
     {
       "name": "image_generate",
       "title": "Generate an image",
-      "description": "Start ONE paid image generation with the owner-configured image connection: OpenAI-compatible Images or native Gemini. The owner can configure provider, API base URL, key and model in Creative Media settings. No URL/key override in tool arguments. Requires project enablement and exec policy. Returns jobId; creative_job collects output. No automatic retries; reuse the same idempotencyKey after a lost response.",
+      "description": "Generate an image directly from chat using the configured provider URL, API key and model. No project, project_overview or workspace context is needed. Supports OpenAI-compatible Images and native Gemini. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -29606,8 +29602,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "prompt",
           "size",
           "quality",
@@ -30061,8 +30055,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "idempotencyKey"
         ],
         "additionalProperties": false
@@ -30325,7 +30317,7 @@
     {
       "name": "image_remove_background",
       "title": "Remove an image background",
-      "description": "Start ONE paid generative image edit to isolate the subject on a transparent PNG. Requires owner image-upload permission and project media enablement. Select exactly ONE guarded path, owned assetId or resourceId. The provider can alter image details; success requires actual transparent pixels. Poll creative_job for output; no repeated paid edit or automatic retry.",
+      "description": "Remove the background from one owned image resource directly from chat, without a project or upload-enablement setting. Accepts resourceId/assetId; a workspace path uses optional explicit project context. Submits one paid generative edit and may alter image details; success requires actual transparent pixels. Collect the existing job with creative_job.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -30388,8 +30380,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "idempotencyKey"
         ],
         "additionalProperties": false
@@ -30705,7 +30695,7 @@
     {
       "name": "video_generate",
       "title": "Generate a video",
-      "description": "Submit ONE text-to-video or image-guided render to an explicitly owner-enabled compatible video connection. Official OpenAI Videos API is retired; video has no enabled default. Optional reference selects one owned/guarded image matching size and requires image-upload permission. Returns jobId; creative_job collects that same render as MP4. No automatic retries, background polling, or 3D.",
+      "description": "Create a video directly from chat without a project using configured compatible video settings. Official OpenAI Videos API is retired; configure a compatible provider and video model first. An optional owned image reference must match size. Returns jobId; creative_job collects that render as MP4. No automatic paid retries or 3D.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -30812,8 +30802,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "prompt",
           "size",
           "seconds",
@@ -31190,8 +31178,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "jobId",
           "prompt",
           "idempotencyKey"
@@ -31592,8 +31578,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "jobId",
           "prompt",
           "seconds",
@@ -31960,8 +31944,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "jobId"
         ],
         "additionalProperties": false
@@ -32563,8 +32545,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "resourceId",
           "expectedSha256",
           "expiresInDays"
@@ -32789,8 +32769,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "limit"
         ],
         "additionalProperties": false
@@ -33019,8 +32997,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "linkId"
         ],
         "additionalProperties": false
@@ -33206,10 +33182,6 @@
             "pattern": "^[a-z0-9!#$&^_.+-]+\\/[a-z0-9!#$&^_.+-]+$"
           }
         },
-        "required": [
-          "workspaceId",
-          "workspaceEpoch"
-        ],
         "additionalProperties": false
       },
       "outputSchema": {
@@ -33506,8 +33478,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "resourceId",
           "maxBytes"
         ],
@@ -33898,8 +33868,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "length"
         ],
         "additionalProperties": false
@@ -34280,8 +34248,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "resourceId",
           "maxEdge"
         ],
@@ -34629,8 +34595,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "resourceId",
           "kind"
         ],
@@ -35005,8 +34969,6 @@
           }
         },
         "required": [
-          "workspaceId",
-          "workspaceEpoch",
           "resourceId",
           "operation",
           "maxEdge"

@@ -61,4 +61,4 @@ const revoke = defineTool({
   handler: async (args, ctx) => ({ data: use(ctx).revoke(ctx, args.linkId) }),
 });
 
-export const DOWNLOAD_TOOLS: AnyToolDef[] = [create, list, revoke];
+export const DOWNLOAD_TOOLS: AnyToolDef[] = [create, list, revoke].map(def => ({ ...def, optionalWorkspaceContext: true }));

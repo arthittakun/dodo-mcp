@@ -1,5 +1,44 @@
 # DODO MCP — Test Report
 
+## 1.8.0 Global chat media — Windows, 2026-11-19
+
+Build, typecheck, lint, UI syntax and diff checks passed. The final results across
+24 focused feature/regression files use the latest result per file; final checks
+replace the initial resource fixture and browser-prerequisite results.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Feature/regression coverage, including Chrome UI and CLI menu | 244 | 0 | 4 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total focused coverage | 261 | 0 | 4 |
+
+Seven real HTTP/OAuth integration cases start without a registered project or
+workspace ACL, configure permanent Env credentials through owner HTTP settings,
+discover Auto models and create images through a local HTTP provider fixture.
+They cover crop, background removal, previews, token downloads/revocation, caller
+isolation, scopes, live revocation, workspace switching, actual server restart,
+and export into an explicit project with journal rollback. Compact and Hybrid
+also reject project-only media operations supplied with valid global context,
+without creating files, plans, changesets, jobs or media handles.
+
+Six installation-authority checks cover live identity grants, token/grant scope
+intersection, managed mode without project ACLs, client removal, grant revocation,
+expiry and project-restricted delegations. Seven actual Chrome cases cover
+project-free setup, disabled provider drafts, Env storage, official/custom
+presets, model discovery and Auto/manual selection. Existing image/video,
+resource/download, project-policy, workspace-switch and HTTP/STDIO surface
+regressions retain their coverage.
+
+The initial resource-security fixture could not create a file symlink on this
+Windows host. The fixture now skips that individual probe and all twelve other
+resource-security tests pass. The four final skips are that symlink prerequisite,
+one POSIX-only credential-permissions case and two existing browser/speech
+prerequisite cases. Provider calls use synthetic credentials and local HTTP
+fixtures; this release does not claim additional live paid image/video acceptance
+or native Linux/macOS acceptance. The locked dependency audit reports zero
+advisories. Private provider endpoints, keys and installation state are excluded
+from the package. See [release details](RELEASE_1.8.0.md).
+
 ## 1.7.0 Persistent local Env API keys — Windows, 2026-11-19
 
 Build, typecheck, lint, UI syntax and diff checks passed. A consolidated focused

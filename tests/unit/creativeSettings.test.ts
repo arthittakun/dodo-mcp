@@ -10,8 +10,8 @@ describe('creative media owner configuration', () => {
   beforeEach(() => { settings = new AISettings(new Store(openDatabase(':memory:')), [21731, 21740]); });
   afterEach(() => { vi.restoreAllMocks(); settings.credentials.close(); settings.store.db.close(); });
 
-  it('defaults to public OpenAI with cloud disabled and no selected projects', () => {
-    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'auto', videoEnabled: false, videoModel: '', allowImageUpload: false, projectIds: [] });
+  it('defaults to public OpenAI with no provider selected and no project or upload gate', () => {
+    expect(settings.media()).toEqual({ enabled: false, connectionId: null, imageModel: 'auto', videoEnabled: false, videoModel: '', allowImageUpload: true, projectIds: [] });
     expect(settings.state().mediaDefaults.baseUrl).toBe('https://api.openai.com/v1');
     expect(settings.state().mediaDefaults).toEqual(CREATIVE_MEDIA_DEFAULTS);
   });
@@ -20,7 +20,7 @@ describe('creative media owner configuration', () => {
     const key = 'synthetic-creative-settings-credential';
     const saved = await settings.saveConnection({ name: 'OpenAI Media', provider: 'openai', protocol: 'responses', baseUrl: CREATIVE_MEDIA_DEFAULTS.baseUrl }, key);
     const value = settings.saveMedia({ enabled: true, connectionId: saved.id, projectIds: ['prj_fixture0001', 'prj_fixture0001'], allowImageUpload: true });
-    expect(value.projectIds).toEqual(['prj_fixture0001']);
+    expect(value.projectIds).toEqual([]);
     expect(settings.state().connections[0]?.credentialPresent).toBe(true);
     const restarted = new AISettings(settings.store, settings.ports);
     expect(restarted.media()).toEqual(value);

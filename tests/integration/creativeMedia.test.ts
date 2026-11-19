@@ -172,11 +172,8 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     expect(CreativeProvider.prototype.generateImage).not.toHaveBeenCalled(); expect(CreativeProvider.prototype.createVideo).not.toHaveBeenCalled();
   });
 
-  it('requires explicit upload permission and returns real transparency from background removal', async () => {
+  it('returns real transparency from an explicitly requested background removal without an upload toggle', async () => {
     const args = { path: 'source.png', idempotencyKey: 'creative-background-one' };
-    error(await call('image_remove_background', args), 'FORBIDDEN');
-    expect(CreativeProvider.prototype.removeBackground).not.toHaveBeenCalled();
-    media({ allowImageUpload: true });
     const started = job(await call('image_remove_background', args)), output = await finished(started.jobId);
     expect(output.data.status).toBe('completed'); expect(output.data.kind).toBe('background_removal');
     const resource = ResourceInfo.parse(output.data.resource);
@@ -226,13 +223,10 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     error(await call('resource_read', { resourceId: resource.resourceId }, other.accessToken), 'NOT_FOUND');
   });
 
-  it('uploads only an explicitly allowed owned reference with dimensions matching the generated video', async () => {
+  it('uploads an explicitly selected owned reference with matching dimensions without an upload toggle', async () => {
     const reference = await sharp({ create: { width: 1280, height: 720, channels: 4, background: '#11447780' } }).png().toBuffer();
     fs.writeFileSync(path.join(ctx.fixtureDir, 'video-reference.png'), reference);
     const args = { prompt: 'Image-guided protocol fixture', reference: { path: 'video-reference.png' }, size: '1280x720', idempotencyKey: 'creative-video-reference' };
-    error(await call('video_generate', args), 'FORBIDDEN');
-    expect(CreativeProvider.prototype.createVideo).not.toHaveBeenCalled();
-    media({ allowImageUpload: true });
     error(await call('video_generate', { ...args, reference: { path: 'source.png' }, idempotencyKey: 'creative-video-reference-size' }), 'INVALID_INPUT');
     error(await call('video_generate', { ...args, reference: { path: '.env' }, idempotencyKey: 'creative-video-reference-secret' }), 'SECRET_PATH_DENIED');
     error(await call('video_generate', { ...args, reference: { path: '../outside.png' }, idempotencyKey: 'creative-video-reference-path' }), 'PATH_DENIED');
@@ -298,19 +292,26 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     expect(CreativeProvider.prototype.createVideo).not.toHaveBeenCalled(); expect(CreativeProvider.prototype.editVideo).not.toHaveBeenCalled(); expect(CreativeProvider.prototype.extendVideo).not.toHaveBeenCalled();
   });
 
-  it('blocks disabled/project/client/scope access before calling any model while crop stays local', async () => {
+  it('uses configured media without legacy enable/project/client gates while retaining OAuth scope checks', async () => {
     media({ enabled: false });
-    error(await call('image_generate', { prompt: 'Disabled', idempotencyKey: 'creative-disabled' }), 'FORBIDDEN');
+    const image = job(await call('image_generate', { prompt: 'Legacy disabled', idempotencyKey: 'creative-disabled' }));
+    expect((await finished(image.jobId)).data.status).toBe('completed');
     media({ projectIds: [] });
-    error(await call('video_generate', { prompt: 'Project denied', idempotencyKey: 'creative-project-denied' }), 'FORBIDDEN');
+    const video = job(await call('video_generate', { prompt: 'No project list', idempotencyKey: 'creative-project-denied' }));
+    expect((await finished(video.jobId)).data.status).toBe('completed');
     media(); settings().savePermission({ projectId, profileIds: [], allowedClientIds: [token.clientId] });
-    error(await call('image_generate', { prompt: 'Client denied', idempotencyKey: 'creative-client-denied' }, other.accessToken), 'FORBIDDEN');
+    const otherImage = job(await call('image_generate', { prompt: 'Client with login', idempotencyKey: 'creative-client-denied' }, other.accessToken));
+    for (let attempt = 0; attempt < 100; attempt++) {
+      const result = job(await call('creative_job', { jobId: otherImage.jobId }, other.accessToken));
+      if (result.status === 'completed') break;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
     settings().savePermission({ projectId, profileIds: [], allowedClientIds: [token.clientId, other.clientId] });
     error(await call('image_generate', { prompt: 'Read only', idempotencyKey: 'creative-reader-denied' }, reader.accessToken), 'FORBIDDEN');
     media({ enabled: false });
     const crop = assertOk(await call('image_crop', { path: 'source.png', regions: [{ left: 0, top: 0, width: 1, height: 1 }], idempotencyKey: 'creative-local-when-disabled' })) as { resources: unknown[] };
     expect(crop.resources).toHaveLength(1);
-    expect(CreativeProvider.prototype.generateImage).not.toHaveBeenCalled(); expect(CreativeProvider.prototype.createVideo).not.toHaveBeenCalled();
+    expect(CreativeProvider.prototype.generateImage).toHaveBeenCalledTimes(2); expect(CreativeProvider.prototype.createVideo).toHaveBeenCalledTimes(1);
   });
 
   it('limits pending remote renders to two and frees a slot only after collecting an existing job', async () => {
@@ -476,7 +477,7 @@ describe('creative media real MCP jobs, immutable outputs and journaled export',
     await previous.cleanup();
     ctx = await launch({ toolSurface: 'full', trust: 'trusted', locked: true, fixtureDir: previous.fixtureDir, configDir: previous.configDir, port: previous.port });
     expect(ctx.server.epoch).not.toBe(oldEpoch);
-    expect(settings().media()).toMatchObject({ enabled: true, connectionId, projectIds: [projectId] });
+    expect(settings().media()).toMatchObject({ enabled: true, connectionId, projectIds: [] });
     expect(settings().credentials.hasSession(connectionId)).toBe(false);
     const restored = job(await call('creative_job', { jobId: started.jobId }));
     expect(restored.status).toBe('completed'); expect(restored.resource?.sha256).toBe(resource.sha256);

@@ -9,6 +9,7 @@ interface Connection { id: string; name: string; provider: string; protocol: str
 interface FixtureOptions {
   connections?: Connection[];
   media?: Record<string, unknown>;
+  projects?: Array<{ projectId: string; displayName: string; available: boolean }>;
   credentialStorageOptions?: Array<{ id: string; available: boolean }>;
   existingEnvVars?: string[];
   models?: (connectionId: string) => Promise<{ data?: Array<{ id: string }>; status?: number; error?: string }>;
@@ -16,7 +17,7 @@ interface FixtureOptions {
 
 async function fixture(options: FixtureOptions = {}) {
   const browser = await chromium.launch({ headless: true, executablePath }), page = await browser.newPage();
-  const state = { presets: [], connections: options.connections ?? [] as Connection[], credentialStorageOptions: options.credentialStorageOptions, profiles: [], permissions: [], projects: [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
+  const state = { presets: [], connections: options.connections ?? [] as Connection[], credentialStorageOptions: options.credentialStorageOptions, profiles: [], permissions: [], projects: options.projects ?? [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('https://owner-fixture.invalid/**', async route => {
@@ -52,6 +53,47 @@ async function fixture(options: FixtureOptions = {}) {
 }
 
 describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () => {
+  it('saves a disabled provider draft while retaining the selected media connection', async () => {
+    const selected: Connection = { id: 'ai_fixture0001', name: 'Current images', provider: 'custom', protocol: 'responses', baseUrl: 'https://current-images.example/v1', enabled: true, credentialPresent: true, credentialStorage: 'session', allowPrivateNetwork: false };
+    const { browser, page, panel, state, requests, errors } = await fixture({ connections: [selected], projects: [], media: { connectionId: selected.id, imageModel: 'selected-image-model' } });
+    try {
+      await panel.locator('summary').click();
+      await panel.locator('input[name=mediaProviderName]').fill('Disabled image draft');
+      await panel.locator('input[name=mediaApiKey]').fill('synthetic-disabled-draft-key');
+      await panel.locator('input[name=mediaProviderEnabled]').uncheck();
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.connections.length).toBe(2);
+      expect(state.connections[1]).toMatchObject({ name: 'Disabled image draft', enabled: false, credentialPresent: true });
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('ที่ปิดใช้งานไว้แล้ว');
+      expect(state.media).toMatchObject({ connectionId: selected.id, imageModel: 'selected-image-model' });
+      expect(requests.filter(request => request.path === '/api/ai/media')).toHaveLength(0);
+      expect(await panel.locator('select[name=mediaConnection]').inputValue()).toBe(selected.id);
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('');
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
+  it('makes a saved provider ready for global chat tools with no registered or selected project', async () => {
+    const { browser, page, panel, state, requests, errors } = await fixture({ projects: [] });
+    try {
+      expect(await page.locator('#wb-toolbar').isVisible()).toBe(false);
+      expect(await panel.textContent()).toContain('ไม่ต้องสร้างหรือเลือกโปรเจกต์');
+      expect(await panel.locator('input[name=mediaEnabled], input[name=mediaAllowImageUpload], input[name^="mediaProject-"]').count()).toBe(0);
+      await panel.locator('summary').click();
+      await panel.locator('input[name=mediaApiKey]').fill('synthetic-global-image-key');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.media.connectionId).toBe('ai_fixture0001');
+      expect(state.media).toMatchObject({ enabled: true, allowImageUpload: true, projectIds: [], imageModel: 'auto' });
+      await expect.poll(() => panel.locator('select[name=mediaConnection]').inputValue()).toBe('ai_fixture0001');
+      await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
+      await expect.poll(() => requests.filter(request => request.path === '/api/ai/media').length).toBe(2);
+      expect(state.media).toMatchObject({ enabled: true, allowImageUpload: true, projectIds: [] });
+      expect(requests.some(request => request.path === '/api/ai/project')).toBe(false);
+      expect(state.projects).toEqual([]);
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
   it('offers permanent server Env storage for images, retains references and supports an existing variable without a browser key', async () => {
     const storageOptions = [{ id: 'session', available: true }, { id: 'env', available: true }, { id: 'keychain', available: false }];
     const { browser, page, panel, state, requests, errors } = await fixture({ credentialStorageOptions: storageOptions, existingEnvVars: ['DODO_EXTERNAL_IMAGE_KEY'] });
@@ -169,12 +211,9 @@ describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () =>
       expect(state.media.imageModel).toBe('auto');
       await expect.poll(() => panel.locator('select[name=mediaConnection]').inputValue()).toBe('ai_fixture0001');
       expect(await panel.locator('input[name=mediaVideoEnabled]').isDisabled()).toBe(true);
-      await panel.locator('input[name=mediaEnabled]').check();
-      await panel.locator('input[name=mediaAllowImageUpload]').check();
-      await panel.locator('input[name=mediaProject-prj_fixture0001]').check();
       await panel.getByRole('button', { name: 'บันทึก Creative Media', exact: true }).click();
       await expect.poll(() => state.media.enabled).toBe(true);
-      expect(state.media).toMatchObject({ projectIds: ['prj_fixture0001'], allowImageUpload: true, videoEnabled: false });
+      expect(state.media).toMatchObject({ projectIds: [], allowImageUpload: true, videoEnabled: false });
       expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('');
       expect(await page.evaluate('JSON.stringify({local:{...localStorage},session:{...sessionStorage}})')).not.toContain(key);
       expect(JSON.stringify(state)).not.toContain(key);

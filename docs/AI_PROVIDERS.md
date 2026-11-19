@@ -1,6 +1,6 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.7.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
+DODO MCP 1.8.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ ส่วนเครื่องมือสร้างภาพจากแชตใช้ connection ได้โดยไม่ต้องสร้างโปรเจกต์หรือ profile
 
 ## เริ่มใช้งานผ่านเว็บ
 
@@ -21,7 +21,7 @@ DODO MCP 1.7.0 สามารถเปิด runtime ของหลายโ�
 
 ส่วน **Providers & Profiles → Creative Media** ใช้ connection/credential store เดียวกัน แต่เลือกโมเดลงานภาพและวิดีโอแยกจาก Agent Profile ไม่ต้องสร้าง profile เพื่อเรียกเครื่องมือสื่อ ฟอร์ม **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** รับชื่อ, รูปแบบ API, Base URL และ key โดยตรง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ ค่าเริ่มต้น provider ยังเป็น OpenAI (`https://api.openai.com/v1`) ส่วนโมเดลของ config/preset ใหม่เป็น **Auto** บันทึก Custom ได้โดยไม่ต้องกรอก Model ID ก่อน และไม่เปลี่ยนโมเดลที่เคยบันทึกเอง วิดีโอมี `videoEnabled:false` และ `videoModel` ว่างจนเจ้าของตั้งค่าเอง
 
-งานสร้างสื่อผ่าน AI เริ่มปิดไว้ ต้องเปิดและเลือกโปรเจกต์ที่อนุญาตก่อน วิดีโอต้องเปิดเพิ่มสำหรับ connection ที่รองรับ การส่งภาพไปลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอต้องเปิด image-upload permission เพิ่ม ส่วนครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ ใน managed mode ใช้ client allowlist ของสิทธิ์ AI รายโปรเจกต์ด้วย การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference คีย์แบบ Env ที่ DODO เก็บจะใช้ข้ามรีสตาร์ตได้ ส่วน Session ต้องใส่ใหม่
+บันทึก provider ที่เปิดใช้แล้ว AI เรียกงานภาพจากแชตแบบ global ได้เลย ไม่ต้องสร้างหรือเลือกโปรเจกต์ ไม่ต้องเปิด media/image-upload switches หรือกำหนด project/client allowlist ฟิลด์เดิม `enabled`, `allowImageUpload`, `projectIds` ยังรับเพื่อความเข้ากันได้ แต่ไม่ใช้จำกัดงานภาพอีก โดย normalize เป็นการเลือก connection, `true`, `[]` ตามลำดับ สิทธิ์ global ใช้ได้กับ client ที่ยืนยันตัวตนระดับ installation และมี OAuth scopes ของ operation รวม managed mode โดยไม่ขอ project trust approval; legacy login ต้อง reconnect ส่วน delegated agent ที่ถูกจำกัดโปรเจกต์ใช้ global ไม่ได้ การส่ง context หรือ project target อย่างชัดเจนยังใช้ runtime/policy ของโปรเจกต์นั้น ส่วน `media_save` ต้องมี context ของโปรเจกต์ปลายทาง วิดีโอต้องเปิดเพิ่มสำหรับ connection/model ที่รองรับ ครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference คีย์แบบ Env ที่ DODO เก็บจะใช้ข้ามรีสตาร์ตได้ ส่วน Session ต้องใส่ใหม่
 
 Creative Media ใช้ OpenAI-compatible Images API กับ connections แบบ Responses/Chat Completions หรือ Gemini native Interactions ตาม protocol ที่เจ้าของเลือก ชื่อ provider เป็นป้ายชื่อ ไม่จำกัด protocol ของงานภาพ หน้าเว็บโหลดรายการโมเดลอัตโนมัติเมื่อเปิด/เปลี่ยน/บันทึก connection และมีปุ่มโหลดใหม่หรือกรอก ID เองเป็นทางเลือก ข้อผิดพลาดในการโหลดไม่บล็อกฟอร์ม ชื่อ resource ของ Gemini จะตัด `models/` ก่อนใช้เป็น Model ID แต่การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้ เครื่องมือ MCP ไม่รับ URL/key/model/remote task ID และไม่มี fallback เปลี่ยน provider อัตโนมัติ
 

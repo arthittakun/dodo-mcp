@@ -26,6 +26,7 @@ function content(ctx: ToolCtx, ids: string[]): ExtraContentBlock[] {
 }
 const statusTool = defineTool({
   name: 'multimodal_status', title: 'Media/browser/game capability status',
+  optionalWorkspaceContext: true,
   description: 'Read installed local media/browser capabilities and existing desktop/web permissions. Opens no browser, microphone, video or screen. Missing native tools/models are reported, never auto-installed or authorized. Image/audio understanding still depends on the client model.',
   input: {}, output: z.object({ media: z.object({ ffmpeg: z.boolean(), ffprobe: z.boolean(), whisper: z.boolean(), defaultModelPresent: z.boolean(), modelLocation: z.string(), speechSynthesis: z.boolean(), limits: z.record(z.string(), z.number()), notes: z.array(z.string()) }), browser: z.object({ chromiumInstalled: z.boolean(), publicWebEnabled: z.boolean(), offlineWorkspaceSupported: z.boolean() }), desktop: z.object({ mode: z.string(), persistent: z.boolean() }), creative: z.object({ enabled: z.boolean(), available: z.boolean(), imageModel: z.string(), videoModel: z.string(), videoAvailable: z.boolean(), videoNote: z.string(), localCrop: z.boolean(), imageUploadEnabled: z.boolean(), modelCalls: z.literal(false), note: z.string() }), modelCalls: z.literal(false), notes: z.array(z.string()) }),
   requiredScope: 'dodo:read', action: 'read', annotations: read,

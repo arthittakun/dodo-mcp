@@ -42,7 +42,7 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp@1.7.0
+npm install -g dodo-mcp@1.8.0
 dodo setup --check
 dodo --cli
 ```
@@ -57,13 +57,13 @@ dodo --cli
 
 ### สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ
 
-เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL และ key ได้เอง ค่าโมเดลเริ่มต้นของ config/preset ใหม่เป็น **Auto** จึงยังไม่ต้องรู้ Model ID เมื่อบันทึก Custom หน้าเว็บแสดงรายการโมเดลอัตโนมัติหลังเลือก/บันทึก connection และยังพิมพ์ ID เองได้เมื่อโหลดไม่สำเร็จ ค่าโมเดลที่เคยบันทึกเองไม่เปลี่ยน จากนั้นเลือกโปรเจกต์และเปิดงานภาพผ่าน AI การลบพื้นหลังหรือใช้ภาพอ้างอิงกับวิดีโอต้องอนุญาตอัปโหลดภาพ ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
+เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL และ key ได้เอง กดบันทึกแล้ว AI เรียกสร้างภาพจากแชตได้เลยโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ และไม่ต้องเปิดสวิตช์งานภาพหรืออนุญาตอัปโหลดเพิ่ม ค่าโมเดลเริ่มต้นของ config/preset ใหม่เป็น **Auto** จึงยังไม่ต้องรู้ Model ID เมื่อบันทึก Custom หน้าเว็บแสดงรายการโมเดลอัตโนมัติหลังเลือก/บันทึก connection และยังพิมพ์ ID เองได้เมื่อโหลดไม่สำเร็จ ค่าโมเดลที่เคยบันทึกเองไม่เปลี่ยน ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
 
 เมื่อส่งงานด้วย Auto backend จะขอรายการโมเดลใหม่ เลือก image model ที่รู้จักจริงจากรายการ แล้วส่งงานภาพหนึ่งครั้ง ผลงานบอก Model ID ที่ใช้จริง ไม่ส่งค่า `auto` หรือเดาใช้โมเดลข้อความ หากไม่พบตัวเลือกให้กรอก ID เอง ไม่มีการสลับโมเดลแล้วส่งงานเสียเงินซ้ำเมื่อเกิดข้อผิดพลาด
 
 เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage/ชื่อตัวแปร Env ไม่เปลี่ยน การเปลี่ยนค่าใดค่าหนึ่งต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
-เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) ติดตามงานด้วย `creative_job` และบันทึก PNG/MP4 ด้วย `media_save` งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
+เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) แบบ global ได้โดยไม่ส่ง `workspaceId`/`workspaceEpoch` และไม่ต้องเรียก `project_overview` ก่อน ติดตามงานด้วย `creative_job` แล้วดู resource หรือสร้างลิงก์ดาวน์โหลดได้จากแชต เมื่อจะอ่านไฟล์หรือบันทึก PNG/MP4 ลงโปรเจกต์ด้วย `media_save` จึงส่ง context ของโปรเจกต์ปลายทาง งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
 
 วิดีโอเริ่มปิดไว้และไม่มีโมเดลเริ่มต้น ต้องเลือก connection ที่รองรับจริงและเปิดเอง OpenAI ยุติ Sora 2/Videos API เมื่อ 24 กันยายน 2026 จึงไม่ส่งงานวิดีโอไปที่ OpenAI ทางการ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
 
@@ -162,7 +162,8 @@ Tunnel, เปิด Remote Config ชั่วคราว 1 ชั่วโม
 `cd` เข้าโปรเจกต์
 ก่อน หากเรียก `dodo` หรือ `dodo start` จากโฟลเดอร์ใดก็ตาม ระบบจะเปิดโปรเจกต์ที่
 เจ้าของเลือกล่าสุด หากยังไม่มีโปรเจกต์ใน registry จะเปิด control plane, OAuth และ
-authenticated tool catalog ได้โดยไม่ใช้ CWD เป็น workspace เมื่อเจ้าของเพิ่มโปรเจกต์
+authenticated tool catalog ได้โดยไม่ใช้ CWD เป็น workspace เครื่องมือสร้างภาพและสื่อแบบ global
+ใช้จากแชตได้ทันทีเมื่อบันทึก provider/key แล้ว โดยไม่ต้องเพิ่มโปรเจกต์ เมื่อเจ้าของเพิ่มโปรเจกต์
 จาก Local Config แล้ว OAuth client ที่เจ้าของอนุมัติจะใช้โปรเจกต์นั้นได้ทันทีตาม scopes
 ของ token และ Agent Profile ที่เลือก โดยไม่ต้องตั้ง permission ซ้ำต่อ path
 
@@ -584,6 +585,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Release 1.0.0](docs/RELEASE_1.0.0.md)
 - [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
 - [Release 1.7.0: Env API Key ถาวรบนเครื่องเซิร์ฟเวอร์](docs/RELEASE_1.7.0.md)
+- [Release 1.8.0: สร้างภาพและวิดีโอจากแชตโดยไม่ต้องมีโปรเจกต์](docs/RELEASE_1.8.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
 - [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)

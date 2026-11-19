@@ -1,6 +1,6 @@
 # Creative Media
 
-DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลัง ตั้งค่าได้ทั้ง OpenAI ทางการ, Google Gemini ทางการ และบริการภายนอกที่ใช้รูปแบบ API ที่รองรับ OpenAI เป็นค่าเริ่มต้นที่แก้ไขได้ เจ้าของกรอกชื่อ provider, API Base URL, คีย์ และโมเดลใน Local Config ได้โดยตรง ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือ MCP ไม่รับ URL, key, remote task ID หรือเปลี่ยนโมเดลเป็นรายคำขอ งานครอปทำในเครื่องโดยไม่เรียกโมเดล
+DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลังจากแชตโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ตั้งค่าได้ทั้ง OpenAI ทางการ, Google Gemini ทางการ และบริการภายนอกที่ใช้รูปแบบ API ที่รองรับ OpenAI เป็นค่าเริ่มต้นที่แก้ไขได้ เจ้าของกรอกชื่อ provider, API Base URL, คีย์ และโมเดลใน Local Config ได้โดยตรงแล้ว AI เรียกสร้างภาพได้ทันที ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือ MCP ไม่รับ URL, key, remote task ID หรือเปลี่ยนโมเดลเป็นรายคำขอ งานครอปทำในเครื่องโดยไม่เรียกโมเดล
 
 ตรวจเอกสารทางการเมื่อ 17 พฤศจิกายน 2026: OpenAI ระบุว่า Sora 2 และ Videos API ปิดบริการเมื่อ 24 กันยายน 2026 และไม่มี API ทดแทนตรงตัว จึงไม่ตั้ง `sora-2` เป็นค่าเริ่มต้นหรือส่งวิดีโอไปที่ OpenAI โดยอัตโนมัติ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api) และ [คู่มือวิดีโอที่เก็บไว้เป็นประวัติ](https://developers.openai.com/api/docs/guides/video-generation)
 
@@ -8,12 +8,15 @@ DODO รองรับสร้างภาพ ครอป/แบ่งภา�
 
 1. เปิด Local Config แล้วไปที่ **Providers & Profiles → Creative Media**
 2. เปิด **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก preset OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ connection, รูปแบบ API, API Base URL และคีย์ เลือก **Env ถาวรในเครื่องที่รัน DODO** เพื่อเก็บคีย์ข้ามรีสตาร์ต หรือเลือก Session/Keychain ตามที่เซิร์ฟเวอร์รองรับ รุ่นใหม่ตั้งโมเดลเป็น **Auto** จึงบันทึก Custom ด้วย URL/key ได้โดยยังไม่ต้องรู้ Model ID ทุก preset แก้ไขได้และไม่บังคับ hostname ของงานภาพ
-3. กด **บันทึก Provider สำหรับภาพ** แล้วเลือก **การเชื่อมต่อสำหรับงานสื่อ** หน้าเว็บโหลดและแสดงรายชื่อโมเดลให้อัตโนมัติเมื่อมี connection ที่เลือก หลังเปิดหน้า เปลี่ยน connection หรือบันทึกค่าการเชื่อมต่อ เลือก Auto, โมเดลในรายการ หรือพิมพ์ Model ID เองได้ หากโหลดไม่สำเร็จยังกรอกเองได้โดยไม่บล็อกฟอร์ม และใช้ **โหลดโมเดลสำหรับภาพ** เพื่อโหลดใหม่ การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้
-4. เลือกโปรเจกต์ที่อนุญาต เปิดงานสร้างสื่อผ่าน AI แล้วกด **บันทึก Creative Media**
-5. หากต้องการลบพื้นหลังหรือสร้างวิดีโอจากภาพอ้างอิง ให้เปิดอนุญาตส่งภาพที่เลือกด้วย
-6. สำหรับวิดีโอ ให้เลือก connection ที่ตรวจแล้วว่ารองรับ video API เปิด `videoEnabled` และกรอก `videoModel` เอง ค่าเริ่มต้นคือปิดและโมเดลว่าง การเชื่อมต่อ OpenAI ทางการเปิดวิดีโอไม่ได้
+3. กด **บันทึก Provider สำหรับภาพ** ระบบเลือก connection และบันทึกโมเดลให้พร้อมใช้งานจากแชต ไม่ต้องเลือกโปรเจกต์หรือเปิดอนุญาตงานภาพเพิ่มเติม หน้าเว็บโหลดและแสดงรายชื่อโมเดลให้อัตโนมัติเมื่อมี connection ที่เลือก หลังเปิดหน้า เปลี่ยน connection หรือบันทึกค่าการเชื่อมต่อ เลือก Auto, โมเดลในรายการ หรือพิมพ์ Model ID เองได้ หากโหลดไม่สำเร็จยังกรอกเองได้โดยไม่บล็อกฟอร์ม และใช้ **โหลดโมเดลสำหรับภาพ** เพื่อโหลดใหม่ การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้
+4. ในแชตที่เชื่อม DODO MCP สั่ง AI เช่น **สร้างภาพแมวใส่ชุดนักบินอวกาศ อัตราส่วน 1:1** ได้เลย หากเปลี่ยน connection หรือโมเดลในฟอร์มหลักให้กด **บันทึก Creative Media** ก่อนเรียกงานใหม่
+5. สำหรับวิดีโอ ให้เลือก connection ที่ตรวจแล้วว่ารองรับ video API เปิด `videoEnabled` และกรอก `videoModel` เอง ค่าเริ่มต้นคือปิดและโมเดลว่าง การเชื่อมต่อ OpenAI ทางการเปิดวิดีโอไม่ได้
 
-ค่าเริ่มต้นปิดงานผ่าน AI และวิดีโอ, ไม่เลือก connection/โปรเจกต์ และไม่อนุญาตอัปโหลดภาพ การตั้งค่าหรือโหลดรายชื่อโมเดลไม่สร้างภาพและไม่ถือเป็นการตรวจรับ inference การโหลดรายชื่อเป็นคำขอ API แบบอ่านแยกต่างหาก งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี Connection ที่สร้างจาก Creative Media ใช้ credential store เดียวกับ AI Providers และไม่ต้องสร้าง Agent Profile
+การสร้างภาพต้องมี connection ที่เปิดใช้และคีย์ที่ใช้งานได้ ส่วน client ต้องเชื่อมต่อ DODO พร้อม OAuth scope ของ operation นั้น งานภาพไม่ใช้รายการโปรเจกต์ที่อนุญาต สวิตช์เปิดงานภาพ หรือสวิตช์อนุญาตอัปโหลดภาพเดิม การลบพื้นหลังและงานที่ใช้ภาพอ้างอิงส่งเฉพาะภาพที่ AI ระบุในคำขอ การตั้งค่าหรือโหลดรายชื่อโมเดลไม่สร้างภาพและไม่ถือเป็นการตรวจรับ inference การโหลดรายชื่อเป็นคำขอ API แบบอ่านแยกต่างหาก งานสร้างสื่ออาจมีค่าใช้จ่ายและขึ้นกับสิทธิ์โมเดลของบัญชี Connection ที่สร้างจาก Creative Media ใช้ credential store เดียวกับ AI Providers และไม่ต้องสร้าง Agent Profile
+
+บันทึก provider ที่ปิดใช้งานไว้เป็นฉบับร่างได้ โดยไม่เปลี่ยน connection สำหรับงานสื่อที่เลือกอยู่ ต้องเปิด connection ก่อนเลือกใช้งาน หากต้องการปิด connection ที่ใช้งานอยู่ ให้เลือก connection อื่นหรือยกเลิกการเลือกแล้วบันทึก Creative Media ก่อน
+
+ตั้งแต่ 1.8.0 การเรียกแบบ global ใช้ได้กับ client ที่ยืนยันตัวตนระดับ installation และมี OAuth scopes ตรงกับ operation รวม managed mode โดยไม่ตรวจรายการ client ของโปรเจกต์หรือขอ project trust approval การเปลี่ยนนี้มีผลกับ provider ที่เลือกไว้ก่อนอัปเกรดด้วย legacy login ที่ผูก root ต้อง reconnect ส่วน delegated agent ที่ถูกจำกัดโปรเจกต์ใช้ global ไม่ได้ ฟิลด์เดิม `enabled`, `allowImageUpload`, `projectIds` ยังรับเพื่อความเข้ากันได้ แต่ไม่ใช้จำกัดงานภาพอีก: ค่าที่อ่าน/บันทึกจะเป็น `enabled` ตามการเลือก connection, `allowImageUpload:true`, `projectIds:[]` ผลงานยังแยกตามผู้เรียกเดิม
 
 Auto เป็นค่าเริ่มต้นเฉพาะ config/preset ใหม่ ค่า Model ID ที่เคยบันทึกเองยังอยู่เดิม เมื่อส่งงานภาพด้วย Auto backend จะขอรายชื่อโมเดลใหม่จาก connection เดิม เลือกหนึ่ง image model ที่รู้จักและปรากฏในรายการ แล้วส่งคำขอสร้าง/แก้ภาพหนึ่งครั้ง ไม่ส่งคำว่า `auto` ไปยัง API และไม่เดาใช้ text/video model หากไม่มีโมเดลที่รู้จักหรือปลายทางไม่รองรับ model-list ให้เลือก Model ID เอง ผล `creative_job.model` แสดงโมเดลที่ใช้จริง หากโมเดลที่เลือกตอบผิดพลาด ระบบไม่เปลี่ยนโมเดลแล้วส่งงานเสียเงินซ้ำ
 
@@ -25,7 +28,7 @@ Env ถาวรใช้ไฟล์ส่วนตัวใต้ `DODO_CONFIG
 
 ถ้าใช้ตัวแปรที่ provision ไว้ใน inherited environment ของเซิร์ฟเวอร์แล้ว ให้ระบุชื่อและเว้นคีย์ว่างสำหรับ connection ใหม่ ระบบอ่าน Env ภายนอกเฉพาะเมื่อไม่มีไฟล์ที่ DODO เก็บเอง ไฟล์ที่มีปัญหาไม่ทำให้สลับแหล่งคีย์ การเปลี่ยนค่า Env ภายนอกต้องบันทึกยืนยัน connection ใหม่ก่อนใช้งาน การลบ connection ลบเฉพาะไฟล์ของ DODO และไม่ unset ตัวแปรภายนอก ดู [credential storage](AI_PROVIDERS.md#credential-และ-endpoint)
 
-Session key อยู่ในหน่วยความจำและต้องกรอกใหม่หลัง DODO รีสตาร์ต ส่วน macOS Keychain ใช้เก็บคีย์ข้ามรอบได้บนเซิร์ฟเวอร์ Mac การตั้งค่าโมเดล/โปรเจกต์ยังอยู่ใน private state เมื่อไม่มีคีย์ ระบบรายงานข้อผิดพลาดโดยไม่เปลี่ยนไปใช้ connection อื่นเอง ใน managed mode เจ้าของต้องอนุญาต client ในสิทธิ์ AI ของโปรเจกต์ด้วย
+Session key อยู่ในหน่วยความจำและต้องกรอกใหม่หลัง DODO รีสตาร์ต ส่วน macOS Keychain ใช้เก็บคีย์ข้ามรอบได้บนเซิร์ฟเวอร์ Mac การตั้งค่าโมเดลยังอยู่ใน private state เมื่อไม่มีคีย์ ระบบรายงานข้อผิดพลาดโดยไม่เปลี่ยนไปใช้ connection อื่นเอง งานสื่อแบบ global ไม่ต้องมีสิทธิ์ AI รายโปรเจกต์
 
 หากการบันทึกคีย์และ connection ไม่สำเร็จครบ ระบบจะพักการใช้ connection นั้นและขอให้กรอกคีย์ใหม่ แม้รีสตาร์ตแล้วก็จะไม่ส่งคีย์ที่อาจจับคู่กับ URL ผิดออกไป เมื่อยืนยัน URL/protocol/storage/Env reference และบันทึกคีย์ใหม่สำเร็จจึงใช้งานต่อได้
 
@@ -57,9 +60,21 @@ Session key อยู่ในหน่วยความจำและต้�
 | `download_link_list` | ดู metadata ของลิงก์ที่เป็นเจ้าของ โดยไม่ส่ง token/URL กลับ |
 | `download_link_revoke` | ยกเลิกลิงก์ที่เป็นเจ้าของก่อนหมดอายุ |
 
-Full surface มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ operations เดียวกันผ่าน `dodo_media` ตรวจ schema ล่าสุดด้วย `dodo_discover` และรับ `workspaceId`/`workspaceEpoch` จาก `project_overview` ก่อนเรียก ไม่มีเครื่องมือสร้างโมเดล 3D ในฟีเจอร์นี้
+Full surface มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ operations เดียวกันผ่าน `dodo_media` ตรวจ schema ล่าสุดด้วย `dodo_discover` ได้ เครื่องมือสร้างภาพ/วิดีโอ ครอป ลบพื้นหลัง รับผลงาน อ่าน resource และสร้างลิงก์ดาวน์โหลดเรียกแบบ global ได้: ไม่ต้องส่ง `workspaceId`/`workspaceEpoch` หรือเรียก `project_overview` ก่อน ผลงานยังแยกตามผู้เรียกเดิม การส่ง workspace context หรือ target อย่างชัดเจนจะเลือกทำงานในโปรเจกต์นั้น ส่วน `media_save` สำหรับเขียนไฟล์ลงโปรเจกต์ยังต้องมี context ของปลายทาง ไม่มีเครื่องมือสร้างโมเดล 3D ในฟีเจอร์นี้
 
-รุ่น 1.7.0 มี Full 173 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 169), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
+ตัวอย่างสร้างภาพผ่าน Compact/Hybrid โดยไม่ใช้โปรเจกต์:
+
+```text
+dodo_media(
+  operation="image_generate",
+  args={prompt:"A cat astronaut, illustration",size:"1024x1024",idempotencyKey:"chat-image-0001"}
+)
+dodo_media(operation="creative_job",args={jobId:"creative_…"})
+```
+
+ใช้ `jobId` ที่ได้จริงจากคำขอแรกเพื่อรับผลจากงานเดิม ไม่เริ่มงานสร้างซ้ำเพื่อดูสถานะ
+
+มี Full 173 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 169), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
 
 งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 
@@ -71,7 +86,6 @@ OpenAI-compatible Images ต้องคืน PNG แบบ `b64_json`; Gemini 
 
 ```text
 dodo_media(
-  workspaceId="…", workspaceEpoch="…",
   operation="download_link_create",
   args={
     resourceId:"res_…",
@@ -84,11 +98,11 @@ dodo_media(
 
 เลือกอายุเป็น 1, 2, 7, 14 หรือ 30 วัน (เริ่มต้น 7) ผลคืน `linkId`, URL, hash และเวลาหมดอายุ URL อยู่บนโดเมนของ HTTP server ที่รันจริง เช่น `https://mcp.example.com/file/<token>/generated.png` ผู้ที่มี URL ดาวน์โหลดได้ จึงต้องเก็บ URL เป็นความลับ ลิงก์ผูกกับสำเนา CAS ที่ไม่เปลี่ยนตามไฟล์ต้นฉบับและมีอายุแยกจาก resource reference 24 ชั่วโมง
 
-`download_link_list` ดูลิงก์ที่ยังไม่หมดอายุของผู้เรียกโดยไม่แสดง token/URL; `download_link_revoke(linkId="dl_…")` ยกเลิกก่อนกำหนด การสร้างต้องมีสิทธิ์ read/write และผ่าน execution trust/approval ส่วนยกเลิกต้องมี write ลิงก์อยู่ข้ามรีสตาร์ต/เปลี่ยน workspace แต่หยุดเมื่อหมดอายุ ถูกยกเลิก หรือสิทธิ์ต้นทางถูกถอน การสร้างลิงก์ไม่เรียก image/video API เพิ่มและไม่ retry เอง STDIO อย่างเดียวสร้าง URL ที่ให้บริการไฟล์ไม่ได้ ดู [Temporary token download links](RESOURCES.md#temporary-token-download-links) สำหรับ HTTP/tunnel, permissions และข้อจำกัดทั้งหมด
+`download_link_list` ดูลิงก์ที่ยังไม่หมดอายุของผู้เรียกโดยไม่แสดง token/URL; `download_link_revoke(linkId="dl_…")` ยกเลิกก่อนกำหนด การสร้างต้องมีสิทธิ์ read/write ส่วนยกเลิกต้องมี write งาน global ใช้คำขอของ AI ที่ยืนยันตัวตนแล้วโดยไม่ต้องขอ project trust approval ส่วนการส่ง context ของโปรเจกต์ยังใช้ policy ของโปรเจกต์นั้น ลิงก์อยู่ข้ามรีสตาร์ต/เปลี่ยน workspace แต่หยุดเมื่อหมดอายุ ถูกยกเลิก หรือสิทธิ์ต้นทางถูกถอน การสร้างลิงก์ไม่เรียก image/video API เพิ่มและไม่ retry เอง STDIO อย่างเดียวสร้าง URL ที่ให้บริการไฟล์ไม่ได้ ดู [Temporary token download links](RESOURCES.md#temporary-token-download-links) สำหรับ HTTP/tunnel, permissions และข้อจำกัดทั้งหมด
 
 ## ครอปและลบพื้นหลัง
 
-`image_crop` และ `image_remove_background` รับต้นฉบับอย่างใดอย่างหนึ่ง: workspace `path`, `assetId` ของภาพที่ผู้เรียกเป็นเจ้าของ หรือ `resourceId` ของภาพที่ผู้เรียกเข้าถึงได้ Path ยังผ่าน workspace, secret และ regular-file guards เดิม
+`image_crop` และ `image_remove_background` รับต้นฉบับอย่างใดอย่างหนึ่ง: workspace `path`, `assetId` ของภาพที่ผู้เรียกเป็นเจ้าของ หรือ `resourceId` ของภาพที่ผู้เรียกเข้าถึงได้ งาน global ใช้ resource ของผลงานที่สร้างในแชตได้โดยตรง หากอ่าน `path` จากโปรเจกต์ให้ส่ง context ของโปรเจกต์นั้น Path ยังผ่าน workspace, secret และ regular-file guards เดิม
 
 ครอปใช้ PNG/JPEG/WebP/GIF ขนาดไม่เกิน 16 MiB และ 40 ล้านพิกเซล ใช้เฟรมแรกสำหรับภาพเคลื่อนไหว พิกัดอ้างพิกเซลที่เข้ารหัสในไฟล์ **ก่อนหมุนตาม EXIF** ไม่ใช่พิกัดภาพ preview ที่ถูกย่อ ผลเป็น lossless PNG รักษา alpha ไม่ขยายภาพ และไม่เติมรายละเอียดใหม่ จำนวนพิกเซลรวมของ crops ต่อครั้งไม่เกิน 40 ล้าน
 
@@ -114,9 +128,9 @@ dodo_media(
 
 ## วิดีโอจากภาพ แก้ไข และต่อคลิป
 
-เมื่อเปิด video compatibility แล้ว `video_generate` รับ `reference` แบบ `{path:"assets/reference.png"}`, `{assetId:"asset_…"}` หรือ `{resourceId:"res_…"}` ได้หนึ่งต้นฉบับ ภาพยังผ่าน path/secret/ownership guards และต้องได้รับอนุญาตอัปโหลด ระบบแปลงเป็น PNG ก่อนส่งและตรวจว่าขนาดตรงกับ `size` ที่ขอ เช่น `1280x720` โดยไม่ย่อหรือครอปให้อัตโนมัติ
+เมื่อเปิด video compatibility แล้ว `video_generate` รับ `reference` แบบ `{path:"assets/reference.png"}`, `{assetId:"asset_…"}` หรือ `{resourceId:"res_…"}` ได้หนึ่งต้นฉบับ ภาพยังผ่าน path/secret/ownership guards ระบบแปลงเป็น PNG ก่อนส่งและตรวจว่าขนาดตรงกับ `size` ที่ขอ เช่น `1280x720` โดยไม่ย่อหรือครอปให้อัตโนมัติ
 
-`video_edit` และ `video_extend` รับ `jobId` ของวิดีโอที่เสร็จแล้วใน workspace และเป็นของผู้เรียกเดียวกัน พร้อม `prompt` และ `idempotencyKey` ส่วน extend รับ `seconds` ตาม schema ด้วย ต้นฉบับต้องมี remote handle ที่บันทึกไว้และใช้ connection/configuration เดิม ระบบไม่รับ remote URL หรือ ID ที่ผู้เรียกกรอกเอง แต่ละ operation สร้างงานลูกใหม่ ไม่แก้ receipt หรือไฟล์ต้นฉบับ
+`video_edit` และ `video_extend` รับ `jobId` ของวิดีโอที่เสร็จแล้วใน scope เดิมและเป็นของผู้เรียกเดียวกัน พร้อม `prompt` และ `idempotencyKey` ส่วน extend รับ `seconds` ตาม schema ด้วย ต้นฉบับต้องมี remote handle ที่บันทึกไว้และใช้ connection/configuration เดิม ระบบไม่รับ remote URL หรือ ID ที่ผู้เรียกกรอกเอง แต่ละ operation สร้างงานลูกใหม่ ไม่แก้ receipt หรือไฟล์ต้นฉบับ
 
 ```text
 dodo_media(
@@ -139,19 +153,20 @@ dodo_media(
 
 ส่งงานสร้างหนึ่งครั้งต่อหนึ่ง `idempotencyKey` หาก response หายขณะ context เดิมยังใช้ได้ ให้เรียกด้วย key และ args เดิมเพื่อรับ receipt เดิม อย่าสร้าง key ใหม่เพียงเพื่อตรวจความคืบหน้า ไม่มี automatic retry ของงานที่อาจคิดเครดิต และไม่มีการ polling วิดีโอเบื้องหลัง การเรียก `creative_job` สำหรับวิดีโออ่านสถานะ/เนื้อหาของ remote render เดิมเท่านั้น
 
-Job metadata เก็บใน private SQLite แยก workspace และผู้เรียก มีอายุ 24 ชั่วโมงนับจากส่งงาน Resource มี `expiresAt` ของตัวเอง หลังรีสตาร์ตให้รับ workspace epoch ใหม่แล้วตรวจ `creative_job` เดิม:
+Job metadata เก็บใน private SQLite แยก global/โปรเจกต์และผู้เรียก มีอายุ 24 ชั่วโมงนับจากส่งงาน Resource มี `expiresAt` ของตัวเอง หลังรีสตาร์ตงาน global เรียก `creative_job` เดิมได้โดยไม่ต้องรับ workspace epoch ส่วนงานในโปรเจกต์ต้องรับ context ใหม่ก่อน:
 
-- งานที่ยังไม่มี remote video ID และค้างอยู่จะเป็น `interrupted` โดยไม่ส่งสร้างซ้ำ
+- งาน global ที่ยังไม่มี remote video ID และค้างจาก server instance อื่นจะแสดง `uncertain` พร้อม `SERVER_INSTANCE_CHANGED` โดยไม่แก้ receipt ของ instance นั้นหรือส่งสร้างซ้ำ
+- งานที่ระบุโปรเจกต์และยังไม่มี remote video ID ซึ่งค้างอยู่หลังรีสตาร์ตจะเป็น `interrupted` โดยไม่ส่งสร้างซ้ำ
 - วิดีโอที่บันทึก remote ID แล้วสามารถขอสถานะเดิมได้เมื่อผู้เรียกยังมีสิทธิ์, คีย์พร้อม และ connection/model configuration ตรงเดิม
 - งานที่ส่งออกแล้วแต่ผลไม่แน่นอนอาจเป็น `uncertain` ซึ่งอาจใช้เครดิตไปแล้ว ต้องตรวจงานก่อนเริ่มงานใหม่
 
-การตัดการเชื่อมต่อของ client ไม่ใช่การยกเลิก billing ของคำขอที่ส่งแล้ว การเปลี่ยนสิทธิ์/โปรเจกต์/connection ถูกตรวจใหม่ก่อนส่งคำขอหรือเผยแพร่ผลที่สร้างเสร็จ
+การตัดการเชื่อมต่อของ client ไม่ใช่การยกเลิก billing ของคำขอที่ส่งแล้ว สิทธิ์ client และ connection ถูกตรวจใหม่ก่อนส่งคำขอหรือเผยแพร่ผลที่สร้างเสร็จ งานที่เลือกโปรเจกต์ยังตรวจสิทธิ์โปรเจกต์ด้วย
 
 ## อ่านและบันทึกผล
 
 ผลสร้างและครอปเข้า immutable Resource Layer/CAS พร้อม `resourceId`, MIME, byte count, `sha256` และ expiry ใช้ `resource_preview` เพื่อดูภาพย่อ หรือ `resource_read_range` เพื่ออ่านไบต์แบบแบ่งช่วงไม่เกิน 256 KiB พร้อม resume token ภาพย่อไม่ใช่ไฟล์ต้นฉบับ ส่วน MP4 ให้ใช้ไบต์ของ resource หรือบันทึกไฟล์เพื่อเล่น
 
-`media_save` รับเฉพาะ PNG/MP4 ที่สร้างผ่านฟีเจอร์นี้ ต้องมี `dodo:write` และ `dodo:exec`, ส่ง `expectedSha256` ของ resource และใช้ workspace-relative path ที่ลงท้าย `.png` หรือ `.mp4` หาก path มีไฟล์อยู่แล้ว ต้องส่ง `expectedHash` ของไฟล์เดิมด้วย ค่า hash ไม่ตรงจะไม่เขียนทับ
+`media_save` รับเฉพาะ PNG/MP4 ที่สร้างผ่านฟีเจอร์นี้ รวมถึง resource ของผู้เรียกที่สร้างแบบ global เมื่อต้องการเขียนลงโปรเจกต์ ให้รับ `workspaceId`/`workspaceEpoch` ของปลายทางจาก `project_overview` แล้วส่ง context นั้น ต้องมี `dodo:write` และ `dodo:exec`, ส่ง `expectedSha256` ของ resource และใช้ workspace-relative path ที่ลงท้าย `.png` หรือ `.mp4` หาก path มีไฟล์อยู่แล้ว ต้องส่ง `expectedHash` ของไฟล์เดิมด้วย ค่า hash ไม่ตรงจะไม่เขียนทับ
 
 ```text
 dodo_media(

@@ -4,6 +4,8 @@ DODO maps guarded workspace files and owned runtime media assets to one immutabl
 resource contract. The content-addressed store (CAS) is local to the installation.
 Ingesting a resource keeps it private. An explicit `download_link_create` call can
 publish that one immutable object through the existing HTTP listener.
+Generated chat media and its resource/download tools also work globally, with no
+registered project or prior `project_overview` call.
 
 ## Operations
 
@@ -14,8 +16,8 @@ publish that one immutable object through the existing HTTP listener.
 | `resource_read_range` | Read/resume a byte range, maximum 256 KiB | `dodo:read` |
 | `resource_preview` | Bounded text/image/audio/metadata preview | `dodo:read` |
 | `resource_extract` | UTF-8 text, metadata, or ZIP central-directory entries | `dodo:read` |
-| `resource_transform` | Create one bounded raster thumbnail resource | `dodo:exec` plus trust/owner approval policy |
-| `download_link_create` | Issue a temporary token URL for one owned resource | `dodo:write` and `dodo:read`; execution trust/approval policy |
+| `resource_transform` | Create one bounded raster thumbnail resource | `dodo:exec`; project trust policy when explicitly targeting a project |
+| `download_link_create` | Issue a temporary token URL for one owned resource | `dodo:write` and `dodo:read`; project trust policy when explicitly targeting a project |
 | `download_link_list` | List owned, unexpired link metadata without tokens/URLs | `dodo:read` |
 | `download_link_revoke` | Revoke an owned link before expiry | `dodo:write`; stopping a link needs no execution approval |
 
@@ -23,11 +25,13 @@ Full STDIO exposes these names directly. HTTP Compact and Hybrid use:
 
 ```text
 dodo_discover(operation="resource_inspect")
-dodo_media(operation="resource_inspect", args={"path":"assets/example.png"})
+dodo_media(operation="resource_inspect", args={"resourceId":"res_…"})
 ```
 
-Keep `workspaceId` and `workspaceEpoch` at the gateway top level. Never put them in
-`args`.
+Omit `workspaceId`, `workspaceEpoch` and project targets to use global chat
+resources. For a project file path or project-owned resource, supply that
+project's context at the gateway top level, never in `args`. Global calls keep
+OAuth scope checks and caller isolation, and need no project trust approval.
 
 ## Temporary token download links
 
@@ -40,20 +44,14 @@ Local mode produces a loopback URL usable only on that machine. For remote
 recipients, configure the public HTTPS origin and route `/file/*` through the same
 tunnel as `/mcp`.
 
-Use `resource_inspect` for one guarded workspace file first, or use the resource
-returned by `creative_job`/`image_crop`. Create a link using the returned ID and
-exact SHA-256:
+Use the global resource returned by `creative_job`/`image_crop` directly. Create a
+link using the returned ID and exact SHA-256:
 
 ```text
-dodo_media(
-  workspaceId="…", workspaceEpoch="…",
-  operation="resource_inspect",
-  args={path:"assets/image.png"}
-)
+dodo_media(operation="creative_job",args={jobId:"creative_…"})
   → resourceId, sha256
 
 dodo_media(
-  workspaceId="…", workspaceEpoch="…",
   operation="download_link_create",
   args={
     resourceId:"res_…",
@@ -66,6 +64,10 @@ dodo_media(
     createdAt, expiresAt, revokedAt
 ```
 
+To share a project file instead, first call `resource_inspect` with its guarded
+workspace-relative `path`, `workspaceId` and `workspaceEpoch`, then keep that same
+project context on link creation and subsequent resource/link operations.
+
 `expiresInDays` accepts **1, 2, 7, 14 or 30**, with a default of 7. `fileName` is
 optional; the default uses the detected MIME type, such as `download.png` or
 `download.mp4`. A custom name must be one filename, at most 180 characters, with no
@@ -73,9 +75,10 @@ path separators or control characters. Neither the name nor the URL can select
 an arbitrary filesystem path. A URL looks like
 `https://mcp.example.com/file/<random-token>/image.png`.
 
-Creation requires read and write access to the source project, plus the execution
-trust/approval policy. The resource must belong to the same caller/workspace and
-still be valid at creation. Sharing does not run an image model or upload bytes to
+Creation requires read and write scopes. Explicit project calls also require
+source-project access and its execution trust policy. The resource must belong
+to the same caller and global/project scope and still be valid at creation.
+Sharing does not run an image model or upload bytes to
 an AI provider. Each create call issues a separate link; there is no automatic
 retry. If a response is lost, inspect the owned links and revoke unwanted ones
 before issuing another.
@@ -86,12 +89,11 @@ stores its hash in private state. Do not place the URL in public logs or a Git
 repository. `download_link_list(limit=50)` returns metadata only (maximum 128 per
 call), including `linkId`, expiry and revocation time, with no token or URL. It
 cannot recover a lost URL. Revoked metadata can disappear after its object is
-collected; expired links are not listed. Use the original caller and project
-context to revoke:
+collected; expired links are not listed. Use the original caller and scope to
+revoke; global links need no workspace context:
 
 ```text
 dodo_media(
-  workspaceId="…", workspaceEpoch="…",
   operation="download_link_revoke",
   args={linkId:"dl_…"}
 )
@@ -99,10 +101,11 @@ dodo_media(
 
 Revocation is safe to repeat. It stops subsequent access; bytes already downloaded
 cannot be recalled. Expired, revoked, invalid or no-longer-authorized links are
-unavailable. Downloads recheck the current underlying client/grant and project
-read/write authority, including managed ACL and project access level. Removing a
-registered source project or making its registered root unavailable also stops
-its links. A link's requested lifetime is independent of the issuing MCP access
+unavailable. Downloads recheck the current underlying client/grant. Project links
+also recheck read/write authority, including managed ACL and project access
+level; removing a registered source project or making its root unavailable stops
+those project links. Global links do not depend on any registered project. A
+link's requested lifetime is independent of the issuing MCP access
 token's shorter lifetime; the underlying
 grant must still be valid.
 
@@ -177,7 +180,8 @@ one-hour grace period so GC cannot race the reference-creation step. The aggrega
 ## Security
 
 Every operation passes the normal invocation pipeline and then rechecks live
-grant/client/workspace access and reference ownership. Workspace ingest also checks
+grant/client access and reference ownership. Explicit project calls also recheck
+workspace access. Workspace ingest checks
 secret/protected/private-state paths, traversal, symlinks, hardlinks, regular-file
 identity and expected hash/MIME. Object bytes live below the owner-private DODO config
 directory and are SHA-256 verified before reads. Resource content and decoder output

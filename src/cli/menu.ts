@@ -39,7 +39,7 @@ function failureText(prefix: string, error: unknown): string {
 export function menuText(startup: CliMenuProject | undefined, platform: NodeJS.Platform = process.platform): string {
   const selected = startup?.available
     ? `${startup.displayName} (${startup.root})`
-    : 'ยังไม่ได้เลือก — server จะรอให้เลือกจาก Local Config';
+    : 'ยังไม่ได้เลือก — ใช้เครื่องมือสื่อจากแชตได้หลังตั้งค่า provider โดยไม่ต้องมีโปรเจกต์';
   const setupLabel = platform === 'win32'
     ? '  5) ติดตั้ง/ตรวจ dependencies (cloudflared ต้องติดตั้งจาก Cloudflare ก่อน)'
     : '  5) ติดตั้ง/ตรวจ dependencies ทั้งหมด รวม cloudflared';

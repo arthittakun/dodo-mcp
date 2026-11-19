@@ -82,4 +82,4 @@ const transformTool = defineTool({
   },
 });
 
-export const RESOURCE_TOOLS: AnyToolDef[] = [inspectTool, resourceReadTool, resourceRangeTool, previewTool, extractTool, transformTool];
+export const RESOURCE_TOOLS: AnyToolDef[] = [inspectTool, resourceReadTool, resourceRangeTool, previewTool, extractTool, transformTool].map(def => ({ ...def, optionalWorkspaceContext: true }));

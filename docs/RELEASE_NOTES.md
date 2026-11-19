@@ -1,5 +1,13 @@
 # DODO MCP — Release Notes
 
+## 1.8.0 — Global image and video tools
+
+- Call creative, resource and temporary-download tools directly from chat without creating/selecting a project or sending workspace context. DODO can start with no registered project; saving an image provider selects its URL/key/model for immediate global use.
+- Remove project allowlists, media-enable and upload switches from Creative Media setup. Legacy `enabled`, `allowImageUpload` and `projectIds` remain accepted but are normalized and no longer restrict creative access. Authenticated installation clients with the relevant OAuth scopes can use global media, including managed mode, without project trust approval. Legacy root-bound logins must reconnect; project-restricted delegations cannot use global tools.
+- Keep explicit project-context routing and project file policy. `media_save` can copy the caller's own global generated resource into an explicitly selected project. Preserve caller isolation, credentials, endpoint checks and bounded media handling.
+- Report pending global jobs from another server instance as uncertain without resubmitting paid work or overwriting that instance's receipt. Collect existing jobs with `creative_job`.
+- Tool counts remain Full 173 (default 169), Compact 20 and Hybrid 49. Restart and reconnect/rescan MCP after upgrading; see [release details and examples](RELEASE_1.8.0.md), [Creative Media](CREATIVE_MEDIA.md) and [validation](TEST_REPORT.md).
+
 ## 1.7.0 — Persistent local Env API keys
 
 - Add permanent, private per-connection Env files on the machine running DODO, and explicit references to inherited server environment variables. Available in both Providers and Creative Media; saved keys survive restarts on Windows, Linux and macOS.

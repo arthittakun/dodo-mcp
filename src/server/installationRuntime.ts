@@ -9,6 +9,7 @@ import { projectAuthority, isOwner } from '../security/projectAuthority.js';
 import { isPersonalMode } from '../security/accessMode.js';
 import type { Principal, AppServices } from '../tools/context.js';
 import type { WorkspaceResources } from './workspaceHost.js';
+import { createGlobalServices } from './globalServices.js';
 
 /** Explicit target runtimes never replace the legacy default workspace. */
 export class InstallationRuntime {
@@ -18,6 +19,7 @@ export class InstallationRuntime {
   private readonly resources = new Map<string, WorkspaceResources>();
   private readonly users = new Map<string, number>();
   private closed = false;
+  private global: AppServices | undefined;
   defaultReady: () => boolean = () => true;
   private readonly registry: ProjectRegistry;
   readonly store: Store;
@@ -30,6 +32,21 @@ export class InstallationRuntime {
     this.ai = new Subagents(this, ports);
   }
   attach(ws: BootstrappedWorkspace): void { ws.services.installation = this; ws.services.recovery?.activate(); }
+  /** Chat media and resources are independent of the selected default project. */
+  globalServices(): AppServices {
+    if (this.closed) throw new DodoError('CONFLICT', 'runtime manager is closing');
+    return this.global ??= createGlobalServices(this, this.initial, this.current);
+  }
+  acquireGlobal(): { services: AppServices; release: () => void } {
+    const services = this.globalServices();
+    this.users.set(services.workspaceId, (this.users.get(services.workspaceId) ?? 0) + 1);
+    let released = false;
+    return { services, release: () => {
+      if (released) return;
+      released = true;
+      this.users.set(services.workspaceId, (this.users.get(services.workspaceId) ?? 1) - 1);
+    } };
+  }
   list(p: Principal) {
     return this.registry.list().filter(r => {
       try { return projectAuthority(this.store, p, r.workspaceId).scopes.includes('dodo:read'); } catch { return false; }
@@ -119,6 +136,8 @@ export class InstallationRuntime {
     await Promise.all([this.current(), ...this.runtimes.values()].map(w => w.services.jobs.shutdown(3000)));
     await this.ai.close();
     while ([...this.users.values()].some(n => n > 0)) await new Promise(r => setTimeout(r, 25));
+    await this.global?.multimodal?.close();
+    this.global?.resources?.close();
     await Promise.all([this.current(), ...this.runtimes.values()].map(w => w.services.recovery?.close()));
     for (const id of this.runtimes.keys()) await this.closeProject(id);
     this.store.db.close();

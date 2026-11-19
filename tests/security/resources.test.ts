@@ -17,10 +17,14 @@ describe('Phase 04 resource authorization and failure boundaries', () => {
   let owner: TokenSet;
   let other: TokenSet;
   let reader: TokenSet;
+  let symlinkAvailable = false;
   beforeAll(async () => {
     ctx = await launch({ toolSurface: 'full', fixtureFiles: { 'safe.txt': 'safe resource', 'quota-unique.txt': 'unique quota probe bytes 8421', '.env': 'DODO_SECRET=never', '.dodo-dev-state/private.txt': 'private state marker' } });
     fs.writeFileSync(path.join(ctx.fixtureDir, 'image.png'), await sharp({ create: { width: 80, height: 60, channels: 3, background: '#123456' } }).png().toBuffer());
-    fs.symlinkSync('safe.txt', path.join(ctx.fixtureDir, 'linked.txt'));
+    try { fs.symlinkSync('safe.txt', path.join(ctx.fixtureDir, 'linked.txt')); symlinkAvailable = true; }
+    catch (error) {
+      if (process.platform !== 'win32' || !['EPERM', 'EACCES'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+    }
     fs.writeFileSync(path.join(ctx.fixtureDir, 'hard-source.txt'), 'hardlink resource');
     fs.linkSync(path.join(ctx.fixtureDir, 'hard-source.txt'), path.join(ctx.fixtureDir, 'hard-linked.txt'));
     owner = await obtainToken(ctx);
@@ -38,13 +42,18 @@ describe('Phase 04 resource authorization and failure boundaries', () => {
     expect((await mcpRaw(ctx, rpc('tools/call', { name: 'resource_inspect', arguments: { ...wsArgs(ctx), path: 'safe.txt' } }))).status).toBe(401);
   });
 
-  it('preserves secret, private-state, traversal, symlink and hardlink refusal on ingest', async () => {
+  it('preserves secret, private-state, traversal and hardlink refusal on ingest', async () => {
     for (const [inputPath, code] of [
       ['.env', 'SECRET_PATH_DENIED'], ['.dodo-dev-state/private.txt', 'PATH_DENIED'], ['../safe.txt', 'PATH_DENIED'],
-      ['linked.txt', 'PATH_DENIED'], ['hard-linked.txt', 'PATH_DENIED'],
+      ['hard-linked.txt', 'PATH_DENIED'],
     ] as const) error(await call('resource_inspect', { path: inputPath }), code);
     const rows = ctx.server.services.store.db.prepare('SELECT COUNT(*) AS count FROM resource_refs').get() as { count: number };
     expect(rows.count).toBe(0);
+  });
+
+  it('refuses symlink resource paths when the host can create the fixture', async ({ skip }) => {
+    if (!symlinkAvailable) { skip(); return; }
+    error(await call('resource_inspect', { path: 'linked.txt' }), 'PATH_DENIED');
   });
 
   it('binds every reference and resume token to the caller and current workspace context', async () => {

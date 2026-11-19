@@ -396,13 +396,16 @@ function buildGateway(spec: GatewaySpec): AnyToolDef {
     },
     requiredScope: scope,
     action: dominantAction(spec.operations),
+    optionalWorkspaceContext: spec.name === 'dodo_media',
     handler: async (args, ctx) => {
       const target = targetOf(args.operation);
       const raw = (args.args ?? {}) as Record<string, unknown>;
       assertNoNestedRoutingContext(raw);
+      const gatewayArgs = args as Record<string, unknown>;
+      const explicitTarget = gatewayArgs['targetProjectId'] !== undefined || gatewayArgs['targetProject'] !== undefined;
       const merged: Record<string, unknown> = target.noWorkspaceContext
         ? { ...raw }
-        : { ...raw, workspaceId: (args as Record<string, unknown>)['workspaceId'], workspaceEpoch: (args as Record<string, unknown>)['workspaceEpoch'] };
+        : { ...raw, workspaceId: gatewayArgs['workspaceId'] ?? (explicitTarget ? ctx.services.workspaceId : undefined), workspaceEpoch: gatewayArgs['workspaceEpoch'] ?? (explicitTarget ? ctx.services.epoch : undefined) };
       if ((args as Record<string,unknown>)['recoverySessionId']) merged['recoverySessionId']=(args as Record<string,unknown>)['recoverySessionId'];
       const { envelope, extraBlocks } = await invokeToolDefinition({
         def: target,
@@ -495,7 +498,7 @@ function usageNotes(def: AnyToolDef): string[] {
       notes.push('file mutation: journaled with backups; in inspect trust mode each call needs a local owner approval');
       break;
     case 'exec':
-      notes.push('effectful: local trust policy applies (owner approval unless trusted mode) and runs with OS-user privileges unless sandboxed');
+      notes.push(def.optionalWorkspaceContext ? 'global calls run on the authenticated chat request without project approval; explicit project context uses project policy' : 'effectful: local trust policy applies (owner approval unless trusted mode) and runs with OS-user privileges unless sandboxed');
       break;
     case 'plan':
       notes.push('creates a preview/plan only; nothing is written until apply');
@@ -531,6 +534,7 @@ function buildDiscoverTool(specs: readonly GatewaySpec[], exposedCatalog: readon
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   requiredScope: 'dodo:read',
   action: 'read',
+  optionalWorkspaceContext: true,
   handler: async (args) => {
     if (args.operation !== undefined) {
       const entry = operationIndex.find((e) => e.operation === args.operation);
@@ -555,9 +559,9 @@ function buildDiscoverTool(specs: readonly GatewaySpec[], exposedCatalog: readon
           schemaHash,
           callShape: {
             gateway: entry.gateway,
-            example: { workspaceId: '<from project_overview>', workspaceEpoch: '<from project_overview>', operation: entry.operation, args: '<object matching inputSchema>' },
+            example: { ...(!def.optionalWorkspaceContext ? { workspaceId: '<from project_overview>', workspaceEpoch: '<from project_overview>' } : {}), operation: entry.operation, args: '<object matching inputSchema>' },
           },
-          notes: [`pass workspaceId/workspaceEpoch at the TOP LEVEL of the ${entry.gateway} call, never inside args`, ...usageNotes(def)],
+          notes: [def.optionalWorkspaceContext ? 'call directly without a project or workspace context; optional top-level project context selects project resources' : `pass workspaceId/workspaceEpoch at the TOP LEVEL of the ${entry.gateway} call, never inside args`, ...usageNotes(def)],
         },
       };
     }

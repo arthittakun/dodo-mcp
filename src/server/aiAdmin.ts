@@ -56,8 +56,6 @@ export function registerAIAdmin(app: Express, host: WorkspaceHost, info: LocalCo
   route('post', '/api/ai/media', req => {
     reviewed(req);
     const value = CreativeSettingsInput.parse(req.body);
-    const available = new Set(new ProjectRegistry(manager().store).list().filter(project => project.available).map(project => project.projectId));
-    if (value.projectIds.some(id => !available.has(id))) throw new DodoError('PATH_DENIED', 'select available projects for creative media');
     return manager().ai.settings.saveMedia(value);
   });
   route('post', '/api/ai/access-mode', req => {

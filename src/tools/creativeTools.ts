@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { z } from 'zod';
 import { DodoError } from '../errors.js';
+import { projectAuthority } from '../security/projectAuthority.js';
 import { digestOf, newId, sha256Bytes } from '../util/hash.js';
 import { defineTool, policyGate, type AnyToolDef, type ToolCtx } from './context.js';
 import { Crop, Hash, Id, Key, Path } from '../services/multimodal/contracts.js';
@@ -21,7 +22,7 @@ function use(ctx: ToolCtx) {
 }
 const generate = defineTool({
   name: 'image_generate', title: 'Generate an image',
-  description: 'Start ONE paid image generation with the owner-configured image connection: OpenAI-compatible Images or native Gemini. The owner can configure provider, API base URL, key and model in Creative Media settings. No URL/key override in tool arguments. Requires project enablement and exec policy. Returns jobId; creative_job collects output. No automatic retries; reuse the same idempotencyKey after a lost response.',
+  description: 'Generate an image directly from chat using the configured provider URL, API key and model. No project, project_overview or workspace context is needed. Supports OpenAI-compatible Images and native Gemini. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.',
   input: { prompt: z.string().trim().min(1).max(16000), size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('1024x1024'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'), background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key },
   output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'image_generate', idempotencyKey, input, () => mm.creative.start(ctx, 'image', input), true, ['AUTH_REQUIRED']) }; },
@@ -40,13 +41,13 @@ const crop = defineTool({
 });
 const removeBackground = defineTool({
   name: 'image_remove_background', title: 'Remove an image background',
-  description: 'Start ONE paid generative image edit to isolate the subject on a transparent PNG. Requires owner image-upload permission and project media enablement. Select exactly ONE guarded path, owned assetId or resourceId. The provider can alter image details; success requires actual transparent pixels. Poll creative_job for output; no repeated paid edit or automatic retry.',
+  description: 'Remove the background from one owned image resource directly from chat, without a project or upload-enablement setting. Accepts resourceId/assetId; a workspace path uses optional explicit project context. Submits one paid generative edit and may alter image details; success requires actual transparent pixels. Collect the existing job with creative_job.',
   input: { ...source, idempotencyKey: Key }, output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'image_remove_background', idempotencyKey, input, () => mm.creative.start(ctx, 'background_removal', input), true, ['AUTH_REQUIRED']) }; },
 });
 const video = defineTool({
   name: 'video_generate', title: 'Generate a video',
-  description: 'Submit ONE text-to-video or image-guided render to an explicitly owner-enabled compatible video connection. Official OpenAI Videos API is retired; video has no enabled default. Optional reference selects one owned/guarded image matching size and requires image-upload permission. Returns jobId; creative_job collects that same render as MP4. No automatic retries, background polling, or 3D.',
+  description: 'Create a video directly from chat without a project using configured compatible video settings. Official OpenAI Videos API is retired; configure a compatible provider and video model first. An optional owned image reference must match size. Returns jobId; creative_job collects that render as MP4. No automatic paid retries or 3D.',
   input: { prompt: Prompt, size: z.enum(['1280x720', '720x1280']).default('1280x720'), seconds: Seconds.default(4), reference: z.object(source).strict().optional(), idempotencyKey: Key },
   output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'video_generate', idempotencyKey, input, () => mm.creative.start(ctx, 'video', input), true, ['AUTH_REQUIRED']) }; },
@@ -81,7 +82,16 @@ const save = defineTool({
   handler: async (args, ctx) => {
     use(ctx); liveAccess(ctx, 'dodo:write'); const { idempotencyKey, ...payload } = args;
     const data = await multimediaEffect(ctx, 'media_save', idempotencyKey, payload, async () => {
-      const s = ctx.services, cap = Math.min(s.limits.readFileBytes, s.limits.previewAggregateBytes), resource = await s.resources!.exportBytes(ctx, args.resourceId, args.expectedSha256, cap);
+      const s = ctx.services, cap = Math.min(s.limits.readFileBytes, s.limits.previewAggregateBytes);
+      const resource = await s.resources!.exportBytes(ctx, args.resourceId, args.expectedSha256, cap).catch(async (error: unknown) => {
+        if (!(error instanceof DodoError) || error.code !== 'NOT_FOUND' || !s.installation) throw error;
+        const lease = s.installation.acquireGlobal();
+        try {
+          const principal = projectAuthority(lease.services.store, ctx.principal, lease.services.workspaceId);
+          const globalCtx: ToolCtx = { ...ctx, services: lease.services, principal };
+          return await lease.services.resources!.exportBytes(globalCtx, args.resourceId, args.expectedSha256, cap);
+        } finally { lease.release(); }
+      });
       const extension = resource.info.mimeType === 'image/png' ? '.png' : '.mp4';
       if (path.extname(args.path).toLowerCase() !== extension) throw new DodoError('INVALID_INPUT', `save this resource with a ${extension} extension`);
       const target = s.wfs.resolve(args.path, { allowMissing: true });
@@ -105,4 +115,4 @@ const save = defineTool({
     return { data };
   },
 });
-export const CREATIVE_TOOLS: AnyToolDef[] = [generate, crop, removeBackground, video, videoEdit, videoExtend, job, save];
+export const CREATIVE_TOOLS: AnyToolDef[] = [...[generate, crop, removeBackground, video, videoEdit, videoExtend, job].map(def => ({ ...def, optionalWorkspaceContext: true })), save];

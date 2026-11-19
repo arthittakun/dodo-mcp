@@ -36,15 +36,18 @@ export class AISettings {
   private credentialReentryRequired(): DodoError { return new DodoError('AUTH_REQUIRED', 'provider credentials need to be entered again before this connection can be used', { recovery: 'Edit the connection, confirm its settings and enter its API key again' }); }
   limits() { return AILimits.parse(this.get('settings','limits') ?? {}); }
   saveLimits(raw: unknown) { const value = AILimits.parse(raw); this.put('settings','limits',value); return value; }
-  media(): CreativeSettings { return CreativeSettingsInput.parse(this.get('settings', 'creative-media') ?? {}); }
+  media(): CreativeSettings {
+    const value = CreativeSettingsInput.parse(this.get('settings', 'creative-media') ?? {});
+    return { ...value, enabled: Boolean(value.connectionId), allowImageUpload: true, projectIds: [] };
+  }
   saveMedia(raw: unknown): CreativeSettings {
     const value = CreativeSettingsInput.parse(raw);
-    if (value.enabled || value.videoEnabled) {
+    if (value.enabled || value.connectionId || value.videoEnabled) {
       const connection = value.connectionId ? this.get<Provider>('connection', value.connectionId) : undefined;
       if (!connection || !isCreativeConnection(connection)) throw new DodoError('INVALID_INPUT', 'select an enabled image connection using OpenAI-compatible Images or Gemini Interactions');
       if (value.videoEnabled && !supportsCreativeVideoConnection(connection)) throw new DodoError('NOT_SUPPORTED', 'compatibility video requires an OpenAI-compatible video protocol; the official OpenAI Videos API is retired');
     }
-    const normalized = { ...value, projectIds: [...new Set(value.projectIds)] };
+    const normalized = { ...value, enabled: Boolean(value.connectionId), allowImageUpload: true, projectIds: [] };
     this.put('settings', 'creative-media', normalized); return normalized;
   }
   state() {

@@ -117,9 +117,9 @@ export async function startServer(opts: StartOptions): Promise<RunningServer> {
   const launcherRoot = launcherConfig ? statePaths(launcherConfig.dir).launcherWorkspaceDir : undefined;
 
   // ---- workspace bootstrap (initial root, and later roots for a switch) ----
-  // The launcher root is private and inert. It may expose the authenticated
-  // catalog, but every operation remains denied until a project ACL is set or
-  // the caller explicitly targets an authorized registered project.
+  // The launcher root lets DODO start without a user project. Global media and
+  // discovery use installation services; project operations still use their
+  // selected workspace context and authority.
   const launcherBootstrap = launcherRoot !== undefined && launcherConfig !== undefined
     ? { rootOverride: launcherRoot, configDir: launcherConfig }
     : opts.rootOverride !== undefined

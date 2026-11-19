@@ -76,9 +76,9 @@ pairing endpoint และ CSP/no-store/frame denial บนทุก response �
 
 UI assets เสิร์ฟจากแพ็กเกจเองทั้งหมดรวมถึง SweetAlert2 ที่ vendor แบบ pin version (ไม่มี CDN; CSP ยังเป็น `script-src 'self'; style-src 'self'` โดยไม่มี `unsafe-inline`/`unsafe-eval`) เส้นทาง `/assets` เป็น fail-closed: path ที่ decode แล้วต้องตรงรูปแบบเข้มงวด (ลึกได้หนึ่งระดับเฉพาะ `ui/`, `vendor/`), นามสกุลอยู่ใน allowlist (`.css/.js/.svg`), ปฏิเสธ `..`, backslash, NUL และไฟล์ที่ resolve ออกนอก UI directory ทั้งหมดตอบ 404 ข้อความจาก server/paths/client/provider ทุกตัว render ผ่าน `textContent` (SweetAlert ใช้ `titleText`/`text` เท่านั้น ไม่ใช้ `html`) กล่องยืนยันของ UI เป็นชั้น UX เพิ่มเติม ไม่แทนที่ approval/validation ฝั่ง server
 
-Launcher mode ไม่มี active AI workspace และไม่ใช้ CWD เป็น implicit authority
-private inert root ไม่ถูกแสดงต่อ client; OAuth และ authenticated catalog เปิดให้ตั้ง
-connection ได้ โหมดส่วนตัวซึ่งเป็นค่าเริ่มต้นอนุญาต owner-approved OAuth installation
+Launcher mode ไม่มี active project workspace และไม่ใช้ CWD เป็น implicit authority
+private inert root ไม่ถูกแสดงต่อ client; OAuth, authenticated catalog และ global
+media/resource/download tools ใช้ได้โดยไม่ต้องลงทะเบียนโปรเจกต์ โหมดส่วนตัวซึ่งเป็นค่าเริ่มต้นอนุญาต owner-approved OAuth installation
 ให้ใช้ target ที่ owner ลงทะเบียนตาม token/profile scopes โดยไม่ต้องสร้าง ACL ซ้ำ
 Simple Project Access Policy เพิ่มเพดานอีกหนึ่งชั้นต่อโปรเจกต์ (`read`/`edit`/`full` →
 `dodo:read` / `+dodo:write` / `+dodo:exec`) บังคับที่จุดเดียวใน
@@ -104,7 +104,7 @@ Project Registry API ใช้ boundary เดียวกันและผู�
 
 ## Workspace and gateway
 
-ทุก tool ตรวจ active workspace, workspace ID/epoch และ ACL target ปัจจุบัน Gateway ใช้ target tool definition เป็น authority และ route ผ่าน invocation pipeline เดียวกับ direct tool
+เครื่องมือที่ทำงานในโปรเจกต์ตรวจ active workspace, workspace ID/epoch และ ACL target ปัจจุบัน เครื่องมือสื่อ/resource/download ที่รองรับ global เรียกโดยไม่ส่ง context เพื่อใช้ installation scope ได้ โดยตรวจ live installation login, OAuth scopes และผู้เรียกแทน project ACL/trust เมื่อส่ง context หรือ target อย่างชัดเจนจะกลับไปใช้ runtime/policy ของโปรเจกต์ Gateway ใช้ target tool definition เป็น authority และ route ผ่าน invocation pipeline เดียวกับ direct tool
 
 Gateway ไม่ bypass OAuth, scope, ACL, trust, approval, sandbox, expected hash, path guards หรือ secret guards ไม่สามารถเรียก gateway อื่น, owner IPC, trust management, OAuth approval หรือ server control ได้
 
@@ -127,8 +127,9 @@ identity/source hash แต่ไม่ใช่ permission; federation epoch �
 - Object อยู่ใน private installation directory และตั้งชื่อจาก SHA-256 เท่านั้น
   reference metadata แยกใน SQLite; object immutable และถูก verify ก่อนทุก read
 - `resourceId`, `dodo-resource://` URI, hash และ resume token ไม่ใช่ bearer
-  capability ทุก operation ตรวจ live OAuth grant/client, scope, workspace ACL,
-  workspace ID/epoch และ principal ownership ใหม่
+  capability ทุก operation ตรวจ live OAuth grant/client, scope และ principal ownership
+  ใหม่ งานที่ระบุโปรเจกต์ตรวจ workspace ACL และ workspace ID/epoch เพิ่ม งาน global
+  ใช้ installation scope โดยไม่พึ่ง project registry หรือ project trust approval
 - Resume token มี HMAC, อายุ 10 นาที และผูก resource/hash/offset/workspace/principal
   การแก้ไขหรือส่งข้าม principal ถูกปฏิเสธ
 - หนึ่ง object ไม่เกิน 512 MiB, store 2 GiB, range 256 KiB, image/audio MCP block
@@ -325,20 +326,34 @@ state เดิมไว้ ดู [WINDOWS_SETUP.md](WINDOWS_SETUP.md)
 
 ## AI providers และ target projects
 
+Creative Media ตั้งแต่ 1.8.0 รองรับ installation scope สำหรับ authenticated chat
+โดยไม่ต้องสร้างโปรเจกต์ ฟอร์มบันทึก provider ที่เปิดใช้แล้วเลือก connection ให้งานสื่อ
+พร้อมใช้ คีย์และ connection configuration ยังตรวจตามเดิม ฟิลด์ legacy `enabled`,
+`allowImageUpload`, `projectIds` ไม่เป็น authorization gate; normalize เป็นมี
+connection, `true`, `[]` ตามลำดับ Global creative/resource/download operations ใช้
+live installation identity และ OAuth scopes ของ operation กับทุก client ที่มีสิทธิ์
+รวม managed mode โดยไม่ตรวจ project AI client allowlist หรือขอ project trust approval
+legacy root-bound login ต้อง reconnect และ project-restricted delegation ใช้ global
+ไม่ได้ ผลงานแยกตาม caller และ global/project scope; `media_save` ยังต้องระบุปลายทาง
+โปรเจกต์และผ่าน project write/exec/path/hash policy ก่อนคัดลอก resource global ของตน
+การระบุ workspace context/target กับงานสื่อยังเลือกใช้ runtime/policy ของโปรเจกต์
+
 Owner-registered `targetProjectId` เลือก runtime ก่อนคำนวณ scope/ACL; token ของ default
 project ไม่เป็น authority ของ target Legacy root-bound grant ยังข้ามไม่ได้ ทุก model
 operation ผ่าน wrapper เดิมพร้อม live checks หลังรอ queue Profile ทำได้เพียงลดสิทธิ์
 และ child run ถูกจำกัดให้ project เดียว ไม่ spawn ต่อหรือเข้าถึง owner controls
 Approved workflow, memory, skill, model output และ repository content ไม่เป็น permission
 
-Provider access เป็น egress permission แยกจาก `allowWebFetch` และแยกต่อ project/profile/
+Provider access ของ project agent เป็น egress permission แยกจาก `allowWebFetch` และแยกต่อ project/profile/
 client ในโหมด managed ส่วนโหมดส่วนตัวถือว่าการเลือก remote profile เพื่อเริ่ม run เป็น
 owner consent สำหรับส่ง bounded context ของ project นั้น ไม่ส่งทั้ง repo/ภาพ/binary อัตโนมัติ
 Loopback Ollama ไม่ใช่หลักฐาน local inference ต้องตรวจ metadata ของ model ก่อนใช้
 ใน project ที่ไม่อนุญาต source egress; endpoint ของเจ้าของยังเป็น trust boundary
 
-Keys ใช้ session memory หรือ macOS Keychain ผ่าน stdin (ไม่ใส่ argv) State เก็บ ref
-เท่านั้น UI ไม่อ่าน key กลับและไม่เก็บใน browser storage Endpoint เปลี่ยนต้องป้อน key
+Keys ใช้ session memory, Env ส่วนตัวถาวรบนเครื่องที่รัน DODO หรือ macOS Keychain
+ผ่าน stdin (ไม่ใส่ argv) Env files เก็บ plaintext พร้อม private permissions/ACL
+แยก connection ใต้ `DODO_CONFIG_DIR/credentials/ai`; SQLite เก็บ ref/binding แทนคีย์
+UI ไม่อ่าน key กลับและไม่เก็บใน browser storage Endpoint เปลี่ยนต้องป้อน key
 ใหม่และ connection ที่ใช้งานถูกล็อกไม่ให้แก้กลาง run Public endpoint ต้อง HTTPS
 Private/LAN ต้อง opt-in; DNS ตรวจทุก address แล้ว pin, metadata/admin endpoint ถูกปฏิเสธ
 และ credentials ไม่ตาม redirect Known key echoes ถูกปฏิเสธก่อนบันทึก result/continuation

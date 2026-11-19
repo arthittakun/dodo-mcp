@@ -14,11 +14,13 @@ DODO รองรับภาพ เสียง วิดีโอ เบรา
 
 Compact surface ใช้ `dodo_media`, `dodo_browser` และ `dodo_game` ส่วน Full surface มี tool รายตัวครบ
 
-รุ่น 1.7.0 มี Full 173 capabilities (ค่าเริ่มต้น 169 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
+รุ่น 1.8.0 มี Full 173 capabilities (ค่าเริ่มต้น 169 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
 
 ## Creative Media
 
-ตั้งค่าที่ **Local Config → Providers & Profiles → Creative Media** ใช้ฟอร์มเพิ่ม/แก้ provider เพื่อกรอกชื่อ, API protocol, Base URL และคีย์ได้เอง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ config/preset ใหม่เลือกโมเดลเป็น **Auto** จึงบันทึกด้วย URL/key ได้ก่อนรู้ Model ID เดิมที่ผู้ใช้บันทึกเองยังอยู่ เลือก connection/โปรเจกต์ที่อนุญาตแล้วเปิดใช้ งานผ่าน AI ปิดไว้จนเจ้าของเปิด การลบพื้นหลังและภาพอ้างอิงวิดีโอต้องอนุญาตส่งภาพเพิ่ม ส่วนครอป/แบ่ง grid ทำในเครื่องโดยไม่ต้องมีคีย์
+ตั้งค่าที่ **Local Config → Providers & Profiles → Creative Media** ใช้ฟอร์มเพิ่ม/แก้ provider เพื่อกรอกชื่อ, API protocol, Base URL และคีย์ได้เอง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ config/preset ใหม่เลือกโมเดลเป็น **Auto** จึงบันทึกด้วย URL/key ได้ก่อนรู้ Model ID เดิมที่ผู้ใช้บันทึกเองยังอยู่ เมื่อบันทึก provider ที่เปิดใช้แล้ว AI เรียกสร้างภาพจากแชตแบบ global ได้ทันทีโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ไม่ต้องส่ง workspace context หรือเปิด media/upload switches ฟิลด์เก่า `enabled`, `allowImageUpload`, `projectIds` ไม่ใช้จำกัดงานภาพอีก ส่วนครอป/แบ่ง grid ทำในเครื่องโดยไม่ต้องมีคีย์
+
+เครื่องมือ creative, resource, download links, `multimodal_status` และ `dodo_discover` ใช้แบบ global ได้กับ client ที่ยืนยันตัวตนระดับ installation และมี OAuth scopes ของ operation รวม managed mode โดยไม่ตรวจ project AI allowlist หรือขอ project trust approval ผลงานยังแยกตามผู้เรียก การส่ง context หรือ target อย่างชัดเจนเลือก runtime และ policy ของโปรเจกต์นั้น `media_save` ยังต้องมี context ของโปรเจกต์ปลายทาง และรับ resource ที่ผู้เรียกสร้างแบบ global ได้ด้วย legacy login ต้อง reconnect ส่วน delegated agent ที่ถูกจำกัดโปรเจกต์ใช้ global ไม่ได้
 
 หน้าเว็บโหลดรายการโมเดลให้อัตโนมัติหลังเปิด/เปลี่ยน/บันทึก connection มีปุ่มโหลดใหม่และพิมพ์ Model ID เองได้หากรายการใช้ไม่ได้ เมื่อส่งงานด้วย Auto backend ขอรายการใหม่แล้วเลือก image model ที่รู้จัก ส่งภาพเพียงหนึ่งคำขอ และคืน Model ID ที่ใช้จริง ไม่มี literal `auto`, การเดาใช้โมเดลข้อความ หรือ paid retry ด้วยโมเดลอื่น หากไม่มีโมเดลที่รู้จักให้เลือกเอง
 
@@ -34,9 +36,9 @@ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Inte
 
 ## Temporary downloads
 
-`download_link_create` รับ resource ที่ผู้เรียกเป็นเจ้าของ พร้อม `expectedSha256`, `expiresInDays` เป็น 1/2/7/14/30 (เริ่มต้น 7 วัน) และชื่อไฟล์ที่เลือกได้ ผลเป็น URL เช่น `https://mcp.example.com/file/<token>/image.png` บน origin ของ HTTP server ที่รันจริง ใช้ resource จาก `creative_job`/`image_crop` หรือ `resource_inspect` โดยไม่ส่งภาพไป provider เพิ่ม ต้องมี read/write และผ่าน execution trust/approval
+`download_link_create` รับ resource ที่ผู้เรียกเป็นเจ้าของ พร้อม `expectedSha256`, `expiresInDays` เป็น 1/2/7/14/30 (เริ่มต้น 7 วัน) และชื่อไฟล์ที่เลือกได้ ผลเป็น URL เช่น `https://mcp.example.com/file/<token>/image.png` บน origin ของ HTTP server ที่รันจริง ใช้ resource จาก `creative_job`/`image_crop` หรือ `resource_inspect` โดยไม่ส่งภาพไป provider เพิ่ม ต้องมี read/write scopes งาน global ไม่ต้องมีโปรเจกต์หรือ project trust approval ส่วนคำขอที่ระบุ project context ยังผ่าน policy ของโปรเจกต์นั้น
 
-ผู้ที่มี URL ดาวน์โหลดได้ จึงต้องเก็บเป็นความลับ `download_link_list` คืน metadata ที่ยังไม่หมดอายุโดยไม่แสดง token/URL และ `download_link_revoke` ยกเลิกได้ด้วย write scope ลิงก์ชี้สำเนา CAS แบบ immutable มีอายุแยกจาก reference 24 ชั่วโมง และเก็บข้ามรีสตาร์ต/สลับ workspace โดยยังตรวจ current grant/สิทธิ์โปรเจกต์ต้นทาง การใช้ STDIO อย่างเดียวไม่เปิด HTTP download server ส่วน localhost URL ใช้ได้เฉพาะเครื่องนั้น ดู [คู่มือฉบับเต็ม](RESOURCES.md#temporary-token-download-links)
+ผู้ที่มี URL ดาวน์โหลดได้ จึงต้องเก็บเป็นความลับ `download_link_list` คืน metadata ที่ยังไม่หมดอายุโดยไม่แสดง token/URL และ `download_link_revoke` ยกเลิกได้ด้วย write scope ลิงก์ชี้สำเนา CAS แบบ immutable มีอายุแยกจาก reference 24 ชั่วโมง และเก็บข้ามรีสตาร์ต/สลับ workspace โดยยังตรวจ current grant; ลิงก์จากโปรเจกต์ตรวจสิทธิ์โปรเจกต์ต้นทางเพิ่ม ส่วนลิงก์ global ไม่พึ่งโปรเจกต์ การใช้ STDIO อย่างเดียวไม่เปิด HTTP download server ส่วน localhost URL ใช้ได้เฉพาะเครื่องนั้น ดู [คู่มือฉบับเต็ม](RESOURCES.md#temporary-token-download-links)
 
 ## Permission and files
 

@@ -1,4 +1,4 @@
-import { isOwner } from '../../security/projectAuthority.js';
+import { isOwner, installationAuthority } from '../../security/projectAuthority.js';
 import { isPersonalMode } from '../../security/accessMode.js';
 import { projectScopeCeiling } from '../../security/projectAccess.js';
 import fs from 'node:fs';
@@ -16,6 +16,10 @@ export type Actor = Pick<Principal, 'grantId' | 'clientId'>;
 export function actorKey(actor: Actor): string { return digestOf({ grantId: actor.grantId, clientId: actor.clientId }); }
 export function liveAccess(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:write' | 'dodo:exec'): void {
   if (!ctx.principal.scopes.includes(scope)) throw new DodoError('FORBIDDEN', `requires ${scope}`);
+  if (ctx.services.installationScoped) {
+    if (!installationAuthority(ctx.services.store, ctx.principal).scopes.includes(scope)) throw new DodoError('FORBIDDEN', `installation authorization no longer permits ${scope}`);
+    return;
+  }
   if (isOwner(ctx.principal)) return;
   const s = ctx.services.store, grant = s.getGrant(ctx.principal.grantId);
   // Personal mode has no per-workspace ACL row by design (projectAuthority

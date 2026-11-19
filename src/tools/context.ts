@@ -50,6 +50,8 @@ export interface Principal {
 
 export interface AppServices {
   installation?: InstallationRuntime;
+  /** Private installation media namespace, independent of any user project. */
+  installationScoped?: boolean;
   mutations?: MutationQueue;
   recovery?: RecoveryService;
   federation: FederationService;
@@ -144,6 +146,8 @@ export interface ToolDef<In extends z.ZodRawShape> {
   action: ActionClass;
   /** Set for the bootstrap tool that does not take workspace context. */
   noWorkspaceContext?: boolean;
+  /** Omit context to use installation services; explicit project context remains supported. */
+  optionalWorkspaceContext?: boolean;
   handler: (args: z.infer<z.ZodObject<In>>, ctx: ToolCtx) => Promise<HandlerResult>;
 }
 
@@ -172,7 +176,8 @@ export function defineTool<In extends z.ZodRawShape>(def: ToolDef<In>): AnyToolD
 }
 
 export function toolInputShape(def: AnyToolDef): z.ZodRawShape {
-  return { recoverySessionId: z.string().min(1).max(128).optional().describe('Explicit caller-owned recovery session for this operation; never an authorization grant'), ...TARGET_PROJECT, ...(def.noWorkspaceContext ? {} : WORKSPACE_CONTEXT_FIELDS), ...def.input };
+  const context = def.optionalWorkspaceContext ? Object.fromEntries(Object.entries(WORKSPACE_CONTEXT_FIELDS).map(([name, schema]) => [name, schema.optional()])) : WORKSPACE_CONTEXT_FIELDS;
+  return { recoverySessionId: z.string().min(1).max(128).optional().describe('Explicit caller-owned recovery session for this operation; never an authorization grant'), ...TARGET_PROJECT, ...(def.noWorkspaceContext ? {} : context), ...def.input };
 }
 
 /**
@@ -276,6 +281,14 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
     // A name is resolved to an id BEFORE any routing happens, so everything
     // downstream (lease acquisition, authority, audit) sees one canonical id.
     const targetId = resolveTargetProject(opts.args, services, principal);
+    const hasContext = opts.args['workspaceId'] !== undefined || opts.args['workspaceEpoch'] !== undefined;
+    const globalContext = typeof opts.args['workspaceId'] === 'string' && opts.args['workspaceId'] === services.store.getMeta('installation-workspace-id');
+    if (def.optionalWorkspaceContext && (!hasContext || globalContext) && targetId === undefined && services.installation) {
+      const lease = services.installation.acquireGlobal();
+      services = lease.services; targetRelease = lease.release;
+      ws = { workspaceId: services.workspaceId, epoch: services.epoch };
+      principal = projectAuthority(services.store, principal, services.workspaceId);
+    }
     if (targetId !== undefined) {
       if (typeof targetId !== 'string' || 'projectId' in opts.args || 'projectIds' in opts.args || (opts.args['args'] && typeof opts.args['args'] === 'object' && ('projectId' in opts.args['args'] || 'projectIds' in opts.args['args']))) throw new DodoError('INVALID_INPUT', 'ambiguous project routing');
       if (!services.installation) throw new DodoError('NOT_SUPPORTED', 'explicit project routing is unavailable');
@@ -284,6 +297,11 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
       ws = { workspaceId: services.workspaceId, epoch: services.epoch };
       principal = projectAuthority(services.store, principal, services.workspaceId);
     } else if (principal.tokenScopes) principal = projectAuthority(services.store, principal, services.workspaceId);
+    if (services.installationScoped && !def.optionalWorkspaceContext) {
+      throw new DodoError('INVALID_INPUT', 'this operation needs a project workspace; global media context cannot authorize project tools', {
+        recovery: 'select the destination project with project_overview and use its workspace context',
+      });
+    }
     if (!principal.scopes.includes('dodo:read') && def.name === 'project_overview' && targetId === undefined && services.installation) {
       const projects = services.installation.list(principal);
       if (projects.length) {
@@ -305,7 +323,7 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
       });
     }
     workspaceAccess = true;
-    if (!def.noWorkspaceContext) {
+    if (!def.noWorkspaceContext && !(def.optionalWorkspaceContext && !hasContext)) {
       const wsArg = opts.args['workspaceId'];
       const epochArg = opts.args['workspaceEpoch'];
       if (wsArg !== services.workspaceId) {
@@ -357,7 +375,7 @@ export async function invokeToolDefinition(opts: InvokeToolOptions): Promise<Inv
         if(def.name==='verify_changes'&&typeof data?.verificationId==='string')services.recovery?.history.record('verification',data.verificationId);
         return result;
       };
-      const track = !def.name.startsWith('dodo_') && !def.name.startsWith('recovery_') && !def.name.startsWith('checkpoint_') && !def.name.startsWith('restore_') && (def.action === 'mutate-files' || def.action === 'exec');
+      const track = !services.installationScoped && !def.name.startsWith('dodo_') && !def.name.startsWith('recovery_') && !def.name.startsWith('checkpoint_') && !def.name.startsWith('restore_') && (def.action === 'mutate-files' || def.action === 'exec');
       const handle = () => services.recovery && track ? services.recovery.history.around(principal!.grantId, args['recoverySessionId'] as string|undefined, runHandler) : runHandler();
       const result=await (services.recovery ? services.recovery.withAuthority(revalidate, handle) : handle());
       revalidate();
@@ -441,7 +459,8 @@ export function registerTool(server: McpServer, services: AppServices, def: AnyT
       // the envelope contract instead of surfacing as a raw SDK text error.
       let release: (() => void) | undefined;
       try {
-        if (!hasExplicitProjectTarget(args as Record<string, unknown>)) release = services.beginTool?.();
+        const globalCall = def.optionalWorkspaceContext && args['workspaceId'] === undefined && args['workspaceEpoch'] === undefined;
+        if (!globalCall && !hasExplicitProjectTarget(args as Record<string, unknown>)) release = services.beginTool?.();
       } catch (err) {
         const envelope = errorEnvelope(null, toDodoError(err).toInfo());
         return {
