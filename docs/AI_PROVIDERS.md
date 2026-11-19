@@ -1,12 +1,12 @@
 # AI Providers, Sub-agents และหลายโปรเจกต์
 
-DODO MCP 1.6.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
+DODO MCP 1.7.0 สามารถเปิด runtime ของหลายโปรเจกต์ใน process เดียว และเรียกโมเดลจาก backend ผ่าน connection/profile ที่เจ้าของเลือกได้ ค่าเริ่มต้นเป็นโหมดส่วนตัว: เพิ่มโปรเจกต์, connection และ profile แล้วใช้งานได้ทันทีโดยไม่ต้องทำ allowlist ซ้ำ
 
 ## เริ่มใช้งานผ่านเว็บ
 
 1. เปิด `dodo start` หรือ `dodo --cli` แล้วเข้า Local Config จาก URL ส่วนตัวที่ terminal แสดง ใช้หน้าเว็บ loopback เท่านั้น หน้า "ภาพรวม" แสดงขั้นตอนถัดไป (เพิ่มโปรเจกต์ → เพิ่ม Provider → สร้าง Profile → เริ่มงาน) พร้อมสถานะและรายการที่ต้องตรวจสอบ
 2. หน้า "โปรเจกต์": เพิ่ม absolute path ของ A/B แล้วพร้อมใช้ทันที การเลือกดู B ไม่เปลี่ยน default และไม่หยุด A
-3. หน้า "Providers & Profiles" (ส่วน AI Providers): เลือก preset หรือ Custom, protocol, Base URL และกรอก key เลือกเฉพาะรอบนี้หรือ macOS Keychain ปุ่มบันทึกตรวจรูปแบบ/endpoint policy และแสดงสถานะบันทึกพร้อมเวลา; ปุ่มรายชื่อโมเดลเป็น credential test แยกจากการทดสอบ inference ผลบอกชื่อ connection, เวลา และเมื่อพลาดจะระบุว่าไม่ retry อัตโนมัติ
+3. หน้า "Providers & Profiles" (ส่วน AI Providers): เลือก preset หรือ Custom, protocol, Base URL และกรอก key เลือก Env ถาวรในเครื่องที่รัน DODO, เฉพาะรอบนี้ หรือ macOS Keychain ตามที่เซิร์ฟเวอร์รองรับ ฟอร์มใหม่เลือก Env ส่วน Ollama ที่ไม่ใช้คีย์เลือก Session ปุ่มบันทึกตรวจรูปแบบ/endpoint policy และแสดงสถานะบันทึกพร้อมเวลา; ปุ่มรายชื่อโมเดลเป็น credential test แยกจากการทดสอบ inference ผลบอกชื่อ connection, เวลา และเมื่อพลาดจะระบุว่าไม่ retry อัตโนมัติ
 4. หน้าเดียวกัน (ส่วน Agent Profiles): เลือกประเภท Coding/Review/Research, connection และ
    Model ID แล้วกด **สร้าง Agent** ได้เลย รายชื่อโมเดลที่โหลดจาก Provider จะปรากฏใน
    Agent form อัตโนมัติ ถ้า endpoint ไม่รองรับ model-list ให้พิมพ์ Model ID เอง ส่วน scopes,
@@ -21,7 +21,7 @@ DODO MCP 1.6.0 สามารถเปิด runtime ของหลายโ�
 
 ส่วน **Providers & Profiles → Creative Media** ใช้ connection/credential store เดียวกัน แต่เลือกโมเดลงานภาพและวิดีโอแยกจาก Agent Profile ไม่ต้องสร้าง profile เพื่อเรียกเครื่องมือสื่อ ฟอร์ม **เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** รับชื่อ, รูปแบบ API, Base URL และ key โดยตรง มี preset OpenAI, Google Gemini และ Custom ที่แก้ไขได้ ค่าเริ่มต้น provider ยังเป็น OpenAI (`https://api.openai.com/v1`) ส่วนโมเดลของ config/preset ใหม่เป็น **Auto** บันทึก Custom ได้โดยไม่ต้องกรอก Model ID ก่อน และไม่เปลี่ยนโมเดลที่เคยบันทึกเอง วิดีโอมี `videoEnabled:false` และ `videoModel` ว่างจนเจ้าของตั้งค่าเอง
 
-งานสร้างสื่อผ่าน AI เริ่มปิดไว้ ต้องเปิดและเลือกโปรเจกต์ที่อนุญาตก่อน วิดีโอต้องเปิดเพิ่มสำหรับ connection ที่รองรับ การส่งภาพไปลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอต้องเปิด image-upload permission เพิ่ม ส่วนครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ ใน managed mode ใช้ client allowlist ของสิทธิ์ AI รายโปรเจกต์ด้วย การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference และคีย์แบบ session ต้องใส่ใหม่หลังรีสตาร์ต
+งานสร้างสื่อผ่าน AI เริ่มปิดไว้ ต้องเปิดและเลือกโปรเจกต์ที่อนุญาตก่อน วิดีโอต้องเปิดเพิ่มสำหรับ connection ที่รองรับ การส่งภาพไปลบพื้นหลังหรือเป็นภาพอ้างอิงวิดีโอต้องเปิด image-upload permission เพิ่ม ส่วนครอป PNG/แบ่ง grid ทำในเครื่องได้โดยไม่มีคีย์ ใน managed mode ใช้ client allowlist ของสิทธิ์ AI รายโปรเจกต์ด้วย การบันทึกตั้งค่าไม่เรียกโมเดลหรือทดสอบ inference คีย์แบบ Env ที่ DODO เก็บจะใช้ข้ามรีสตาร์ตได้ ส่วน Session ต้องใส่ใหม่
 
 Creative Media ใช้ OpenAI-compatible Images API กับ connections แบบ Responses/Chat Completions หรือ Gemini native Interactions ตาม protocol ที่เจ้าของเลือก ชื่อ provider เป็นป้ายชื่อ ไม่จำกัด protocol ของงานภาพ หน้าเว็บโหลดรายการโมเดลอัตโนมัติเมื่อเปิด/เปลี่ยน/บันทึก connection และมีปุ่มโหลดใหม่หรือกรอก ID เองเป็นทางเลือก ข้อผิดพลาดในการโหลดไม่บล็อกฟอร์ม ชื่อ resource ของ Gemini จะตัด `models/` ก่อนใช้เป็น Model ID แต่การมีชื่อในรายการไม่รับรองว่าโมเดลนั้นสร้างภาพได้ เครื่องมือ MCP ไม่รับ URL/key/model/remote task ID และไม่มี fallback เปลี่ยน provider อัตโนมัติ
 
@@ -55,9 +55,22 @@ Ollama loopback อาจเรียก cloud model ได้ ต้องเ�
 
 ## Credential และ endpoint
 
-- Session key อยู่ในหน่วยความจำจน DODO ปิด; Keychain ใช้บน macOS และอาจมีหน้าต่างระบบให้เจ้าของอนุญาต
-- Private state เก็บ credential reference/สถานะเท่านั้น ไม่ส่ง key กลับมาเติม UI ไม่มี key ใน repo, localStorage, URL, logs หรือ process arguments
-- เปลี่ยน endpoint/protocol/storage ต้องกรอก key ใหม่ ไม่มีการส่ง key เดิมไปปลายทางใหม่ การแก้ connection ที่มี run ใช้อยู่ถูกปฏิเสธจนหยุด/จบงาน
+| วิธีเก็บ | ข้ามรีสตาร์ต | ที่เก็บ |
+|---|---|---|
+| Env ถาวรในเครื่องที่รัน DODO | ได้ เมื่อเก็บคีย์กับ DODO หรือ provision Env ภายนอกให้ process ทุกครั้ง | ไฟล์ Env ส่วนตัวใต้ `DODO_CONFIG_DIR/credentials/ai` หรือชื่อตัวแปรของเซิร์ฟเวอร์ที่เจ้าของระบุ |
+| Session | ไม่ได้ | หน่วยความจำของ DODO process |
+| macOS Keychain | ได้ | คลังคีย์ของ macOS บนเครื่องเซิร์ฟเวอร์ |
+
+Env ใช้ได้บน Windows, Linux และ macOS โดยกรอก API Key ในฟอร์มและเลือก Env ระบบจะสร้างชื่อตัวแปรให้เองเมื่อเว้นชื่อว่าง เก็บคีย์แยกต่อ connection และอ่านกลับหลังเปิด DODO ใหม่ ไฟล์เก็บค่าเป็นข้อความ ไม่ใช่ OS vault; DODO จำกัดสิทธิ์ด้วย owner-only directory/file permissions บน POSIX (0700/0600) และ private ACL บน Windows ไฟล์อยู่นอกโปรเจกต์และไม่เขียน shell profile, Windows registry หรือ Env ทั้งเครื่อง ไม่ส่งค่าที่บันทึกไปเป็น environment ของ child jobs
+
+ถ้ามี Env ที่ provision ไว้บนเครื่องเซิร์ฟเวอร์อยู่แล้ว ให้สร้าง connection แบบ Env ระบุ `credentialEnvVar` และเว้น API Key ว่าง DODO จะอ่าน inherited environment ของ process เมื่อยังไม่มีไฟล์ของ connection นั้น ชื่อต้องเป็น A–Z, 0–9 และ `_` จำนวน 3–128 ตัว เริ่มด้วยตัวอักษร และไม่ใช้ตัวแปร OS/loader สำคัญ เช่น `PATH` หรือ `NODE_OPTIONS` ตัวแปรที่ตั้งในเครื่องเบราว์เซอร์จะไม่มีผลต่อเซิร์ฟเวอร์อีกเครื่อง
+
+ไฟล์ที่ DODO เก็บเองมีลำดับก่อนตัวแปรภายนอกเสมอ หากไฟล์มีปัญหา อ่านไม่ได้ หรือชื่อไม่ตรง จะหยุดและให้เจ้าของแก้ไขแทนการสลับไปอ่านแหล่งอื่น การเปลี่ยนค่า Env ภายนอกไม่เปลี่ยนคีย์ที่อนุญาตโดยอัตโนมัติ: กลับมาแก้ connection เดิม ยืนยัน endpoint/reference และบันทึกใหม่ก่อนเรียก API การกรอกคีย์ใหม่ใน UI จะเขียนไฟล์ส่วนตัวและเปลี่ยนไปใช้ค่าที่บันทึกนั้น การลบ connection ลบเฉพาะไฟล์ที่ DODO เป็นเจ้าของ ไม่ unset ตัวแปรภายนอก
+
+ฟอร์มใหม่เลือก Env เมื่อเซิร์ฟเวอร์รองรับ ส่วน connection เดิมไม่เปลี่ยนวิธีเก็บ และ Provider API ยังคง `credentialStorage:'session'` เป็นค่าเริ่มต้นเมื่อไม่ได้ระบุ Keychain เปิดได้เฉพาะเซิร์ฟเวอร์ macOS แม้เปิดหน้าเว็บจากระบบอื่น และอาจมีหน้าต่างระบบให้เจ้าของอนุญาต
+
+- State DB เก็บ credential reference/สถานะและ fingerprint สำหรับผูกคีย์กับ connection ส่วนไฟล์ Env เก็บค่าคีย์ ไม่ส่ง key กลับมาเติม UI ไม่มี key ใน repo, localStorage, URL, logs หรือ process arguments
+- เปลี่ยน endpoint/protocol/storage/ชื่อตัวแปร Env ต้องกรอก key ใหม่ ไม่มีการส่ง key เดิมไปปลายทางใหม่ การแก้ connection ที่มี run ใช้อยู่ถูกปฏิเสธจนหยุด/จบงาน
 - Public ใช้ HTTPS; loopback/LAN ต้องเลือกอนุญาต private endpoint ชัดเจน DNS ถูกตรวจทุก address แล้ว pin socket; ไม่ตาม redirect, metadata/link-local และ DODO MCP/admin ports ถูกปฏิเสธ
 - การอนุญาต AI provider แยกจาก `allowWebFetch` และไม่เปิด Desktop/microphone/system audio หรือเปลี่ยน tunnel token ให้ persistent
 - หน้าเว็บใช้ owner authentication เดิม; loopback ไม่ถือเป็น authentication ด้วยตัวเอง Public MCP ไม่มี admin routes

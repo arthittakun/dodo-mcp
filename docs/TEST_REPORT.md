@@ -1,5 +1,51 @@
 # DODO MCP — Test Report
 
+## 1.7.0 Persistent local Env API keys — Windows, 2026-11-19
+
+Build, typecheck, lint, UI syntax and diff checks passed. A consolidated focused
+run covers 22 files, including the new credential backend, metadata bindings,
+owner HTTP/restart flow and both provider forms, plus existing AI/media/resource
+and Full/Compact/Hybrid regressions.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Consolidated feature and regression coverage | 220 | 0 | 11 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total focused coverage | 237 | 0 | 11 |
+
+The credential backend has 17 passing cases and one POSIX permission case skipped
+on Windows. It checks fresh-instance persistence, rotation, inherited-variable
+references, fingerprint-aware presence, private file ACLs, strict data-only
+parsing, unsafe names, symlinks/junctions/hardlinks, corrupt data, bounded reads,
+atomic-write failures and safe owned-file removal. Saved keys are not added to
+the server environment or project child-job environment.
+
+Six metadata cases cover retained credentials on cosmetic edits, overlapping
+settings instances with mismatched endpoints/keys, transactional binding-write
+failure, failed variable renames, corrupt-file cleanup, disabled drafts and
+missing bindings. Mismatches stop before outbound requests and require explicit
+owner repair; credential fingerprints and values are absent from returned state.
+
+Four real owner HTTP/OAuth integration cases save Env credentials, restart the
+server with the same installation state, then list models, run AI inference and
+complete an Auto image job through a local HTTP provider fixture. They also
+verify storage switching, rotation, reference confirmation, external-variable
+preservation, owner authentication, reviewed epochs and key redaction. Five
+actual Chrome cases cover both provider forms, permanent Env defaults, external
+references, server-platform Keychain availability and existing Auto/model flows.
+
+Provider calls for the new Env checks use synthetic credentials and local
+fixtures. No additional paid external generation was needed; earlier live
+custom-provider image acceptance is recorded under 1.6.0 below. The eleven skips
+are the new POSIX-only permission check and ten existing browser/local-speech
+prerequisite cases. Native Linux/macOS acceptance and the full native release
+gate are separate from this focused Windows run.
+
+The inspected package includes the Env backend and setup documentation without
+private test endpoints, credentials, local Env files or release evidence.
+`npm audit` reports zero advisories for the locked dependency tree. See
+[release details](RELEASE_1.7.0.md) and [AI Providers](AI_PROVIDERS.md).
+
 ## 1.6.0 Image Auto and temporary downloads — Windows, 2026-11-19
 
 Build, typecheck, lint, UI syntax and diff checks passed. The consolidated focused

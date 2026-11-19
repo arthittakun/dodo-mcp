@@ -223,9 +223,9 @@ describe('creative media owner configuration', () => {
       expect(settings.connection(c.id)).toMatchObject({ baseUrl: changed.baseUrl, credentialStorage: 'keychain' });
       expect(await settings.credentials.get(c.id, 'keychain')).toBe('synthetic-storage-repaired');
       expect(await settings.credentials.get(c.id, 'session')).toBe('');
-      expect(deleteKey).toHaveBeenCalledExactlyOnceWith(c.id, 'session');
+      expect(deleteKey).toHaveBeenCalledExactlyOnceWith(c.id, 'session', undefined);
       expect(settings.get('credential-update', c.id)).toBeUndefined();
-      expect(settings.state().connections.find(item => item.id === c.id)).toMatchObject({ credentialPresent: true, credentialNeedsReentry: false });
+      expect(settings.state().connections.find(item => item.id === c.id)).toMatchObject({ credentialPresent: process.platform === 'darwin', credentialNeedsReentry: false });
     } finally { settings.store.db.exec('DROP TRIGGER IF EXISTS credential_storage_metadata_failure'); }
   });
 

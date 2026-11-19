@@ -1,5 +1,13 @@
 # DODO MCP — Release Notes
 
+## 1.7.0 — Persistent local Env API keys
+
+- Add permanent, private per-connection Env files on the machine running DODO, and explicit references to inherited server environment variables. Available in both Providers and Creative Media; saved keys survive restarts on Windows, Linux and macOS.
+- Load the selected credential consistently for models, inference/probes, agents, image generation/edits and compatible video. Keep existing storage selections; new forms prefer Env when supported. Keychain availability follows the server platform.
+- Keep secrets out of browser state and connection metadata. Use atomic private file writes, truthful credential presence, and key/configuration fingerprints to stop mismatched credentials before outbound requests, including overlapping settings instances.
+- Preserve endpoint/storage/reference reentry and interrupted-update quarantine. Connection removal can clean a corrupt or partially renamed owned file without touching externally provisioned variables.
+- Tool counts remain Full 173 (default 169), Compact 20 and Hybrid 49. See [setup and storage details](RELEASE_1.7.0.md) and [validation](TEST_REPORT.md).
+
 ## 1.6.0 — Image model Auto and temporary downloads
 
 - Create and edit image connections directly in Creative Media: provider name, protocol, API base URL, key, model and credential storage are editable. OpenAI and Google Gemini presets are starting points; external compatible services use Custom.

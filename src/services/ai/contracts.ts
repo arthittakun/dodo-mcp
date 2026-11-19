@@ -8,7 +8,8 @@ export const ProviderInput = z.object({
   baseUrl: z.string().url().max(2048),
   enabled: z.boolean().default(true),
   allowPrivateNetwork: z.boolean().default(false),
-  credentialStorage: z.enum(['session', 'keychain']).default('session'),
+  credentialStorage: z.enum(['session', 'keychain', 'env']).default('session'),
+  credentialEnvVar: z.string().trim().regex(/^[A-Z][A-Z0-9_]{2,127}$/).optional(),
 }).strict();
 export type Provider = z.infer<typeof ProviderInput> & { id: string };
 export const ProfileInput = z.object({

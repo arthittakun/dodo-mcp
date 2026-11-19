@@ -30,6 +30,7 @@
 - มี Runtime Intelligence สำหรับ task ที่ reconnect ได้, process/test/browser evidence แบบ bounded, snapshot freshness และ diagnosis ที่แยก fact/observation/inference
 - มี Advanced Agent Runtime สำหรับ immutable plan, parallel hypotheses, intent locks, guarded snapshots, evidence-backed completion, restart recovery และ owner-reviewed reusable guidance
 - มี AI Providers เจ็ด presets/Custom, profiles, model/tool loop และประวัติ private ผ่าน Local Config ([คู่มือ](docs/AI_PROVIDERS.md))
+- เก็บ API Key แบบ Env ถาวรเฉพาะเครื่องที่รัน DODO ได้บน Windows, Linux และ macOS ใช้ร่วมกันทั้ง Providers, Agents และ Creative Media ([วิธีเก็บคีย์](docs/AI_PROVIDERS.md#credential-และ-endpoint))
 - เขียน/รันหลายโปรเจกต์พร้อมกันด้วย targetProjectId และคิว mutation แยกโปรเจกต์
 - มี DodoBench และ revision-bound release gate สำหรับ retrieval, safe edit, runtime, resource, recovery, security และ fresh package artifact
 - เปลี่ยน workspace จาก Local Config ได้จริง โดยรอ request/jobs และ rollback เมื่อเตรียม workspace ใหม่ไม่สำเร็จ
@@ -41,10 +42,18 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp@1.6.0
+npm install -g dodo-mcp@1.7.0
 dodo setup --check
 dodo --cli
 ```
+
+### เก็บ API Key ถาวรในเครื่อง
+
+ใน **Providers & Profiles** หรือฟอร์ม Provider สำหรับภาพ เลือก **Env ถาวรในเครื่องที่รัน DODO** แล้วกรอก API Key และบันทึก DODO สร้างชื่อตัวแปรให้อัตโนมัติและเก็บคีย์ในไฟล์ Env ส่วนตัวใต้ `DODO_CONFIG_DIR/credentials/ai` จึงอ่านกลับได้หลังรีสตาร์ตบน Windows, Linux และ macOS ไฟล์เก็บค่าเป็นข้อความที่จำกัดสิทธิ์ ไม่ใช่คลังเข้ารหัสของ OS และไม่เปลี่ยน Env ทั้งเครื่องหรือ shell profile
+
+ถ้ามีตัวแปร Env อยู่แล้วใน process ที่รัน DODO ให้กรอกชื่อตัวแปรและเว้นคีย์ว่างสำหรับ connection ใหม่ DODO อ่านตัวแปรนั้นเมื่อไม่มีไฟล์คีย์ที่ตัวเองเก็บไว้ หากมีไฟล์แล้วจะใช้ไฟล์ก่อน การเปลี่ยนค่าตัวแปรภายนอกต้องบันทึกยืนยัน connection ใหม่ก่อนเรียก API คีย์ไม่ส่งกลับหน้าเว็บและไม่เก็บใน browser storage การลบ connection ลบเฉพาะไฟล์ที่ DODO เป็นเจ้าของ ไม่ลบตัวแปรภายนอก
+
+ฟอร์มใหม่เลือก Env เมื่อเซิร์ฟเวอร์รองรับ ส่วน connection เดิมยังคงวิธีเก็บเดิม และ API ที่ไม่ระบุ storage ยังใช้ Session ตัวเลือก macOS Keychain เปิดเฉพาะเมื่อเครื่องเซิร์ฟเวอร์เป็น Mac ดู [รายละเอียด storage และการเปลี่ยนคีย์](docs/AI_PROVIDERS.md#credential-และ-endpoint)
 
 ### สร้างภาพ ครอป ลบพื้นหลัง และวิดีโอ
 
@@ -52,7 +61,7 @@ dodo --cli
 
 เมื่อส่งงานด้วย Auto backend จะขอรายการโมเดลใหม่ เลือก image model ที่รู้จักจริงจากรายการ แล้วส่งงานภาพหนึ่งครั้ง ผลงานบอก Model ID ที่ใช้จริง ไม่ส่งค่า `auto` หรือเดาใช้โมเดลข้อความ หากไม่พบตัวเลือกให้กรอก ID เอง ไม่มีการสลับโมเดลแล้วส่งงานเสียเงินซ้ำเมื่อเกิดข้อผิดพลาด
 
-เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage ไม่เปลี่ยน การเปลี่ยนสามค่านี้ต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
+เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage/ชื่อตัวแปร Env ไม่เปลี่ยน การเปลี่ยนค่าใดค่าหนึ่งต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
 เรียก `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit` หรือ `video_extend` ผ่าน `dodo_media` (Full surface ใช้ชื่อเครื่องมือโดยตรง) ติดตามงานด้วย `creative_job` และบันทึก PNG/MP4 ด้วย `media_save` งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้ ดู [คู่มือ Creative Media](docs/CREATIVE_MEDIA.md)
 
@@ -574,6 +583,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 
 - [Release 1.0.0](docs/RELEASE_1.0.0.md)
 - [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
+- [Release 1.7.0: Env API Key ถาวรบนเครื่องเซิร์ฟเวอร์](docs/RELEASE_1.7.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
 - [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)

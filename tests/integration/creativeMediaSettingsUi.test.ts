@@ -5,16 +5,18 @@ import { describe, expect, it } from 'vitest';
 import { CREATIVE_MEDIA_DEFAULTS, CREATIVE_IMAGE_PRESETS, CreativeSettingsInput } from '../../src/services/multimodal/creativeSettings.js';
 
 const executablePath = process.env['DODO_TEST_CHROMIUM_EXECUTABLE'] ?? chromium.executablePath();
-interface Connection { id: string; name: string; provider: string; protocol: string; baseUrl: string; enabled: boolean; credentialPresent: boolean; credentialStorage: string; allowPrivateNetwork: boolean }
+interface Connection { id: string; name: string; provider: string; protocol: string; baseUrl: string; enabled: boolean; credentialPresent: boolean; credentialStorage: string; credentialEnvVar?: string; allowPrivateNetwork: boolean }
 interface FixtureOptions {
   connections?: Connection[];
   media?: Record<string, unknown>;
+  credentialStorageOptions?: Array<{ id: string; available: boolean }>;
+  existingEnvVars?: string[];
   models?: (connectionId: string) => Promise<{ data?: Array<{ id: string }>; status?: number; error?: string }>;
 }
 
 async function fixture(options: FixtureOptions = {}) {
   const browser = await chromium.launch({ headless: true, executablePath }), page = await browser.newPage();
-  const state = { presets: [], connections: options.connections ?? [] as Connection[], profiles: [], permissions: [], projects: [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
+  const state = { presets: [], connections: options.connections ?? [] as Connection[], credentialStorageOptions: options.credentialStorageOptions, profiles: [], permissions: [], projects: [{ projectId: 'prj_fixture0001', displayName: 'Media fixture', available: true }], runs: [], accessMode: 'personal', media: CreativeSettingsInput.parse(options.media ?? {}), mediaDefaults: CREATIVE_MEDIA_DEFAULTS, mediaPresets: CREATIVE_IMAGE_PRESETS };
   const requests: Array<{ path: string; body?: Record<string, unknown> }> = [], errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.route('https://owner-fixture.invalid/**', async route => {
@@ -27,7 +29,8 @@ async function fixture(options: FixtureOptions = {}) {
     else if (url.pathname === '/api/ai/connection') {
       const c = body!['connection'] as Omit<Connection, 'id' | 'credentialPresent'> & { id?: string };
       const previous = state.connections.find(value => value.id === c.id);
-      const connection: Connection = { ...c, id: c.id ?? `ai_fixture000${state.connections.length + 1}`, credentialPresent: Boolean(body!['apiKey']) || previous?.credentialPresent === true };
+      const connection: Connection = { ...c, id: c.id ?? `ai_fixture000${state.connections.length + 1}`, credentialPresent: Boolean(body!['apiKey']) || previous?.credentialPresent === true || options.existingEnvVars?.includes(c.credentialEnvVar ?? '') === true };
+      if (connection.credentialStorage === 'env' && !connection.credentialEnvVar) connection.credentialEnvVar = `DODO_AI_KEY_${connection.id.toUpperCase()}`;
       if (previous) state.connections.splice(state.connections.indexOf(previous), 1, connection); else state.connections.push(connection);
       data = connection;
     } else if (url.pathname === '/api/ai/media') { state.media = CreativeSettingsInput.parse(body); data = state.media; }
@@ -49,6 +52,101 @@ async function fixture(options: FixtureOptions = {}) {
 }
 
 describe.skipIf(!fs.existsSync(executablePath))('creative media owner UI', () => {
+  it('offers permanent server Env storage for images, retains references and supports an existing variable without a browser key', async () => {
+    const storageOptions = [{ id: 'session', available: true }, { id: 'env', available: true }, { id: 'keychain', available: false }];
+    const { browser, page, panel, state, requests, errors } = await fixture({ credentialStorageOptions: storageOptions, existingEnvVars: ['DODO_EXTERNAL_IMAGE_KEY'] });
+    const key = 'synthetic-persistent-env-ui-key';
+    const saves = () => requests.filter(request => request.path === '/api/ai/connection');
+    try {
+      await panel.locator('summary').click();
+      expect(await panel.locator('select[name=mediaCredentialStorage]').inputValue()).toBe('env');
+      expect(await panel.locator('input[name=mediaCredentialEnvVar]').isVisible()).toBe(true);
+      expect(await panel.locator('option[value=keychain]').getAttribute('disabled')).toBe('');
+      expect(await panel.textContent()).toContain('เครื่องที่รัน DODO');
+      await panel.locator('input[name=mediaApiKey]').fill(key);
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.media.connectionId).toBe('ai_fixture0001');
+      expect(state.connections[0]).toMatchObject({ credentialStorage: 'env', credentialEnvVar: 'DODO_AI_KEY_AI_FIXTURE0001', credentialPresent: true });
+      expect(saves()[0]?.body?.['connection']).toMatchObject({ credentialStorage: 'env' });
+      expect(saves()[0]?.body?.['connection']).not.toHaveProperty('credentialEnvVar');
+      await panel.getByRole('button', { name: 'แก้ไข connection ที่เลือก', exact: true }).click();
+      expect(await panel.locator('input[name=mediaCredentialEnvVar]').inputValue()).toBe('DODO_AI_KEY_AI_FIXTURE0001');
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('');
+      await panel.locator('input[name=mediaProviderName]').fill('Persistent image renamed');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.connections[0]?.name).toBe('Persistent image renamed');
+      expect(saves()[1]?.body).not.toHaveProperty('apiKey');
+      expect(saves()[1]?.body?.['connection']).toMatchObject({ credentialStorage: 'env', credentialEnvVar: 'DODO_AI_KEY_AI_FIXTURE0001' });
+      await panel.getByRole('button', { name: 'แก้ไข connection ที่เลือก', exact: true }).click();
+      await panel.locator('input[name=mediaCredentialEnvVar]').fill('DODO_CHANGED_IMAGE_KEY');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('กรอก API key ใหม่');
+      expect(saves()).toHaveLength(2);
+      await panel.getByRole('button', { name: 'สร้าง connection ใหม่', exact: true }).click();
+      await panel.locator('input[name=mediaCredentialEnvVar]').fill('DODO_EXTERNAL_IMAGE_KEY');
+      await panel.getByRole('button', { name: 'บันทึก Provider สำหรับภาพ', exact: true }).click();
+      await expect.poll(() => state.media.connectionId).toBe('ai_fixture0002');
+      expect(saves()[2]?.body).not.toHaveProperty('apiKey');
+      expect(state.connections[1]).toMatchObject({ credentialStorage: 'env', credentialEnvVar: 'DODO_EXTERNAL_IMAGE_KEY', credentialPresent: true });
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('');
+      expect(await page.evaluate('JSON.stringify({local:{...localStorage},session:{...sessionStorage}})')).not.toContain(key);
+      expect(JSON.stringify(state)).not.toContain(key);
+      storageOptions[2]!.available = true;
+      await page.getByRole('button', { name: 'Providers', exact: true }).click();
+      expect(await panel.locator('option[value=keychain]').getAttribute('disabled')).toBe(null);
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
+  it('saves and edits general providers with Env references and guards storage/reference changes before submission', async () => {
+    const { browser, page, panel, state, requests, errors } = await fixture({ credentialStorageOptions: [{ id: 'session', available: true }, { id: 'env', available: true }, { id: 'keychain', available: false }] });
+    const general = page.locator('#wb-body > section').filter({ has: page.getByRole('heading', { name: 'AI Providers', exact: true }) });
+    const saves = () => requests.filter(request => request.path === '/api/ai/connection');
+    const key = 'synthetic-general-env-ui-key', replacement = 'synthetic-general-env-ui-rotation';
+    try {
+      expect(await general.locator('select[name=storage]').inputValue()).toBe('env');
+      expect(await general.locator('option[value=keychain]').getAttribute('disabled')).toBe('');
+      await general.locator('select[name=provider]').selectOption('custom');
+      await general.locator('input[name=name]').fill('General Env provider');
+      await general.locator('input[name=baseUrl]').fill('https://general-env.example/v1');
+      await general.locator('input[name=credentialEnvVar]').fill('DODO_GENERAL_IMAGE_KEY');
+      await general.locator('input[name=apiKey]').fill(key);
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => state.connections.length).toBe(1);
+      expect(state.connections[0]).toMatchObject({ credentialStorage: 'env', credentialEnvVar: 'DODO_GENERAL_IMAGE_KEY' });
+      expect(saves()[0]?.body?.['apiKey']).toBe(key);
+      await general.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+      expect(await general.locator('input[name=credentialEnvVar]').inputValue()).toBe('DODO_GENERAL_IMAGE_KEY');
+      expect(await general.locator('input[name=apiKey]').inputValue()).toBe('');
+      await general.locator('input[name=name]').fill('General Env renamed');
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => state.connections[0]?.name).toBe('General Env renamed');
+      expect(saves()[1]?.body).not.toHaveProperty('apiKey');
+      await general.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+      await general.locator('input[name=credentialEnvVar]').fill('DODO_GENERAL_ROTATED_KEY');
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('กรอก API key ใหม่');
+      expect(saves()).toHaveLength(2);
+      await general.locator('input[name=apiKey]').fill(replacement);
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => state.connections[0]?.credentialEnvVar).toBe('DODO_GENERAL_ROTATED_KEY');
+      await general.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+      await general.locator('select[name=storage]').selectOption('session');
+      expect(await general.locator('input[name=credentialEnvVar]').isVisible()).toBe(false);
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => page.locator('#wb-notice').textContent()).toContain('กรอก API key ใหม่');
+      expect(saves()).toHaveLength(3);
+      await general.locator('input[name=apiKey]').fill(replacement);
+      await general.getByRole('button', { name: 'บันทึก connection', exact: true }).click();
+      await expect.poll(() => state.connections[0]?.credentialStorage).toBe('session');
+      expect(saves()[3]?.body?.['connection']).not.toHaveProperty('credentialEnvVar');
+      expect(await panel.locator('input[name=mediaApiKey]').inputValue()).toBe('');
+      const browserState = await page.evaluate('JSON.stringify({local:{...localStorage},session:{...sessionStorage}})');
+      for (const secret of [key, replacement]) { expect(browserState).not.toContain(secret); expect(JSON.stringify(state)).not.toContain(secret); }
+      expect(errors).toEqual([]);
+    } finally { await browser.close(); }
+  });
+
   it('offers editable official presets and saves Gemini without enabling compatibility video', async () => {
     const { browser, page, panel, state, requests, errors } = await fixture();
     const key = 'synthetic-gemini-ui-credential';

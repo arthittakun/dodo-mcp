@@ -1,9 +1,14 @@
 import { spawn } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { DodoError } from '../../errors.js';
+import { EnvCredentials, validateCredential } from './envCredentials.js';
+export { defaultEnvVariable, validateEnvVariable } from './envCredentials.js';
+export type CredentialStorage = 'session' | 'keychain' | 'env';
 const SERVICE = 'DODO AI Providers';
 export class AICredentials {
   private readonly session = new Map<string, Buffer>();
+  private readonly env: EnvCredentials;
+  constructor(envDirectory?: string) { this.env = new EnvCredentials(envDirectory); }
   private command(args: string[], input?: Buffer): Promise<Buffer> {
     if (process.platform !== 'darwin') return Promise.reject(new DodoError('NOT_SUPPORTED', 'Keychain storage requires macOS; use session credentials on this platform'));
     return new Promise((resolve, reject) => {
@@ -17,14 +22,18 @@ export class AICredentials {
     });
   }
   hasSession(id: string): boolean { return this.session.has(id); }
-  async get(id: string, storage: 'session' | 'keychain'): Promise<string> {
+  hasEnv(id: string, envVar?: string, expectedFingerprint?: string): boolean { return this.env.has(id, envVar, expectedFingerprint); }
+  deleteOwnedEnv(id: string): void { this.env.removeOwned(id); }
+  async get(id: string, storage: CredentialStorage, envVar?: string): Promise<string> {
     if (storage === 'session') return this.session.get(id)?.toString('utf8') ?? '';
+    if (storage === 'env') return this.env.get(id, envVar);
     const value = await this.command(['find-generic-password', '-a', id, '-s', SERVICE, '-w']);
     try { return value.toString('utf8').replace(/\r?\n$/, ''); } finally { value.fill(0); }
   }
-  async set(id: string, storage: 'session' | 'keychain', key: string): Promise<void> {
-    if (key.length < 1 || key.length > 4096 || /[\x00-\x20\x7f]/.test(key)) throw new DodoError('INVALID_INPUT', 'API key must be a single nonempty credential without whitespace');
+  async set(id: string, storage: CredentialStorage, key: string, envVar?: string): Promise<void> {
+    validateCredential(key);
     if (storage === 'session') { this.session.get(id)?.fill(0); this.session.set(id, Buffer.from(key)); return; }
+    if (storage === 'env') { this.env.set(id, key, envVar); return; }
     const input = Buffer.from(`${key}\n${key}\n`);
     try {
       await this.command(['add-generic-password', '-U', '-a', id, '-s', SERVICE, '-w'], input);
@@ -33,9 +42,10 @@ export class AICredentials {
       finally { roundtrip.fill(0); expected.fill(0); }
     } finally { input.fill(0); }
   }
-  async delete(id: string, storage: 'session' | 'keychain'): Promise<void> {
+  async delete(id: string, storage: CredentialStorage, envVar?: string): Promise<void> {
     if (storage === 'session') { this.session.get(id)?.fill(0); this.session.delete(id); }
     if (storage === 'keychain') await this.command(['delete-generic-password', '-a', id, '-s', SERVICE]);
+    if (storage === 'env') this.env.delete(id, envVar);
   }
   close(): void { for (const b of this.session.values()) b.fill(0); this.session.clear(); }
 }

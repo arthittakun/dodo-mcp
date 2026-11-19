@@ -165,7 +165,7 @@ export class CreativeService {
     checkParent();
     const release = cfg.settings.lease(cfg.connection.id);
     let key: string;
-    try { key = await cfg.settings.credentials.get(cfg.connection.id, cfg.connection.credentialStorage); } catch (error) { release(); throw error; }
+    try { key = await cfg.settings.credential(cfg.connection); } catch (error) { release(); throw error; }
     let provider: CreativeProvider;
     let model = kind === 'video' ? cfg.config.videoModel : cfg.config.imageModel;
     try {
@@ -200,7 +200,7 @@ export class CreativeService {
       epoch: this.storage.services.epoch, connectionId: cfg.connection.id, configuration: cfg.digest };
     try { this.save(ctx, record); } catch (error) { release(); throw error; }
     const controller = new AbortController(); let dispatched = false;
-    const beforeSend = () => { const current = configForRequest(); if (current.digest !== record.configuration) throw new DodoError('FORBIDDEN', 'media configuration changed'); source?.guard(); checkParent(); record.status = 'running'; this.save(ctx, record); dispatched = true; };
+    const beforeSend = () => { cfg.settings.assertCredential(cfg.connection, key); const current = configForRequest(); if (current.digest !== record.configuration) throw new DodoError('FORBIDDEN', 'media configuration changed'); source?.guard(); checkParent(); record.status = 'running'; this.save(ctx, record); dispatched = true; };
     activeGlobal.add(jobId);
     const promise = Promise.resolve().then(async () => {
       if (kind === 'video') {
@@ -247,9 +247,11 @@ export class CreativeService {
     const release = cfg.settings.lease(cfg.connection.id);
     const controller = new AbortController();
     this.pollControllers.set(record.jobId, controller);
-    const check = () => { this.check(ctx); if (this.videoConfiguration(ctx).digest !== record.configuration) throw new DodoError('FORBIDDEN', 'media configuration changed'); };
+    let key: string;
+    const check = () => { cfg.settings.assertCredential(cfg.connection, key); this.check(ctx); if (this.videoConfiguration(ctx).digest !== record.configuration) throw new DodoError('FORBIDDEN', 'media configuration changed'); };
     try {
-      const provider = new CreativeProvider(cfg.connection, await cfg.settings.credentials.get(cfg.connection.id, cfg.connection.credentialStorage), cfg.settings.ports);
+      key = await cfg.settings.credential(cfg.connection);
+      const provider = new CreativeProvider(cfg.connection, key, cfg.settings.ports);
       const job = await provider.videoStatus(record.remoteId!, controller.signal, check);
       check(); record.progress = job.progress;
       if (job.status === 'failed') { record.status = 'failed'; record.error = 'PROVIDER_RENDER_FAILED'; }

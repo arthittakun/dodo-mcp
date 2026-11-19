@@ -112,7 +112,7 @@ describe('bounded model discovery before provider effects', () => {
     try {
       const c = await settings.saveConnection(connection(server.baseUrl.replace('127.0.0.1', 'metadata.fixture')), key);
       const result = expect(settings.models(c.id, { beforeSend })).rejects.toMatchObject({ code });
-      await Promise.resolve(); await Promise.resolve(); expect(lookup).toHaveBeenCalledTimes(1); expect(beforeSend).not.toHaveBeenCalled();
+      await nextTurn(); expect(lookup).toHaveBeenCalledTimes(1); expect(beforeSend).not.toHaveBeenCalled();
       lookupResult.resolve([{ address: '127.0.0.1', family: 4 }]); await result; await nextTurn();
       expect(beforeSend).toHaveBeenCalledTimes(1); expect(requests).toBe(0);
     } finally { await server.close(); }
