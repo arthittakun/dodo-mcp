@@ -9,6 +9,7 @@ import { ResourceInfo } from '../services/resources/contracts.js';
 import { liveAccess } from '../services/multimodal/storage.js';
 import { multimediaEffect } from '../services/multimodal/operations.js';
 import type { StoredPlan } from '../services/changes/types.js';
+import { CreativeModelId } from '../services/multimodal/creativeSettings.js';
 
 const execute = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
 const source = { path: Path.optional(), assetId: Id.optional(), resourceId: Id.optional() };
@@ -16,14 +17,14 @@ const Seconds = z.union([z.literal(4), z.literal(8), z.literal(12), z.literal(16
 const Prompt = z.string().trim().min(1).max(16000);
 const Job = z.object({ jobId: Id, kind: z.enum(['image', 'background_removal', 'video']), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted']),
   model: z.string(), progress: z.number().min(0).max(100), resource: ResourceInfo.nullable(), error: z.string().nullable(), createdAt: z.number(), expiresAt: z.number(), note: z.string(), replayed: z.boolean().optional() });
-function use(ctx: ToolCtx) {
-  liveAccess(ctx, 'dodo:exec'); const mm = ctx.services.multimodal;
+function use(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:exec' = 'dodo:exec') {
+  liveAccess(ctx, scope); const mm = ctx.services.multimodal;
   if (!mm) throw new DodoError('NOT_SUPPORTED', 'creative media service is unavailable'); mm.storage.check(); return mm;
 }
 const generate = defineTool({
   name: 'image_generate', title: 'Generate an image',
-  description: 'Generate an image directly from chat using the configured provider URL, API key and model. No project, project_overview or workspace context is needed. Supports OpenAI-compatible Images and native Gemini. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.',
-  input: { prompt: z.string().trim().min(1).max(16000), size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('1024x1024'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'), background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key },
+  description: 'Generate an image directly from chat without a project. Use creative_models to inspect the configured provider models, choose one for the task and pass its model ID. Respect the user\'s requested model. Omitted model or auto uses Creative Media settings, including server fallback when configured Auto. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.',
+  input: { prompt: z.string().trim().min(1).max(16000), model: CreativeModelId.optional().describe('Model ID chosen by the AI or user for this request; list with creative_models. Omitted or auto uses the configured default.'), size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('1024x1024'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'), background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key },
   output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'image_generate', idempotencyKey, input, () => mm.creative.start(ctx, 'image', input), true, ['AUTH_REQUIRED']) }; },
 });
@@ -42,13 +43,13 @@ const crop = defineTool({
 const removeBackground = defineTool({
   name: 'image_remove_background', title: 'Remove an image background',
   description: 'Remove the background from one owned image resource directly from chat, without a project or upload-enablement setting. Accepts resourceId/assetId; a workspace path uses optional explicit project context. Submits one paid generative edit and may alter image details; success requires actual transparent pixels. Collect the existing job with creative_job.',
-  input: { ...source, idempotencyKey: Key }, output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
+  input: { ...source, model: CreativeModelId.optional().describe('Image editing model chosen for this request; use creative_models for available IDs.'), idempotencyKey: Key }, output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'image_remove_background', idempotencyKey, input, () => mm.creative.start(ctx, 'background_removal', input), true, ['AUTH_REQUIRED']) }; },
 });
 const video = defineTool({
   name: 'video_generate', title: 'Generate a video',
   description: 'Create a video directly from chat without a project using configured compatible video settings. Official OpenAI Videos API is retired; configure a compatible provider and video model first. An optional owned image reference must match size. Returns jobId; creative_job collects that render as MP4. No automatic paid retries or 3D.',
-  input: { prompt: Prompt, size: z.enum(['1280x720', '720x1280']).default('1280x720'), seconds: Seconds.default(4), reference: z.object(source).strict().optional(), idempotencyKey: Key },
+  input: { prompt: Prompt, model: CreativeModelId.optional().describe('Compatible video model chosen for this request; omitted model uses the configured video model.'), size: z.enum(['1280x720', '720x1280']).default('1280x720'), seconds: Seconds.default(4), reference: z.object(source).strict().optional(), idempotencyKey: Key },
   output: Job, requiredScope: 'dodo:exec', action: 'exec', annotations: execute,
   handler: async (args, ctx) => { const mm = use(ctx), { idempotencyKey, ...input } = args; return { data: await multimediaEffect(ctx, 'video_generate', idempotencyKey, input, () => mm.creative.start(ctx, 'video', input), true, ['AUTH_REQUIRED']) }; },
 });
@@ -116,3 +117,14 @@ const save = defineTool({
   },
 });
 export const CREATIVE_TOOLS: AnyToolDef[] = [...[generate, crop, removeBackground, video, videoEdit, videoExtend, job].map(def => ({ ...def, optionalWorkspaceContext: true })), save];
+
+/** Appended to the full catalog so all previous capability names retain their order. */
+export const CREATIVE_MODEL_TOOLS: AnyToolDef[] = [defineTool({
+  name: 'creative_models', title: 'List image and video models for AI selection',
+  description: 'Read the configured media provider\'s actual model IDs without generating or paying for a render. In Auto mode, inspect this list, choose a model suited to the user\'s task, and pass model to image_generate, image_remove_background or video_generate. Media hints come from names and are not verified capabilities. Supports query and pagination. No project needed; never returns the API key or endpoint. An explicit known model can be used even if listing is unsupported.',
+  input: { query: z.string().trim().max(200).optional(), limit: z.number().int().min(1).max(100).default(50), cursor: z.number().int().min(0).max(200).optional() },
+  output: z.object({ protocol: z.string(), imageModel: z.string(), videoModel: z.string(), videoEnabled: z.boolean(), models: z.array(z.object({ id: z.string().min(1).max(200), mediaHint: z.enum(['image', 'video', 'unknown']), hintSource: z.literal('name') }).strict()).max(100), nextCursor: z.number().int().nonnegative().nullable(), note: z.string() }).strict(),
+  requiredScope: 'dodo:read', action: 'read', optionalWorkspaceContext: true,
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (args, ctx) => ({ data: await use(ctx, 'dodo:read').creative.models(ctx, args) }),
+})];

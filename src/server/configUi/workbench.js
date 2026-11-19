@@ -522,7 +522,7 @@
     const providerName=field(keyForm,'ชื่อ connection','mediaProviderName',defaults.name||'OpenAI Media');
     const protocol=choice(keyForm,'รูปแบบ API สำหรับภาพ','mediaProtocol',[['responses','OpenAI-compatible Images API'],['chat-completions','OpenAI-compatible Images API (Chat connection)'],['gemini','Gemini Interactions API']],'responses');
     const baseUrl=field(keyForm,'API Base URL','mediaBaseUrl',defaults.baseUrl||'https://api.openai.com/v1');baseUrl.placeholder='https://api.example.com/v1';
-    const providerModel=field(keyForm,'Model ID สำหรับ connection นี้ (เว้นว่างหรือใช้ auto เพื่อเลือกอัตโนมัติ)','mediaProviderModel',defaults.imageModel||'auto');providerModel.autocomplete='off';providerModel.spellcheck=false;providerModel.placeholder='auto';
+    const providerModel=field(keyForm,'Model ID เริ่มต้น (เว้นว่างหรือใช้ auto เพื่อให้ AI เลือกตามงาน)','mediaProviderModel',defaults.imageModel||'auto');providerModel.autocomplete='off';providerModel.spellcheck=false;providerModel.placeholder='auto';
     const credentials=credentialFields(keyForm,{storage:'mediaCredentialStorage',envVar:'mediaCredentialEnvVar'});
     const key=field(keyForm,'API key ใหม่ (เว้นว่างเพื่อใช้คีย์เดิมเมื่อแก้ไข)','mediaApiKey','','password');key.autocomplete='new-password';
     const privateNetwork=check(keyForm,'อนุญาต connection นี้เข้าปลายทาง loopback / LAN','mediaPrivateNetwork');
@@ -547,12 +547,13 @@
     const compatible=state.connections.filter(c=>c.enabled&&['responses','chat-completions','gemini'].includes(c.protocol));
     const connection=choice(f,'การเชื่อมต่อสำหรับงานสื่อ','mediaConnection',[['','เลือก connection…'],...compatible.map(c=>[c.id,`${c.name} · key ${c.credentialPresent?'พร้อม':'ต้องใส่ใหม่'}`])],current.connectionId||'');
     const imageModel=field(f,'โมเดลสร้างภาพ / ลบพื้นหลัง','mediaImageModel',current.imageModel||'auto');imageModel.placeholder='auto';
-    const modelPicker=choice(f,'เลือกโมเดลภาพ','mediaModelPicker',[['auto','Auto — เลือกโมเดลภาพอัตโนมัติ']],'auto');
+    const modelPicker=choice(f,'เลือกโมเดลภาพ','mediaModelPicker',[['auto','Auto — ให้ AI เลือกโมเดลตามงาน']],'auto');
     const modelState=el('p','เลือก connection เพื่อโหลดรายชื่อโมเดล หรือใช้ Auto / กรอก Model ID เอง','wb-status');modelState.setAttribute('role','status');f.append(modelState);
+    f.append(help('Auto ให้ AI ดูรายชื่อโมเดลแล้วเลือกตามงานในแต่ละคำขอ โดยไม่เปลี่ยนค่าที่บันทึกไว้ ถ้า AI client ไม่เลือกโมเดล DODO จะใช้ค่าเริ่มต้นอัตโนมัติเดิม', 'การเลือกโมเดลสำหรับงานสื่อ'));
     const selectedModelCacheKey=()=>{const selectedConnection=compatible.find(c=>c.id===connection.value);return selectedConnection?mediaModelCacheKey(selectedConnection):undefined;};
     const refreshModels=()=>{
       const ids=mediaModelCatalog.get(selectedModelCacheKey())?.ids||[],selectedModel=imageModel.value.trim()||'auto';modelPicker.replaceChildren();
-      const options=[['auto','Auto — เลือกโมเดลภาพอัตโนมัติ'],...(!ids.includes(selectedModel)&&selectedModel!=='auto'?[[selectedModel,`${selectedModel} (กำหนดเอง)`]]:[]),...ids.filter(id=>id!=='auto').map(id=>[id,id])];
+      const options=[['auto','Auto — ให้ AI เลือกโมเดลตามงาน'],...(!ids.includes(selectedModel)&&selectedModel!=='auto'?[[selectedModel,`${selectedModel} (กำหนดเอง)`]]:[]),...ids.filter(id=>id!=='auto').map(id=>[id,id])];
       for(const [id,label] of options){const option=el('option',label);option.value=id;modelPicker.append(option);}modelPicker.value=selectedModel;
     };
     modelPicker.onchange=()=>{imageModel.value=modelPicker.value;};imageModel.oninput=refreshModels;
@@ -574,7 +575,7 @@
     const fillPreset=()=>{
       const preset=presets.find(p=>p.id===providerPreset.value);if(!preset)return;
       editing=undefined;providerType=preset.provider;providerName.value=preset.name;protocol.value=preset.protocol;baseUrl.value=preset.baseUrl;key.value='';credentials.reset();providerEnabled.checked=true;privateNetwork.checked=false;
-      providerModel.value=preset.imageModel||'auto';connectionState.textContent='กำลังสร้าง connection ใหม่ กรอก URL และ API key ใช้ Auto เพื่อเลือกโมเดลภาพอัตโนมัติ หรือระบุ Model ID เอง';
+      providerModel.value=preset.imageModel||'auto';connectionState.textContent='กำลังสร้าง connection ใหม่ กรอก URL และ API key ใช้ Auto เพื่อให้ AI เลือกโมเดลตามงาน หรือระบุ Model ID เริ่มต้นเอง';
     };providerPreset.onchange=fillPreset;
     keyForm.append(button('สร้าง connection ใหม่',()=>{providerPreset.value='openai';fillPreset();setup.open=true;}));
     f.append(button('แก้ไข connection ที่เลือก',()=>{

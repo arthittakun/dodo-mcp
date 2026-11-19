@@ -1,6 +1,6 @@
 # Creative Media
 
-DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลังจากแชตโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ตั้งค่าได้ทั้ง OpenAI ทางการ, Google Gemini ทางการ และบริการภายนอกที่ใช้รูปแบบ API ที่รองรับ OpenAI เป็นค่าเริ่มต้นที่แก้ไขได้ เจ้าของกรอกชื่อ provider, API Base URL, คีย์ และโมเดลใน Local Config ได้โดยตรงแล้ว AI เรียกสร้างภาพได้ทันที ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือ MCP ไม่รับ URL, key, remote task ID หรือเปลี่ยนโมเดลเป็นรายคำขอ งานครอปทำในเครื่องโดยไม่เรียกโมเดล
+DODO รองรับสร้างภาพ ครอป/แบ่งภาพเป็นตาราง และลบพื้นหลังจากแชตโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ ตั้งค่าได้ทั้ง OpenAI ทางการ, Google Gemini ทางการ และบริการภายนอกที่ใช้รูปแบบ API ที่รองรับ OpenAI เป็นค่าเริ่มต้นที่แก้ไขได้ เจ้าของกรอกชื่อ provider, API Base URL, คีย์ และโมเดลใน Local Config ได้โดยตรงแล้ว AI เรียกสร้างภาพได้ทันที ส่วนวิดีโอมี adapter สำหรับปลายทางที่รองรับ create/status/content/edit/extend แบบเข้ากันได้ และเริ่มปิดไว้ เครื่องมือ MCP ไม่รับ URL, key หรือ remote task ID แต่ AI ระบุ `model` สำหรับสร้างภาพ ลบพื้นหลัง และสร้างวิดีโอในแต่ละคำขอได้ งานครอปทำในเครื่องโดยไม่เรียกโมเดล
 
 ตรวจเอกสารทางการเมื่อ 17 พฤศจิกายน 2026: OpenAI ระบุว่า Sora 2 และ Videos API ปิดบริการเมื่อ 24 กันยายน 2026 และไม่มี API ทดแทนตรงตัว จึงไม่ตั้ง `sora-2` เป็นค่าเริ่มต้นหรือส่งวิดีโอไปที่ OpenAI โดยอัตโนมัติ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api) และ [คู่มือวิดีโอที่เก็บไว้เป็นประวัติ](https://developers.openai.com/api/docs/guides/video-generation)
 
@@ -18,7 +18,11 @@ DODO รองรับสร้างภาพ ครอป/แบ่งภา�
 
 ตั้งแต่ 1.8.0 การเรียกแบบ global ใช้ได้กับ client ที่ยืนยันตัวตนระดับ installation และมี OAuth scopes ตรงกับ operation รวม managed mode โดยไม่ตรวจรายการ client ของโปรเจกต์หรือขอ project trust approval การเปลี่ยนนี้มีผลกับ provider ที่เลือกไว้ก่อนอัปเกรดด้วย legacy login ที่ผูก root ต้อง reconnect ส่วน delegated agent ที่ถูกจำกัดโปรเจกต์ใช้ global ไม่ได้ ฟิลด์เดิม `enabled`, `allowImageUpload`, `projectIds` ยังรับเพื่อความเข้ากันได้ แต่ไม่ใช้จำกัดงานภาพอีก: ค่าที่อ่าน/บันทึกจะเป็น `enabled` ตามการเลือก connection, `allowImageUpload:true`, `projectIds:[]` ผลงานยังแยกตามผู้เรียกเดิม
 
-Auto เป็นค่าเริ่มต้นเฉพาะ config/preset ใหม่ ค่า Model ID ที่เคยบันทึกเองยังอยู่เดิม เมื่อส่งงานภาพด้วย Auto backend จะขอรายชื่อโมเดลใหม่จาก connection เดิม เลือกหนึ่ง image model ที่รู้จักและปรากฏในรายการ แล้วส่งคำขอสร้าง/แก้ภาพหนึ่งครั้ง ไม่ส่งคำว่า `auto` ไปยัง API และไม่เดาใช้ text/video model หากไม่มีโมเดลที่รู้จักหรือปลายทางไม่รองรับ model-list ให้เลือก Model ID เอง ผล `creative_job.model` แสดงโมเดลที่ใช้จริง หากโมเดลที่เลือกตอบผิดพลาด ระบบไม่เปลี่ยนโมเดลแล้วส่งงานเสียเงินซ้ำ
+ตั้งแต่ 1.9.0 **Auto — ให้ AI เลือกโมเดลตามงาน** เป็นค่าเริ่มต้นของ config/preset ใหม่ AI เรียก `creative_models` เพื่ออ่านค่าเริ่มต้นและรายชื่อจาก API แล้วเลือกโมเดลที่เหมาะกับคำขอโดยส่ง `model` ใน `image_generate`, `image_remove_background` หรือ `video_generate` การเลือกนี้ไม่เปลี่ยนค่าตั้ง หากผู้ใช้ระบุโมเดลให้ใช้ ID นั้น และหากตั้งค่าเริ่มต้นแบบเจาะจงไว้ AI ใช้ค่านั้นเมื่อไม่มีคำสั่งเลือกอย่างอื่น รายชื่อเป็นข้อมูลจาก provider; `mediaHint` เป็นเพียงคำใบ้จากชื่อ ไม่ใช่ผลทดสอบความสามารถ ราคา ความเร็ว หรือคุณภาพ
+
+`creative_models` ใช้ `query`, `limit`, `cursor` เพื่อค้นและอ่านหน้าถัดไปได้ คืนเฉพาะข้อมูลโมเดล ไม่มี API URL หรือคีย์ หากปลายทางไม่รองรับ model-list ยังส่ง ID ที่ทราบเองได้และไม่บังคับให้ ID อยู่ในรายการ hardcoded สำหรับ Gemini native ระบบตัด `models/` นำหน้า ID ก่อนเรียก API
+
+หาก client ไม่ส่ง `model` หรือส่ง `auto` DODO ยังใช้โมเดลเริ่มต้นที่บันทึกไว้ และเมื่อค่านั้นเป็น Auto จะเลือก image model ที่รู้จักจากรายชื่อ API ตามลำดับสำรองเดิม นี่เป็นการรองรับ client ที่ไม่เลือกโมเดลเอง หากไม่มีตัวเลือกที่รู้จักให้ส่ง Model ID เอง ไม่ส่งคำว่า `auto` ไปยัง provider ผล `creative_job.model` แสดงโมเดลที่ใช้จริง หากเกิดข้อผิดพลาดระบบไม่สลับโมเดลแล้วส่งงานเสียเงินซ้ำ
 
 เลือก connection แล้วกด **แก้ไข connection ที่เลือก** เพื่อเปลี่ยนชื่อ, URL, protocol, model หรือวิธีเก็บคีย์ ช่องคีย์ไม่เติมค่ากลับจาก server เว้นว่างได้เมื่อคง URL/protocol/storage/ชื่อตัวแปร Env เดิม หากเปลี่ยนค่าใดค่าหนึ่งต้องกรอกคีย์ใหม่ก่อนบันทึก ระบบไม่ส่งคีย์เดิมต่อไปยัง endpoint ใหม่
 
@@ -40,7 +44,7 @@ Session key อยู่ในหน่วยความจำและต้�
 | Google Gemini / Gemini Interactions | `https://generativelanguage.googleapis.com/v1beta` · Auto | `POST /interactions`; `x-goog-api-key`, inline PNG |
 | Custom / API ภายนอก | เจ้าของกรอก URL · Auto หรือ Model ID เอง | เลือกรูปแบบ OpenAI-compatible Images หรือ Gemini Interactions ให้ตรงกับปลายทาง |
 
-เลือกรูปแบบตาม API ที่บริการนั้นรับจริง ไม่เดาจากชื่อ provider หรือชื่อโมเดล ตัวอย่างเช่น gateway ที่ให้โมเดล Gemini ผ่าน `/images/generations` ต้องเลือก OpenAI-compatible Images ส่วน Gemini native ใช้ Interactions โหลดรายชื่อ Gemini แล้วระบบตัด `models/` ออกจากชื่อ resource เพื่อใช้เป็น Model ID Auto ของ OpenAI-compatible เลือก GPT image ที่รู้จักก่อน เช่น `gpt-image-2.5-flare` เมื่อมีในรายการ ส่วน Gemini native เลือกเฉพาะ Gemini image IDs ที่รู้จัก เช่น `gemini-nano-banana-2.1` ไม่ใช่การเปลี่ยนค่า Model ID ที่บันทึกเอง
+เลือกรูปแบบตาม API ที่บริการนั้นรับจริง ไม่เดาจากชื่อ provider หรือชื่อโมเดล ตัวอย่างเช่น gateway ที่ให้โมเดล Gemini ผ่าน `/images/generations` ต้องเลือก OpenAI-compatible Images ส่วน Gemini native ใช้ Interactions โหลดรายชื่อ Gemini แล้วระบบตัด `models/` ออกจากชื่อ resource เพื่อใช้เป็น Model ID AI เลือก ID ที่เหมาะกับงานจากรายชื่อจริงได้ ส่วนตัวสำรองสำหรับ client ที่ไม่ส่งโมเดลเลือกเฉพาะ image IDs ที่ระบบรู้จักและพบในรายการ การระบุ `model` รายคำขอไม่ถูกจำกัดด้วยรายชื่อสำรองนี้ และไม่เปลี่ยนค่า Model ID ที่บันทึกเอง
 
 อ่านรูปแบบและข้อจำกัดจาก [OpenAI image generation](https://developers.openai.com/api/docs/guides/image-generation) และ [Google Gemini image generation](https://aistudio.google.com/docs/image-generation) การรองรับวิดีโอต้องตรวจจากปลายทางที่เลือกเอง Gemini image protocol ไม่ถือว่ารองรับ video compatibility เอกสาร OpenAI Videos API เป็นข้อมูลรูปแบบเดิม ไม่ใช่การรับรองว่าปลายทางนั้นยังเปิดบริการ
 
@@ -48,7 +52,8 @@ Session key อยู่ในหน่วยความจำและต้�
 
 | Operation | ผลลัพธ์ |
 |---|---|
-| `image_generate` | สร้างภาพจาก `prompt` แล้วคืน `jobId` สำหรับอ่านผล PNG |
+| `creative_models` | อ่านรายชื่อโมเดลจาก API และค่าเริ่มต้น เพื่อให้ AI เลือกโมเดลตามงาน ไม่มีการสร้างสื่อ |
+| `image_generate` | สร้างภาพจาก `prompt` พร้อม `model` ที่เลือกได้ แล้วคืน `jobId` สำหรับอ่านผล PNG |
 | `image_crop` | ครอป 1–16 บริเวณด้วย `regions` หรือแบ่งเป็น `grid` แล้วคืน PNG resources ทันที |
 | `image_remove_background` | ส่งภาพที่เลือกเพื่อแยกวัตถุหลักบนพื้นโปร่งใส แล้วคืน `jobId` |
 | `video_generate` | สร้างวิดีโอจากข้อความ พร้อมภาพอ้างอิงที่เลือกได้ แล้วคืน `jobId` |
@@ -62,19 +67,23 @@ Session key อยู่ในหน่วยความจำและต้�
 
 Full surface มีเครื่องมือรายตัว ส่วน Compact/Hybrid ใช้ operations เดียวกันผ่าน `dodo_media` ตรวจ schema ล่าสุดด้วย `dodo_discover` ได้ เครื่องมือสร้างภาพ/วิดีโอ ครอป ลบพื้นหลัง รับผลงาน อ่าน resource และสร้างลิงก์ดาวน์โหลดเรียกแบบ global ได้: ไม่ต้องส่ง `workspaceId`/`workspaceEpoch` หรือเรียก `project_overview` ก่อน ผลงานยังแยกตามผู้เรียกเดิม การส่ง workspace context หรือ target อย่างชัดเจนจะเลือกทำงานในโปรเจกต์นั้น ส่วน `media_save` สำหรับเขียนไฟล์ลงโปรเจกต์ยังต้องมี context ของปลายทาง ไม่มีเครื่องมือสร้างโมเดล 3D ในฟีเจอร์นี้
 
-ตัวอย่างสร้างภาพผ่าน Compact/Hybrid โดยไม่ใช้โปรเจกต์:
+ตัวอย่างให้ AI เลือกโมเดลแล้วสร้างภาพผ่าน Compact/Hybrid โดยไม่ใช้โปรเจกต์:
 
 ```text
+dodo_media(operation="creative_models",args={limit:50})
+  → models, imageModel, videoModel, nextCursor
+
+# ใช้ Model ID จริงจากผลก่อนหน้า ไม่ใช้ข้อความตัวอย่างนี้ตรง ๆ
 dodo_media(
   operation="image_generate",
-  args={prompt:"A cat astronaut, illustration",size:"1024x1024",idempotencyKey:"chat-image-0001"}
+  args={prompt:"A cat astronaut, illustration",model:"<chosen model ID>",size:"1024x1024",idempotencyKey:"chat-image-0001"}
 )
 dodo_media(operation="creative_job",args={jobId:"creative_…"})
 ```
 
 ใช้ `jobId` ที่ได้จริงจากคำขอแรกเพื่อรับผลจากงานเดิม ไม่เริ่มงานสร้างซ้ำเพื่อดูสถานะ
 
-มี Full 173 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 169), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
+รุ่น 1.9.0 มี Full 174 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 170), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
 
 งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 

@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.9.0 — AI chooses media models per request
+
+- Add global `creative_models` so the calling AI can read configured defaults and actual provider model IDs, with bounded query/pagination and name-based media hints. Listing does not generate media or return provider URLs/keys.
+- Add optional `model` to image generation, background removal and video generation. The AI can choose a model for each task without changing settings; explicit IDs do not require a model-list endpoint or a hardcoded allowlist.
+- Auto instructions now ask the AI to inspect models and select an appropriate ID. Omitted/`auto` requests retain the configured/default server fallback for older clients; paid failures never trigger automatic model-switch retries.
+- Full now has 174 capabilities (170 when sub-agent tools are hidden); Compact remains 20 and Hybrid 49. Restart and reconnect/rescan MCP after upgrading. See [release details](RELEASE_1.9.0.md) and [Creative Media](CREATIVE_MEDIA.md).
+
 ## 1.8.0 — Global image and video tools
 
 - Call creative, resource and temporary-download tools directly from chat without creating/selecting a project or sending workspace context. DODO can start with no registered project; saving an image provider selects its URL/key/model for immediate global use.

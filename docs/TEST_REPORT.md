@@ -1,5 +1,42 @@
 # DODO MCP — Test Report
 
+## 1.9.0 AI-selected media models — Windows, 2026-11-19
+
+Build, typecheck, lint, UI syntax and diff checks passed. The final results across
+14 focused files use the latest result per file, including the updated discovery
+pagination expectation after adding one media operation.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Feature/regression coverage, including Chrome UI | 160 | 0 | 0 |
+| Fresh tarball install and packaging | 17 | 0 | 0 |
+| Total focused coverage | 177 | 0 | 0 |
+
+Ten new real HTTP/OAuth cases exercise model discovery and actual provider
+serialization. They list/filter/page advertised IDs, then select custom models
+outside the server fallback preference list for images, background edits and
+videos. Captured POST bodies and job receipts contain the selected IDs, settings
+remain unchanged, and idempotent replay never creates a second paid request.
+Explicit model selection works when the model-list endpoint returns HTTP 404.
+Existing omitted/auto behavior remains compatible, video edits/extensions retain
+the parent job's actual model, read-only clients can list but cannot generate,
+and malformed model/URL/key overrides are rejected before rendering. URL-shaped
+model IDs are filtered from metadata and rejected in generation requests.
+Full, Compact and Hybrid all exercise discovery followed by explicit selection.
+
+Seven actual Chrome cases retain provider setup, project-free usage, persistent
+Env storage, editable presets, Auto/manual model selection and disabled draft
+behavior. Existing global image/video jobs, resource previews, restart/export,
+scope/ownership checks and HTTP/STDIO tool surfaces also pass. Full now contains
+174 capabilities, with 170 exposed by default; Compact remains 20 and Hybrid 49.
+
+The calling AI makes the per-request choice. These tests verify that its chosen
+ID reaches the provider; they do not rate the AI's model-selection judgment or
+prove model quality, speed, cost or capability from name hints. Provider traffic
+uses synthetic credentials and local fixtures, with no additional live paid
+generation or native Linux/macOS acceptance claimed for this release. The locked
+dependency audit reports zero advisories. See [release details](RELEASE_1.9.0.md).
+
 ## 1.8.0 Global chat media — Windows, 2026-11-19
 
 Build, typecheck, lint, UI syntax and diff checks passed. The final results across

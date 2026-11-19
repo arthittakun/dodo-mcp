@@ -1,8 +1,8 @@
 {
   "$comment": "GENERATED from src/tools — do not edit by hand. Complete DODO capability contract; optional feature metadata describes definitions filtered from the default live MCP catalog.",
   "version": 1,
-  "toolCount": 173,
-  "defaultLiveToolCount": 169,
+  "toolCount": 174,
+  "defaultLiveToolCount": 170,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -29520,7 +29520,7 @@
     {
       "name": "image_generate",
       "title": "Generate an image",
-      "description": "Generate an image directly from chat using the configured provider URL, API key and model. No project, project_overview or workspace context is needed. Supports OpenAI-compatible Images and native Gemini. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.",
+      "description": "Generate an image directly from chat without a project. Use creative_models to inspect the configured provider models, choose one for the task and pass its model ID. Respect the user's requested model. Omitted model or auto uses Creative Media settings, including server fallback when configured Auto. Returns jobId; creative_job collects its PNG preview/resource. Submits one paid request; reuse the same idempotencyKey after a lost response.",
       "requiredScope": "dodo:exec",
       "annotations": {
         "readOnlyHint": false,
@@ -29565,6 +29565,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 16000
+          },
+          "model": {
+            "description": "Model ID chosen by the AI or user for this request; list with creative_models. Omitted or auto uses the configured default.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^(?!.*:\\/\\/)[a-zA-Z0-9_./:-]+$"
           },
           "size": {
             "default": "1024x1024",
@@ -30373,6 +30380,13 @@
             "maxLength": 100,
             "pattern": "^[a-z]+_[a-z0-9]{8,64}$"
           },
+          "model": {
+            "description": "Image editing model chosen for this request; use creative_models for available IDs.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^(?!.*:\\/\\/)[a-zA-Z0-9_./:-]+$"
+          },
           "idempotencyKey": {
             "type": "string",
             "minLength": 8,
@@ -30740,6 +30754,13 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 16000
+          },
+          "model": {
+            "description": "Compatible video model chosen for this request; omitted model uses the configured video model.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^(?!.*:\\/\\/)[a-zA-Z0-9_./:-]+$"
           },
           "size": {
             "default": "1280x720",
@@ -45910,6 +45931,237 @@
                 "type": "object",
                 "properties": {},
                 "additionalProperties": {}
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "recovery": {
+                    "type": "string"
+                  },
+                  "detail": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "ok",
+          "workspaceId",
+          "workspaceEpoch",
+          "data",
+          "error",
+          "warnings",
+          "truncated",
+          "nextCursor"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "creative_models",
+      "title": "List image and video models for AI selection",
+      "description": "Read the configured media provider's actual model IDs without generating or paying for a render. In Auto mode, inspect this list, choose a model suited to the user's task, and pass model to image_generate, image_remove_background or video_generate. Media hints come from names and are not verified capabilities. Supports query and pagination. No project needed; never returns the API key or endpoint. An explicit known model can be used even if listing is unsupported.",
+      "requiredScope": "dodo:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recoverySessionId": {
+            "description": "Explicit caller-owned recovery session for this operation; never an authorization grant",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "targetProjectId": {
+            "description": "Explicit owner-registered target; use its project_overview context",
+            "type": "string",
+            "pattern": "^prj_[0-9a-hjkmnp-tv-z]{8,64}$"
+          },
+          "targetProject": {
+            "description": "Owner-registered project NAME to target (alternative to targetProjectId; must match exactly one project)",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "workspaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace id from project_overview"
+          },
+          "workspaceEpoch": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Workspace epoch from project_overview (changes on server restart or workspace switch)"
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "cursor": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 200
+          }
+        },
+        "required": [
+          "limit"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "workspaceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "workspaceEpoch": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string"
+                  },
+                  "imageModel": {
+                    "type": "string"
+                  },
+                  "videoModel": {
+                    "type": "string"
+                  },
+                  "videoEnabled": {
+                    "type": "boolean"
+                  },
+                  "models": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 200
+                        },
+                        "mediaHint": {
+                          "type": "string",
+                          "enum": [
+                            "image",
+                            "video",
+                            "unknown"
+                          ]
+                        },
+                        "hintSource": {
+                          "type": "string",
+                          "const": "name"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "mediaHint",
+                        "hintSource"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "nextCursor": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "imageModel",
+                  "videoModel",
+                  "videoEnabled",
+                  "models",
+                  "nextCursor",
+                  "note"
+                ],
+                "additionalProperties": false
               },
               {
                 "type": "null"

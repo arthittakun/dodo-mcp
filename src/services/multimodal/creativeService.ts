@@ -4,7 +4,7 @@ import type { ToolCtx } from '../../tools/context.js';
 import type { ResourceInfoData } from '../resources/contracts.js';
 import { CreativeProvider, type CreativeImageInput, type CreativeVideoInput } from './creativeProvider.js';
 import { cropCreativeImage, normalizeCreativeImage, gridCreativeRegions, type CreativeGrid } from './creativeImages.js';
-import { isCreativeConnection, supportsCreativeVideoConnection, resolveAutoImageModel } from './creativeSettings.js';
+import { CreativeModelId, creativeModelHint, isCreativeConnection, supportsCreativeVideoConnection, resolveAutoImageModel } from './creativeSettings.js';
 import { loadSharpBackend } from './sharpBackend.js';
 import { MediaStorage, actorKey, liveAccess } from './storage.js';
 import type { CropRect } from './contracts.js';
@@ -20,7 +20,9 @@ export interface CreativeJobData {
 }
 interface RecordData extends CreativeJobData { epoch: string; connectionId: string; configuration: string; remoteId?: string }
 export interface ImageSource { path?: string | undefined; assetId?: string | undefined; resourceId?: string | undefined }
-type VideoRequest = Omit<CreativeVideoInput, 'model' | 'reference'> & { reference?: ImageSource | undefined };
+interface ModelSelection { model?: string | undefined }
+type ImageRequest = Omit<CreativeImageInput, 'model'> & ModelSelection;
+type VideoRequest = Omit<CreativeVideoInput, 'model' | 'reference'> & ModelSelection & { reference?: ImageSource | undefined };
 interface VideoTransform { sourceJobId: string; operation: 'edit' | 'extend'; prompt: string; seconds?: number | undefined }
 
 /** Paid work is submitted once. Status requests only retrieve an existing remote job. */
@@ -35,12 +37,12 @@ export class CreativeService {
       WHERE workspace_id=? AND json_extract(payload,'$.epoch')<>? AND json_extract(payload,'$.remoteId') IS NULL
       AND json_extract(payload,'$.status') IN ('queued','running')`).run(storage.services.workspaceId, storage.services.epoch);
   }
-  private check(ctx: ToolCtx): void {
-    this.storage.check(); liveAccess(ctx, 'dodo:exec'); ctx.revalidate?.();
+  private check(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:exec' = 'dodo:exec'): void {
+    this.storage.check(); liveAccess(ctx, scope); ctx.revalidate?.();
     if (ctx.principal.expiresAt !== undefined && ctx.principal.expiresAt * 1000 <= Date.now()) throw new DodoError('AUTH_REQUIRED', 'client authorization expired');
   }
-  private configuration(ctx: ToolCtx) {
-    this.check(ctx);
+  private configuration(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:exec' = 'dodo:exec') {
+    this.check(ctx, scope);
     const installation = this.storage.services.installation;
     if (!installation) throw new DodoError('NOT_SUPPORTED', 'creative media needs the installation provider settings');
     const settings = installation.ai.settings, config = settings.media();
@@ -54,6 +56,34 @@ export class CreativeService {
     if (!cfg.config.videoEnabled || !cfg.config.videoModel) throw new DodoError('NOT_SUPPORTED', 'video compatibility is not configured; select a supported connection and model in Creative Media');
     if (!supportsCreativeVideoConnection(cfg.connection)) throw new DodoError('NOT_SUPPORTED', 'OpenAI Videos API is retired; use an explicitly configured compatible video connection');
     return cfg;
+  }
+  /** Metadata-only discovery for the calling AI; does not submit a paid render. */
+  async models(ctx: ToolCtx, options: { query?: string | undefined; limit: number; cursor?: number | undefined }) {
+    const { query, limit, cursor = 0 } = options;
+    if (!Number.isInteger(limit) || limit < 1 || limit > 100 || !Number.isInteger(cursor) || cursor < 0 || cursor > 200 || (query !== undefined && (typeof query !== 'string' || query.length > 200))) throw new DodoError('INVALID_INPUT', 'invalid model discovery query or pagination');
+    const cfg = this.configuration(ctx, 'dodo:read');
+    const validate = () => {
+      const current = this.configuration(ctx, 'dodo:read');
+      if (current.digest !== cfg.digest) throw new DodoError('FORBIDDEN', 'media configuration changed during model discovery');
+      return current;
+    };
+    const release = cfg.settings.lease(cfg.connection.id);
+    try {
+      const advertised = await cfg.settings.models(cfg.connection.id, { beforeSend: validate });
+      const current = validate();
+      const needle = query?.trim().toLowerCase() ?? '';
+      const ids = [...new Set(advertised.map(item => item.id).filter(id => CreativeModelId.safeParse(id).success))]
+        .filter(id => !needle || id.toLowerCase().includes(needle)).sort();
+      return {
+        protocol: cfg.connection.protocol,
+        imageModel: cfg.config.imageModel,
+        videoModel: cfg.config.videoModel,
+        videoEnabled: current.config.videoEnabled && supportsCreativeVideoConnection(current.connection),
+        models: ids.slice(cursor, cursor + limit).map(id => ({ id, mediaHint: creativeModelHint(id), hintSource: 'name' as const })),
+        nextCursor: cursor + limit < ids.length ? cursor + limit : null,
+        note: 'Provider-advertised model IDs. mediaHint is inferred only from the name, not proof of API capabilities or quality. Choose a suitable model for this task and pass its exact ID to image_generate, image_remove_background or video_generate; discovery does not create media.',
+      };
+    } finally { release(); }
   }
   status(ctx: ToolCtx) {
     liveAccess(ctx, 'dodo:read'); this.storage.check();
@@ -131,7 +161,7 @@ export class CreativeService {
     if (this.unsaved.size >= 128) this.unsaved.delete(this.unsaved.keys().next().value!);
     this.unsaved.set(record.jobId, record);
   }
-  async start(ctx: ToolCtx, kind: RecordData['kind'], input: Omit<CreativeImageInput, 'model'> | VideoRequest | VideoTransform | ImageSource): Promise<CreativeJobData> {
+  async start(ctx: ToolCtx, kind: RecordData['kind'], input: ImageRequest | VideoRequest | VideoTransform | (ImageSource & ModelSelection)): Promise<CreativeJobData> {
     const video = kind === 'video' && !('sourceJobId' in input) ? input as VideoRequest : undefined;
     const transform = kind === 'video' && 'sourceJobId' in input ? input : undefined;
     const configForRequest = () => kind === 'video' ? this.videoConfiguration(ctx) : this.configuration(ctx);
@@ -159,7 +189,12 @@ export class CreativeService {
     let key: string;
     try { key = await cfg.settings.credential(cfg.connection); } catch (error) { release(); throw error; }
     let provider: CreativeProvider;
-    let model = kind === 'video' ? cfg.config.videoModel : cfg.config.imageModel;
+    const requested = !transform && 'model' in input && input.model !== undefined ? CreativeModelId.safeParse(input.model) : undefined;
+    if (requested && !requested.success) { release(); throw new DodoError('INVALID_INPUT', 'invalid creative model ID'); }
+    const selected = requested?.success && requested.data.toLowerCase() !== 'auto' ? requested.data : undefined;
+    let model = parent?.model ?? selected ?? (kind === 'video' ? cfg.config.videoModel : cfg.config.imageModel);
+    if (cfg.connection.protocol === 'gemini') model = model.replace(/^models\//, '');
+    if (!CreativeModelId.safeParse(model).success) { release(); throw new DodoError('INVALID_INPUT', 'invalid creative model ID'); }
     try {
       provider = new CreativeProvider(cfg.connection, key, cfg.settings.ports); configForRequest(); source?.guard(); checkParent();
       if (kind !== 'video' && model.toLowerCase() === 'auto') {

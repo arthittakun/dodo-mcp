@@ -6,6 +6,7 @@ import { registerTool, type AnyToolDef, type AppServices } from './context.js';
 import { CORE_TOOL_CATALOG } from './coreCatalog.js';
 import { AGENT_RUNTIME_TOOLS } from './agentRuntimeTools.js';
 import { ANDROID_TOOLS } from './androidTools.js';
+import { CREATIVE_MODEL_TOOLS } from './creativeTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -30,6 +31,7 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   ...ANDROID_TOOLS,
   ...RECOVERY_TOOLS,
   ...DEPLOYMENT_TOOLS,
+  ...CREATIVE_MODEL_TOOLS,
 ];
 
 export function registerCatalog(server: McpServer, services: AppServices): void {

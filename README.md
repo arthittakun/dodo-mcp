@@ -15,7 +15,7 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 173 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 169 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
+- STDIO ใช้ Full Tool Surface 174 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 170 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
@@ -42,7 +42,7 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp@1.8.0
+npm install -g dodo-mcp@1.9.0
 dodo setup --check
 dodo --cli
 ```
@@ -59,7 +59,7 @@ dodo --cli
 
 เปิด **Local Config → Providers & Profiles → Creative Media → เพิ่ม / แก้ไข Provider สำหรับสร้างภาพ** เลือก OpenAI, Google Gemini หรือ Custom แล้วกรอกชื่อ, รูปแบบ API, Base URL และ key ได้เอง กดบันทึกแล้ว AI เรียกสร้างภาพจากแชตได้เลยโดยไม่ต้องสร้างหรือเลือกโปรเจกต์ และไม่ต้องเปิดสวิตช์งานภาพหรืออนุญาตอัปโหลดเพิ่ม ค่าโมเดลเริ่มต้นของ config/preset ใหม่เป็น **Auto** จึงยังไม่ต้องรู้ Model ID เมื่อบันทึก Custom หน้าเว็บแสดงรายการโมเดลอัตโนมัติหลังเลือก/บันทึก connection และยังพิมพ์ ID เองได้เมื่อโหลดไม่สำเร็จ ค่าโมเดลที่เคยบันทึกเองไม่เปลี่ยน ส่วนครอป `regions`/`grid` ทำในเครื่องโดยไม่ใช้คีย์
 
-เมื่อส่งงานด้วย Auto backend จะขอรายการโมเดลใหม่ เลือก image model ที่รู้จักจริงจากรายการ แล้วส่งงานภาพหนึ่งครั้ง ผลงานบอก Model ID ที่ใช้จริง ไม่ส่งค่า `auto` หรือเดาใช้โมเดลข้อความ หากไม่พบตัวเลือกให้กรอก ID เอง ไม่มีการสลับโมเดลแล้วส่งงานเสียเงินซ้ำเมื่อเกิดข้อผิดพลาด
+เมื่อใช้ **Auto** AI เรียก `creative_models` เพื่อดูรายชื่อจาก API แล้วเลือกโมเดลให้เหมาะกับงาน และส่ง `model` ใน `image_generate`, `image_remove_background` หรือ `video_generate` ได้เองในแต่ละคำขอ โดยไม่เปลี่ยนค่าที่บันทึกไว้ หาก client ไม่ส่งโมเดลหรือส่ง `auto` DODO ยังใช้ค่าเริ่มต้นและตัวเลือกสำรองอัตโนมัติเดิมเพื่อรองรับ client เก่า รายชื่อและคำใบ้จากชื่อโมเดลไม่รับรองความสามารถ ราคา หรือคุณภาพ ผล `creative_job.model` บอก ID ที่ใช้จริง และไม่มีการสลับโมเดลเพื่อส่งงานเสียเงินซ้ำอัตโนมัติ
 
 เมื่อแก้ connection เว้นคีย์ว่างเพื่อคงค่าเดิมได้ถ้า URL/protocol/storage/ชื่อตัวแปร Env ไม่เปลี่ยน การเปลี่ยนค่าใดค่าหนึ่งต้องกรอกคีย์ใหม่ ระบบไม่แสดงคีย์เดิมกลับจาก server และไม่ส่งคีย์เดิมไป endpoint ใหม่ OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; ขนาด/quality/transparency ขึ้นกับโมเดล ดู [ข้อจำกัดและวิธีเลือก protocol](docs/CREATIVE_MEDIA.md)
 
@@ -586,6 +586,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
 - [Release 1.7.0: Env API Key ถาวรบนเครื่องเซิร์ฟเวอร์](docs/RELEASE_1.7.0.md)
 - [Release 1.8.0: สร้างภาพและวิดีโอจากแชตโดยไม่ต้องมีโปรเจกต์](docs/RELEASE_1.8.0.md)
+- [Release 1.9.0: AI เลือกโมเดลสร้างภาพและวิดีโอในแต่ละคำขอ](docs/RELEASE_1.9.0.md)
 - [Runtime Intelligence](docs/RUNTIME.md)
 - [Advanced Agent Runtime](docs/AGENT_RUNTIME.md)
 - [Release notes](docs/RELEASE_NOTES.md)

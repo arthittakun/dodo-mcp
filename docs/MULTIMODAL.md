@@ -14,7 +14,7 @@ DODO รองรับภาพ เสียง วิดีโอ เบรา
 
 Compact surface ใช้ `dodo_media`, `dodo_browser` และ `dodo_game` ส่วน Full surface มี tool รายตัวครบ
 
-รุ่น 1.8.0 มี Full 173 capabilities (ค่าเริ่มต้น 169 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
+รุ่น 1.9.0 มี Full 174 capabilities (ค่าเริ่มต้น 170 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
 
 ## Creative Media
 
@@ -22,13 +22,13 @@ Compact surface ใช้ `dodo_media`, `dodo_browser` และ `dodo_game` ส
 
 เครื่องมือ creative, resource, download links, `multimodal_status` และ `dodo_discover` ใช้แบบ global ได้กับ client ที่ยืนยันตัวตนระดับ installation และมี OAuth scopes ของ operation รวม managed mode โดยไม่ตรวจ project AI allowlist หรือขอ project trust approval ผลงานยังแยกตามผู้เรียก การส่ง context หรือ target อย่างชัดเจนเลือก runtime และ policy ของโปรเจกต์นั้น `media_save` ยังต้องมี context ของโปรเจกต์ปลายทาง และรับ resource ที่ผู้เรียกสร้างแบบ global ได้ด้วย legacy login ต้อง reconnect ส่วน delegated agent ที่ถูกจำกัดโปรเจกต์ใช้ global ไม่ได้
 
-หน้าเว็บโหลดรายการโมเดลให้อัตโนมัติหลังเปิด/เปลี่ยน/บันทึก connection มีปุ่มโหลดใหม่และพิมพ์ Model ID เองได้หากรายการใช้ไม่ได้ เมื่อส่งงานด้วย Auto backend ขอรายการใหม่แล้วเลือก image model ที่รู้จัก ส่งภาพเพียงหนึ่งคำขอ และคืน Model ID ที่ใช้จริง ไม่มี literal `auto`, การเดาใช้โมเดลข้อความ หรือ paid retry ด้วยโมเดลอื่น หากไม่มีโมเดลที่รู้จักให้เลือกเอง
+หน้าเว็บโหลดรายการโมเดลให้อัตโนมัติหลังเปิด/เปลี่ยน/บันทึก connection มีปุ่มโหลดใหม่และพิมพ์ Model ID เองได้หากรายการใช้ไม่ได้ Auto ให้ AI เรียก `creative_models` แล้วเลือก `model` ตามงานในคำขอสร้างภาพ ลบพื้นหลัง หรือสร้างวิดีโอ โดยไม่แก้ค่าที่บันทึกไว้ รายชื่อ/คำใบ้จากชื่อไม่รับรองความสามารถหรือราคา explicit ID ใช้ได้โดยไม่บังคับ model-list หรือรายชื่อ hardcoded หาก client ไม่ส่งโมเดลหรือส่ง `auto` DODO ใช้ค่าเริ่มต้นและตัวเลือกสำรองเดิม ผล `creative_job.model` คืน ID ที่ใช้จริง ไม่มี literal `auto` ส่งถึง provider หรือ paid retry ด้วยโมเดลอื่น
 
 OpenAI-compatible ใช้ Images API ส่วน Gemini native ใช้ Interactions; Gemini ขอภาพระดับ 1K ตามอัตราส่วนและใช้ quality อัตโนมัติ ขนาดจริงและความโปร่งใสต้องตรวจจาก output ไม่ถือว่าทุก provider รองรับตัวเลือกเหมือนกัน แก้ชื่อ/โมเดลได้โดยคงคีย์เดิม แต่การเปลี่ยน URL/protocol/storage/ชื่อตัวแปร Env ต้องกรอกคีย์ใหม่ ไม่มีคีย์เดิมเติมกลับหน้าเว็บ
 
 ทั้ง Providers และ Creative Media เลือก **Env ถาวรในเครื่องที่รัน DODO** ได้บน Windows, Linux และ macOS โดยเก็บคีย์เป็นข้อความในไฟล์ส่วนตัวใต้ `DODO_CONFIG_DIR/credentials/ai` พร้อม private permissions/ACL และอ่านกลับหลังรีสตาร์ต ไม่เปลี่ยน Env ทั้งเครื่อง ไม่เก็บใน browser storage และไม่ส่งคีย์ที่บันทึกไปเป็น Env ของ child jobs หากใช้ตัวแปรภายนอก ให้ระบุชื่อและเว้นคีย์ว่างสำหรับ connection ใหม่ ระบบอ่าน inherited environment เฉพาะเมื่อไม่มีไฟล์ของ connection; เมื่อหมุนคีย์ภายนอกต้องบันทึกยืนยันใหม่ Session และ macOS Keychain ยังเลือกได้ตามความสามารถของเซิร์ฟเวอร์ ดู [credential storage และการลบ/เปลี่ยนคีย์](AI_PROVIDERS.md#credential-และ-endpoint)
 
-เครื่องมือใหม่คือ `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit`, `video_extend` พร้อม `creative_job` สำหรับอ่านผล และ `media_save` สำหรับบันทึกลงโปรเจกต์ งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ ภาพ/วิดีโอที่สร้างเสร็จเป็น immutable resources รองรับ preview, bounded range และ hash-verified save การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้
+เครื่องมือคือ `creative_models` สำหรับให้ AI ดูรายชื่อและค่าเริ่มต้น, `image_generate`, `image_crop`, `image_remove_background`, `video_generate`, `video_edit`, `video_extend` พร้อม `creative_job` สำหรับอ่านผล และ `media_save` สำหรับบันทึกลงโปรเจกต์ งานผ่าน AI อาจมีค่าใช้จ่ายและไม่ retry อัตโนมัติ ภาพ/วิดีโอที่สร้างเสร็จเป็น immutable resources รองรับ preview, bounded range และ hash-verified save การลบพื้นหลังเป็น generative edit ซึ่งอาจเปลี่ยนรายละเอียดภาพได้
 
 วิดีโอเป็น compatibility adapter ที่ต้องเปิด `videoEnabled` และกรอกโมเดลของปลายทางที่รองรับจริง ไม่มีโมเดลวิดีโอเริ่มต้น OpenAI ยุติ Sora 2 และ Videos API แล้วเมื่อ 24 กันยายน 2026 จึงใช้ OpenAI ทางการเพื่อสร้างวิดีโอไม่ได้ ดู [ประกาศยุติบริการ](https://developers.openai.com/api/docs/deprecations#2026-03-24-sora-2-video-generation-models-and-videos-api)
 

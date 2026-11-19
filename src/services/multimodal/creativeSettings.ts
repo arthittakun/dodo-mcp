@@ -44,7 +44,17 @@ export function resolveAutoImageModel(protocol: Provider['protocol'], ids: reado
   return selected;
 }
 
-const Model = z.string().trim().min(1).max(200).regex(/^[a-zA-Z0-9_./:-]+$/);
+/** Model IDs are request data; URLs, credentials and endpoint overrides are not accepted. */
+export const CreativeModelId = z.string().trim().min(1).max(200).regex(/^(?!.*:\/\/)[a-zA-Z0-9_./:-]+$/);
+const Model = CreativeModelId;
+
+/** A display hint only. A name never proves that an endpoint supports an operation. */
+export function creativeModelHint(id: string): 'image' | 'video' | 'unknown' {
+  const name = id.toLowerCase();
+  if (/(?:image|imagen|flux|stable[-_.]?diffusion|sdxl|dall[-_.]?e|midjourney|ideogram|recraft|nano[-_.]?banana)/.test(name)) return 'image';
+  if (/(?:^|[./:_-])(?:video|sora|veo|kling|wan|hunyuan|ltx|seedance)(?:[./:_-]|$|\d)/.test(name)) return 'video';
+  return 'unknown';
+}
 export const CreativeSettingsInput = z.object({
   enabled: z.boolean().default(false),
   connectionId: z.string().regex(/^ai_[a-z0-9_-]{8,64}$/).nullable().default(null),

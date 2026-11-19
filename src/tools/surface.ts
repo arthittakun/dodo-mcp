@@ -196,6 +196,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'resource_preview',
       'resource_extract',
       'resource_transform',
+      'creative_models',
     ],
   },
   {
