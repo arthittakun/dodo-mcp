@@ -1,5 +1,13 @@
 # DODO MCP — Release Notes
 
+## 1.11.1 — Animation collection, edit preflight and setup safety
+
+- Remove the hidden completed-job quota, share concurrent animation collection, preserve accepted output after collection errors and revalidate queued dispatch.
+- Validate transparent PNG edit masks and a combined 16 MiB normalized input budget before paid requests.
+- Check private animation setup paths/interpreters and restrict child-process environments.
+- Correct sandbox wording: the renderer has no network operation; OS network denial depends on the optional command sandbox.
+- Full 185 (default 181), Compact 20, Hybrid 49. See [release details](RELEASE_1.11.1.md) and [validation](TEST_REPORT.md).
+
 ## 1.11.0 — Local animation studio and reference image edits
 
 - Embed the Gift animation engine: `animation_image` (still → loop), `animation_rig` (spring physics, blinks, jumps, presets or custom rigs with loop checks), `animation_sprite`, `animation_banner` (Thai neon banners without a browser), `animation_scene` (Solar System or background + up to 20 animated layers), `animation_catalog` and `animation_job`. Local, network-less and free; exports GIF/WebP/APNG/WebM/MP4/sprite sheet and LINE/Telegram stickers with Thai captions.

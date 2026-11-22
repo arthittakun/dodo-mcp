@@ -56950,10 +56950,10 @@
               },
               "additionalProperties": false
             },
-            "description": "Reference images in order; the first is the canvas the mask applies to"
+            "description": "Reference images in order; the first is the canvas the mask applies to. Combined normalized references and mask must fit 16 MiB."
           },
           "mask": {
-            "description": "Same pixel size as the first image; transparent = repaint, opaque = keep",
+            "description": "PNG with alpha and a fully transparent editable region, same pixel size as the first image; transparent = repaint, opaque = keep",
             "type": "object",
             "properties": {
               "path": {

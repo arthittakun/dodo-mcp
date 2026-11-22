@@ -94,7 +94,7 @@ dodo_media(operation="creative_job",args={jobId:"creative_…"})
 
 ใช้ `jobId` ที่ได้จริงจากคำขอแรกเพื่อรับผลจากงานเดิม ไม่เริ่มงานสร้างซ้ำเพื่อดูสถานะ
 
-รุ่น 1.11.0 มี Full 185 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 181), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
+รุ่น 1.11.1 มี Full 185 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 181), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
 
 งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 
@@ -106,7 +106,7 @@ OpenAI-compatible Images ต้องคืน PNG แบบ `b64_json`; Gemini 
 
 **ตั้งค่าครั้งเดียว** (เลือกอย่างใดอย่างหนึ่ง):
 
-- `dodo-media-setup --install-animation` สร้าง Python venv ส่วนตัวใน DODO config directory (`animation/venv`) และติดตั้งเฉพาะ wheel ที่ pin ไว้: `Pillow==13.0.0`, `pydantic==2.14.4`, `uharfbuzz==0.57.0` ต้องมี Python 3.10+ บน trusted PATH และ build DODO แล้ว คำสั่งนี้ไม่เปลี่ยนสิทธิ์หรือ config ของ DODO
+- `dodo-media-setup --install-animation` สร้าง Python venv ส่วนตัวใน DODO config directory (`animation/venv`) และติดตั้งแบบ wheel-only โดย pin dependency หลักสามตัว: `Pillow==13.0.0`, `pydantic==2.14.4`, `uharfbuzz==0.57.0` ต้องมี Python 3.11+ บน trusted PATH และ build DODO แล้ว dependency ทางอ้อมยังเป็นช่วงเวอร์ชันตามแพ็กเกจต้นทาง คำสั่งนี้ไม่เปลี่ยนการตั้งค่าสิทธิ์ของ DODO และไม่ซ่อม path เดิมที่ไม่ปลอดภัยโดยอัตโนมัติ
 - หรือเริ่ม DODO พร้อม `DODO_ANIMATION_PYTHON` เป็น absolute path ของ Python ที่มีแพ็กเกจเหล่านี้แล้ว (เช่น `.venv` ของโปรเจกต์ Gift) path ต้องอยู่นอก workspace
 
 ไฟล์ `webm`, `mp4` และ `telegram` ต้องมี FFmpeg บน trusted PATH ส่วน `gif`, `webp`, `apng`, `spritesheet` และ `line` ไม่ต้องใช้ ตรวจสถานะด้วย `animation_catalog` หรือ `dodo-media-setup --check`
@@ -149,6 +149,8 @@ dodo_media(operation="animation_scene", args={background:{resourceId:"res_ฉา
 
 แทนที่จะขยับภาพเดิม ให้โมเดลสร้างภาพวาดท่าใหม่ทุกเฟรม แล้ว Gift ตรวจและประกอบเป็นลูป ใช้กับท่าที่ rig ทำไม่ได้ เช่น เดินหันข้าง กระโดดตัวลอย หรือท่าที่กำหนดเอง มีเงื่อนไขกำกับให้แม่นยำทั้งก่อนและหลังวาด:
 
+`image_edit` รับภาพอ้างอิง 1–4 ภาพ โดยขนาดรวมของภาพอ้างอิงและ mask หลังแปลงเป็น PNG ต้องไม่เกิน **16 MiB** (เป็นงบรวม ไม่ใช่ต่อภาพ) Mask ต้องเป็น PNG ที่มี alpha channel มีพื้นที่โปร่งใสเต็มที่ให้วาดใหม่ และมีขนาดพิกเซลตรงกับภาพแรก ระบบตรวจเงื่อนไขเหล่านี้ก่อนสร้างงานหรือส่งคำขอที่มีค่าใช้จ่าย Mask ที่เป็น JPEG, ทึบทั้งหมด หรือมีเพียงความโปร่งใสบางส่วนโดยไม่มีพิกเซล alpha เป็นศูนย์จะถูกปฏิเสธ
+
 1. `animation_frames_plan` (ในเครื่อง ไม่เสียเงิน) รับภาพตัวละครพื้นโปร่งใสหนึ่งภาพ แล้วสร้าง sheet 4×2 (8 ท่า, 1536×1024) หรือ 4×4 (16 ท่า, 1024×1536) โดยวางตัวละครในช่องแรกด้วยขนาดและเส้นพื้นที่ทุกเฟรมต้องใช้ พร้อม **mask** ที่ให้โมเดลวาดได้เฉพาะด้านในช่องที่เหลือ ช่องแรกและร่องระหว่างช่องจึงคงเดิม prompt ระบุเงื่อนไขตัวตน ขนาด เส้นพื้น และท่าทีละช่องตามลำดับลูป `motion`: `wave`, `walk`, `idle` (หายใจและกะพริบตา), `jump` (เว้นที่ด้านบนให้ตัวลอย) หรือ `custom` พร้อม `customPoses`
 2. `image_edit` ส่ง `images:[plan.guide, ตัวละคร]`, `mask: plan.mask`, `prompt: plan.prompt`, `size: plan.size`, `background:"transparent"` เป็นงานเสียเงินครั้งเดียว แล้วรับผลด้วย `creative_job`
 3. `animation_sprite` ส่ง sheet ที่ได้ พร้อม `motion`, `poses`, `layout: plan.layout` และ `reference` (ตัวละคร) ระบบตรวจก่อนประกอบ: `transparent_background`, `one_figure_per_cell` (ไม่หลุดขอบหรือล้นช่อง), `consistent_size`, `ground_line` (เทียบเส้นพื้นของแถวเดียวกัน เพราะโมเดลอาจเลื่อนทั้งแถวซึ่งไม่กระทบผล ส่วนท่ากระโดดช่องจุดสูงสุดต้องลอยจริง และตอนประกอบจะยึดเส้นพื้นที่วัดได้ ตัวละครจึงลอยขึ้นจริงไม่ถูกดึงลงพื้น), `same_character` (สีตรงกับตัวละคร), `distinct_poses` และ `smooth_sequence` (เตือน) จากนั้นปรับขนาดที่คลาดเล็กน้อยให้เท่าช่องแรกเพื่อไม่ให้ตัวละครเต้นขยายหด ถ้ามี check ไม่ผ่าน ผลยังประกอบให้ดูแต่ `passed:false` และ `notes` บอกสาเหตุ ให้ AI แจ้งผู้ใช้ก่อนสั่งวาดใหม่ เพราะ `image_edit` ครั้งใหม่มีค่าใช้จ่าย
@@ -160,7 +162,7 @@ dodo_media(operation="creative_job", args={jobId:"creative_…"})
 dodo_media(operation="animation_sprite", args={resourceId:"<sheet>",motion:"jump",poses:8,layout:<plan.layout>,reference:{resourceId:"res_ตัวละคร"},format:"line",idempotencyKey:"bunny-jump-line-1"})
 ```
 
-ขอบเขตความปลอดภัย: แต่ละงานรันเป็น owned job ของ JobManager ที่ปิดเครือข่าย (`network:false`) Worker ของ Node เรียก Python แบบ isolated (`-I -B -X utf8`) ใน temp directory ส่วนตัว ภาพต้นทางถูกคัดลอกเป็นชื่อคงที่ และชื่อไฟล์ผลลัพธ์ทุกไฟล์ถูกกำหนดโดย bridge ไม่รับ path หรือฟอนต์จาก client ไฟล์ของ engine ถูก pin ด้วย SHA-256 ใน `engines/animation/MANIFEST.json` และตรวจก่อน render ครั้งแรกของแต่ละ process หาก engine ถูกแก้ไขจะปฏิเสธงาน อัปเดต engine จากโปรเจกต์ Gift ด้วย `node scripts/vendor-animation.mjs --from <path ของ Gift>`
+ขอบเขตความปลอดภัย: แต่ละงานรันเป็น owned job ของ JobManager โดยขอ `network:false` การปิดเครือข่ายในระดับ OS ต้องใช้ command sandbox ที่รองรับ ส่วน renderer ที่ให้มาประมวลผลในเครื่องและไม่มีคำสั่งเรียกเครือข่าย Python isolated mode เพียงอย่างเดียวไม่ใช่ network sandbox Worker ของ Node เรียก Python แบบ isolated (`-I -B -X utf8`) ใน temp directory ส่วนตัว ภาพต้นทางถูกคัดลอกเป็นชื่อคงที่ และชื่อไฟล์ผลลัพธ์ทุกไฟล์ถูกกำหนดโดย bridge ไม่รับ path หรือฟอนต์จาก client ไฟล์ของ engine ถูก pin ด้วย SHA-256 ใน `engines/animation/MANIFEST.json` และตรวจก่อน render ครั้งแรกของแต่ละ process หาก engine ถูกแก้ไขจะปฏิเสธงาน อัปเดต engine จากโปรเจกต์ Gift ด้วย `node scripts/vendor-animation.mjs --from <path ของ Gift>`
 
 ## แชร์ไฟล์ด้วยลิงก์ชั่วคราว
 

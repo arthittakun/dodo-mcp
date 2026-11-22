@@ -105,7 +105,16 @@ def _load_frames(path, *, animated=True):
                 if image.n_frames * image.width * image.height > MAX_ANIMATED_PIXELS:
                     raise ValueError(f"Animated layer is too large; use fewer or smaller frames: {path}")
                 frames, durations = [], []
+                decoded_pixels = 0
                 for frame in ImageSequence.Iterator(image):
+                    # GIF local image descriptors may expand the logical canvas
+                    # after the first frame, so initial dimensions are insufficient.
+                    pixels = frame.width * frame.height
+                    decoded_pixels += pixels
+                    if pixels > MAX_SOURCE_PIXELS or decoded_pixels > MAX_ANIMATED_PIXELS:
+                        raise ValueError("Animated layer is too large; use fewer or smaller frames")
+                    if len(frames) >= MAX_LAYER_FRAMES:
+                        raise ValueError(f"Animated layers can have at most {MAX_LAYER_FRAMES} frames: {path}")
                     frames.append(frame.convert("RGBA"))
                     durations.append(max(1, int(frame.info.get("duration") or 100)))
                 return frames, durations

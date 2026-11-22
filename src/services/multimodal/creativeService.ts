@@ -3,8 +3,8 @@ import { digestOf, newId } from '../../util/hash.js';
 import type { ToolCtx, Principal } from '../../tools/context.js';
 import { projectAuthority, isOwner } from '../../security/projectAuthority.js';
 import type { ResourceInfoData } from '../resources/contracts.js';
-import { CreativeProvider, type CreativeImageInput, type CreativeVideoInput } from './creativeProvider.js';
-import { cropCreativeImage, normalizeCreativeImage, gridCreativeRegions, type CreativeGrid } from './creativeImages.js';
+import { CreativeProvider, assertCreativeEditInputBudget, type CreativeImageInput, type CreativeVideoInput } from './creativeProvider.js';
+import { cropCreativeImage, normalizeCreativeImage, normalizeCreativeMask, gridCreativeRegions, type CreativeGrid } from './creativeImages.js';
 import { CreativeModelId, creativeModelHint, isCreativeConnection, supportsCreativeVideoConnection, resolveAutoImageModel } from './creativeSettings.js';
 import { loadSharpBackend } from './sharpBackend.js';
 import { MediaStorage, actorKey, liveAccess } from './storage.js';
@@ -333,14 +333,18 @@ export class CreativeService {
       for (const reference of edit.images) sources.push(await this.imageSource(ctx, reference));
       const maskSource = edit.mask ? await this.imageSource(ctx, edit.mask) : undefined;
       const normalized = [];
-      for (const item of sources) normalized.push(await normalizeCreativeImage(item.bytes));
+      for (const item of sources) {
+        normalized.push(await normalizeCreativeImage(item.bytes));
+        assertCreativeEditInputBudget(normalized.map(image => image.bytes));
+      }
       references = normalized.map(item => item.bytes);
       if (maskSource) {
-        const shape = await normalizeCreativeImage(maskSource.bytes);
+        const shape = await normalizeCreativeMask(maskSource.bytes);
         // The mask applies to the first image, so both must have the same pixel size.
         if (shape.width !== normalized[0]!.width || shape.height !== normalized[0]!.height) throw new DodoError('INVALID_INPUT', 'the mask must have the same pixel size as the first image');
         mask = shape.bytes;
       }
+      assertCreativeEditInputBudget(references, mask);
       const all = [...sources, ...(maskSource ? [maskSource] : [])];
       source = { bytes: references[0]!, guard: () => { for (const item of all) item.guard(); } };
       source.guard();

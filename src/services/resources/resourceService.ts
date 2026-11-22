@@ -19,6 +19,7 @@ const REF_MAX_PER_ACTOR = 512;
 const ORPHAN_GRACE_MS = 60 * 60 * 1000;
 const TEXT_MAX_BYTES = 256 * 1024;
 const MCP_BLOCK_MAX_BYTES = 6 * 1024 * 1024;
+const GENERATED_JSON_MAX_BYTES = 1024 * 1024;
 
 interface ResourceRow {
   id: string;
@@ -148,8 +149,12 @@ export class ResourceService {
   async ingestGenerated(ctx: ToolCtx, bytes: Buffer, mimeType: GeneratedMime, label: string, metadata: ResourceMetadataData = {}): Promise<ResourceInfoData> {
     this.check(); liveAccess(ctx, 'dodo:exec');
     if (bytes.length > 64 * 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'generated media exceeds 64 MiB');
+    if (mimeType === 'application/json' && bytes.length > GENERATED_JSON_MAX_BYTES) throw new DodoError('RESOURCE_LIMIT', 'generated animation JSON metadata exceeds 1 MiB');
     const typeAllowed = label.startsWith('anim_') || mimeType === 'image/png' || mimeType === 'video/mp4';
-    if (!/^(?:creative|crop|anim)_[a-z0-9]{8,64}$/.test(label) || !typeAllowed || sniffType(bytes.subarray(0, 64 * 1024)).mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
+    // Binary formats have recognizable prefixes; JSON requires strict UTF-8 and
+    // the entire bounded document, including trailing bytes, to be validated.
+    const sniffed = sniffType(mimeType === 'application/json' ? bytes : bytes.subarray(0, 64 * 1024));
+    if (!/^(?:creative|crop|anim)_[a-z0-9]{8,64}$/.test(label) || !typeAllowed || sniffed.mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
     const reservation = this.services.store.db.prepare('SELECT max_bytes FROM creative_output_reservations WHERE job_id=? AND workspace_id=? AND owner=?').get(label, this.services.workspaceId, principalKey(ctx)) as { max_bytes: number } | undefined;
     if (reservation && reservation.max_bytes > 0 && bytes.length > reservation.max_bytes) throw new DodoError('RESOURCE_LIMIT', 'provider output exceeds its reserved capacity');
     const object = await this.cas.ingestBuffer(bytes, undefined, reservation ? label : undefined);

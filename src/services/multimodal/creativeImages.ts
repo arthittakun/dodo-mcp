@@ -79,6 +79,21 @@ export async function normalizeCreativeImage(bytes: Buffer, requireAlpha = false
   }
 }
 
+/** Validate the editable region before accepting a paid edit, rather than relying
+ * on the provider to reject an opaque or flattened mask after submission. */
+export async function normalizeCreativeMask(bytes: Buffer): Promise<CreativeImage> {
+  const invalid = () => new DodoError('INVALID_INPUT', 'the edit mask must be a valid PNG with an alpha channel and a fully transparent editable region');
+  if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw invalid();
+  try {
+    const source = await raster(bytes);
+    if (!source.hasAlpha || (await source.image.stats()).channels.at(-1)?.min !== 0) throw invalid();
+    return await normalizeCreativeImage(bytes);
+  } catch (error) {
+    if (error instanceof DodoError && error.code !== 'UNSUPPORTED_ENCODING') throw error;
+    throw invalid();
+  }
+}
+
 /** Precisely extract bounded PNG crops without resizing or losing transparency. */
 export async function cropCreativeImage(bytes: Buffer, regions: CreativeCrop[]): Promise<CreativeImage[]> {
   if (!Array.isArray(regions) || regions.length < 1 || regions.length > 16) throw new DodoError('INVALID_INPUT', 'provide between 1 and 16 crop regions');

@@ -3,13 +3,15 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { assertWindowsArgv } from '../../platform/shell.js';
-import { signalOwnedProcess } from '../../platform/processTree.js';
 import { AnimationWorkerSpec, BridgeResult, type AnimationWorkerSpecData } from './animationContracts.js';
 
 /**
  * Runs as an OWNED JobManager subprocess and drives the vendored Gift engine. Python runs in
  * isolated mode (-I: no PYTHON* variables, user site or script-directory imports) without
- * bytecode writes (-B), inside the private job directory. No network, URLs or client paths.
+ * bytecode writes (-B), inside the private job directory. Inputs contain no URLs or
+ * client-selected paths; OS-level network denial follows the configured sandbox.
+ * JobManager owns the wall timeout and cancels this worker's entire process tree,
+ * including Python and FFmpeg; killing only Python would orphan its encoder.
  */
 const OUTPUT_CAP = 64 * 1024 * 1024;
 
@@ -20,21 +22,17 @@ function missingModule(stderr: string): string | undefined {
 export async function runBridge(spec: AnimationWorkerSpecData, specFile: string): Promise<void> {
   const args = ['-I', '-B', '-X', 'utf8', spec.bridge, specFile];
   if (process.platform === 'win32') assertWindowsArgv(spec.python, args);
-  const env: NodeJS.ProcessEnv = { ...process.env, ...(spec.ffmpeg ? { GIFT_FFMPEG: spec.ffmpeg } : {}) };
+  const env: NodeJS.ProcessEnv = { ...process.env, GIFT_CAPTION_ENGINE: 'harfbuzz', ...(spec.ffmpeg ? { GIFT_FFMPEG: spec.ffmpeg } : {}) };
   await new Promise<void>((resolve, reject) => {
     const child = spawn(spec.python, args, { cwd: spec.directory, env, shell: false, windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
-    let errors = '', failure: Error | undefined;
-    const stop = () => { try { signalOwnedProcess(child, 'SIGKILL'); } catch { reject(new Error('owned animation process termination failed')); } };
-    const timer = setTimeout(() => { failure = new Error('animation render timed out; shorten the loop or lower the frame rate'); stop(); }, spec.timeoutMs);
-    child.on('error', err => { clearTimeout(timer); reject(err); });
+    let errors = '';
+    child.on('error', reject);
     child.stderr.on('data', (buffer: Buffer) => { errors = (errors + buffer.toString('utf8')).slice(-6000); });
     child.on('close', code => {
-      clearTimeout(timer);
-      if (failure) return reject(failure);
       if (code === 0) return resolve();
       const module = missingModule(errors);
       reject(new Error(module
-        ? `the animation Python environment lacks the '${module}' package; run dodo-media-setup --install-animation (or point DODO_ANIMATION_PYTHON at a Python with Pillow, pydantic and uharfbuzz)`
+        ? `the animation Python environment lacks the '${module}' package; run dodo-media-setup --install-animation (or point DODO_ANIMATION_PYTHON at Python 3.11+ with Pillow, pydantic and uharfbuzz)`
         : `animation engine exited ${code}: ${errors.slice(-1500)}`));
     });
   });

@@ -1,5 +1,58 @@
 # DODO MCP — Test Report
 
+## 1.11.1 Animation and image-edit release review — Windows, 2026-11-22
+
+Build, typecheck, ESLint and diff checks passed. Consolidated results cover 20
+focused integration/security/unit files on Windows x64, Node v24.22.1 and Python
+3.13.15, with `DODO_TEST_ANIMATION_PYTHON` explicitly enabled.
+
+| Check | Passed | Failed | Skipped |
+|---|---:|---:|---:|
+| Animation, image-edit and existing media/resource/surface regressions | 197 | 0 | 1 |
+
+The skip is the existing Windows file-symlink privilege prerequisite in resource
+security tests. No earlier release's results are counted again here.
+
+Actual local renders exercise rigs, still-image effects, captions, stickers,
+sprite output, banners, scenes and planned frames. The conditioned-image step
+uses a local fixture with synthetic credentials, including four references and
+a transparent mask, and verifies one paid-style POST with idempotent replay.
+Eight edit-safety cases reject malformed/non-PNG/opaque masks and oversized
+combined normalized inputs before a lease, job, reservation or provider request.
+Six JSON cases preserve a 94 KiB atlas byte-for-byte and reject invalid UTF-8,
+trailing garbage and metadata over 1 MiB before CAS insertion.
+
+Service regressions cover collection deduplication, partial-save recovery,
+accepted-output retention, history without a 32-job quota, bounded concurrent
+dispatch and live authorization. Real Python/encoder-like child processes verify
+JobManager timeout and explicit cancellation kill the owned process tree.
+Captions force HarfBuzz rather than selecting an optional browser dependency.
+
+Eight installer cases check private paths, junctions, interpreter/venv identity,
+Python 3.11 requirements, incomplete environments and synthetic API-key filtering.
+An additional end-to-end invocation of `dodo-media-setup --install-animation`
+created a separate private test environment and successfully installed/probed
+Pillow 13.0.0, pydantic 2.14.4 and uharfbuzz 0.57.0. Only the three direct versions
+are pinned; transitive Python dependencies retain upstream version ranges.
+
+A tiny expanding-canvas GIF regression checks per-frame and cumulative decoded
+pixel limits before RGBA conversion, retains the 240-frame limit, and verifies a
+normal scene still renders. The affected real-animation suite was rerun after
+the decoder fix; repeated files are counted once using their final full result.
+
+Packaging validation installs the retained candidate tarball, checks shipped
+schemas/CLI/media previews and hashes the actual packed engine files against
+the packed manifest. Loose root media, private test credentials/endpoints,
+state, Python environments and bytecode are excluded. The published tarball is
+compared with the exact tested candidate.
+
+The locked npm dependency audit reports zero advisories. No live paid provider
+call or native macOS acceptance is claimed. New Linux execution was blocked by
+the host's disabled virtualization (`HCS_E_HYPERV_NOT_INSTALLED`); Docker/WSL2
+could not start, and no Linux/POSIX venv-symlink acceptance is claimed for this
+release. OS network denial still depends on the optional command sandbox.
+See [release details](RELEASE_1.11.1.md).
+
 ## 1.10.0 Media reliability and upgrade recovery — Windows/Linux, 2026-11-19
 
 Results use the latest complete result for each file. The Windows run covers

@@ -112,6 +112,6 @@ export type BridgeResultData = z.infer<typeof BridgeResult>;
 export const AnimationWorkerSpec = z.object({
   version: z.literal(1), operation: z.enum(['image', 'rig', 'sprite', 'plan', 'banner', 'scene']), directory: z.string().min(1),
   python: z.string().min(1), bridge: z.string().min(1), ffmpeg: z.string().min(1).nullable(),
-  timeoutMs: z.number().int().min(1000).max(600000), params: z.record(z.string(), z.unknown()),
+  params: z.record(z.string(), z.unknown()),
 }).strict();
 export type AnimationWorkerSpecData = z.infer<typeof AnimationWorkerSpec>;

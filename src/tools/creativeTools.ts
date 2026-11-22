@@ -125,8 +125,8 @@ export const CREATIVE_EDIT_TOOLS: AnyToolDef[] = [defineTool({
   name: 'image_edit', title: 'Draw from reference images',
   description: 'Draw a new image conditioned on 1-4 owned reference images (resourceId, assetId or workspace path), optionally repainting only part of the first one: mask is a PNG the same size as the first image whose TRANSPARENT pixels may be repainted and opaque pixels are kept. Use it to keep a character consistent across new poses, outfits or scenes. For animation frames, call animation_frames_plan first and pass its guide and the character as images, its mask, prompt and size, with background transparent. Submits one paid request (OpenAI-compatible /images/edits; Gemini without mask); returns jobId for creative_job. Reuse the same idempotencyKey after a lost response.',
   input: {
-    images: z.array(z.object(source).strict()).min(1).max(4).describe('Reference images in order; the first is the canvas the mask applies to'),
-    mask: z.object(source).strict().optional().describe('Same pixel size as the first image; transparent = repaint, opaque = keep'),
+    images: z.array(z.object(source).strict()).min(1).max(4).describe('Reference images in order; the first is the canvas the mask applies to. Combined normalized references and mask must fit 16 MiB.'),
+    mask: z.object(source).strict().optional().describe('PNG with alpha and a fully transparent editable region, same pixel size as the first image; transparent = repaint, opaque = keep'),
     prompt: Prompt, model: CreativeModelId.optional().describe('Image editing model chosen for this request; use creative_models for available IDs.'),
     size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('auto'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
     background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key,

@@ -14,9 +14,10 @@ dodo status --json
 ```
 
 `--install-animation` creates a private Python venv in the DODO config directory
-(`animation/venv`) and installs only pinned wheels: `Pillow==13.0.0`,
-`pydantic==2.14.4`, `uharfbuzz==0.57.0`. It needs Python 3.10+ on the trusted PATH and
-changes no permissions or configuration. Alternatively start DODO with
+(`animation/venv`) and installs wheels with three direct dependency pins: `Pillow==13.0.0`,
+`pydantic==2.14.4`, `uharfbuzz==0.57.0`. Transitive dependencies retain their upstream
+version ranges. This setup needs Python 3.11+ on the trusted PATH and changes no
+DODO access configuration. Alternatively start DODO with
 `DODO_ANIMATION_PYTHON` set to an absolute Python (outside any workspace) that has
 those packages. FFmpeg on the trusted PATH is needed only for `webm`, `mp4` and
 `telegram` output. Restart DODO and reconnect/rescan MCP to load the new schemas.
@@ -35,8 +36,10 @@ those packages. FFmpeg on the trusted PATH is needed only for `webm`, `mp4` and
 | `animation_job` | Collects a render that is still running. |
 | `image_edit` | Paid: draws from 1–4 reference images with an optional mask (transparent = repaint). OpenAI-compatible `/images/edits`; Gemini without a mask. |
 
-Every animation tool exports GIF, WebP, APNG, WebM, MP4, sprite sheet + JSON, LINE
-animated stickers and Telegram video stickers within each platform's limits, adds
+Image, rig, sprite and banner rendering support GIF, WebP, APNG, WebM, MP4,
+sprite sheet + JSON, LINE animated stickers and Telegram video stickers within
+each platform's limits. Scene rendering supports GIF/MP4; frame planning returns
+PNG guide and mask resources. Supported rendering tools add
 Thai or Latin captions shaped with HarfBuzz, and accepts `maxSide` for lighter chat
 files. Results are owned resources with a six-frame contact-sheet preview, so
 `media_save` and `download_link_create` work directly. `media_save` now also accepts
@@ -66,7 +69,9 @@ transparent padding automatically, with every rig coordinate remapped.
 
 ## Security and integrity
 
-Each render runs as an owned JobManager job with networking disabled. A Node worker
+Each render runs as an owned JobManager job requesting `network:false`. OS-level
+network denial requires DODO's optional command sandbox; Python isolated mode
+alone does not deny network access. The supplied renderer has no network operation. A Node worker
 starts Python in isolated mode (`-I -B -X utf8`) inside a private temporary
 directory; source images are copied in under fixed names and every output name is
 fixed by the bridge, so clients cannot pass file paths or fonts to the engine. All 34
@@ -87,13 +92,9 @@ names and order are unchanged; the new tools are appended.
 
 ## Validation
 
-- Unit, integration, security and compatibility suites, and the packaging suite
-  (engine manifest, packaged files, no bytecode or Python environment).
-- Real renders through the MCP pipeline on a venv created by
-  `dodo-media-setup --install-animation` (Windows 11): rigs, effects, stickers,
-  sprites, planned frames with a mocked provider, banners and scenes.
-- Live acceptance against an OpenAI-compatible image provider: generated characters
-  and backgrounds animated through `resourceId`, two image-model pose sheets (jump and
-  a custom spell) passing all sheet checks.
-- Not yet exercised: Linux and macOS, and DODO's optional OS sandbox around the
-  animation job.
+Animation rendering tests require `DODO_TEST_ANIMATION_PYTHON`; without it,
+readiness checks run but real-render cases are skipped. The frame-edit pipeline
+uses a local provider fixture. See the [current test report](TEST_REPORT.md) and
+[1.11.1 release review](RELEASE_1.11.1.md) for measured results, packaging checks
+and platform limitations. No additional live paid-provider acceptance is claimed
+by that review.

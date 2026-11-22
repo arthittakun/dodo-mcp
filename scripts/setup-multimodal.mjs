@@ -32,9 +32,12 @@ if (args.includes('--install-browser')) {
 // ship these helpers; an unbuilt checkout reports not-checked, never falls back.
 let nativeProbes;
 try {
-  const { resolveTrustedExecutable } = await import('../dist/platform/execResolve.js');
+  const { resolveTrustedExecutable, trustedExecutable } = await import('../dist/platform/execResolve.js');
   const { buildChildEnv } = await import('../dist/security/env.js');
-  nativeProbes = { resolveTrustedExecutable, env: buildChildEnv({ parentEnv: process.env, workspaceRoot: process.cwd(), extraAllowlist: [] }) };
+  const { ensurePrivateDirectory, assertPrivatePath } = await import('../dist/platform/privateFs.js');
+  const { isWithinPath } = await import('../dist/platform/pathPolicy.js');
+  nativeProbes = { resolveTrustedExecutable, trustedExecutable, ensurePrivateDirectory, assertPrivatePath, isWithinPath,
+    env: buildChildEnv({ parentEnv: process.env, workspaceRoot: process.cwd(), extraAllowlist: [] }) };
 } catch { /* source checkout must be built before native dependency probes */ }
 for (const [name, argv] of [['ffmpeg', ['-version']], ['ffprobe', ['-version']], ['whisper-cli', ['--help']]]) {
   if (!nativeProbes) { console.log(`${name}: not checked (build DODO first; trusted resolver unavailable)`); continue; }
@@ -74,33 +77,84 @@ let animationVenv;
 try { const { resolveConfigDir } = await import('../dist/config/paths.js'); animationVenv = path.join(resolveConfigDir().dir, 'animation', 'venv'); }
 catch { /* source checkout must be built before the config directory can be resolved */ }
 const venvPython = venv => path.join(venv, ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python3']));
+const samePath = (left, right) => process.platform === 'win32' ? left.toLowerCase() === right.toLowerCase() : left === right;
+const existsEntry = target => { try { fs.lstatSync(target); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } };
+function assertCanonicalParents(target) {
+  const absolute = path.resolve(target), root = path.parse(absolute).root;
+  for (let item = absolute; item !== root; item = path.dirname(item)) {
+    if (!existsEntry(item)) continue;
+    if (fs.lstatSync(item).isSymbolicLink() || !samePath(fs.realpathSync.native(item), item)) throw new Error('animation setup paths must not contain links or noncanonical directories');
+  }
+}
+/** Validate the private state boundary before running an existing interpreter.
+ * POSIX venv entries may themselves link to a trusted system Python; directory
+ * links are never admitted. The private boundary keeps ordinary 0755 venv
+ * subdirectories private without changing a working user's environment.
+ */
+function animationPaths(create = false) {
+  if (!nativeProbes || !animationVenv) throw new Error('build DODO first so animation setup can verify private paths');
+  const directory = path.dirname(animationVenv), config = path.dirname(directory);
+  // A read-only check of an absent installation cannot execute its Python or
+  // create anything, even when the caller selected a location under cwd.
+  if (!create && !existsEntry(config)) return false;
+  if (nativeProbes.isWithinPath(process.cwd(), config)) throw new Error('animation setup state must be outside the workspace');
+  for (const boundary of [config, directory]) {
+    assertCanonicalParents(boundary);
+    if (!existsEntry(boundary)) { if (!create) return false; nativeProbes.ensurePrivateDirectory(boundary); }
+    nativeProbes.assertPrivatePath(boundary, true);
+  }
+  for (const child of [animationVenv, path.dirname(venvPython(animationVenv))]) {
+    assertCanonicalParents(child);
+    if (!existsEntry(child)) continue;
+    const stat = fs.lstatSync(child);
+    if (!stat.isDirectory()) throw new Error('animation venv directories must be regular owner directories');
+    if (process.platform === 'win32') nativeProbes.assertPrivatePath(child, true);
+    else if (stat.uid !== process.getuid?.() || (stat.mode & 0o022) !== 0) throw new Error('animation venv directories must not be writable by other users');
+  }
+  const python = venvPython(animationVenv);
+  if (!existsEntry(python)) return false;
+  const configFile = path.join(animationVenv, 'pyvenv.cfg');
+  if (!existsEntry(configFile)) throw new Error('animation Python is not a complete private venv (pyvenv.cfg missing); refusing to install into a global Python');
+  const configStat = fs.lstatSync(configFile);
+  if (!configStat.isFile() || configStat.isSymbolicLink() || configStat.nlink !== 1) throw new Error('animation venv configuration must be an unlinked owner file');
+  if (process.platform === 'win32') nativeProbes.assertPrivatePath(configFile);
+  else if (configStat.uid !== process.getuid?.() || (configStat.mode & 0o022) !== 0) throw new Error('animation venv configuration must not be writable by other users');
+  const entry = fs.lstatSync(python);
+  if (process.platform === 'win32') nativeProbes.assertPrivatePath(python);
+  else if (!entry.isSymbolicLink() && (!entry.isFile() || entry.nlink !== 1 || entry.uid !== process.getuid?.() || (entry.mode & 0o022) !== 0)) throw new Error('animation Python must be an owner file or a trusted system-Python symlink');
+  if (!nativeProbes.trustedExecutable(python, process.cwd(), false)) throw new Error('animation Python must be a trusted executable outside the workspace');
+  return true;
+}
+const VENV_CHECK = 'import os, sys; assert sys.version_info >= (3, 11), "Python 3.11 or newer is required"; expected = os.path.normcase(os.path.realpath(sys.argv[1])); assert os.path.normcase(os.path.realpath(sys.prefix)) == expected and sys.prefix != sys.base_prefix, "not the requested private venv"';
 const probeAnimation = python => {
-  const probe = spawnSync(python, ['-I', '-c', 'import PIL, pydantic, uharfbuzz; print(PIL.__version__, pydantic.VERSION, uharfbuzz.__version__)'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
+  animationPaths();
+  const probe = spawnSync(python, ['-I', '-c', `${VENV_CHECK}; import PIL, pydantic, uharfbuzz; print(PIL.__version__, pydantic.VERSION, uharfbuzz.__version__)`, animationVenv], { env: nativeProbes.env, shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
   return !probe.error && probe.status === 0 ? probe.stdout.trim() : undefined;
 };
 if (args.includes('--install-animation')) {
   if (!nativeProbes || !animationVenv) throw new Error('build DODO first (npm run build) so the trusted Python resolver and config directory are available');
+  const existingVenv = animationPaths(true);
   let base;
   for (const name of process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python']) {
     try {
       const candidate = nativeProbes.resolveTrustedExecutable(name, process.cwd(), { allowBatch: false });
-      const version = spawnSync(candidate, ['-I', '-c', 'import sys; print(int(sys.version_info >= (3, 10)))'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
+      const version = spawnSync(candidate, ['-I', '-c', 'import sys; print(int(sys.version_info >= (3, 11)))'], { env: nativeProbes.env, shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
       if (!version.error && version.status === 0 && version.stdout.trim() === '1') { base = candidate; break; }
     } catch { /* try the next name */ }
   }
-  if (!base) throw new Error('Python 3.10 or newer was not found on the trusted PATH; install it outside this project first');
-  const directory = path.dirname(animationVenv);
-  if (fs.existsSync(directory)) { const st = fs.lstatSync(directory); if (!st.isDirectory() || st.isSymbolicLink()) throw new Error('the animation directory must be a real directory'); }
-  else fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  if (!fs.existsSync(venvPython(animationVenv))) {
-    const created = spawnSync(base, ['-I', '-m', 'venv', animationVenv], { stdio: 'inherit', shell: false, windowsHide: true, timeout: 300000 });
+  if (!base) throw new Error('Python 3.11 or newer was not found on the trusted PATH; install it outside this project first');
+  if (!existingVenv) {
+    const created = spawnSync(base, ['-I', '-m', 'venv', animationVenv], { env: nativeProbes.env, stdio: 'inherit', shell: false, windowsHide: true, timeout: 300000 });
     if (created.error || created.status !== 0) throw new Error('creating the animation venv failed; no DODO configuration changed');
   }
+  if (!animationPaths()) throw new Error('creating the animation venv did not produce a trusted Python');
+  const activeVenv = spawnSync(venvPython(animationVenv), ['-I', '-c', VENV_CHECK, animationVenv], { env: nativeProbes.env, shell: false, windowsHide: true, timeout: 30000 });
+  if (activeVenv.error || activeVenv.status !== 0) throw new Error('animation Python did not activate the requested private venv; no packages were installed');
   // Wheels only: no package build scripts run on this machine.
-  const installed = spawnSync(venvPython(animationVenv), ['-I', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--only-binary=:all:', ...ANIMATION_PACKAGES], { stdio: 'inherit', shell: false, windowsHide: true, timeout: 600000 });
+  const installed = spawnSync(venvPython(animationVenv), ['-I', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--only-binary=:all:', ...ANIMATION_PACKAGES], { env: nativeProbes.env, stdio: 'inherit', shell: false, windowsHide: true, timeout: 600000 });
   if (installed.error || installed.status !== 0) throw new Error('installing the animation packages failed; no DODO configuration changed');
 }
-if (animationVenv && fs.existsSync(venvPython(animationVenv))) {
+if (animationVenv && animationPaths()) {
   const versions = probeAnimation(venvPython(animationVenv));
   console.log(`Animation engine: ${versions ? `ready (Pillow/pydantic/uharfbuzz ${versions})` : 'venv present but packages missing; rerun --install-animation'}`);
 } else console.log('Animation engine: run dodo-media-setup --install-animation (or set DODO_ANIMATION_PYTHON)');

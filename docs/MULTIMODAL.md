@@ -14,7 +14,7 @@ DODO รองรับภาพ เสียง วิดีโอ เบรา
 
 Compact surface ใช้ `dodo_media`, `dodo_browser` และ `dodo_game` ส่วน Full surface มี tool รายตัวครบ
 
-รุ่น 1.11.0 มี Full 185 capabilities (ค่าเริ่มต้น 181 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
+รุ่น 1.11.1 มี Full 185 capabilities (ค่าเริ่มต้น 181 เมื่อซ่อน sub-agent), Compact 20 และ Hybrid 49
 
 ## Creative Media
 

@@ -3,6 +3,9 @@ import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { createGunzip } from 'node:zlib';
+import { pipeline } from 'node:stream/promises';
+import { extract } from 'tar-stream';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -76,6 +79,8 @@ describe('PACK: npm tarball', () => {
     for (const file of ['docs/RELEASE_1.8.0.md', 'dist/server/globalServices.js']) expect(fileList).toContain(file);
     expect(fileList).toContain('docs/RELEASE_1.9.0.md');
     expect(fileList).toContain('docs/RELEASE_1.10.0.md');
+    expect(fileList).toContain('docs/RELEASE_1.11.1.md');
+    expect(fileList.some(file => /^[^/]+\.(?:gif|webp|apng|webm|mp4)$/i.test(file))).toBe(false);
     expect(fileList).toContain('docs/RELEASE_1.11.0.md');
     for (const file of ['dist/cli/menu.js', 'dist/platform/execResolve.js', 'dist/platform/privateFs.js', 'dist/ipc/authentication.js', 'dist/tunnel/credentials.js', 'dist/tunnel/supervisor.js', 'dist/tunnel/control.js', 'dist/services/brain/brainWorker.js', 'dist/services/context/contextEngine.js', 'dist/services/memory/memoryService.js', 'dist/services/runtime/runtimeService.js', 'dist/services/agent/agentService.js', 'dist/services/android/androidService.js', 'dist/services/android/adbBackend.js', 'dist/tools/androidTools.js', 'dist/evaluation/contracts.js', 'dist/evaluation/dodoBench.js', 'dist/tools/contextTools.js', 'dist/tools/memoryTools.js', 'dist/tools/runtimeTools.js', 'dist/tools/agentRuntimeTools.js', 'docs/ANDROID.md', 'docs/BRAIN.md', 'docs/CONTEXT.md', 'docs/MEMORY.md', 'docs/RUNTIME.md', 'docs/AGENT_RUNTIME.md', 'docs/EVALUATION.md', 'docs/RELEASE_1.0.0.md', 'docs/RELEASE_1.0.4.md', 'docs/RELEASE_1.0.5.md', 'docs/RELEASE_1.1.0.md', 'docs/RELEASE_1.2.0.md', 'docs/WINDOWS.md', 'docs/WINDOWS_SETUP.md', 'docs/WEB_CLIENTS.md', 'docs/adr/044-global-launcher-and-cli-menu.md', 'docs/adr/049-android-adb-control.md', 'docs/adr/050-cloudflare-local-and-project-access.md']) expect(fileList).toContain(file);
     const privateDocs = [
@@ -122,13 +127,46 @@ describe('PACK: npm tarball', () => {
     expect(fileList.some(f => /^(?:models|tmp|release-evidence)\//.test(f) || /\.(?:bin|mp4|aiff|wav|db)$/.test(f))).toBe(false);
   });
 
-  it('PACK-17: ships the vendored Gift animation engine exactly as pinned, without bytecode or a Python environment', () => {
+  it('PACK-17: ships the vendored Gift animation engine exactly as pinned, without bytecode or a Python environment', async () => {
     for (const file of ['engines/animation/dodo_bridge.py', 'engines/animation/MANIFEST.json', 'dist/services/multimodal/animationWorker.js', 'dist/services/multimodal/animationService.js', 'dist/tools/animationTools.js']) expect(fileList).toContain(file);
-    const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'engines/animation/MANIFEST.json'), 'utf8')) as { files: Record<string, string> };
+    // Inspect the actual candidate bytes, without extracting paths onto disk.
+    const archive = extract(), packed = new Map<string, string>();
+    let totalSize = 0, entries = 0, packedManifest: Buffer | undefined;
+    archive.on('entry', (header, body, next) => {
+      entries++; totalSize += header.size ?? 0;
+      if (entries > 2048 || totalSize > 64 * 1024 * 1024) { archive.destroy(new Error('candidate archive exceeds inspection budget')); return; }
+      const prefix = 'package/engines/animation/';
+      if (!header.name.startsWith(prefix)) { body.once('end', next); body.resume(); return; }
+      const name = header.name.slice(prefix.length);
+      if (header.type === 'directory') { body.once('end', next); body.resume(); return; }
+      if (header.type !== 'file' || !name || name.split('/').includes('..') || packed.has(name) || (header.size ?? 0) > 16 * 1024 * 1024) {
+        archive.destroy(new Error('unexpected animation engine archive entry')); return;
+      }
+      const hash = createHash('sha256'), chunks: Buffer[] = [];
+      let bytes = 0;
+      body.on('data', (chunk: unknown) => {
+        if (!Buffer.isBuffer(chunk)) { archive.destroy(new Error('unexpected packed animation data')); return; }
+        bytes += chunk.length; hash.update(chunk);
+        if (name === 'MANIFEST.json') {
+          if (bytes > 128 * 1024) archive.destroy(new Error('packed animation manifest exceeds its budget'));
+          else chunks.push(chunk);
+        }
+      });
+      body.once('end', () => {
+        if (bytes !== header.size) { archive.destroy(new Error('packed animation file size mismatch')); return; }
+        packed.set(name, hash.digest('hex'));
+        if (name === 'MANIFEST.json') packedManifest = Buffer.concat(chunks);
+        next();
+      });
+    });
+    await pipeline(fs.createReadStream(tarball), createGunzip(), archive);
+    expect(packedManifest).toBeDefined();
+    const manifest = JSON.parse(packedManifest!.toString('utf8')) as { files: Record<string, string> };
+    expect(manifest).toEqual(JSON.parse(fs.readFileSync(path.join(ROOT, 'engines/animation/MANIFEST.json'), 'utf8')));
     expect(Object.keys(manifest.files)).toEqual(expect.arrayContaining(['rig_animation.py', 'caption.py', 'assets/Sarabun-Bold.ttf', 'assets/characters/fox_girl.png']));
     for (const [name, digest] of Object.entries(manifest.files)) {
       expect(fileList, name).toContain(`engines/animation/${name}`);
-      expect(createHash('sha256').update(fs.readFileSync(path.join(ROOT, 'engines/animation', name))).digest('hex'), name).toBe(digest);
+      expect(packed.get(name), name).toBe(digest);
     }
     expect(fileList.some(f => f.startsWith('engines/') && (/__pycache__|\.pyc$|\/(?:venv|\.venv)\//.test(f)))).toBe(false);
   });

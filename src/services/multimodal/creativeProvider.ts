@@ -18,6 +18,13 @@ const PNG_HEADER = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 const VIDEO_ID = /^[a-zA-Z0-9_-]{1,200}$/;
 const REMOVE_BACKGROUND = 'Remove only the background from this image. Preserve the main foreground subject, its colors, fine details, shape and proportions. Do not add objects, shadows or text. Return the isolated foreground on a fully transparent background.';
 
+/** Leaves room for multipart fields or Gemini base64 expansion within transport caps. */
+export const CREATIVE_EDIT_INPUT_BYTES = 16 * MiB;
+export function assertCreativeEditInputBudget(images: readonly Buffer[], mask?: Buffer): void {
+  const bytes = images.reduce((sum, image) => sum + image.length, mask?.length ?? 0);
+  if (bytes > CREATIVE_EDIT_INPUT_BYTES) throw new DodoError('RESOURCE_LIMIT', 'combined normalized image-edit references and mask exceed 16 MiB');
+}
+
 export interface CreativeImageInput {
   model: string;
   prompt: string;
@@ -218,6 +225,7 @@ export class CreativeProvider {
   async editImage(input: CreativeEditInput, signal?: AbortSignal, beforeSend?: () => void): Promise<CreativeImageResult> {
     this.validateModel(input.model); this.validatePrompt(input.prompt);
     if (!Array.isArray(input.images) || input.images.length < 1 || input.images.length > 4) throw new DodoError('INVALID_INPUT', 'image edits take 1-4 reference images');
+    assertCreativeEditInputBudget(input.images, input.mask);
     for (const image of [...input.images, ...(input.mask ? [input.mask] : [])]) {
       if (image.length > IMAGE_CAP) throw new DodoError('RESOURCE_LIMIT', 'an image edit input exceeds 16 MiB');
       if (!image.subarray(0, PNG_HEADER.length).equals(PNG_HEADER)) throw new DodoError('INVALID_INPUT', 'image edit inputs must be normalized PNG images');
