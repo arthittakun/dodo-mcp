@@ -5,7 +5,7 @@ import { liveAccess } from './storage.js';
 import { actorKey } from './storage.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
 
-const PAID_MEDIA = new Set(['image_generate', 'image_remove_background', 'video_generate', 'video_edit', 'video_extend']);
+const PAID_MEDIA = new Set(['image_generate', 'image_edit', 'image_remove_background', 'video_generate', 'video_edit', 'video_extend']);
 export const creativeSubmission = new AsyncLocalStorage<{ key: string; tool: string; payloadHash: string }>();
 
 /** Preserve reservations on uncertain execution OR receipt-persistence failure. Never replay an action just because its response was lost.

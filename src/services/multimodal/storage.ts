@@ -100,7 +100,7 @@ export class MediaStorage {
   }
   releaseSource(size: number): void { this.sourceBytes = Math.max(0, this.sourceBytes - size); }
   resultFile(dir: string, basename: string, cap = 6 * 1024 * 1024): Buffer {
-    if (!this.directories.has(dir) || !/^(?:result\.json|out-[0-9]+\.(?:jpg|wav|json))$/.test(basename)) throw new DodoError('PATH_DENIED', 'invalid generated artifact');
+    if (!this.directories.has(dir) || !/^(?:result\.json|out-[0-9]+\.(?:jpg|wav|json)|animation\.(?:gif|webp|png|webm|mp4|json)|(?:preview|guide|mask)\.png)$/.test(basename)) throw new DodoError('PATH_DENIED', 'invalid generated artifact');
     const file = path.join(dir, basename), before = fs.lstatSync(file);
     if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1 || fs.realpathSync.native(file).toLowerCase() !== path.resolve(file).toLowerCase()) throw new DodoError('PATH_DENIED', 'generated artifact must not be a link or path alias');
     const fd = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));

@@ -25,20 +25,24 @@ export interface CreativeImageInput {
   quality: 'auto' | 'low' | 'medium' | 'high';
   background: 'auto' | 'opaque' | 'transparent';
 }
+/** A reference-conditioned edit: the first image is the canvas a mask (transparent = repaint) applies to. */
+export interface CreativeEditInput extends CreativeImageInput { images: Buffer[]; mask?: Buffer | undefined }
 export interface CreativeVideoInput { model: string; prompt: string; size: string; seconds: number; reference?: Buffer | undefined }
 export interface CreativeVideoJob { id: string; status: 'queued' | 'in_progress' | 'completed' | 'failed'; progress: number }
 export interface CreativeImageResult { bytes: Buffer; mimeType: 'image/png' }
 interface RequestBody { bytes: Buffer; contentType: string }
 
-function multipart(fields: Record<string, string>, image?: Buffer, imageField: 'image[]' | 'input_reference' = 'image[]'): RequestBody {
+function multipart(fields: Record<string, string>, image?: Buffer, imageField: 'image[]' | 'input_reference' = 'image[]', files: Array<{ field: 'image[]' | 'mask'; bytes: Buffer }> = []): RequestBody {
   const boundary = `dodo-${randomBytes(24).toString('hex')}`;
   const parts: Buffer[] = [];
   for (const [name, value] of Object.entries(fields)) {
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
   }
-  if (image) {
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${imageField}"; filename="input.png"\r\nContent-Type: image/png\r\n\r\n`), image, Buffer.from('\r\n'));
-  }
+  const attachments = [...(image ? [{ field: imageField, bytes: image }] : []), ...files];
+  attachments.forEach((file, index) => {
+    const filename = file.field === 'mask' ? 'mask.png' : index === 0 ? 'input.png' : `input-${index}.png`;
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${file.field}"; filename="${filename}"\r\nContent-Type: image/png\r\n\r\n`), file.bytes, Buffer.from('\r\n'));
+  });
   parts.push(Buffer.from(`--${boundary}--\r\n`));
   return { bytes: Buffer.concat(parts), contentType: `multipart/form-data; boundary=${boundary}` };
 }
@@ -208,6 +212,27 @@ export class CreativeProvider {
     if (this.connection.protocol === 'gemini') return this.geminiRequest(input.model, [{ type: 'text', text: REMOVE_BACKGROUND }, { type: 'image', mime_type: 'image/png', data: input.image.toString('base64') }], {}, signal, beforeSend);
     const body = multipart({ model: input.model, prompt: REMOVE_BACKGROUND, n: '1', background: 'transparent', output_format: 'png', size: 'auto' }, input.image);
     return this.image(await this.request('images/edits', body, JSON_CAP, signal, beforeSend));
+  }
+
+  /** Draw from 1-4 reference images, optionally repainting only the mask's transparent area. */
+  async editImage(input: CreativeEditInput, signal?: AbortSignal, beforeSend?: () => void): Promise<CreativeImageResult> {
+    this.validateModel(input.model); this.validatePrompt(input.prompt);
+    if (!Array.isArray(input.images) || input.images.length < 1 || input.images.length > 4) throw new DodoError('INVALID_INPUT', 'image edits take 1-4 reference images');
+    for (const image of [...input.images, ...(input.mask ? [input.mask] : [])]) {
+      if (image.length > IMAGE_CAP) throw new DodoError('RESOURCE_LIMIT', 'an image edit input exceeds 16 MiB');
+      if (!image.subarray(0, PNG_HEADER.length).equals(PNG_HEADER)) throw new DodoError('INVALID_INPUT', 'image edit inputs must be normalized PNG images');
+    }
+    if (!['auto', '1024x1024', '1536x1024', '1024x1536'].includes(input.size) || !['auto', 'low', 'medium', 'high'].includes(input.quality) || !['auto', 'opaque', 'transparent'].includes(input.background)) throw new DodoError('INVALID_INPUT', 'invalid creative image options');
+    if (this.connection.protocol === 'gemini') {
+      if (input.mask) throw new DodoError('NOT_SUPPORTED', 'masked edits need an OpenAI-compatible Images connection; Gemini Interactions has no edit mask');
+      if (input.quality !== 'auto') throw new DodoError('NOT_SUPPORTED', 'Gemini native image generation supports quality=auto; OpenAI quality levels are not silently translated');
+      const background = input.background === 'transparent' ? '\nReturn the image on a fully transparent background.' : input.background === 'opaque' ? '\nUse a fully opaque background.' : '';
+      const aspectRatio = input.size === '1536x1024' ? '3:2' : input.size === '1024x1536' ? '2:3' : input.size === '1024x1024' ? '1:1' : undefined;
+      return this.geminiRequest(input.model, [{ type: 'text', text: input.prompt + background }, ...input.images.map(image => ({ type: 'image', mime_type: 'image/png', data: image.toString('base64') }))], { image_size: '1K', ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}) }, signal, beforeSend);
+    }
+    const fields = { model: input.model, prompt: input.prompt, n: '1', size: input.size, quality: input.quality, output_format: 'png', ...(input.background !== 'auto' ? { background: input.background } : {}) };
+    const files = [...input.images.map(bytes => ({ field: 'image[]' as const, bytes })), ...(input.mask ? [{ field: 'mask' as const, bytes: input.mask }] : [])];
+    return this.image(await this.request('images/edits', multipart(fields, undefined, 'image[]', files), JSON_CAP, signal, beforeSend));
   }
 
   private job(bytes: Buffer): CreativeVideoJob {

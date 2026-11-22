@@ -1,5 +1,12 @@
 # DODO MCP — Release Notes
 
+## 1.11.0 — Local animation studio and reference image edits
+
+- Embed the Gift animation engine: `animation_image` (still → loop), `animation_rig` (spring physics, blinks, jumps, presets or custom rigs with loop checks), `animation_sprite`, `animation_banner` (Thai neon banners without a browser), `animation_scene` (Solar System or background + up to 20 animated layers), `animation_catalog` and `animation_job`. Local, network-less and free; exports GIF/WebP/APNG/WebM/MP4/sprite sheet and LINE/Telegram stickers with Thai captions.
+- Add `image_edit` (paid, 1–4 reference images and an optional mask) and `animation_frames_plan`, so an image model draws animation frames under layout conditions and Gift checks size, ground line, colours and poses before assembling.
+- Set up with `dodo-media-setup --install-animation` (pinned Pillow, pydantic, uharfbuzz in a private venv) or `DODO_ANIMATION_PYTHON`. Engine files are pinned by SHA-256 and verified before use. `media_save` accepts animation outputs.
+- Full 185 (default 181), Compact 20, Hybrid 49. See [release details](RELEASE_1.11.0.md) and [Creative Media](CREATIVE_MEDIA.md).
+
 ## 1.10.0 — Reliable creative jobs, private startup and safe state upgrades
 
 - Preserve sanitized provider diagnostics and explicit failure/uncertainty categories, local readiness blockers and metadata-only connection checks.

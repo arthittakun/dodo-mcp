@@ -6,7 +6,8 @@ import { registerTool, type AnyToolDef, type AppServices } from './context.js';
 import { CORE_TOOL_CATALOG } from './coreCatalog.js';
 import { AGENT_RUNTIME_TOOLS } from './agentRuntimeTools.js';
 import { ANDROID_TOOLS } from './androidTools.js';
-import { CREATIVE_MODEL_TOOLS, CREATIVE_HISTORY_TOOLS } from './creativeTools.js';
+import { CREATIVE_EDIT_TOOLS, CREATIVE_MODEL_TOOLS, CREATIVE_HISTORY_TOOLS } from './creativeTools.js';
+import { ANIMATION_TOOLS } from './animationTools.js';
 
 /**
  * The tool catalog in a FIXED, stable order. Every listed tool is fully
@@ -33,6 +34,10 @@ export const TOOL_CATALOG: AnyToolDef[] = [
   ...DEPLOYMENT_TOOLS,
   ...CREATIVE_MODEL_TOOLS,
   ...CREATIVE_HISTORY_TOOLS,
+  // Local Gift animation engine (engines/animation).
+  ...ANIMATION_TOOLS,
+  // Reference-conditioned image drawing (also used to draw planned animation frames).
+  ...CREATIVE_EDIT_TOOLS,
 ];
 
 export function registerCatalog(server: McpServer, services: AppServices): void {

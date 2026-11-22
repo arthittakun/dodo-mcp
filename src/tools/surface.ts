@@ -174,7 +174,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
     name: 'dodo_media',
     title: 'Screen, image, media and speech',
     domain: 'media',
-    summary: 'image generation/crop/background removal, video generation, media saving, temporary token download links, bounded screen/image views and local video/audio/speech',
+    summary: 'image generation/crop/background removal, video generation, local animated loops (Gift engine: image effects, rigged characters, sprite sheets, LINE/Telegram stickers), media saving, temporary token download links, bounded screen/image views and local video/audio/speech',
     operations: [
       'multimodal_status',
       'screen_observe',
@@ -198,6 +198,7 @@ const GATEWAY_SPECS: readonly GatewaySpec[] = [
       'resource_transform',
       'creative_models',
       'creative_jobs', 'creative_job_control',
+      'animation_catalog', 'animation_image', 'animation_rig', 'animation_sprite', 'animation_job', 'animation_frames_plan', 'animation_banner', 'animation_scene', 'image_edit',
     ],
   },
   {

@@ -1,6 +1,6 @@
 {
   "name": "dodo-mcp",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "author": "Arthittakun",
   "description": "DODO — local-first MCP server with multi-project coding, AI providers, sub-agents, context, memory, media and workflow tools; embedded OAuth and workspace permissions.",
   "type": "module",
@@ -66,6 +66,7 @@
     "docs/RELEASE_1.8.0.md",
     "docs/RELEASE_1.9.0.md",
     "docs/RELEASE_1.10.0.md",
+    "docs/RELEASE_1.11.0.md",
     "docs/RELEASE_NOTES.md",
     "docs/SCHEDULES.md",
     "docs/SECURITY.md",
@@ -79,6 +80,8 @@
     "README.md",
     "LICENSE",
     "native",
+    "engines/animation",
+    "!engines/animation/**/__pycache__",
     "scripts/setup-multimodal.mjs",
     "scripts/guard-publish.mjs"
   ],

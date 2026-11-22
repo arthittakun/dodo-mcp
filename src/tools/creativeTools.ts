@@ -10,13 +10,14 @@ import { liveAccess } from '../services/multimodal/storage.js';
 import { multimediaEffect } from '../services/multimodal/operations.js';
 import type { StoredPlan } from '../services/changes/types.js';
 import { CreativeModelId } from '../services/multimodal/creativeSettings.js';
+import { SAVEABLE_GENERATED } from '../services/resources/resourceService.js';
 
 const execute = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true };
 const source = { path: Path.optional(), assetId: Id.optional(), resourceId: Id.optional() };
 const Seconds = z.union([z.literal(4), z.literal(8), z.literal(12), z.literal(16), z.literal(20)]);
 const Prompt = z.string().trim().min(1).max(16000);
 const Diagnostics = z.object({ outcome: z.enum(['rejected', 'unknown', 'not_sent']), httpStatus: z.number().int().min(100).max(599).optional(), providerCode: z.string().max(128).optional(), message: z.string().max(1024).optional(), requestId: z.string().max(128).optional(), retryAfterMs: z.number().nonnegative().optional(), phase: z.string().max(64).optional(), retryable: z.boolean().optional() });
-const Job = z.object({ jobId: Id, kind: z.enum(['image', 'background_removal', 'video']), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted', 'stopped']),
+const Job = z.object({ jobId: Id, kind: z.enum(['image', 'image_edit', 'background_removal', 'video']), status: z.enum(['queued', 'running', 'completed', 'failed', 'uncertain', 'interrupted', 'stopped']),
   model: z.string(), progress: z.number().min(0).max(100), resource: ResourceInfo.nullable(), error: z.string().nullable(), createdAt: z.number(), expiresAt: z.number(), note: z.string(), replayed: z.boolean().optional(), diagnostics: Diagnostics.optional() });
 function use(ctx: ToolCtx, scope: 'dodo:read' | 'dodo:exec' = 'dodo:exec') {
   liveAccess(ctx, scope); const mm = ctx.services.multimodal;
@@ -78,7 +79,7 @@ const job = defineTool({
 });
 const save = defineTool({
   name: 'media_save', title: 'Save generated media into the project',
-  description: 'Save an owned generated PNG/MP4 resource to a guarded workspace-relative path. Requires write AND exec scopes, expectedSha256, and an explicit expectedHash before replacing an existing file. Uses the existing hash-verified journal/backup/rollback path. Owner-configured plan byte budgets apply; no arbitrary download or API call. Retry the same idempotencyKey after a lost response.',
+  description: 'Save an owned generated PNG/MP4 resource, or an animation_* result (GIF, WebP, APNG, WebM, sprite-sheet JSON), to a guarded workspace-relative path with the matching extension. Requires write AND exec scopes, expectedSha256, and an explicit expectedHash before replacing an existing file. Uses the existing hash-verified journal/backup/rollback path. Owner-configured plan byte budgets apply; no arbitrary download or API call. Retry the same idempotencyKey after a lost response.',
   input: { resourceId: Id, expectedSha256: Hash, path: Path, expectedHash: Hash.optional(), createParents: z.boolean().default(true), idempotencyKey: Key },
   output: z.object({ path: z.string(), hash: Hash, bytes: z.number(), changesetId: z.string(), replayed: z.boolean() }), requiredScope: 'dodo:write', action: 'mutate-files', annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (args, ctx) => {
@@ -94,8 +95,8 @@ const save = defineTool({
           return await lease.services.resources!.exportBytes(globalCtx, args.resourceId, args.expectedSha256, cap);
         } finally { lease.release(); }
       });
-      const extension = resource.info.mimeType === 'image/png' ? '.png' : '.mp4';
-      if (path.extname(args.path).toLowerCase() !== extension) throw new DodoError('INVALID_INPUT', `save this resource with a ${extension} extension`);
+      const extensions = SAVEABLE_GENERATED[resource.info.mimeType] ?? [], extension = extensions[0] ?? '.bin';
+      if (!extensions.includes(path.extname(args.path).toLowerCase())) throw new DodoError('INVALID_INPUT', `save this resource with a ${extensions.join(' or ')} extension`);
       const target = s.wfs.resolve(args.path, { allowMissing: true });
       let beforeHash: string | null = null, beforeMode: number | undefined, beforeSize = 0;
       if (target.stat) {
@@ -118,6 +119,27 @@ const save = defineTool({
   },
 });
 export const CREATIVE_TOOLS: AnyToolDef[] = [...[generate, crop, removeBackground, video, videoEdit, videoExtend, job].map(def => ({ ...def, optionalWorkspaceContext: true })), save];
+
+/** Appended after the animation tools so every earlier capability keeps its position. */
+export const CREATIVE_EDIT_TOOLS: AnyToolDef[] = [defineTool({
+  name: 'image_edit', title: 'Draw from reference images',
+  description: 'Draw a new image conditioned on 1-4 owned reference images (resourceId, assetId or workspace path), optionally repainting only part of the first one: mask is a PNG the same size as the first image whose TRANSPARENT pixels may be repainted and opaque pixels are kept. Use it to keep a character consistent across new poses, outfits or scenes. For animation frames, call animation_frames_plan first and pass its guide and the character as images, its mask, prompt and size, with background transparent. Submits one paid request (OpenAI-compatible /images/edits; Gemini without mask); returns jobId for creative_job. Reuse the same idempotencyKey after a lost response.',
+  input: {
+    images: z.array(z.object(source).strict()).min(1).max(4).describe('Reference images in order; the first is the canvas the mask applies to'),
+    mask: z.object(source).strict().optional().describe('Same pixel size as the first image; transparent = repaint, opaque = keep'),
+    prompt: Prompt, model: CreativeModelId.optional().describe('Image editing model chosen for this request; use creative_models for available IDs.'),
+    size: z.enum(['auto', '1024x1024', '1536x1024', '1024x1536']).default('auto'), quality: z.enum(['auto', 'low', 'medium', 'high']).default('auto'),
+    background: z.enum(['auto', 'opaque', 'transparent']).default('auto'), idempotencyKey: Key,
+  },
+  output: Job, requiredScope: 'dodo:exec', action: 'exec', optionalWorkspaceContext: true, annotations: execute,
+  handler: async (args, ctx) => {
+    const mm = use(ctx), { idempotencyKey, ...input } = args;
+    for (const item of [...input.images, ...(input.mask ? [input.mask] : [])]) {
+      if ([item.path, item.assetId, item.resourceId].filter(value => value !== undefined).length !== 1) throw new DodoError('INVALID_INPUT', 'each image and the mask need exactly one of path, assetId or resourceId');
+    }
+    return { data: await multimediaEffect(ctx, 'image_edit', idempotencyKey, input, () => mm.creative.start(ctx, 'image_edit', input), true, ['AUTH_REQUIRED']) };
+  },
+})];
 
 /** Appended to the full catalog so all previous capability names retain their order. */
 export const CREATIVE_MODEL_TOOLS: AnyToolDef[] = [defineTool({

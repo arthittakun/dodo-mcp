@@ -6,6 +6,7 @@ import { BrowserService } from './browserService.js';
 import { GameService } from './gameService.js';
 import { WorkflowService } from './workflowService.js';
 import { CreativeService } from './creativeService.js';
+import { AnimationService } from './animationService.js';
 
 /** One instance per workspace/epoch. Services are lazy: constructing this opens no browser, camera, microphone or decoder. */
 export class MultimodalService {
@@ -16,6 +17,7 @@ export class MultimodalService {
   readonly games: GameService;
   readonly workflows: WorkflowService;
   readonly creative: CreativeService;
+  readonly animation: AnimationService;
   private closePromise: Promise<void> | undefined;
   private readonly cleanupTimer: NodeJS.Timeout;
   private sweeping: Promise<void> | undefined;
@@ -27,10 +29,11 @@ export class MultimodalService {
     this.games = new GameService(this.storage, this.screen, this.browser);
     this.workflows = new WorkflowService(this.storage, this.screen, this.browser);
     this.creative = new CreativeService(this.storage);
+    this.animation = new AnimationService(this.storage, this.creative);
     this.cleanupTimer = setInterval(() => {
       if (this.storage.closed || this.sweeping) return;
       this.sweeping = Promise.resolve().then(async () => {
-        this.storage.sweep(); this.games.sweep(); this.workflows.sweep(); this.creative.sweep();
+        this.storage.sweep(); this.games.sweep(); this.workflows.sweep(); this.creative.sweep(); this.animation.sweep();
         await Promise.all([this.media.sweep(), this.browser.sweep()]);
       }).catch(() => { try { services.logEvent?.('media.cleanup.failed', { code: 'STORAGE_UNAVAILABLE' }); } catch { /* diagnostics cannot break maintenance */ } }).finally(() => { this.sweeping = undefined; });
     }, 15000);
@@ -42,7 +45,7 @@ export class MultimodalService {
       clearInterval(this.cleanupTimer);
       this.closePromise = (async () => {
         await this.sweeping;
-        await Promise.all([this.media.close(), this.browser.close(), this.creative.close()]);
+        await Promise.all([this.media.close(), this.browser.close(), this.creative.close(), this.animation.close()]);
         this.screen.close(); this.games.close(); this.workflows.close(); this.storage.close();
       })();
     }

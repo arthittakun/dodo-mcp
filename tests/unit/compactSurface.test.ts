@@ -52,6 +52,7 @@ const FULL_NAMES = [
   'restore_status','checkpoint_list','checkpoint_inspect','checkpoint_create','recovery_session_list','recovery_session_inspect','recovery_session_begin','recovery_session_end','restore_preview','restore_apply',
   'deployment_targets','deployment_list','deployment_inspect','deployment_compare','deployment_prepare','deployment_build','deployment_apply','deployment_observe','deployment_source_preview','deployment_rollback_prepare',
   'creative_models', 'creative_jobs', 'creative_job_control',
+  'animation_catalog', 'animation_image', 'animation_rig', 'animation_sprite', 'animation_job', 'animation_frames_plan', 'animation_banner', 'animation_scene', 'image_edit',
 ];
 
 const call = (def: AnyToolDef, args: Record<string, unknown>) => {
@@ -168,8 +169,8 @@ describe('compact surface catalog', () => {
     const compact = surfaceCatalog('compact', hidden);
     const hybrid = surfaceCatalog('hybrid', hidden);
 
-    expect(TOOL_CATALOG).toHaveLength(176); // the installed capability contract stays complete
-    expect(full).toHaveLength(172);
+    expect(TOOL_CATALOG).toHaveLength(185); // the installed capability contract stays complete
+    expect(full).toHaveLength(181);
     expect(compact).toHaveLength(20);
     expect(hybrid).toHaveLength(49);
     for (const name of subagents) expect(full.some((d) => d.name === name), name).toBe(false);
@@ -185,10 +186,10 @@ describe('compact surface catalog', () => {
     const search = await call(hiddenDiscover, { ...WS, query: 'subagent', limit: 25 });
     expect((search.data as { matches: Array<{ operation: string }> }).matches).toEqual([]);
 
-    expect(surfaceStats('full', hidden).toolCount).toBe(172);
+    expect(surfaceStats('full', hidden).toolCount).toBe(181);
     expect(surfaceStats('compact', hidden).toolCount).toBe(20);
     expect(surfaceStats('hybrid', hidden).toolCount).toBe(49);
-    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(176);
+    expect(surfaceStats('full', { subagents: true }).toolCount).toBe(185);
     expect(instructionsFor('compact', hidden)).not.toContain('subagent_spawn');
     expect(instructionsFor('compact', hidden)).toContain('not exposed');
     expect(instructionsFor('compact', { subagents: true })).toContain('subagent_spawn');
@@ -213,10 +214,11 @@ describe('dodo_discover', () => {
     expect(media.nextCursor).toBe('c25');
     const mediaNext = await call(discover, { ...WS, domain: 'media', limit: 25, cursor: media.nextCursor! });
     const matches = (value: typeof media) => (value.data as { matches: Array<{ operation: string; gateway: string }> }).matches;
-    expect(matches(media)).toHaveLength(25); expect(matches(mediaNext)).toHaveLength(7);
+    expect(matches(media)).toHaveLength(25); expect(matches(mediaNext)).toHaveLength(16);
     const ops = [...matches(media), ...matches(mediaNext)];
-    expect(ops.length).toBe(32);
+    expect(ops.length).toBe(41);
     expect(ops.some(match => match.operation === 'creative_models')).toBe(true);
+    expect(ops.filter(match => match.operation.startsWith('animation_')).map(match => match.operation)).toEqual(['animation_catalog', 'animation_image', 'animation_rig', 'animation_sprite', 'animation_job', 'animation_frames_plan', 'animation_banner', 'animation_scene']);
     expect(ops.every((m) => m.gateway === 'dodo_media')).toBe(true);
 
     const page1 = await call(discover, { ...WS, limit: 10 });
@@ -259,7 +261,7 @@ describe('dodo_discover', () => {
     expect(readSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectId']).toBeDefined();
     expect(searchSchema.properties['projectIds']).toBeDefined();
-    expect(TOOL_CATALOG).toHaveLength(176);
+    expect(TOOL_CATALOG).toHaveLength(185);
     expect(COMPACT_CATALOG).toHaveLength(20);
     expect(HYBRID_CATALOG).toHaveLength(49);
   });

@@ -15,12 +15,13 @@
 - MCP ผ่าน HTTP ที่ `127.0.0.1:21730/mcp` พร้อม OAuth และ PKCE
 - Local Config แบบ loopback ที่ `127.0.0.1:21731` และ Remote Config ชั่วคราวผ่าน tunnel เมื่อเจ้าของสั่ง `dodo --web`
 - HTTP ใช้ Compact Tool Surface 20 tools เพื่อลดภาระการโหลด schema
-- STDIO ใช้ Full Tool Surface 176 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 172 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
+- STDIO ใช้ Full Tool Surface 185 capabilities แต่ค่าเริ่มต้นซ่อน Sub-agent 4 operations จึงเห็น 181 tools; ตรวจ catalog ของ build ที่รันด้วย `dodo_discover`
 - Hybrid Surface 49 tools สำหรับ client ที่รับ catalog ขนาดกลาง
 - อ่าน ค้นหา สร้าง แก้ ย้าย ลบไฟล์ พร้อม expected hash, journal และ rollback
 - รันคำสั่ง งานแบบขนาน jobs, Git, TypeScript/JavaScript intelligence, LSP และ task assistance
 - รองรับภาพ เสียง วิดีโอ เบราว์เซอร์ เกม และ workflow ตาม dependency และ permission ที่เจ้าของเปิดใช้
 - สร้างภาพผ่าน OpenAI, Google Gemini หรือ API ภายนอก โดยกรอก provider/URL/key/model ได้เอง ครอป/แบ่ง grid เป็น PNG ที่รักษาความโปร่งใส ลบพื้นหลัง พร้อม video compatibility สำหรับปลายทางที่รองรับ ([Creative Media](docs/CREATIVE_MEDIA.md))
+- ทำแอนิเมชันวนลูปในเครื่องด้วย Gift engine โดยไม่ใช้ API: เอฟเฟกต์จากภาพนิ่ง ตัวละครมีโครงพร้อม spring physics และกะพริบตา ประกอบ pose sheet ให้โมเดลสร้างภาพวาดเฟรม (`image_edit`) แบนเนอร์ข้อความไทย และฉากหลายเลเยอร์ ส่งออก GIF/WebP/APNG/WebM/MP4/sprite sheet หรือสติกเกอร์ LINE/Telegram พร้อมคำบรรยายภาษาไทย ตั้งค่าด้วย `dodo-media-setup --install-animation` ([แอนิเมชันในเครื่อง](docs/CREATIVE_MEDIA.md#แอนิเมชันวนลูปในเครื่อง-gift-engine))
 - ตรวจและควบคุมมือถือ Android ผ่าน ADB ได้ตั้งแต่ภาพหน้าจอ/UI/logcat ไปจนถึง input, apps, APK, file transfer และ device-side shell โดยจำกัดเฉพาะ serial ที่เจ้าของอนุญาต ([คู่มือ](docs/ANDROID.md))
 - มี Universal Resource Layer + CAS สำหรับ text/binary/image/audio/video/PDF/ZIP/WASM พร้อม SHA-256, dedup, bounded range/resume และ MCP image/audio blocks
 - ให้ AI สร้างลิงก์ดาวน์โหลดชั่วคราวบนโดเมน MCP ด้วย token เลือกอายุ 1, 2, 7, 14 หรือ 30 วัน และยกเลิกก่อนหมดอายุได้ ([คู่มือ](docs/RESOURCES.md#temporary-token-download-links))

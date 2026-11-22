@@ -14,9 +14,11 @@ const MODEL = {
   bytes: 77691713,
 };
 const args = process.argv.slice(2);
-const usage = 'Usage: dodo-media-setup [--check] [--install-browser] [--download-model]\nRuns from your chosen project directory. Model destination: ./models/ggml-tiny.bin\nNo flags/--check only reports readiness; downloads require explicit flags.\nDoes not change DODO permissions/configuration or start/restart any server.';
+// Pinned, wheel-only dependencies of the bundled Gift animation engine (engines/animation).
+const ANIMATION_PACKAGES = ['Pillow==13.0.0', 'pydantic==2.14.4', 'uharfbuzz==0.57.0'];
+const usage = 'Usage: dodo-media-setup [--check] [--install-browser] [--download-model] [--install-animation]\nRuns from your chosen project directory. Model destination: ./models/ggml-tiny.bin\n--install-animation creates a private Python venv in the DODO config directory (animation/venv) with ' + ANIMATION_PACKAGES.join(', ') + ' for the animation_* tools.\nNo flags/--check only reports readiness; downloads require explicit flags.\nDoes not change DODO permissions/configuration or start/restart any server.';
 if (args.includes('--help') || args.includes('-h')) { console.log(usage); process.exit(0); }
-if (args.some(a => !['--download-model', '--check', '--install-browser'].includes(a))) throw new Error(usage);
+if (args.some(a => !['--download-model', '--check', '--install-browser', '--install-animation'].includes(a))) throw new Error(usage);
 if (args.includes('--check') && args.length !== 1) throw new Error('--check is read-only and cannot be combined with installation flags');
 if (args.includes('--install-browser')) {
   // Resolve the CLI belonging to this installed DODO, never an unpinned npx package.
@@ -67,4 +69,39 @@ if (args.includes('--download-model')) {
     } catch (err) { try { fs.unlinkSync(temporary); } catch { /* no partial file */ } throw err; }
   }
 }
+// Local animation engine: a private venv under the DODO config directory, never the workspace.
+let animationVenv;
+try { const { resolveConfigDir } = await import('../dist/config/paths.js'); animationVenv = path.join(resolveConfigDir().dir, 'animation', 'venv'); }
+catch { /* source checkout must be built before the config directory can be resolved */ }
+const venvPython = venv => path.join(venv, ...(process.platform === 'win32' ? ['Scripts', 'python.exe'] : ['bin', 'python3']));
+const probeAnimation = python => {
+  const probe = spawnSync(python, ['-I', '-c', 'import PIL, pydantic, uharfbuzz; print(PIL.__version__, pydantic.VERSION, uharfbuzz.__version__)'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
+  return !probe.error && probe.status === 0 ? probe.stdout.trim() : undefined;
+};
+if (args.includes('--install-animation')) {
+  if (!nativeProbes || !animationVenv) throw new Error('build DODO first (npm run build) so the trusted Python resolver and config directory are available');
+  let base;
+  for (const name of process.platform === 'win32' ? ['python', 'python3'] : ['python3', 'python']) {
+    try {
+      const candidate = nativeProbes.resolveTrustedExecutable(name, process.cwd(), { allowBatch: false });
+      const version = spawnSync(candidate, ['-I', '-c', 'import sys; print(int(sys.version_info >= (3, 10)))'], { shell: false, windowsHide: true, encoding: 'utf8', timeout: 30000 });
+      if (!version.error && version.status === 0 && version.stdout.trim() === '1') { base = candidate; break; }
+    } catch { /* try the next name */ }
+  }
+  if (!base) throw new Error('Python 3.10 or newer was not found on the trusted PATH; install it outside this project first');
+  const directory = path.dirname(animationVenv);
+  if (fs.existsSync(directory)) { const st = fs.lstatSync(directory); if (!st.isDirectory() || st.isSymbolicLink()) throw new Error('the animation directory must be a real directory'); }
+  else fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  if (!fs.existsSync(venvPython(animationVenv))) {
+    const created = spawnSync(base, ['-I', '-m', 'venv', animationVenv], { stdio: 'inherit', shell: false, windowsHide: true, timeout: 300000 });
+    if (created.error || created.status !== 0) throw new Error('creating the animation venv failed; no DODO configuration changed');
+  }
+  // Wheels only: no package build scripts run on this machine.
+  const installed = spawnSync(venvPython(animationVenv), ['-I', '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--only-binary=:all:', ...ANIMATION_PACKAGES], { stdio: 'inherit', shell: false, windowsHide: true, timeout: 600000 });
+  if (installed.error || installed.status !== 0) throw new Error('installing the animation packages failed; no DODO configuration changed');
+}
+if (animationVenv && fs.existsSync(venvPython(animationVenv))) {
+  const versions = probeAnimation(venvPython(animationVenv));
+  console.log(`Animation engine: ${versions ? `ready (Pillow/pydantic/uharfbuzz ${versions})` : 'venv present but packages missing; rerun --install-animation'}`);
+} else console.log('Animation engine: run dodo-media-setup --install-animation (or set DODO_ANIMATION_PYTHON)');
 console.log('No DODO permissions/configuration changed. Use modelFile: "models/ggml-tiny.bin" when this workspace is active.');

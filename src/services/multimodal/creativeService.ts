@@ -19,7 +19,7 @@ const activeGlobal = new Set<string>();
 const pollingGlobal = new Set<string>();
 type Status = 'queued' | 'running' | 'completed' | 'failed' | 'uncertain' | 'interrupted' | 'stopped';
 export interface CreativeJobData {
-  jobId: string; kind: 'image' | 'background_removal' | 'video'; status: Status;
+  jobId: string; kind: 'image' | 'image_edit' | 'background_removal' | 'video'; status: Status;
   model: string; progress: number; resource: ResourceInfoData | null; error: string | null;
   createdAt: number; expiresAt: number; note: string;
   diagnostics?: CreativeDiagnostics;
@@ -28,6 +28,8 @@ interface RecordData extends CreativeJobData { epoch: string; connectionId: stri
 export interface ImageSource { path?: string | undefined; assetId?: string | undefined; resourceId?: string | undefined }
 interface ModelSelection { model?: string | undefined }
 type ImageRequest = Omit<CreativeImageInput, 'model'> & ModelSelection;
+/** Reference-conditioned drawing: 1-4 owned images, the first being the canvas an optional mask applies to. */
+export type EditRequest = ImageRequest & { images: ImageSource[]; mask?: ImageSource | undefined };
 type VideoRequest = Omit<CreativeVideoInput, 'model' | 'reference'> & ModelSelection & { reference?: ImageSource | undefined };
 interface VideoTransform { sourceJobId: string; operation: 'edit' | 'extend'; prompt: string; seconds?: number | undefined }
 
@@ -315,7 +317,7 @@ export class CreativeService {
       }
     }
   }
-  async start(ctx: ToolCtx, kind: RecordData['kind'], input: ImageRequest | VideoRequest | VideoTransform | (ImageSource & ModelSelection)): Promise<CreativeJobData> {
+  async start(ctx: ToolCtx, kind: RecordData['kind'], input: ImageRequest | EditRequest | VideoRequest | VideoTransform | (ImageSource & ModelSelection)): Promise<CreativeJobData> {
     const video = kind === 'video' && !('sourceJobId' in input) ? input as VideoRequest : undefined;
     const transform = kind === 'video' && 'sourceJobId' in input ? input : undefined;
     const configForRequest = () => kind === 'video' ? this.videoConfiguration(ctx) : this.configuration(ctx);
@@ -324,6 +326,25 @@ export class CreativeService {
     let source: Awaited<ReturnType<CreativeService['imageSource']>> | undefined;
     let image: Buffer | undefined;
     if (kind === 'background_removal') { source = await this.imageSource(ctx, input as ImageSource); image = (await normalizeCreativeImage(source.bytes)).bytes; source.guard(); }
+    let references: Buffer[] | undefined, mask: Buffer | undefined;
+    if (kind === 'image_edit') {
+      const edit = input as EditRequest;
+      const sources = [];
+      for (const reference of edit.images) sources.push(await this.imageSource(ctx, reference));
+      const maskSource = edit.mask ? await this.imageSource(ctx, edit.mask) : undefined;
+      const normalized = [];
+      for (const item of sources) normalized.push(await normalizeCreativeImage(item.bytes));
+      references = normalized.map(item => item.bytes);
+      if (maskSource) {
+        const shape = await normalizeCreativeImage(maskSource.bytes);
+        // The mask applies to the first image, so both must have the same pixel size.
+        if (shape.width !== normalized[0]!.width || shape.height !== normalized[0]!.height) throw new DodoError('INVALID_INPUT', 'the mask must have the same pixel size as the first image');
+        mask = shape.bytes;
+      }
+      const all = [...sources, ...(maskSource ? [maskSource] : [])];
+      source = { bytes: references[0]!, guard: () => { for (const item of all) item.guard(); } };
+      source.guard();
+    }
     if (video?.reference) {
       source = await this.imageSource(ctx, video.reference);
       const normalized = await normalizeCreativeImage(source.bytes);
@@ -405,8 +426,10 @@ export class CreativeService {
         if (job.status === 'failed') { record.error = 'PROVIDER_RENDER_FAILED'; this.finish(record); this.resources().releaseGeneratedOutput(jobId); }
         record.note = 'Remote render submitted. Call creative_job to retrieve its status and completed MP4; no render is resubmitted.';
       } else {
+        const edit = input as EditRequest;
         const result = kind === 'background_removal' ? await provider.removeBackground({ model: record.model, image: image! }, controller.signal, beforeSend)
-          : await provider.generateImage({ ...input as Omit<CreativeImageInput, 'model'>, model: record.model }, controller.signal, beforeSend);
+          : kind === 'image_edit' ? await provider.editImage({ model: record.model, prompt: edit.prompt, size: edit.size, quality: edit.quality, background: edit.background, images: references!, mask }, controller.signal, beforeSend)
+            : await provider.generateImage({ ...input as Omit<CreativeImageInput, 'model'>, model: record.model }, controller.signal, beforeSend);
         this.check(workCtx);
         const transparent = kind === 'background_removal' || (input as Partial<CreativeImageInput>).background === 'transparent';
         const normalized = await normalizeCreativeImage(result.bytes, transparent);

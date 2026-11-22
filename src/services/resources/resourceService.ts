@@ -45,6 +45,13 @@ function safeJson<T>(value: string, fallback: T): T {
   try { return JSON.parse(value) as T; } catch { return fallback; }
 }
 
+/** MIME types a local generator may publish. Only animation output (anim_*) adds GIF/WebP/WebM and sprite-sheet JSON. */
+export type GeneratedMime = 'image/png' | 'video/mp4' | 'image/gif' | 'image/webp' | 'video/webm' | 'application/json';
+/** Generated resources media_save may write, with the file extensions each accepts. */
+export const SAVEABLE_GENERATED: Readonly<Record<string, readonly string[]>> = {
+  'image/png': ['.png', '.apng'], 'video/mp4': ['.mp4'], 'image/gif': ['.gif'], 'image/webp': ['.webp'], 'video/webm': ['.webm'], 'application/json': ['.json'],
+};
+
 export class ResourceService {
   readonly cas: CasStore;
   readonly downloads: DownloadLinkService;
@@ -138,10 +145,11 @@ export class ResourceService {
   }
 
   /** Internal creative output only: never accepts a caller URL, path or claimed MIME. */
-  async ingestGenerated(ctx: ToolCtx, bytes: Buffer, mimeType: 'image/png' | 'video/mp4', label: string, metadata: ResourceMetadataData = {}): Promise<ResourceInfoData> {
+  async ingestGenerated(ctx: ToolCtx, bytes: Buffer, mimeType: GeneratedMime, label: string, metadata: ResourceMetadataData = {}): Promise<ResourceInfoData> {
     this.check(); liveAccess(ctx, 'dodo:exec');
     if (bytes.length > 64 * 1024 * 1024) throw new DodoError('RESOURCE_LIMIT', 'generated media exceeds 64 MiB');
-    if (!/^(?:creative|crop)_[a-z0-9]{8,64}$/.test(label) || sniffType(bytes.subarray(0, 64 * 1024)).mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
+    const typeAllowed = label.startsWith('anim_') || mimeType === 'image/png' || mimeType === 'video/mp4';
+    if (!/^(?:creative|crop|anim)_[a-z0-9]{8,64}$/.test(label) || !typeAllowed || sniffType(bytes.subarray(0, 64 * 1024)).mimeType !== mimeType) throw new DodoError('INVALID_INPUT', 'invalid generated media bytes or provenance');
     const reservation = this.services.store.db.prepare('SELECT max_bytes FROM creative_output_reservations WHERE job_id=? AND workspace_id=? AND owner=?').get(label, this.services.workspaceId, principalKey(ctx)) as { max_bytes: number } | undefined;
     if (reservation && reservation.max_bytes > 0 && bytes.length > reservation.max_bytes) throw new DodoError('RESOURCE_LIMIT', 'provider output exceeds its reserved capacity');
     const object = await this.cas.ingestBuffer(bytes, undefined, reservation ? label : undefined);
@@ -152,7 +160,7 @@ export class ResourceService {
   /** Owned, verified binary input for journaled media_save. Budgets apply before allocation. */
   async exportBytes(ctx: ToolCtx, resourceId: string, expectedHash: string, maxBytes: number): Promise<{ info: ResourceInfoData; bytes: Buffer }> {
     const row = await this.lookup(ctx, resourceId, expectedHash, 'dodo:exec');
-    if (row.source_kind !== 'generated' || !['image/png', 'video/mp4'].includes(row.mime_type)) throw new DodoError('FORBIDDEN', 'media_save accepts generated image/video resources only');
+    if (row.source_kind !== 'generated' || !Object.hasOwn(SAVEABLE_GENERATED, row.mime_type)) throw new DodoError('FORBIDDEN', 'media_save accepts generated image/video/animation resources only');
     if (row.bytes > Math.min(maxBytes, 64 * 1024 * 1024)) throw new DodoError('RESOURCE_LIMIT', 'media exceeds the configured file/plan budget; use resource_read_range or raise the owner budget');
     const bytes = await this.cas.readRange(row.object_hash, row.bytes, 0, row.bytes);
     if (sha256Bytes(bytes) !== row.object_hash) throw new DodoError('FILE_CHANGED', 'media changed during export');

@@ -3,8 +3,8 @@
   "version": 1,
   "toolCount": 20,
   "defaultLiveToolCount": 20,
-  "fullToolCount": 176,
-  "defaultLiveFullToolCount": 172,
+  "fullToolCount": 185,
+  "defaultLiveFullToolCount": 181,
   "optionalMcpFeatures": {
     "subagents": {
       "configKey": "exposeSubagentsToMcp",
@@ -21,15 +21,15 @@
   "stats": {
     "compact": {
       "toolCount": 20,
-      "schemaBytes": 64049
+      "schemaBytes": 64475
     },
     "hybrid": {
       "toolCount": 49,
-      "schemaBytes": 144931
+      "schemaBytes": 145357
     },
     "full": {
-      "toolCount": 176,
-      "schemaBytes": 650379
+      "toolCount": 185,
+      "schemaBytes": 776781
     }
   },
   "tools": [
@@ -2108,7 +2108,7 @@
     {
       "name": "dodo_media",
       "title": "Screen, image, media and speech",
-      "description": "Gateway: image generation/crop/background removal, video generation, media saving, temporary token download links, bounded screen/image views and local video/audio/speech. Set operation to one of: multimodal_status, screen_observe, image_view, image_generate, image_crop, image_remove_background, video_generate, video_edit, video_extend, creative_job, media_save, download_link_create, download_link_list, download_link_revoke, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract, resource_transform, creative_models, creative_jobs, creative_job_control. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
+      "description": "Gateway: image generation/crop/background removal, video generation, local animated loops (Gift engine: image effects, rigged characters, sprite sheets, LINE/Telegram stickers), media saving, temporary token download links, bounded screen/image views and local video/audio/speech. Set operation to one of: multimodal_status, screen_observe, image_view, image_generate, image_crop, image_remove_background, video_generate, video_edit, video_extend, creative_job, media_save, download_link_create, download_link_list, download_link_revoke, media_open, media_extract, media_transcribe, media_subtitles, media_search, media_read, media_job, media_close, speech_synthesize, resource_inspect, resource_read, resource_read_range, resource_preview, resource_extract, resource_transform, creative_models, creative_jobs, creative_job_control, animation_catalog, animation_image, animation_rig, animation_sprite, animation_job, animation_frames_plan, animation_banner, animation_scene, image_edit. Put that operation's own arguments in args (never workspaceId/workspaceEpoch — they come from the top level only). Identical authorization to calling the operation directly: its own OAuth scope, workspace access, trust policy, local approvals, path/secret guards, hash checks and audit all apply. Call dodo_discover with operation=\"<name>\" for the exact input schema.",
       "requiredScope": "dodo:read",
       "annotations": {
         "readOnlyHint": false,
@@ -2149,7 +2149,16 @@
         "resource_transform",
         "creative_models",
         "creative_jobs",
-        "creative_job_control"
+        "creative_job_control",
+        "animation_catalog",
+        "animation_image",
+        "animation_rig",
+        "animation_sprite",
+        "animation_job",
+        "animation_frames_plan",
+        "animation_banner",
+        "animation_scene",
+        "image_edit"
       ],
       "inputSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2218,7 +2227,16 @@
               "resource_transform",
               "creative_models",
               "creative_jobs",
-              "creative_job_control"
+              "creative_job_control",
+              "animation_catalog",
+              "animation_image",
+              "animation_rig",
+              "animation_sprite",
+              "animation_job",
+              "animation_frames_plan",
+              "animation_banner",
+              "animation_scene",
+              "image_edit"
             ],
             "description": "Target operation to invoke"
           },

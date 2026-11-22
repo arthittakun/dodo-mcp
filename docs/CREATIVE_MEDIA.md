@@ -62,7 +62,16 @@ Session key อยู่ในหน่วยความจำและต้�
 | `creative_job` | อ่านสถานะและรับ resource ของงานเดิม โดยไม่เริ่มสร้างใหม่ |
 | `creative_jobs` | ดูเฉพาะประวัติงานของผู้เรียก หรือค้นด้วย `idempotencyKey` เดิมหลัง response หาย |
 | `creative_job_control` | `retry_save` กู้ผลที่สร้างแล้วโดยไม่ render ซ้ำ; `stop_tracking` หยุดติดตามในเครื่อง |
-| `media_save` | บันทึก resource ที่สร้างแล้วลงโปรเจกต์ ผ่าน hash checks และ journal/rollback เดิม |
+| `animation_catalog` | อ่าน preset ตัวละคร เอฟเฟกต์ รูปแบบไฟล์ และสถานะความพร้อมของเครื่องยนต์แอนิเมชันในเครื่อง ไม่ render |
+| `animation_image` | ทำภาพนิ่งหนึ่งภาพให้เป็นลูป: เอฟเฟกต์ทั้งภาพ หรือกะพริบตา/โบกมือ พร้อมคำบรรยายภาษาไทยได้ |
+| `animation_rig` | ขยับตัวละครแบบมีโครง (preset หรือ rig เอง) พร้อม spring physics การกะพริบตา และผลตรวจลูป |
+| `animation_sprite` | ประกอบ pose sheet 4×2 หรือ 4×4 แบบโปร่งใสเป็นลูปเดินหรือโบกมือ |
+| `animation_job` | รับผลงานแอนิเมชันที่ยัง render อยู่ โดยไม่เริ่มงานใหม่ |
+| `animation_frames_plan` | เตรียมให้โมเดลสร้างภาพวาดเฟรม: ภาพนำทาง (ตัวละครในช่องแรก), mask, prompt ทีละช่อง และ layout ทำในเครื่อง ไม่เสียเงิน |
+| `image_edit` | วาดภาพใหม่จากภาพอ้างอิง 1–4 ภาพ พร้อม mask ที่ให้วาดเฉพาะบางส่วนได้ (งานเสียเงินหนึ่งครั้ง คืน `jobId`) |
+| `animation_banner` | แบนเนอร์ข้อความไทย/อังกฤษแบบนีออน มีป้ายสถานะ ดาวหางวิ่งรอบกรอบ และท่าขยับ 5 แบบ วาดด้วย Pillow + HarfBuzz ไม่ต้องใช้เบราว์เซอร์ |
+| `animation_scene` | ฉากหลายเลเยอร์: preset ระบบสุริยะ หรือฉากหลัง + เลเยอร์ภาพนิ่ง/ภาพเคลื่อนไหวสูงสุด 20 ชั้น เดินผ่าน โคจร หมุน หรือเต้น ส่งออก GIF/MP4 |
+| `media_save` | บันทึก resource ที่สร้างแล้วลงโปรเจกต์ ผ่าน hash checks และ journal/rollback เดิม (PNG/MP4 และผลแอนิเมชัน GIF/WebP/APNG/WebM/JSON) |
 | `download_link_create` | สร้าง URL แบบ token สำหรับ resource ที่เป็นเจ้าของ เลือกอายุ 1, 2, 7, 14 หรือ 30 วัน |
 | `download_link_list` | ดู metadata ของลิงก์ที่เป็นเจ้าของ โดยไม่ส่ง token/URL กลับ |
 | `download_link_revoke` | ยกเลิกลิงก์ที่เป็นเจ้าของก่อนหมดอายุ |
@@ -85,11 +94,73 @@ dodo_media(operation="creative_job",args={jobId:"creative_…"})
 
 ใช้ `jobId` ที่ได้จริงจากคำขอแรกเพื่อรับผลจากงานเดิม ไม่เริ่มงานสร้างซ้ำเพื่อดูสถานะ
 
-รุ่น 1.10.0 มี Full 176 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 172), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
+รุ่น 1.11.0 มี Full 185 capabilities (ค่าเริ่มต้นซ่อน sub-agent 4 tools จึงเห็น 181), Compact 20 และ Hybrid 49 การสร้างลิงก์ใช้ HTTP server และ origin ที่ตั้งไว้ ไม่ต้องตั้ง provider หรือใช้คีย์ภาพเพิ่ม
 
 งานสร้างภาพใช้ขนาด `1024x1024`, `1536x1024`, `1024x1536` หรือ `auto` รูปแบบ OpenAI ส่ง size/quality/background ตามที่เลือก ส่วน Gemini native รองรับ `quality=auto` และขอภาพระดับ `1K` โดยแปลง size เป็นอัตราส่วน `1:1`, `3:2`, `2:3` หรือปล่อยอัตโนมัติ ขนาด PNG ที่โมเดลคืนมาอาจต่างจากจำนวนพิกเซลใน size; metadata ของผลลัพธ์เป็นขนาดจริง Adapter สร้างวิดีโอรองรับ `1280x720`/`720x1280` และ 4, 8, 12, 16 หรือ 20 วินาทีตามปลายทาง ไม่มีการเปลี่ยนโมเดลหรือเรียกสร้างใหม่เพื่อเลี่ยงข้อผิดพลาดเอง
 
 OpenAI-compatible Images ต้องคืน PNG แบบ `b64_json`; Gemini ต้องคืน inline base64 PNG จาก Interactions ไม่ดาวน์โหลดภาพจาก URL ที่ปลายทางส่งกลับ ไม่ตาม redirect และไม่ส่ง credentials ต่อไปยัง URL อื่น การตั้งค่าผ่านหรือการที่ text chat ใช้ได้ไม่รับรอง operation ภาพ/วิดีโอ หากรูปแบบไม่รองรับจะรายงานปัญหาโดยไม่ส่งงานซ้ำ การตรวจรับ Google Gemini native ใช้ protocol fixtures และยังไม่มี live acceptance ด้วยคีย์ทางการในการตรวจรับครั้งนี้ ดู [Test report](TEST_REPORT.md)
+
+## แอนิเมชันวนลูปในเครื่อง (Gift engine)
+
+`animation_*` ใช้เครื่องยนต์แอนิเมชันของโปรเจกต์ Gift ที่ฝังไว้ใน `engines/animation` render บนเครื่องที่รัน DODO ทั้งหมด ไม่เรียกโมเดลหรือ API และไม่มีค่าใช้จ่าย ผลงานเป็น resource ของผู้เรียกเหมือน `image_crop` จึงใช้ `media_save` หรือ `download_link_create` ต่อได้ทันที
+
+**ตั้งค่าครั้งเดียว** (เลือกอย่างใดอย่างหนึ่ง):
+
+- `dodo-media-setup --install-animation` สร้าง Python venv ส่วนตัวใน DODO config directory (`animation/venv`) และติดตั้งเฉพาะ wheel ที่ pin ไว้: `Pillow==13.0.0`, `pydantic==2.14.4`, `uharfbuzz==0.57.0` ต้องมี Python 3.10+ บน trusted PATH และ build DODO แล้ว คำสั่งนี้ไม่เปลี่ยนสิทธิ์หรือ config ของ DODO
+- หรือเริ่ม DODO พร้อม `DODO_ANIMATION_PYTHON` เป็น absolute path ของ Python ที่มีแพ็กเกจเหล่านี้แล้ว (เช่น `.venv` ของโปรเจกต์ Gift) path ต้องอยู่นอก workspace
+
+ไฟล์ `webm`, `mp4` และ `telegram` ต้องมี FFmpeg บน trusted PATH ส่วน `gif`, `webp`, `apng`, `spritesheet` และ `line` ไม่ต้องใช้ ตรวจสถานะด้วย `animation_catalog` หรือ `dodo-media-setup --check`
+
+| งาน | เครื่องมือ | หมายเหตุ |
+|---|---|---|
+| ภาพนิ่ง → ลูป | `animation_image` | `actions` เลือกเอฟเฟกต์ทั้งภาพหนึ่งอย่าง (`wiggle`, `zoom`, `pan`, `bounce`, `float`, `sway`, `heartbeat`, `shake`, `spin`, `jelly`) หรือ `blink`/`wave` กับภาพวาดหันหน้าตรง ระบุ `eyes`/`arm` แบบ normalized ได้ |
+| ตัวละครมีโครง | `animation_rig` | `preset`: `orange_cat`, `orange_cat_ik`, `orange_cat_idle`, `orange_cat_jump`, `fox_girl_idle`, `fox_girl_bounce`, `fox_girl_jump` หรือ `rig` รูปแบบเดียวกับที่ Gift rig editor บันทึก (snake_case) บนภาพต้นฉบับ ใส่ `seeds` ในชิ้นส่วนเพื่อตัดตามเส้นภาพและไม่ให้ขาด |
+| pose sheet → ลูป | `animation_sprite` | ภาพโปร่งใส 4 คอลัมน์ × 2 แถว (8 ท่า) หรือ × 4 แถว (16 ท่า) เรียงจากซ้ายไปขวา |
+
+ทุกงานรับ `format` (`gif` ค่าเริ่มต้น, `webp`, `apng`, `webm`, `mp4`, `spritesheet`, `line`, `telegram`), `caption` สำหรับข้อความสติกเกอร์ภาษาไทยหรืออังกฤษ (ฟอนต์ Sarabun ที่แนบมา จัดรูปสระและวรรณยุกต์ด้วย HarfBuzz โดยไม่ต้องมีเบราว์เซอร์), `maxSide` (128–800 px ย่อให้ไฟล์เบาสำหรับแชต), `edgeMatte`, `gifDither`, `background` และ `loops` GIF ยาว 3 วินาทีที่ 800 px อาจเกินงบ 8 MiB ของ `media_save` ให้ใช้ `maxSide` เช่น 480, ใช้ `webp` หรือส่งผ่าน `download_link_create` ซึ่งไม่จำกัดด้วยงบนี้
+
+ใช้ได้ดีกับภาพที่สร้างจาก `image_generate`: ส่ง `resourceId` ของผลงานต่อให้ `animation_*` ได้ทันที ขอพื้นหลังโปร่งใส (`background:"transparent"`) และเส้นขอบชัด engine ตัดชิ้นส่วนตามเส้นของภาพจาก `seeds` จึงรับเส้นขอบหนาแบบภาพ AI ได้ทั้งเส้น polygon ที่วาดชิดขอบเกินไปเล็กน้อยไม่ทิ้งขอบหูหรือหางไว้บนตัว และหากชิ้นส่วนที่แกว่ง (หู หาง มือ) จะหลุดขอบภาพ engine เติมพื้นที่โปร่งใสให้อัตโนมัติพร้อมย้ายพิกัดทุกจุดตาม รูปแบบ `line` ปรับให้ตรงกฎ LINE Creators Market (≤320×270, 5–20 เฟรม, วินาทีเต็ม, รวม ≤4 วินาที, <1 MB) ส่วน `telegram` ตรงกฎ video sticker (512 px VP9 WebM, ≤3 วินาที, ≤30 FPS, ≤256 KB)
+
+ผลลัพธ์มี `animation` (resource หลัก), `companions` (JSON ของ sprite sheet), `preview` (contact sheet 6 เฟรมที่ส่งเป็นภาพใน MCP ด้วย), `details` และสำหรับ `animation_rig` มี `checks`/`passed` จากการตรวจลูปของ Gift: รอยต่อลูป, ตัวไม่ไหล, แขนขาไม่หลุด, ชิ้นส่วนไม่ขาด และเท้าไม่ลื่นเมื่อใช้ IK ให้ AI แจ้งผู้ใช้เมื่อมี check ไม่ผ่านหรือมี `notes` งานปกติใช้เวลา 5–40 วินาที เครื่องมือรอได้ตาม `waitMs` (ค่าเริ่มต้น 120 วินาที) หากยังไม่เสร็จให้เรียก `animation_job` ด้วย `jobId` เดิม
+
+```text
+dodo_media(operation="animation_catalog")
+dodo_media(operation="animation_rig",
+  args={preset:"fox_girl_idle",format:"line",caption:{text:"สวัสดีค่ะ"},idempotencyKey:"fox-hello-line-0001"})
+dodo_media(operation="animation_image",
+  args={resourceId:"res_…",actions:["jelly"],format:"telegram",idempotencyKey:"jelly-sticker-0001"})
+dodo_media(operation="media_save",
+  args={resourceId:"res_…",expectedSha256:"sha256:…",path:"stickers/fox-hello.png",idempotencyKey:"save-fox-0001"})
+```
+
+### แบนเนอร์และฉากหลายเลเยอร์
+
+`animation_banner` ทำแบนเนอร์วนลูปจาก `text` (หัวข้อ) และ `label` (ป้ายเล็ก เช่น ONLINE, SALE) เลือก `motion` (`bounce`, `pulse`, `slide`, `shake`, `still`), ขนาด, `background` (สี หรือ `transparent`), `accent`, `textColor` และรูปแบบไฟล์ได้เหมือนเครื่องมืออื่น วาดด้วย Pillow และจัดรูปภาษาไทยด้วย HarfBuzz จึงไม่ต้องติดตั้งเบราว์เซอร์
+
+`animation_scene` ประกอบฉาก: `preset:"solar_system"` (ดวงอาทิตย์และดาวเคราะห์ 8 ดวงโคจร) หรือ `background` + `layers` เรียงจากหลังไปหน้า แต่ละชั้นรับภาพจาก `resourceId`/`assetId`/`path` ทั้งภาพนิ่งและภาพเคลื่อนไหว (เช่น ผลจาก `animation_rig`) วางด้วย `x`/`y` (0–1 และเกินขอบได้) และ `width` เคลื่อนด้วย `endX`/`endY` (เริ่มและจบนอกจอเพื่อเดินผ่านแบบวนลูป), `orbit`, `spinTurns`, `pulse`, `mirror` ส่งออก `gif` หรือ `mp4` เช่น สร้างฉากหลังด้วย `image_generate` แล้วให้ตัวละครจาก `animation_rig` เดินผ่าน
+
+```text
+dodo_media(operation="animation_banner", args={text:"ยินดีต้อนรับ",label:"NEW",motion:"bounce",accent:"#FF7AB6",idempotencyKey:"welcome-banner-1"})
+dodo_media(operation="animation_scene", args={background:{resourceId:"res_ฉากหลัง"},width:960,height:640,format:"mp4",
+  layers:[{image:{resourceId:"res_ตัวละครเคลื่อนไหว"},x:-0.15,y:0.66,endX:1.15,width:0.24,animationLoops:2}],idempotencyKey:"meadow-walk-1"})
+```
+
+### วาดเฟรมด้วยโมเดลสร้างภาพ (frame by frame)
+
+แทนที่จะขยับภาพเดิม ให้โมเดลสร้างภาพวาดท่าใหม่ทุกเฟรม แล้ว Gift ตรวจและประกอบเป็นลูป ใช้กับท่าที่ rig ทำไม่ได้ เช่น เดินหันข้าง กระโดดตัวลอย หรือท่าที่กำหนดเอง มีเงื่อนไขกำกับให้แม่นยำทั้งก่อนและหลังวาด:
+
+1. `animation_frames_plan` (ในเครื่อง ไม่เสียเงิน) รับภาพตัวละครพื้นโปร่งใสหนึ่งภาพ แล้วสร้าง sheet 4×2 (8 ท่า, 1536×1024) หรือ 4×4 (16 ท่า, 1024×1536) โดยวางตัวละครในช่องแรกด้วยขนาดและเส้นพื้นที่ทุกเฟรมต้องใช้ พร้อม **mask** ที่ให้โมเดลวาดได้เฉพาะด้านในช่องที่เหลือ ช่องแรกและร่องระหว่างช่องจึงคงเดิม prompt ระบุเงื่อนไขตัวตน ขนาด เส้นพื้น และท่าทีละช่องตามลำดับลูป `motion`: `wave`, `walk`, `idle` (หายใจและกะพริบตา), `jump` (เว้นที่ด้านบนให้ตัวลอย) หรือ `custom` พร้อม `customPoses`
+2. `image_edit` ส่ง `images:[plan.guide, ตัวละคร]`, `mask: plan.mask`, `prompt: plan.prompt`, `size: plan.size`, `background:"transparent"` เป็นงานเสียเงินครั้งเดียว แล้วรับผลด้วย `creative_job`
+3. `animation_sprite` ส่ง sheet ที่ได้ พร้อม `motion`, `poses`, `layout: plan.layout` และ `reference` (ตัวละคร) ระบบตรวจก่อนประกอบ: `transparent_background`, `one_figure_per_cell` (ไม่หลุดขอบหรือล้นช่อง), `consistent_size`, `ground_line` (เทียบเส้นพื้นของแถวเดียวกัน เพราะโมเดลอาจเลื่อนทั้งแถวซึ่งไม่กระทบผล ส่วนท่ากระโดดช่องจุดสูงสุดต้องลอยจริง และตอนประกอบจะยึดเส้นพื้นที่วัดได้ ตัวละครจึงลอยขึ้นจริงไม่ถูกดึงลงพื้น), `same_character` (สีตรงกับตัวละคร), `distinct_poses` และ `smooth_sequence` (เตือน) จากนั้นปรับขนาดที่คลาดเล็กน้อยให้เท่าช่องแรกเพื่อไม่ให้ตัวละครเต้นขยายหด ถ้ามี check ไม่ผ่าน ผลยังประกอบให้ดูแต่ `passed:false` และ `notes` บอกสาเหตุ ให้ AI แจ้งผู้ใช้ก่อนสั่งวาดใหม่ เพราะ `image_edit` ครั้งใหม่มีค่าใช้จ่าย
+
+```text
+dodo_media(operation="animation_frames_plan", args={resourceId:"res_ตัวละคร",motion:"jump",idempotencyKey:"bunny-jump-plan-1"})
+dodo_media(operation="image_edit", args={images:[{resourceId:"<plan.guide>"},{resourceId:"res_ตัวละคร"}],mask:{resourceId:"<plan.mask>"},prompt:"<plan.prompt>",size:"1536x1024",background:"transparent",quality:"high",idempotencyKey:"bunny-jump-draw-1"})
+dodo_media(operation="creative_job", args={jobId:"creative_…"})
+dodo_media(operation="animation_sprite", args={resourceId:"<sheet>",motion:"jump",poses:8,layout:<plan.layout>,reference:{resourceId:"res_ตัวละคร"},format:"line",idempotencyKey:"bunny-jump-line-1"})
+```
+
+ขอบเขตความปลอดภัย: แต่ละงานรันเป็น owned job ของ JobManager ที่ปิดเครือข่าย (`network:false`) Worker ของ Node เรียก Python แบบ isolated (`-I -B -X utf8`) ใน temp directory ส่วนตัว ภาพต้นทางถูกคัดลอกเป็นชื่อคงที่ และชื่อไฟล์ผลลัพธ์ทุกไฟล์ถูกกำหนดโดย bridge ไม่รับ path หรือฟอนต์จาก client ไฟล์ของ engine ถูก pin ด้วย SHA-256 ใน `engines/animation/MANIFEST.json` และตรวจก่อน render ครั้งแรกของแต่ละ process หาก engine ถูกแก้ไขจะปฏิเสธงาน อัปเดต engine จากโปรเจกต์ Gift ด้วย `node scripts/vendor-animation.mjs --from <path ของ Gift>`
 
 ## แชร์ไฟล์ด้วยลิงก์ชั่วคราว
 
