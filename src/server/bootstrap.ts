@@ -17,6 +17,7 @@ import { NativeAdbBackend } from '../services/android/adbBackend.js';
 import type Database from 'better-sqlite3';
 import { resolveConfigDir, ensureConfigDir, statePaths, type ConfigDirResolution, type StatePaths } from '../config/paths.js';
 import { loadGlobalConfig, type GlobalConfig } from '../config/globalConfig.js';
+import { assertNoPendingStateRestore, withInstallationStateLock } from '../config/stateCheckpoint.js';
 import { loadProjectConfig, type ProjectConfigResult } from '../config/projectConfig.js';
 import { resolveWorkspaceRoot, type RootInfo } from '../workspace/root.js';
 import { mintWorkspaceId, mintEpoch } from '../workspace/identity.js';
@@ -83,17 +84,26 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
   const { dir: configDir, source: configDirSource, envVar: configDirEnvVar } = configResolution;
   ensureConfigDir(configDir);
   const paths = statePaths(configDir);
-  const config = loadGlobalConfig(paths.configFile);
+  const rootInfo = resolveWorkspaceRoot(opts.rootOverride ?? opts.invokedCwd, { allowUnsafe: opts.allowUnsafeRoot ?? false });
+  // Checkpoint/migrate before creating our lease. Keep both steps under one
+  // installation lock so an offline restore cannot start between them.
+  const { config, db, releaseLease } = withInstallationStateLock(configDir, () => {
+    assertNoPendingStateRestore(configDir);
+    const config = loadGlobalConfig(paths.configFile);
+    activateManagedTools(configDir, rootInfo.root);
+    const db = openDatabase(paths.dbFile);
+    try {
+      return { config, db, releaseLease: acquireProjectLease(configDir, rootInfo.root) };
+    } catch (error) {
+      db.close();
+      throw error;
+    }
+  });
   if (opts.runMode) config.allowWebFetch = true;
   if (opts.runMode === 'bypass') config.commandSandbox = 'off';
   const limits = config.limits;
 
-  const rootInfo = resolveWorkspaceRoot(opts.rootOverride ?? opts.invokedCwd, { allowUnsafe: opts.allowUnsafeRoot ?? false });
-  const releaseLease = acquireProjectLease(configDir, rootInfo.root);
-  let openedDb: Database.Database | undefined;
   try {
-  activateManagedTools(configDir, rootInfo.root);
-  const db = openDatabase(paths.dbFile); openedDb = db;
   const store = new Store(db);
   // Global config is the owner-controlled source for this installation-wide
   // choice. Mirror it into private state so authorization helpers that only
@@ -251,5 +261,5 @@ export function bootstrapWorkspace(opts: BootstrapOptions): BootstrappedWorkspac
       }
     },
   };
-  } catch (error) { try { openedDb?.close(); } finally { releaseLease(); } throw error; }
+  } catch (error) { try { db.close(); } finally { releaseLease(); } throw error; }
 }

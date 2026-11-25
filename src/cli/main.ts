@@ -119,15 +119,16 @@ function projectLines(project: RegisteredProject): string[] {
 }
 
 function startupProject(): RegisteredProject | undefined {
-  try {
-    return withProjectRegistry((registry) => {
-      const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
-      const projectId = loadGlobalConfig(configFile).startupProjectId;
-      return projectId ? registry.get(projectId) : undefined;
-    });
-  } catch {
-    return undefined;
-  }
+  const configFile = statePaths(resolveConfigDir(process.env).dir).configFile;
+  const projectId = loadGlobalConfig(configFile).startupProjectId;
+  if (!projectId) return undefined;
+  return withProjectRegistry(registry => {
+    try { return registry.get(projectId); }
+    catch (error) {
+      if (error instanceof DodoError && error.code === 'NOT_FOUND') return undefined;
+      throw error;
+    }
+  });
 }
 
 function selectStartupProject(projectId: string): RegisteredProject {

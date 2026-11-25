@@ -43,7 +43,7 @@
 ## เริ่มใช้งาน
 
 ```bash
-npm install -g dodo-mcp@1.11.1
+npm install -g dodo-mcp@1.11.2
 dodo setup --check
 dodo --cli
 ```
@@ -601,6 +601,7 @@ dodo desktop allow --app com.google.Chrome --mode control --persist --yes
 - [Release 1.6.0: Image Auto และ temporary download links](docs/RELEASE_1.6.0.md)
 - [Release 1.7.0: Env API Key ถาวรบนเครื่องเซิร์ฟเวอร์](docs/RELEASE_1.7.0.md)
 - [Release 1.8.0: สร้างภาพและวิดีโอจากแชตโดยไม่ต้องมีโปรเจกต์](docs/RELEASE_1.8.0.md)
+- [Release 1.11.2: Windows startup during state upgrades](docs/RELEASE_1.11.2.md)
 - [Release 1.11.1: Animation and image-edit release checks](docs/RELEASE_1.11.1.md)
 - [Release 1.11.0: Local animation studio and reference image edits](docs/RELEASE_1.11.0.md)
 - [Release 1.10.0: Media reliability, safe configuration and upgrade checkpoints](docs/RELEASE_1.10.0.md)

@@ -14,6 +14,8 @@ const FILE_CAP = 1024 * 1024 * 1024;
 const JSON_CAP = 4 * 1024 * 1024;
 const LOCK_TIMEOUT = 15000;
 const activeLocks = new Map<string, number>();
+const RuntimeLease = z.object({ pid: z.number().int().min(1).max(0x7fffffff) });
+const LEASE_READ_CODES = new Set(['PATH_DENIED', 'FILE_CHANGED', 'ENOENT', 'EACCES', 'EPERM', 'EBUSY', 'EINVAL', 'EISDIR', 'ENOTDIR', 'EIO']);
 const Id = z.string().regex(/^state_[a-z0-9]+_[a-f0-9]{12}$/);
 const FileEntry = z.object({ path: z.string(), bytes: z.number().int().nonnegative(), sha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
 const Manifest = z.object({
@@ -123,17 +125,50 @@ function atomicPrivateCopy(source: string, target: string): void {
 function processAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; } catch (error) { return (error as NodeJS.ErrnoException).code !== 'ESRCH'; }
 }
+
+function leaseEntryDisappeared(file: string, error: unknown): boolean {
+  if ((error as NodeJS.ErrnoException | null)?.code !== 'ENOENT') return false;
+  try { return !existsEntry(file); }
+  catch { return false; }
+}
+
+function unverifiedRuntimeLease(cause: unknown, entry: string): DodoError {
+  const code = (cause as NodeJS.ErrnoException | null)?.code;
+  const reason = cause instanceof SyntaxError ? 'INVALID_JSON' : code && LEASE_READ_CODES.has(code) ? code : 'LEASE_READ_FAILED';
+  return new DodoError('CONFLICT', `cannot establish whether an installation runtime is still using state (${reason} in ${entry})`, {
+    cause,
+    detail: { entry, reason },
+  });
+}
+
 export function liveStateRuntimePids(configDir: string, includeCurrent = false): number[] {
   const directory = path.join(path.resolve(configDir), 'runtime-leases'), result = new Set<number>();
-  if (!fs.existsSync(directory)) return [];
-  assertCanonical(directory);
-  for (const name of fs.readdirSync(directory)) {
+  let names: string[];
+  try {
+    assertCanonical(directory);
+    names = fs.readdirSync(directory);
+  } catch (error) {
+    if (leaseEntryDisappeared(directory, error)) return [];
+    throw unverifiedRuntimeLease(error, 'runtime-leases');
+  }
+  for (const name of names) {
     if (!/^[a-f0-9]{64}\.json$/.test(name)) continue;
-    let value: { pid?: unknown };
-    try { value = JSON.parse(readFile(path.join(directory, name), 1024).toString('utf8')) as { pid?: unknown }; }
-    catch { throw new DodoError('CONFLICT', 'cannot establish whether an installation runtime is still using state'); }
-    if (!Number.isSafeInteger(value.pid) || Number(value.pid) <= 0) throw new DodoError('CONFLICT', 'invalid runtime lease prevents an offline state operation');
-    const pid = Number(value.pid);
+    const file = path.join(directory, name);
+    let value: unknown;
+    try { value = JSON.parse(readFile(file, 1024).toString('utf8')); }
+    catch (error) {
+      // A runtime may have shut down since we listed the directory.
+      if (leaseEntryDisappeared(file, error)) continue;
+      throw unverifiedRuntimeLease(error, name);
+    }
+    const lease = RuntimeLease.safeParse(value);
+    if (!lease.success) {
+      throw new DodoError('CONFLICT', `invalid runtime lease prevents an offline state operation (INVALID_PID in ${name})`, {
+        cause: lease.error,
+        detail: { entry: name, reason: 'INVALID_PID' },
+      });
+    }
+    const { pid } = lease.data;
     if ((includeCurrent || pid !== process.pid) && processAlive(pid)) result.add(pid);
   }
   return [...result];

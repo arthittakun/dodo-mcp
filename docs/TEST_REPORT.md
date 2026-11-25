@@ -1,5 +1,24 @@
 # DODO MCP — Test Report
 
+## 1.11.2 Windows startup during state upgrades — 2026-11-25
+
+Build, typecheck, ESLint and diff checks passed. The targeted Windows run on
+Node v24.22.1 covers 7 files. Across the initial run and a targeted rerun,
+69 cases passed and 2 platform cases were skipped. The CLI Android permission
+case failed in the initial run and passed when rerun in isolation.
+
+The startup regression uses an existing 1.11.1 state database and simulates a
+lease read returning `EACCES`. Startup completes, creates a verified checkpoint,
+and only then publishes the lease. The check for live foreign processes and
+interrupted restores still blocks unsafe state changes. The suite also covers
+lease read diagnostics, invalid lease contents, a lease disappearing at
+shutdown, concurrent project registration, STDIO and workspace switching.
+The reporter's original filesystem error could not be reproduced without
+the injected read failure on this host.
+
+The packaging suite verifies a fresh install of the retained npm candidate,
+the shipped setup and CLI, the release notes, and the animation manifest.
+
 ## 1.11.1 Animation and image-edit release review — Windows, 2026-11-22
 
 Build, typecheck, ESLint and diff checks passed. Consolidated results cover 20

@@ -1,5 +1,11 @@
 # DODO MCP — Release Notes
 
+## 1.11.2 — Windows startup during state upgrades
+
+- Open and checkpoint installation state before creating the new runtime lease. Both steps use the same installation lock.
+- Report the file and safe reason code when runtime lease verification fails. A lease that disappears during shutdown is skipped after confirming it is absent.
+- Surface startup database errors when loading a saved project. See [release details](RELEASE_1.11.2.md) and [validation](TEST_REPORT.md).
+
 ## 1.11.1 — Animation collection, edit preflight and setup safety
 
 - Remove the hidden completed-job quota, share concurrent animation collection, preserve accepted output after collection errors and revalidate queued dispatch.
